@@ -24,7 +24,7 @@ export default function App() {
   return (
     <div className={`app ${theme}`}>
       <Nav page={page} go={go} theme={theme} setTheme={setTheme} />
-      <main>
+      <main className="container">
         {page === "home"     && <Home go={go} />}
         {page === "articles" && <Articles go={go} />}
         {page === "article"  && <ArticleDetail item={ctx} go={go} />}
