@@ -1,97 +1,67 @@
 import { useState, useEffect } from "react";
-import { collection, query, where, getDocs, writeBatch, doc, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, collection, getDocs, writeBatch, doc, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
 
+// --- Firebase Configuration (อ้างอิงจากระบบเดิมของคุณ) ---
 const firebaseConfig = {
   apiKey: "AIzaSyAqz8d5xKNI-2LRAzFlTURJgYva0hOe3UE",
   authDomain: "talib-trackingnumber.firebaseapp.com",
   projectId: "talib-trackingnumber",
   storageBucket: "talib-trackingnumber.firebasestorage.app",
   messagingSenderId: "495823490887",
-  appId: "1:495823490887:web:59062f61596514eb764662",
-  measurementId: "G-RTDQS2WN6X"
+  appId: "1:495823490887:web:59062f61596514eb764662"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 export default function Tracking() {
-  // --- การจัดการเส้นทางภายใน (Inner View Routing) ---
-  const [view, setView] = useState("home"); // home, user-recipient, user-track, admin-login, admin-dashboard
-  const [adminTab, setAdminTab] = useState("prep"); // prep, prep-manage, extract, match, manage
-
-  // --- สถานะการโหลดสคริปต์ภายนอก (CDN) ---
-  const [scriptsLoaded, setScriptsLoaded] = useState(false);
-
-  // --- สถานะสำหรับฝั่งผู้ใช้งานทั่วไป (Public User Views) ---
-  const [userQuery, setUserQuery] = useState("");
-  const [userSearchResult, setUserSearchResult] = useState(null);
-  const [isUserLoading, setIsUserLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-
-  // --- สถานะสำหรับระบบผู้ดูแลระบบ (Admin Studio States) ---
+  // --- View & Routing State ---
+  const [view, setView] = useState("home"); 
+  const [adminTab, setAdminTab] = useState("prep");
+  
+  // --- Secret Admin Trigger ---
+  const [secretClickCount, setSecretClickCount] = useState(0);
   const [adminPassword, setAdminPassword] = useState("");
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
 
-  // ข้อมูลจำลอง/ข้อมูลดิบในกระบวนการทำงาน
+  // --- External Scripts (PDF.js, PapaParse) ---
+  const [scriptsLoaded, setScriptsLoaded] = useState(false);
+
+  // --- Public State ---
+  const [userQuery, setUserQuery] = useState("");
+  const [userSearchResult, setUserSearchResult] = useState(null);
+  const [isUserLoading, setIsUserLoading] = useState(false);
+
+  // --- Admin Engine State ---
   const [csvRows, setCsvRows] = useState([]);
   const [pdfRows, setPdfRows] = useState([]);
   const [matches, setMatches] = useState([]);
-  const [manualPairs, setManualPairs] = useState({});
   const [savedRecords, setSavedRecords] = useState([]);
   const [savedRecipients, setSavedRecipients] = useState([]);
-  
-  // สถานะการแปลง PDF (Tab 3)
   const [extractFiles, setExtractFiles] = useState([]);
   const [extractedRows, setExtractedRows] = useState([]);
   const [extractStep, setExtractStep] = useState(1);
-  const [extractQuery, setExtractQuery] = useState("");
+  const [isEngineRunning, setIsEngineRunning] = useState(false);
 
-  // ฟิลเตอร์และการจัดเรียง (Admin Filters)
-  const [searchFilter, setSearchFilter] = useState("");
-  const [sortType, setSortType] = useState("csv");
-
-  // โมดอลการจัดการข้อมูล (Modals Control)
-  const [activeModal, setActiveModal] = useState(null); // null, edit-match, edit-record, edit-prep, label-manager
-  const [selectedRecordId, setSelectedRecordId] = useState(null);
-  const [editFormData, setEditFormData] = useState({});
-  const [checkedItems, setCheckedItems] = useState({});
-  const [labelSize, setLabelSize] = useState("therm-150x100");
-  const [senderInfo, setSenderInfo] = useState({ name: "Talib Club", phone: "", addr: "" });
-
-  // โหลดสคริปต์ประมวลผลไฟล์ (pdf.js / PapaParse) อัตโนมัติเมื่อคอมโพเนนต์ทำงาน
+  // โหลด Scripts เมื่อเริ่มต้น
   useEffect(() => {
-    if (window.pdfjsLib && window.Papa) {
-      setScriptsLoaded(true);
-      return;
-    }
-
-    const loadScript = (src) => {
-      return new Promise((resolve, reject) => {
-        const script = document.createElement("script");
-        script.src = src;
-        script.onload = resolve;
-        script.onerror = reject;
-        document.head.appendChild(script);
-      });
-    };
-
+    if (window.pdfjsLib && window.Papa) { setScriptsLoaded(true); return; }
+    const loadScript = (src) => new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = src; script.onload = resolve; document.head.appendChild(script);
+    });
     Promise.all([
       loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"),
       loadScript("https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js")
     ]).then(() => {
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
       setScriptsLoaded(true);
-    }).catch(err => console.error("Error loading CDN utilities:", err));
-
-    // ตรวจสอบเซสชันผู้ดูแลระบบ
-    if (localStorage.getItem("talib_admin_auth") === "true") {
-      setIsAdminAuthenticated(true);
-    }
+    });
+    if (localStorage.getItem("talib_admin_auth") === "true") setIsAdminAuthenticated(true);
   }, []);
 
-  // ดึงข้อมูลจากฐานข้อมูล Firebase เมื่อสลับแท็บแอดมิน
+  // โหลดฐานข้อมูลเมื่อเปลี่ยนแท็บ
   useEffect(() => {
     if (!isAdminAuthenticated) return;
     if (adminTab === "prep-manage") fetchRecipients();
@@ -99,44 +69,114 @@ export default function Tracking() {
   }, [adminTab, isAdminAuthenticated]);
 
   // ==========================================
-  // ★ LOGIC: DATABASE OPERATIONS (FIREBASE) ★
+  // ★ FIREBASE OPERATIONS
   // ==========================================
   const fetchRecipients = async () => {
-    setIsUserLoading(true);
+    setIsEngineRunning(true);
     try {
       const snap = await getDocs(collection(db, "recipients"));
-      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      items.sort((a, b) => (a.csvIndex ?? 99999) - (b.csvIndex ?? 99999));
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.csvIndex || 0) - (b.csvIndex || 0));
       setSavedRecipients(items);
-    } catch (e) {
-      setErrorMsg("ไม่สามารถดึงข้อมูลรายชื่อได้");
-    }
-    setIsUserLoading(false);
+    } catch (e) { console.error(e); }
+    setIsEngineRunning(false);
   };
 
   const fetchRecords = async () => {
-    setIsUserLoading(true);
+    setIsEngineRunning(true);
     try {
       const snap = await getDocs(collection(db, "records"));
-      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
       setSavedRecords(items);
-    } catch (e) {
-      setErrorMsg("ไม่สามารถดึงข้อมูลพัสดุได้");
-    }
+    } catch (e) { console.error(e); }
+    setIsEngineRunning(false);
+  };
+
+  const handlePublicSearch = async (e, mode) => {
+    e.preventDefault();
+    if (!userQuery.trim()) return;
+    setIsUserLoading(true); setUserSearchResult(null);
+    try {
+      const targetCol = mode === "recipient" ? "recipients" : "records";
+      const snap = await getDocs(collection(db, targetCol));
+      const qClean = userQuery.trim().toLowerCase().replace(/\s+/g, '');
+      const found = snap.docs.map(d => d.data()).filter(item => 
+        (item.fullName || "").toLowerCase().replace(/\s+/g, '').includes(qClean) ||
+        (item.phone || "").replace(/[-\s]/g, '').includes(qClean)
+      );
+      setUserSearchResult(found.length > 0 ? found : "NOT_FOUND");
+    } catch (err) { console.error(err); }
     setIsUserLoading(false);
   };
 
   // ==========================================
-  // ★ LOGIC: PARSING & FUZZY MATCHING STUDIO ★
+  // ★ PDF EXTRACTOR LOGIC
   // ==========================================
-  const normalName = (name) => {
-    return (name || "")
-      .replace(/^(นาย|นาง|นางสาว|คุณ|ด\.ช\.|ด\.ญ\.|ดร\.|ด\.ร\.|mr\.|mrs\.|ms\.)/i, "")
-      .replace(/[\s\.\-\(\)\/]/g, "")
-      .toLowerCase()
-      .trim();
+  const parsePDFToRows = async (file) => {
+    const buf = await file.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+    let allText = [];
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const tc = await page.getTextContent();
+      allText = allText.concat(tc.items.map(it => ({ str: it.str.trim(), y: it.transform[5] })));
+    }
+    // Logic สกัดอย่างง่าย (Simplified for React State)
+    const rawLines = allText.filter(t => t.str.length > 2).map(t => t.str);
+    const results = [];
+    const seen = new Set();
+    
+    for (let i = 0; i < rawLines.length; i++) {
+      const line = rawLines[i].replace(/\s+/g, '');
+      const trMatch = line.match(/[A-Z]{2}\d{9}TH/i) || line.match(/^[JP]\d{10,}/i);
+      if (trMatch) {
+        let tracking = trMatch[0].toUpperCase();
+        if (seen.has(tracking)) continue;
+        seen.add(tracking);
+        
+        // หารหัสไปรษณีย์ใกล้เคียง
+        let zip = "";
+        for (let j = Math.max(0, i - 5); j <= Math.min(rawLines.length - 1, i + 5); j++) {
+          const zMatch = rawLines[j].match(/\b\d{5}\b/);
+          if (zMatch) { zip = zMatch[0]; break; }
+        }
+        
+        // หาชื่อผู้รับ
+        let name = "";
+        const pdfType = tracking.startsWith("J") || tracking.startsWith("P") ? "postsabuy" : "thaipost";
+        if (pdfType === "thaipost") {
+           const parts = rawLines[i].split(/\s+/).filter(p => p !== tracking && p !== zip && p.length > 2);
+           name = parts.join(" ");
+        } else {
+           for (let j = i; j <= Math.min(rawLines.length - 1, i + 10); j++) {
+              if (rawLines[j].includes("ผู้รับ")) {
+                 name = rawLines[j].replace(/.*ผู้รับ\s*[:;]?\s*/, '').split(/โทร/)[0].trim();
+                 break;
+              }
+           }
+        }
+        results.push({ tracking, postalCode: zip, recipientName: name || "(สกัดชื่อไม่สำเร็จ)", pdfType });
+      }
+    }
+    return results;
   };
 
+  const runExtract = async () => {
+    if (!extractFiles.length) return;
+    setIsEngineRunning(true); setExtractStep(2);
+    try {
+      let combined = [];
+      for (const f of extractFiles) {
+        const parsed = await parsePDFToRows(f);
+        combined.push(...parsed);
+      }
+      setExtractedRows(combined); setExtractStep(3);
+    } catch(e) { alert("Error parsing PDF"); setExtractStep(1); }
+    setIsEngineRunning(false);
+  };
+
+  // ==========================================
+  // ★ FUZZY MATCHING ENGINE
+  // ==========================================
   const lcsLength = (a, b) => {
     if (!a || !b) return 0;
     const dp = Array(b.length + 1).fill(0);
@@ -151,534 +191,302 @@ export default function Tracking() {
     return dp[b.length];
   };
 
-  const calculateFuzzyScore = (csv, pdf) => {
+  const getFuzzyScore = (csv, pdf) => {
+    const csvName = (csv.fullName || "").replace(/\s/g,'').toLowerCase();
+    const pdfName = (pdf.recipientName || "").replace(/\s/g,'').toLowerCase();
     const csvZip = (csv.postalCode || "").trim();
     const pdfZip = (pdf.postalCode || "").trim();
-    if (csvZip && pdfZip && csvZip !== pdfZip) return 0;
-    if (pdfZip && !csvZip) return 0;
-
-    const csvFull = normalName(csv.cleanName || csv.fullName);
-    const pdfName = normalName(pdf.recipientName);
-    if (!pdfName || !csvFull) return csvZip && pdfZip ? 55 : 0;
-
-    let nameScore = 0;
-    if (csvFull === pdfName) nameScore = 100;
-    else if (csvFull.includes(pdfName) || pdfName.includes(csvFull)) {
-      nameScore = Math.min(csvFull.length, pdfName.length) >= 2 ? 90 : 60;
-    } else {
-      const l = lcsLength(csvFull, pdfName);
-      const ratio = (l * 2) / (csvFull.length + pdfName.length);
-      if (ratio >= 0.75) nameScore = 85;
-      else if (ratio >= 0.55) nameScore = 65;
-      else if (ratio >= 0.4) nameScore = 45;
-    }
-
-    if (csvZip && pdfZip) return Math.min(100, nameScore);
-    return nameScore >= 85 ? Math.min(80, nameScore - 10) : 0;
-  };
-
-  const runMatchingEngine = () => {
-    if (!csvRows.length || !pdfRows.length) return;
-    setIsUserLoading(true);
-
-    setTimeout(() => {
-      const pairs = [];
-      for (let ci = 0; ci < csvRows.length; ci++) {
-        for (let pi = 0; pi < pdfRows.length; pi++) {
-          const s = calculateFuzzyScore(csvRows[ci], pdfRows[pi]);
-          if (s > 0) pairs.push({ ci, pi, s });
-        }
-      }
-      pairs.sort((a, b) => b.s - a.s);
-
-      const usedC = new Set();
-      const usedP = new Set();
-      const matchMap = new Map();
-
-      // จัดการคู่ที่แมปด้วยสิทธิ์ Admin ด้วยตนเองก่อน
-      Object.entries(manualPairs).forEach(([cStr, piArray]) => {
-        const ci = parseInt(cStr);
-        matchMap.set(ci, { pis: piArray, s: 100, manual: true, scores: piArray.map(() => 100) });
-        usedC.add(ci);
-        piArray.forEach(p => usedP.add(p));
-      });
-
-      // จัดการวนลูปตามสัมประสิทธิ์ความใกล้เคียงของชื่อ
-      for (const p of pairs) {
-        if (!usedC.has(p.ci) && !usedP.has(p.pi)) {
-          matchMap.set(p.ci, { pis: [p.pi], s: p.s, manual: false, scores: [p.s] });
-          usedC.add(p.ci); usedP.add(p.pi);
-        } else if (usedC.has(p.ci) && !usedP.has(p.pi)) {
-          const currentMatch = matchMap.get(p.ci);
-          if (currentMatch && !currentMatch.manual) {
-            currentMatch.pis.push(p.pi);
-            currentMatch.scores.push(p.s);
-            usedP.add(p.pi);
-          }
-        }
-      }
-
-      const finalCalculatedMatches = [];
-      for (let ci = 0; ci < csvRows.length; ci++) {
-        const matchInfo = matchMap.get(ci);
-        if (!matchInfo) {
-          finalCalculatedMatches.push({ csvIdx: ci, pdfIndices: [], scores: [], level: "none", confirmed: false, manual: false });
-        } else {
-          const topScore = matchInfo.scores[0] || matchInfo.s;
-          const lv = topScore >= 85 ? "high" : (topScore >= 60 ? "med" : "low");
-          finalCalculatedMatches.push({ csvIdx: ci, pdfIndices: matchInfo.pis, scores: matchInfo.scores, level: lv, confirmed: lv === "high" || matchInfo.manual, manual: matchInfo.manual });
-        }
-      }
-
-      for (let pi = 0; pi < pdfRows.length; pi++) {
-        if (!usedP.has(pi)) {
-          finalCalculatedMatches.push({ csvIdx: null, pdfIndices: [pi], scores: [0], level: "none", confirmed: false, manual: false });
-        }
-      }
-
-      setMatches(finalCalculatedMatches);
-      setIsUserLoading(false);
-    }, 100);
-  };
-
-  // ==========================================
-  // ★ LOGIC: PDF PARSER CONTROLLER ★
-  // ==========================================
-  const parsePDFFile = async (file) => {
-    const buf = await file.arrayBuffer();
-    const pdf = await window.pdfjsLib.getDocument({ data: buf, cMapUrl: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/", cMapPacked: true }).promise;
     
-    const allItems = [];
-    for (let p = 1; p <= pdf.numPages; p++) {
-      const page = await pdf.getPage(p);
-      const tc = await page.getTextContent();
-      const pageOffset = (p - 1) * 10000;
-      for (const it of tc.items) {
-        const txt = (it.str || '').trim();
-        if (txt) allItems.push({ text: txt, x: Math.round(it.transform[4]), y: Math.round(it.transform[5]) + pageOffset });
-      }
+    let zipMatch = 0;
+    if (csvZip && pdfZip) {
+      if (csvZip !== pdfZip) return 0; // Zip ไม่ตรงปัดตก
+      zipMatch = 20; // Zip ตรงให้โบนัส
     }
 
-    allItems.sort((a, b) => Math.abs(b.y - a.y) > 3 ? b.y - a.y : a.x - b.x);
-    const lines = [];
-    let curLine = [], lastY = null;
-
-    for (const item of allItems) {
-      if (lastY === null || Math.abs(item.y - lastY) <= 4) curLine.push(item.text);
-      else { if (curLine.length) lines.push(curLine.join(" ")); curLine = [item.text]; }
-      lastY = item.y;
-    }
-    if (curLine.length) lines.push(curLine.join(" "));
-
-    const out = [];
-    const seenTracks = new Set();
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const cleanLine = line.replace(/\s+/g, '');
-      const trMatch = cleanLine.match(/[A-Z]{2}\d{9}TH/i);
-      if (!trMatch) continue;
-
-      let tracking = trMatch[0].toUpperCase();
-      if (seenTracks.has(tracking)) continue;
-      seenTracks.add(tracking);
-
-      const isSabuy = tracking.startsWith("J") || tracking.startsWith("P");
-      let zip = "", name = "", addr = "";
-
-      if (isSabuy) {
-        for (let j = Math.max(0, i - 6); j <= i; j++) {
-          const zm = lines[j].match(/\b\d{5}\b/);
-          if (zm) { zip = zm[0]; break; }
-        }
-        for (let j = i + 1; j <= Math.min(lines.length - 1, i + 8); j++) {
-          if (/ผู้รับ|ชื่อผู้รับ/.test(lines[j])) {
-            name = lines[j].replace(/.*(?:ผู้รับ|ชื่อผู้รับ)\s*[:;]?\s*/, '').split(/โทร|tel/i)[0].trim();
-            break;
-          }
-        }
-      } else {
-        const zm = line.match(/\b\d{5}\b/);
-        if (zm) zip = zm[0];
-        const parts = line.split(/\s+/).filter(p => !p.match(/[A-Z]{2}\d{9}TH/i) && p !== zip && p.length > 1);
-        name = parts.join(" ");
-      }
-
-      out.push({ tracking, recipientName: name, postalCode: zip, pdfType: isSabuy ? "postsabuy" : "thaipost" });
-    }
-    return out;
+    if (csvName === pdfName) return 100;
+    if (csvName.includes(pdfName) || pdfName.includes(csvName)) return 90;
+    
+    const l = lcsLength(csvName, pdfName);
+    const ratio = (l * 2) / (csvName.length + pdfName.length);
+    let nameScore = ratio >= 0.75 ? 80 : (ratio >= 0.5 ? 50 : 0);
+    
+    return Math.min(100, nameScore + zipMatch);
   };
 
-  const handleExtractPDFs = async () => {
-    if (!extractFiles.length) return;
-    setIsUserLoading(true);
-    setExtractStep(2);
-    try {
-      let combined = [];
-      for (const f of extractFiles) {
-        const parsed = await parsePDFFile(f);
-        combined.push(...parsed);
-      }
-      setExtractedRows(combined);
-      setExtractStep(3);
-    } catch (e) {
-      alert("เกิดข้อผิดพลาดในการอ่านไฟล์ PDF");
-      setExtractStep(1);
-    }
-    setIsUserLoading(false);
-  };
-
-  // ==========================================
-  // ★ LOGIC: PUBLIC USERS METHOD ★
-  // ==========================================
-  const handlePublicSearch = async (e, mode) => {
-    e.preventDefault();
-    if (!userQuery.trim()) return;
-    setIsUserLoading(true);
-    setUserSearchResult(null);
-    setErrorMsg("");
-
-    try {
-      const targetCollection = mode === "recipient" ? "recipients" : "records";
-      const snap = await getDocs(collection(db, targetCollection));
-      const allData = snap.docs.map(d => d.data());
+  const runMatching = () => {
+    setIsEngineRunning(true);
+    setTimeout(() => {
+      const results = [];
+      const usedPdf = new Set();
       
-      const qClean = userQuery.trim().toLowerCase().replace(/\s+/g, '');
-      const found = allData.filter(item => 
-        (item.fullName || "").toLowerCase().replace(/\s+/g, '').includes(qClean) ||
-        (item.phone || "").replace(/[-\s]/g, '').includes(qClean) ||
-        (item.trackingNumber || "").toLowerCase().includes(qClean)
-      );
+      csvRows.forEach((csv, cIdx) => {
+        let bestMatch = null;
+        let bestScore = 0;
+        
+        pdfRows.forEach((pdf, pIdx) => {
+          if (usedPdf.has(pIdx)) return;
+          const score = getFuzzyScore(csv, pdf);
+          if (score > bestScore && score > 40) { bestScore = score; bestMatch = pIdx; }
+        });
 
-      if (found.length > 0) {
-        setUserSearchResult(found);
-      } else {
-        setUserSearchResult("NOT_FOUND");
-      }
-    } catch (err) {
-      setErrorMsg("ไม่สามารถติดต่อเซิร์ฟเวอร์ฐานข้อมูลได้ในขณะนี้");
-    }
-    setIsUserLoading(false);
+        if (bestMatch !== null) {
+          usedPdf.add(bestMatch);
+          results.push({ csvIdx: cIdx, pdfIdx: bestMatch, score: bestScore, status: bestScore >= 80 ? "high" : "med", confirmed: bestScore >= 80 });
+        } else {
+          results.push({ csvIdx: cIdx, pdfIdx: null, score: 0, status: "none", confirmed: false });
+        }
+      });
+      
+      pdfRows.forEach((pdf, pIdx) => {
+        if (!usedPdf.has(pIdx)) {
+          results.push({ csvIdx: null, pdfIdx: pIdx, score: 0, status: "none", confirmed: false });
+        }
+      });
+      
+      setMatches(results.sort((a, b) => b.score - a.score));
+      setIsEngineRunning(false);
+    }, 500);
   };
 
-  // ==========================================
-  // ★ LOGIC: LABELS COMPILER & PRINTER ★
-  // ==========================================
-  const executeLabelPrinting = () => {
-    const cssStyles = {
-      "therm-150x100": `@page{size:150mm 100mm;margin:0}body{margin:0;font-family:'Prompt',sans-serif}.plabel{width:150mm;height:99mm;padding:4mm;box-sizing:border-box;page-break-after:always}.l-inner{border:1.5px solid var(--text);height:100%;display:flex;flex-direction:column;padding:3mm}.l-sender{font-size:11px;border-bottom:1px dashed #ccc;padding-bottom:2mm;margin-bottom:3mm}.l-recv{flex:1}.l-name{font-size:20px;font-weight:600;margin-bottom:2mm}.l-addr{font-size:14px;line-height:1.5}.l-zip{font-size:28px;font-weight:600;text-align:right;margin-top:auto}`,
-      "therm-100x150": `@page{size:100mm 150mm;margin:0}body{margin:0;font-family:'Prompt',sans-serif}.plabel{width:100mm;height:149mm;padding:3mm;box-sizing:border-box;page-break-after:always}.l-inner{border:1.5px solid var(--text);height:100%;display:flex;flex-direction:column;padding:3mm}.l-sender{font-size:11px;border-bottom:1px dashed #ccc;padding-bottom:2mm;margin-bottom:3mm}.l-recv{flex:1}.l-name{font-size:18px;font-weight:600;margin-bottom:2mm}.l-addr{font-size:13px;line-height:1.5}.l-zip{font-size:26px;font-weight:600;text-align:right;margin-top:auto}`
-    };
+  const saveConfirmedMatches = async () => {
+    const toSave = matches.filter(m => m.confirmed && m.csvIdx !== null && m.pdfIdx !== null);
+    if (!toSave.length) { alert("ไม่มีรายการที่ยืนยันการจับคู่"); return; }
+    
+    setIsEngineRunning(true);
+    try {
+      const batch = writeBatch(db);
+      toSave.forEach(m => {
+        const csv = csvRows[m.csvIdx];
+        const pdf = pdfRows[m.pdfIdx];
+        const ref = doc(collection(db, "records"));
+        batch.set(ref, {
+          fullName: csv.fullName, phone: csv.phone || "", address: csv.address || "",
+          postalCode: pdf.postalCode || csv.postalCode || "", trackingNumber: pdf.tracking,
+          status: "จัดส่งสำเร็จ", courier: pdf.pdfType, createdAt: Timestamp.now()
+        });
+      });
+      await batch.commit();
+      alert(`บันทึกสำเร็จ ${toSave.length} พัสดุ!`);
+      setAdminTab("manage");
+    } catch(e) { console.error(e); alert("เกิดข้อผิดพลาดในการบันทึก"); }
+    setIsEngineRunning(false);
+  };
 
-    const printableHtml = savedRecipients.map(r => `
-      <div class="plabel">
-        <div class="l-inner">
-          <div class="l-sender"><strong>ผู้ส่ง:</strong> ${senderInfo.name} ${senderInfo.phone} ${senderInfo.addr}</div>
-          <div class="l-recv">
-            <div class="l-name">${r.fullName}</div>
-            ${r.phone ? `<div class="l-addr">โทร: ${r.phone}</div>` : ""}
-            <div class="l-addr">${r.address || ""}</div>
-          </div>
-          <div class="l-zip">${r.postalCode || ""}</div>
-        </div>
-      </div>
-    `).join("");
-
-    const iframe = document.createElement("iframe");
-    iframe.style.display = "none";
-    document.body.appendChild(iframe);
-    const win = iframe.contentWindow;
-    win.document.write(`<html><head><style>${cssStyles[labelSize]}</style></head><body>${printableHtml}</body></html>`);
-    win.document.close();
-    setTimeout(() => { win.focus(); win.print(); document.body.removeChild(iframe); }, 500);
+  // --- Handlers ---
+  const handleSecretClick = () => {
+    if (secretClickCount >= 2) {
+      setView("admin-login"); setSecretClickCount(0);
+    } else {
+      setSecretClickCount(prev => prev + 1);
+      setTimeout(() => setSecretClickCount(0), 1500);
+    }
   };
 
   return (
     <div className="tracking-wrapper animate-fade-in" style={{ color: "var(--text)" }}>
       
-      {/* ---------------------------------------------------------------------- */}
-      {/* 🏠 VIEW: USER HOME INTERFACE                                          */}
-      {/* ---------------------------------------------------------------------- */}
+      {/* ========================================================= */}
+      {/* 🏠 VIEW 1: HOME (PUBLIC) */}
+      {/* ========================================================= */}
       {view === "home" && (
-        <div style={{ textAlign: "center", padding: "40px 0" }}>
-          <div style={{ fontSize: "56px", marginBottom: "16px" }}>📮</div>
-          <h1 style={{ fontSize: "32px", marginBottom: "8px", fontWeight: "600" }}>Talib Club Logistics</h1>
-          <p style={{ color: "var(--t2)", marginBottom: "40px" }}>ระบบตรวจสอบสิทธิ์รายชื่อจองหนังสือ และติดตามสถานะพัสดุพัทลุง/ปัตตานี</p>
-          
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", maxWidth: "600px", margin: "0 auto", padding: "0 16px" }}>
-            <div className="card" style={{ padding: "32px 24px", cursor: "pointer" }} onClick={() => { setView("user-recipient"); setUserQuery(""); setUserSearchResult(null); }}>
-              <div style={{ fontSize: "36px", marginBottom: "12px" }}>📝</div>
-              <h2 style={{ color: "var(--teal)", marginBottom: "8px" }}>ตรวจสอบรายชื่อ</h2>
-              <p style={{ fontSize: "12px" }}>เช็คความถูกต้องและยืนยันสิทธิ์รับวารสารรอบล่าสุดก่อนจัดส่ง</p>
-            </div>
-            <div className="card" style={{ padding: "32px 24px", cursor: "pointer" }} onClick={() => { setView("user-track"); setUserQuery(""); setUserSearchResult(null); }}>
-              <div style={{ fontSize: "36px", marginBottom: "12px" }}>📦</div>
-              <h2 style={{ color: "var(--text)", marginBottom: "8px" }}>ตรวจสอบเลข Track</h2>
-              <p style={{ fontSize: "12px" }}>ค้นหารหัสไปรษณีย์และเลขพัสดุสำหรับกล่องที่ส่งออกไปแล้ว</p>
-            </div>
+        <div style={{ textAlign: "center", padding: "60px 16px" }}>
+          {/* 📮 Easter Egg Trigger */}
+          <div onClick={handleSecretClick} style={{ fontSize: "64px", marginBottom: "16px", cursor: "pointer", display: "inline-block", userSelect: "none", transition: "transform 0.1s" }} className="hover:scale-110">
+            📮
           </div>
-
-          <div style={{ marginTop: "64px" }}>
-            <span style={{ fontSize: "12px", color: "var(--t3)", cursor: "pointer" }} onClick={() => isAdminAuthenticated ? setView("admin-dashboard") : setView("admin-login")}>
-              🔐 Admin Console Management
-            </span>
+          <h1 style={{ fontSize: "36px", fontWeight: "700", marginBottom: "12px", color: "var(--text)" }}>Talib Club Logistics</h1>
+          <p style={{ color: "var(--t2)", marginBottom: "48px", fontSize: "15px" }}>ระบบตรวจสอบสิทธิ์รายชื่อจองหนังสือ และติดตามสถานะพัสดุ</p>
+          
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "24px", maxWidth: "700px", margin: "0 auto" }}>
+            <div className="card" style={{ padding: "40px 24px", cursor: "pointer", borderTop: "4px solid var(--teal)", transition: "all 0.3s" }} onClick={() => { setView("user-recipient"); setUserQuery(""); setUserSearchResult(null); }}>
+              <div style={{ fontSize: "48px", marginBottom: "16px" }}>📝</div>
+              <h2 style={{ color: "var(--teal)", marginBottom: "8px", fontSize: "20px" }}>ตรวจสอบรายชื่อ</h2>
+              <p style={{ fontSize: "13px", color: "var(--t2)" }}>เช็คความถูกต้องและยืนยันสิทธิ์รับวารสารรอบล่าสุด (ก่อนทำการจัดส่ง)</p>
+            </div>
+            <div className="card" style={{ padding: "40px 24px", cursor: "pointer", borderTop: "4px solid var(--acc)", transition: "all 0.3s" }} onClick={() => { setView("user-track"); setUserQuery(""); setUserSearchResult(null); }}>
+              <div style={{ fontSize: "48px", marginBottom: "16px" }}>📦</div>
+              <h2 style={{ color: "var(--text)", marginBottom: "8px", fontSize: "20px" }}>ตรวจสอบเลข Track</h2>
+              <p style={{ fontSize: "13px", color: "var(--t2)" }}>ค้นหารหัสไปรษณีย์และเลขพัสดุสำหรับกล่องที่ดำเนินการส่งออกไปแล้ว</p>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ---------------------------------------------------------------------- */}
-      {/* 📝 VIEW: PUBLIC SEARCH (RECIPIENT & TRACKING LOOKUP)                  */}
-      {/* ---------------------------------------------------------------------- */}
+      {/* ========================================================= */}
+      {/* 🔍 VIEW 2: PUBLIC SEARCH RESULTS */}
+      {/* ========================================================= */}
       {(view === "user-recipient" || view === "user-track") && (
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+        <div style={{ maxWidth: "700px", margin: "0 auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "32px" }}>
             <button className="btn btn-outline btn-sm" onClick={() => setView("home")}>← กลับหน้าหลัก</button>
-            <span className="badge badge-teal">{view === "user-recipient" ? "Pre-Shipping Mode" : "Shipped Status"}</span>
+            <span className="badge badge-teal" style={{ fontSize: "12px" }}>{view === "user-recipient" ? "ระบบเตรียมจัดส่ง" : "ระบบติดตามพัสดุ"}</span>
           </div>
 
-          <h1 style={{ fontSize: "24px", marginBottom: "24px" }}>
-            {view === "user-recipient" ? "ตรวจสอบรายชื่อรับวารสาร" : "ติดตามเลขพัสดุ Talib Club"}
+          <h1 style={{ fontSize: "28px", marginBottom: "24px", fontWeight: "600" }}>
+            {view === "user-recipient" ? "ตรวจสอบรายชื่อรับวารสาร" : "ติดตามเลขพัสดุจัดส่ง"}
           </h1>
 
-          <div className="card" style={{ padding: "24px", marginBottom: "24px" }}>
-            <form onSubmit={(e) => handlePublicSearch(e, view === "user-recipient" ? "recipient" : "track")} style={{ display: "flex", gap: "12px" }}>
-              <input 
-                type="text" 
-                className="inp" 
-                placeholder="กรอกชื่อ-นามสกุล หรือ เบอร์โทรศัพท์ที่ใช้ลงทะเบียน..." 
-                value={userQuery}
-                onChange={(e) => setUserQuery(e.target.value)}
-              />
-              <button type="submit" className="btn btn-teal" disabled={isUserLoading}>ค้นหา</button>
+          <div className="card" style={{ padding: "24px", marginBottom: "32px", border: "1px solid var(--br2)" }}>
+            <form onSubmit={(e) => handlePublicSearch(e, view === "user-recipient" ? "recipient" : "track")} style={{ display: "flex", gap: "12px", flexDirection: "column", sm: { flexDirection: "row"} }}>
+              <label style={{ fontSize: "13px", color: "var(--t2)", fontWeight: "500" }}>ค้นหาด้วย ชื่อ-นามสกุล หรือ เบอร์โทรศัพท์</label>
+              <div style={{ display: "flex", gap: "12px" }}>
+                <input type="text" className="inp" placeholder="พิมพ์ข้อมูลที่นี่..." value={userQuery} onChange={(e) => setUserQuery(e.target.value)} style={{ flex: 1, padding: "12px 16px", fontSize: "15px" }} />
+                <button type="submit" className="btn btn-teal" disabled={isUserLoading} style={{ padding: "0 24px" }}>
+                  {isUserLoading ? "⏳" : "ค้นหา"}
+                </button>
+              </div>
             </form>
           </div>
 
-          {isUserLoading && <div className="empty card">กำลังดึงข้อมูลฐานข้อมูล...</div>}
-
           {userSearchResult === "NOT_FOUND" && (
-            <div className="empty card" style={{ border: "1px dashed var(--br)" }}>
-              <p style={{ color: "var(--text)", fontWeight: "500" }}>ไม่พบข้อมูลรายชื่อสำหรับ "{userQuery}"</p>
-              <p style={{ fontSize: "12px", marginTop: "4px" }}>รบกวนตรวจสอบตัวสะกด หรือติดต่อเพจผู้จัดพิมพ์เพื่อตรวจสอบสิทธิ์ซ้ำอีกครั้งครับ</p>
+            <div className="empty card" style={{ border: "1px dashed var(--br)", padding: "48px 24px" }}>
+              <div style={{ fontSize: "40px", marginBottom: "12px" }}>📭</div>
+              <p style={{ color: "var(--text)", fontWeight: "500", fontSize: "16px" }}>ไม่พบข้อมูลสำหรับ "{userQuery}"</p>
+              <p style={{ fontSize: "13px", marginTop: "8px" }}>กรุณาตรวจสอบตัวสะกด หรือติดต่อแอดมินเพจหากคุณมีสิทธิ์รับหนังสือ</p>
             </div>
           )}
 
           {Array.isArray(userSearchResult) && userSearchResult.map((item, idx) => (
-            <div key={idx} className="card animate-fade-in" style={{ padding: "0", overflow: "hidden", marginBottom: "16px" }}>
-              <div style={{ background: "var(--teal-bg)", padding: "16px 24px", borderBottom: "0.5px solid var(--br2)" }}>
-                <h3 style={{ color: "var(--teal)", margin: 0 }}>ผลการค้นหาข้อมูลพัสดุสิทธิ์</h3>
-              </div>
-              <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "12px" }}>
-                <div><span style={{ color: "var(--t2)", fontSize: "12px" }}>ชื่อผู้รับ:</span> <strong style={{ fontSize: "16px" }}>{item.fullName}</strong></div>
-                {item.phone && <div><span style={{ color: "var(--t2)", fontSize: "12px" }}>เบอร์โทร:</span> {item.phone}</div>}
-                {item.trackingNumber ? (
-                  <div>
-                    <span style={{ color: "var(--t2)", fontSize: "12px" }}>เลข Tracking (ไปรษณีย์ไทย):</span>
-                    <div style={{ background: "var(--inp)", padding: "12px", borderRadius: "8px", fontFamily: "monospace", fontSize: "18px", fontWeight: "600", marginTop: "4px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span>{item.trackingNumber}</span>
-                      <button className="btn btn-outline btn-sm" style={{ padding: "4px 10px" }} onClick={() => navigator.clipboard.writeText(item.trackingNumber)}>คัดลอก</button>
-                    </div>
-                    <a href={`https://track.thailandpost.co.th/?trackNumber=${item.trackingNumber}`} target="_blank" rel="noreferrer" className="btn btn-teal btn-sm" style={{ display: "inline-block", marginTop: "12px", textDecoration: "none" }}>🌐 เปิดเว็บไปรษณีย์ไทยเพื่อเช็คสถานะละเอียด</a>
-                  </div>
-                ) : (
-                  <div style={{ padding: "12px", background: "var(--acc2)", color: "var(--teal)", borderRadius: "8px", fontSize: "13px", fontWeight: "500" }}>
-                    ✓ ท่านมีรายชื่อยู่ในคลังระบบเตรียมการจัดส่งแล้ว (Status: คัดแยกพัสดุต้นทาง)
-                  </div>
-                )}
-                {item.bonusNote && <div style={{ color: "#d97706", fontSize: "13px", marginTop: "6px" }}>🎁 โน้ตพิเศษ: {item.bonusNote}</div>}
-              </div>
-            </div>
+             <div key={idx} className="card animate-fade-in" style={{ padding: "0", overflow: "hidden", marginBottom: "20px", border: "1px solid var(--br2)" }}>
+               <div style={{ background: "var(--teal-bg)", padding: "16px 24px", borderBottom: "1px solid var(--br2)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                 <h3 style={{ color: "var(--teal)", margin: 0, fontSize: "16px" }}>ข้อมูลผู้รับสิทธิ์</h3>
+                 {item.status && <span className="badge badge-teal">{item.status}</span>}
+               </div>
+               <div style={{ padding: "24px", display: "grid", gap: "16px" }}>
+                 <div>
+                    <div style={{ color: "var(--t2)", fontSize: "12px", marginBottom: "4px" }}>ชื่อผู้รับ</div>
+                    <div style={{ fontSize: "18px", fontWeight: "600", color: "var(--text)" }}>{item.fullName}</div>
+                 </div>
+                 {item.phone && (
+                   <div>
+                      <div style={{ color: "var(--t2)", fontSize: "12px", marginBottom: "4px" }}>เบอร์โทรศัพท์</div>
+                      <div style={{ fontSize: "15px", color: "var(--text)" }}>{item.phone}</div>
+                   </div>
+                 )}
+                 {item.trackingNumber ? (
+                   <div style={{ marginTop: "8px", paddingTop: "16px", borderTop: "1px dashed var(--br2)" }}>
+                     <div style={{ color: "var(--t2)", fontSize: "12px", marginBottom: "8px" }}>เลข Tracking (พัสดุไปรษณีย์)</div>
+                     <div style={{ background: "var(--bg)", padding: "16px", borderRadius: "8px", border: "1px solid var(--br2)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                       <span style={{ fontFamily: "monospace", fontSize: "22px", fontWeight: "700", color: "var(--teal)", letterSpacing: "1px" }}>{item.trackingNumber}</span>
+                       <button className="btn btn-outline btn-sm" onClick={() => navigator.clipboard.writeText(item.trackingNumber)}>📋 คัดลอก</button>
+                     </div>
+                   </div>
+                 ) : (
+                   <div style={{ marginTop: "8px", padding: "16px", background: "var(--acc2)", borderRadius: "8px", color: "var(--teal)", fontSize: "14px", fontWeight: "500", display: "flex", gap: "8px", alignItems: "center" }}>
+                     <span>✅</span> ท่านมีรายชื่ออยู่ในคลังระบบเตรียมการจัดส่งแล้ว
+                   </div>
+                 )}
+               </div>
+             </div>
           ))}
         </div>
       )}
 
-      {/* ---------------------------------------------------------------------- */}
-      {/* 🔐 VIEW: ADMIN ACCESS TERMINAL LOGIN                                   */}
-      {/* ---------------------------------------------------------------------- */}
+      {/* ========================================================= */}
+      {/* 🔐 VIEW 3: ADMIN LOGIN */}
+      {/* ========================================================= */}
       {view === "admin-login" && (
-        <div style={{ maxWidth: "400px", margin: "60px auto" }}>
-          <h1 style={{ fontSize: "24px", textAlign: "center", marginBottom: "8px" }}>Admin Access</h1>
-          <p style={{ textLabel: "center", color: "var(--t2)", fontSize: "13px", marginBottom: "24px", textAlign: "center" }}>กรอกรหัสความปลอดภัยหลังบ้านเพื่อทำแมตช์พัสดุ</p>
-          <div className="card" style={{ padding: "24px" }}>
-            <input 
-              type="password" 
-              className="inp" 
-              placeholder="รหัสผ่านผู้ดูแลระบบ..." 
-              value={adminPassword}
-              onChange={(e) => setAdminPassword(e.target.value)}
-              style={{ marginBottom: "16px" }}
-            />
-            <button className="btn btn-teal style-full" style={{ width: "100%" }} onClick={() => {
-              if (adminPassword === "admin1234") {
-                setIsAdminAuthenticated(true);
-                localStorage.setItem("talib_admin_auth", "true");
-                setView("admin-dashboard");
-              } else {
-                alert("รหัสผ่านไม่ถูกต้อง");
-              }
+        <div style={{ maxWidth: "400px", margin: "80px auto" }}>
+          <div className="card" style={{ padding: "32px", textAlign: "center", borderTop: "4px solid var(--text)" }}>
+            <div style={{ fontSize: "40px", marginBottom: "16px" }}>🔐</div>
+            <h1 style={{ fontSize: "24px", marginBottom: "8px", fontWeight: "600" }}>Admin Access</h1>
+            <p style={{ color: "var(--t2)", fontSize: "13px", marginBottom: "24px" }}>ระบบจัดการโลจิสติกส์หลังบ้าน</p>
+            <input type="password" className="inp" placeholder="รหัสผ่าน..." value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} style={{ marginBottom: "16px", textAlign: "center", letterSpacing: "2px" }} />
+            <button className="btn btn-main style-full" style={{ width: "100%" }} onClick={() => {
+              if (adminPassword === "admin1234") { setIsAdminAuthenticated(true); localStorage.setItem("talib_admin_auth", "true"); setView("admin-dashboard"); } else { alert("รหัสผ่านไม่ถูกต้อง"); }
             }}>เข้าสู่แผงควบคุม</button>
+            <button className="btn btn-outline btn-sm" style={{ width: "100%", marginTop: "12px", border: "none" }} onClick={() => setView("home")}>ยกเลิก</button>
           </div>
-          <button className="btn btn-outline btn-sm" style={{ width: "100%", marginTop: "12px" }} onClick={() => setView("home")}>ยกเลิก</button>
         </div>
       )}
 
-      {/* ---------------------------------------------------------------------- */}
-      {/* 🎛️ VIEW: ADMIN COMPLETE DASHBOARD ENGINE (ALL 5 TABS INCLUDED)          */}
-      {/* ---------------------------------------------------------------------- */}
+      {/* ========================================================= */}
+      {/* 🎛️ VIEW 4: ADMIN DASHBOARD (THE STUDIO) */}
+      {/* ========================================================= */}
       {view === "admin-dashboard" && isAdminAuthenticated && (
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", flexWrap: "wrap", gap: "12px" }}>
+        <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "32px", flexWrap: "wrap", gap: "16px" }}>
             <div>
-              <h1 style={{ fontSize: "26px", fontWeight: "600" }}>Logistics Control Station</h1>
-              <p style={{ fontSize: "12px", color: "var(--t2)" }}>ตัวดึง Logic จับคู่ใบสั่งและคัดแยกข้อมูลอัตโนมัติ</p>
+              <h1 style={{ fontSize: "28px", fontWeight: "700", color: "var(--text)" }}>Logistics Control Station</h1>
+              <p style={{ fontSize: "14px", color: "var(--t2)", marginTop: "4px" }}>ระบบจัดการพัสดุและวิเคราะห์ข้อมูลอัตโนมัติครบวงจร</p>
             </div>
             <div style={{ display: "flex", gap: "8px" }}>
-              <button className="btn btn-outline btn-sm" onClick={() => setView("home")}>หน้าหลักผู้ใช้</button>
-              <button className="btn btn-outline btn-sm" style={{ color: "red" }} onClick={() => {
-                setIsAdminAuthenticated(false);
-                localStorage.removeItem("talib_admin_auth");
-                setView("home");
-              }}>ออกจากระบบ</button>
+              <button className="btn btn-outline btn-sm" onClick={() => setView("home")}>🏠 มุมมองผู้ใช้</button>
+              <button className="btn btn-outline btn-sm" style={{ borderColor: "#ef4444", color: "#ef4444" }} onClick={() => { setIsAdminAuthenticated(false); localStorage.removeItem("talib_admin_auth"); setView("home"); }}>ออกจากระบบ</button>
             </div>
           </div>
 
-          {/* แท็บตัวเลือก แผงคอนโซลควบคุม 5 ระดับ */}
-          <div style={{ display: "flex", gap: "4px", borderBottom: "1px solid var(--br)", marginBottom: "24px", overflowX: "auto", paddingBottom: "4px" }}>
-            <button className={`btn btn-sm ${adminTab === "prep" ? "btn-teal" : "btn-outline"}`} onClick={() => setAdminTab("prep")}>📥 1. อัปโหลดเตรียมรายชื่อ</button>
-            <button className={`btn btn-sm ${adminTab === "prep-manage" ? "btn-teal" : "btn-outline"}`} onClick={() => setAdminTab("prep-manage")}>📝 2. จัดการคลังรายชื่อ</button>
-            <button className={`btn btn-sm ${adminTab === "extract" ? "btn-teal" : "btn-outline"}`} onClick={() => setAdminTab("extract")}>🔄 3. ตัวแปลง PDF แปลงร่าง</button>
-            <button className={`btn btn-sm ${adminTab === "match" ? "btn-teal" : "btn-outline"}`} onClick={() => setAdminTab("match")}>📊 4. สตูดิโอจับคู่พัสดุ</button>
-            <button className={`btn btn-sm ${adminTab === "manage" ? "btn-teal" : "btn-outline"}`} onClick={() => setAdminTab("manage")}>🗂️ 5. รายการพัสดุส่งออก</button>
+          {/* Admin Tabs */}
+          <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid var(--br)", paddingBottom: "12px", marginBottom: "24px", overflowX: "auto", whiteSpace: "nowrap" }}>
+            {[
+              { id: "prep", icon: "📥", label: "อัปโหลดรายชื่อ" },
+              { id: "extract", icon: "🔄", label: "แปลง PDF ไปรษณีย์" },
+              { id: "match", icon: "📊", label: "สตูดิโอจับคู่ (Matching)" },
+              { id: "prep-manage", icon: "📝", label: "คลังเตรียมส่ง" },
+              { id: "manage", icon: "🗂️", label: "คลังส่งออกแล้ว" }
+            ].map(t => (
+              <button key={t.id} onClick={() => setAdminTab(t.id)} className={`btn btn-sm ${adminTab === t.id ? "btn-teal" : "btn-outline"}`} style={{ border: adminTab !== t.id ? "1px solid transparent" : "" }}>
+                {t.icon} {t.label}
+              </button>
+            ))}
           </div>
 
-          {/* ----------------- TAB 1: PREP REGISTER NAMES ----------------- */}
+          {/* --- TAB: PREP (Upload CSV) --- */}
           {adminTab === "prep" && (
-            <div className="card" style={{ padding: "24px" }}>
-              <h3>📥 อัปโหลดคลังรายชื่อผู้ได้รับสิทธิ์หนังสือ (จาก Google Sheets CSV)</h3>
-              <p style={{ fontSize: "13px", marginBottom: "16px" }}>นำเข้าข้อมูลรายชื่อจาก Google Sheet เพื่อเปิดให้บุคคลภายนอกเข้าตรวจสอบสิทธิ์ก่อนส่งจ่าหน้าซอง</p>
+            <div className="card" style={{ padding: "32px" }}>
+              <h3 style={{ fontSize: "18px", marginBottom: "8px" }}>📥 1. อัปโหลดรายชื่อจาก Google Sheet (CSV)</h3>
+              <p style={{ fontSize: "14px", color: "var(--t2)", marginBottom: "24px" }}>ใช้สำหรับเตรียมข้อมูลตั้งต้นให้ผู้รับตรวจสอบสิทธิ์ หรือเตรียมจับคู่</p>
               
-              <input type="file" accept=".csv" onChange={(e) => {
-                const f = e.target.files[0];
-                if (!f || !window.Papa) return;
-                window.Papa.parse(f, {
-                  header: true,
-                  skipEmptyLines: true,
-                  complete: (result) => {
-                    const parsed = result.data.map((row, idx) => ({
-                      fullName: row["ชื่อ-นามสกุล"] || row["ชื่อ"] || Object.values(row)[0],
-                      phone: (row["เบอร์โทร"] || row["phone"] || "").replace(/[-\s]/g, ''),
-                      address: row["ที่อยู่"] || row["address"] || "",
-                      postalCode: (row["ที่อยู่"] || "").match(/\b\d{5}\b/)?.[0] || "",
-                      csvIndex: idx
-                    })).filter(r => r.fullName);
-                    setCsvRows(parsed);
-                    alert(`โหลดสำเร็จ ${parsed.length} บรรทัด`);
-                  }
-                });
-              }} style={{ marginBottom: "20px" }} />
-
-              {csvRows.length > 0 && (
-                <div style={{ marginTop: "16px", textAlign: "right" }}>
-                  <button className="btn btn-teal" onClick={async () => {
-                    setIsUserLoading(true);
-                    const batch = writeBatch(db);
-                    csvRows.forEach(row => {
-                      const ref = doc(collection(db, "recipients"));
-                      batch.set(ref, { ...row, createdAt: Timestamp.now() });
-                    });
-                    await batch.commit();
-                    setIsUserLoading(false);
-                    alert("บันทึกข้อมูลรายชื่อลงดาต้าเบสแล้ว!");
-                    setAdminTab("prep-manage");
-                  }}>💾 อัปโหลดบันทึก {csvRows.length} รายชื่อขึ้นระบบคลัง</button>
-                </div>
-              )}
+              <div style={{ border: "2px dashed var(--br2)", borderRadius: "12px", padding: "40px 24px", textAlign: "center", background: "var(--bg)", cursor: "pointer" }} onClick={() => document.getElementById('csv-uploader').click()}>
+                <div style={{ fontSize: "32px", marginBottom: "12px" }}>📄</div>
+                <div style={{ fontWeight: "500", color: "var(--teal)", marginBottom: "4px" }}>คลิกเพื่อเลือกไฟล์ CSV</div>
+                <div style={{ fontSize: "12px", color: "var(--t3)" }}>หรือลากไฟล์มาวางที่นี่</div>
+                <input id="csv-uploader" type="file" accept=".csv" className="hidden" style={{ display: 'none' }} onChange={(e) => {
+                  if (!e.target.files[0] || !window.Papa) return;
+                  window.Papa.parse(e.target.files[0], {
+                    header: true, skipEmptyLines: true, complete: (res) => {
+                      const parsed = res.data.map(r => ({ fullName: r["ชื่อ-นามสกุล"] || r["ชื่อ"] || Object.values(r)[0], phone: (r["เบอร์โทร"] || "").replace(/[-\s]/g, ''), postalCode: (r["ที่อยู่"] || "").match(/\b\d{5}\b/)?.[0] || "" })).filter(x => x.fullName);
+                      setCsvRows(parsed); alert(`โหลดสำเร็จ ${parsed.length} รายการ แนะนำให้ไปที่แท็บ 'สตูดิโอจับคู่'`);
+                    }
+                  });
+                }} />
+              </div>
+              {csvRows.length > 0 && <div style={{ marginTop: "16px", padding: "12px", background: "var(--teal-bg)", color: "var(--teal)", borderRadius: "8px", fontWeight: "500" }}>✅ โหลดข้อมูลพร้อมใช้งาน: {csvRows.length} รายการ</div>}
             </div>
           )}
 
-          {/* ----------------- TAB 2: PREP RECIPIENTS MANAGE ----------------- */}
-          {adminTab === "prep-manage" && (
-            <div className="card" style={{ padding: "24px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-                <h3>📝 รายชื่อรอคัดแยกจัดส่งในฐานข้อมูล ({savedRecipients.length})</h3>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <button className="btn btn-outline btn-sm" onClick={() => setActiveModal("label-manager")}>🏷️ เปิดห้องเครื่องพิมพ์ลาเบล</button>
-                  <button className="btn btn-outline btn-sm" style={{ color: "red" }} onClick={async () => {
-                    if(!confirm("ยืนยันการล้างคลังรายชื่อเตรียมส่งทั้งหมด?")) return;
-                    setIsUserLoading(true);
-                    const snap = await getDocs(collection(db, "recipients"));
-                    const batch = writeBatch(db);
-                    snap.docs.forEach(d => batch.delete(d.ref));
-                    await batch.commit();
-                    fetchRecipients();
-                  }}>🗑️ ล้างทั้งหมด</button>
-                </div>
-              </div>
-
-              <div className="tbl-wrap">
-                <table className="rec-table">
-                  <thead>
-                    <tr>
-                      <th>#</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>ที่อยู่รหัสไปรษณีย์</th><th>จัดการ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {savedRecipients.map((r, i) => (
-                      <tr key={r.id}>
-                        <td>{i + 1}</td>
-                        <td>{r.fullName}</td>
-                        <td>{r.phone || "-"}</td>
-                        <td>{r.address} {r.postalCode}</td>
-                        <td>
-                          <button className="btn btn-outline btn-sm" style={{ color: "red", padding: "2px 6px" }} onClick={async () => {
-                            if(!confirm("ลบรายชื่อนี้?")) return;
-                            await deleteDoc(doc(db, "recipients", r.id));
-                            fetchRecipients();
-                          }}>ลบ</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* ----------------- TAB 3: PDF TO CSV EXTRACTOR ----------------- */}
+          {/* --- TAB: EXTRACT PDF --- */}
           {adminTab === "extract" && (
-            <div className="card" style={{ padding: "24px" }}>
-              <h3>🔄 ตัวแปลงโครงสร้าง PDF ไปรษณีย์ / PostSabuy</h3>
-              <p style={{ fontSize: "13px", marginBottom: "20px" }}>ถอดข้อมูลลอจิก รหัสพัสดุและไปรษณีย์ออกมาจากเอกสาร PDF โดยไม่ต้องคีย์มือ</p>
-
-              <input type="file" multiple accept=".pdf" onChange={(e) => setExtractFiles(Array.from(e.target.files))} style={{ marginBottom: "16px" }} />
+            <div className="card" style={{ padding: "32px" }}>
+              <h3 style={{ fontSize: "18px", marginBottom: "8px" }}>🔄 2. สกัดข้อมูลจาก PDF ไปรษณีย์ไทย</h3>
+              <p style={{ fontSize: "14px", color: "var(--t2)", marginBottom: "24px" }}>ดึงเลข Tracking และรหัสไปรษณีย์ออกมาอัตโนมัติ เพื่อความแม่นยำในการจับคู่</p>
               
-              {extractFiles.length > 0 && extractStep === 1 && (
-                <button className="btn btn-teal" onClick={handleExtractPDFs}>เริ่มลูปถอดข้อมูลจาก {extractFiles.length} ไฟล์</button>
-              )}
+              <input type="file" multiple accept=".pdf" className="inp" onChange={(e) => setExtractFiles(Array.from(e.target.files))} style={{ marginBottom: "16px" }} />
+              {extractFiles.length > 0 && extractStep === 1 && <button className="btn btn-main" onClick={runExtract}>🚀 เริ่มรันตัวสกัดข้อมูล ({extractFiles.length} ไฟล์)</button>}
+              
+              {isEngineRunning && <div style={{ padding: "24px", textAlign: "center", color: "var(--teal)" }}>⏳ กำลังประมวลผล PDF...</div>}
 
               {extractStep === 3 && (
                 <div style={{ marginTop: "24px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
-                    <h4>รายการพัสดุที่สกัดได้สำเร็จ ({extractedRows.length} รายการ)</h4>
-                    <button className="btn btn-teal btn-sm" onClick={() => {
-                      setPdfRows(extractedRows.map(r => ({ ...r, courier: "ไปรษณีย์ไทย", date: "รอบปัจจุบัน" })));
-                      setAdminTab("match");
-                      alert("ส่งข้อมูลไปที่แท็บจับคู่แล้ว!");
-                    }}>⚡ โยนข้อมูลเข้าแท็บสตูดิโอจับคู่</button>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", padding: "16px", background: "var(--bg)", borderRadius: "8px", border: "1px solid var(--br2)" }}>
+                     <div>
+                       <span style={{ fontSize: "14px", color: "var(--t2)" }}>สกัดสำเร็จ: </span>
+                       <span style={{ fontSize: "20px", fontWeight: "700", color: "var(--teal)" }}>{extractedRows.length}</span>
+                       <span style={{ fontSize: "14px", color: "var(--t2)" }}> รายการ</span>
+                     </div>
+                     <button className="btn btn-teal" onClick={() => { setPdfRows(extractedRows); setAdminTab("match"); }}>➡️ โยนข้อมูลเข้าสตูดิโอจับคู่</button>
                   </div>
-
-                  <div className="tbl-wrap">
-                    <table className="rec-table">
-                      <thead>
-                        <tr><th>#</th><th>เลขพัสดุ</th><th>รหัสไปรษณีย์</th><th>ชื่อผู้รับ (สกัดจากใบเสร็จ)</th><th>ค่ายขนส่ง</th></tr>
+                  <div style={{ maxHeight: "300px", overflowY: "auto", border: "1px solid var(--br2)", borderRadius: "8px" }}>
+                    <table style={{ width: "100%", fontSize: "13px", textAlign: "left", borderCollapse: "collapse" }}>
+                      <thead style={{ background: "var(--bg)", position: "sticky", top: 0 }}>
+                        <tr><th style={{ padding: "12px 16px" }}>Tracking</th><th style={{ padding: "12px 16px" }}>ชื่อผู้รับ (PDF)</th><th style={{ padding: "12px 16px" }}>รหัสไปรษณีย์</th></tr>
                       </thead>
                       <tbody>
-                        {extractedRows.map((row, idx) => (
-                          <tr key={idx}>
-                            <td>{idx + 1}</td>
-                            <td style={{ fontFamily: "monospace", fontWeight: "600" }}>{row.tracking}</td>
-                            <td>{row.postalCode}</td>
-                            <td>{row.recipientName || "-"}</td>
-                            <td><span className="tag tag-teal">{row.pdfType}</span></td>
+                        {extractedRows.map((r, i) => (
+                          <tr key={i} style={{ borderTop: "1px solid var(--br2)" }}>
+                            <td style={{ padding: "10px 16px", fontFamily: "monospace", fontWeight: "600", color: "var(--text)" }}>{r.tracking}</td>
+                            <td style={{ padding: "10px 16px", color: "var(--t2)" }}>{r.recipientName}</td>
+                            <td style={{ padding: "10px 16px" }}>{r.postalCode || "-"}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -689,88 +497,99 @@ export default function Tracking() {
             </div>
           )}
 
-          {/* ----------------- TAB 4: FUZZY MATCHING WORKBENCH ----------------- */}
+          {/* --- TAB: MATCHING STUDIO (THE CORE UI) --- */}
           {adminTab === "match" && (
-            <div className="card" style={{ padding: "24px" }}>
-              <h3>📊 สตูดิโอจับคู่ไฟล์พัสดุอัจฉริยะ (Fuzzy Validation Studio)</h3>
-              <p style={{ fontSize: "13px", marginBottom: "20px" }}>ตรรกะประมวลผลเทียบความแม่นยำชื่อผู้รับและรหัสปลายทาง เพื่อส่งข้อมูลยิงพัสดุขึ้น Firebase</p>
+            <div>
+              <div className="card" style={{ padding: "24px", marginBottom: "24px", background: "linear-gradient(to right, var(--card), var(--bg))" }}>
+                <h3 style={{ fontSize: "18px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>📊 สตูดิโอจับคู่ไฟล์อัจฉริยะ <span className="badge badge-teal" style={{ fontSize: "10px" }}>Fuzzy Logic Engine</span></h3>
+                
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
+                   <div style={{ background: "var(--bg)", padding: "16px", borderRadius: "8px", border: "1px solid var(--br2)", borderLeft: csvRows.length ? "3px solid var(--teal)" : "3px solid var(--t3)" }}>
+                      <div style={{ fontSize: "12px", color: "var(--t2)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>Source 1: Google Sheet</div>
+                      <div style={{ fontSize: "16px", fontWeight: "600", color: csvRows.length ? "var(--text)" : "var(--t3)" }}>{csvRows.length ? `${csvRows.length} รายการพร้อมแมตช์` : "รอข้อมูล (ไปที่แท็บ 1)"}</div>
+                   </div>
+                   <div style={{ background: "var(--bg)", padding: "16px", borderRadius: "8px", border: "1px solid var(--br2)", borderLeft: pdfRows.length ? "3px solid var(--teal)" : "3px solid var(--t3)" }}>
+                      <div style={{ fontSize: "12px", color: "var(--t2)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>Source 2: PDF Tracking</div>
+                      <div style={{ fontSize: "16px", fontWeight: "600", color: pdfRows.length ? "var(--text)" : "var(--t3)" }}>{pdfRows.length ? `${pdfRows.length} เลขพัสดุพร้อมแมตช์` : "รอข้อมูล (ไปที่แท็บ 2)"}</div>
+                   </div>
+                </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
-                <div style={{ background: "var(--inp)", padding: "16px", borderRadius: "8px" }}>
-                  <strong>สถานะฝั่งคลัง Google Sheet:</strong> {csvRows.length > 0 ? `พร้อมใช้งาน (${csvRows.length} แถว)` : "ยังไม่ได้อัปโหลดไฟล์ในแท็บ 1 (ใช้คลังชั่วคราวได้)"}
-                  <input type="file" accept=".csv" onChange={(e) => {
-                    const f = e.target.files[0];
-                    if (!f) return;
-                    window.Papa.parse(f, {
-                      header: true, skipEmptyLines: true, complete: (res) => {
-                        setCsvRows(res.data.map(r => ({ fullName: r["ชื่อ-นามสกุล"] || Object.values(r)[0], phone: r["เบอร์โทร"] || "", address: r["ที่อยู่"] || "", postalCode: (r["ที่อยู่"] || "").match(/\b\d{5}\b/)?.[0] || "" })).filter(x => x.fullName));
-                      }
-                    });
-                  }} style={{ marginTop: "8px", display: "block" }} />
-                </div>
-                <div style={{ background: "var(--inp)", padding: "16px", borderRadius: "8px" }}>
-                  <strong>สถานะข้อมูล Tracking ปลายทาง:</strong> {pdfRows.length > 0 ? `พร้อมตรวจสอบ (${pdfRows.length} รหัสพัสดุ)` : "รอส่งข้อมูลมาจากแท็บตัวสกัด PDF"}
-                </div>
+                {csvRows.length > 0 && pdfRows.length > 0 && (
+                  <button className="btn btn-main style-full" onClick={runMatching} disabled={isEngineRunning} style={{ width: "100%", padding: "14px", fontSize: "15px" }}>
+                    {isEngineRunning ? "⏳ กำลังคำนวณสัมประสิทธิ์ความคล้ายคลึง..." : "🔀 รันอัลกอริทึมจับคู่พัสดุอัตโนมัติ"}
+                  </button>
+                )}
               </div>
 
-              {csvRows.length > 0 && pdfRows.length > 0 && (
-                <button className="btn btn-teal" onClick={runMatchingEngine} style={{ marginBottom: "24px", width: "100%" }}>🔀 เริ่มรันอัลกอริทึมจับคู่ตามสัมประสิทธิ์น้ำหนัก</button>
-              )}
-
-              {matches.length > 0 && (
+              {/* MATCHING RESULTS UI */}
+              {matches.length > 0 && !isEngineRunning && (
                 <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                    <h4>ผลลัพธ์การคัดกรอง</h4>
-                    <button className="btn btn-teal" onClick={async () => {
-                      setIsUserLoading(true);
-                      const batch = writeBatch(db);
-                      let count = 0;
-                      matches.forEach(m => {
-                        if (!m.confirmed || m.csvIdx === null) return;
-                        const csvItem = csvRows[m.csvIdx];
-                        m.pdfIndices.forEach(pi => {
-                          const pdfItem = pdfRows[pi];
-                          const ref = doc(collection(db, "records"));
-                          batch.set(ref, {
-                            fullName: csvItem.fullName,
-                            phone: csvItem.phone || "",
-                            address: csvItem.address || "",
-                            postalCode: pdfItem.postalCode || csvItem.postalCode || "",
-                            trackingNumber: pdfItem.tracking,
-                            status: "จัดส่งเรียบร้อยแล้ว",
-                            courier: pdfItem.pdfType === "postsabuy" ? "Post Sabuy" : "ไปรษณีย์ไทย",
-                            createdAt: Timestamp.now()
-                          });
-                          count++;
-                        });
-                      });
-                      await batch.commit();
-                      setIsUserLoading(false);
-                      alert(`บันทึกข้อมูลพัสดุส่งออกเรียบร้อย ${count} รายการ!`);
-                      setAdminTab("manage");
-                    }}>💾 บันทึกทุกรายการที่ยืนยัน ขึ้นระบบฐานข้อมูลจริง</button>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", padding: "0 4px" }}>
+                    <div style={{ fontSize: "16px", fontWeight: "600" }}>ผลลัพธ์การคัดกรอง ({matches.length} คู่)</div>
+                    <button className="btn btn-teal" onClick={saveConfirmedMatches}>💾 บันทึกรายการที่ยืนยันขึ้น Database</button>
                   </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  
+                  <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                     {matches.map((m, idx) => {
-                      const csvItem = m.csvIdx !== null ? csvRows[m.csvIdx] : null;
-                      const pdfItem = m.pdfIndices.length > 0 ? pdfRows[m.pdfIndices[0]] : null;
+                      const csv = m.csvIdx !== null ? csvRows[m.csvIdx] : null;
+                      const pdf = m.pdfIdx !== null ? pdfRows[m.pdfIdx] : null;
+                      const colorMap = { high: "#10b981", med: "#f59e0b", none: "#ef4444" };
+                      const labelMap = { high: "มั่นใจสูง", med: "ตรวจสอบ", none: "ไม่พบคู่" };
+                      const mainColor = colorMap[m.status];
+
                       return (
-                        <div key={idx} className="card" style={{ padding: "16px", borderLeft: `4px solid ${m.level === "high" ? "var(--teal)" : "#e0a910"}` }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--t2)", marginBottom: "8px" }}>
-                            <span>ความมั่นใจระดับ: {m.level} ({m.scores[0] || 0}%)</span>
-                            <input type="checkbox" checked={m.confirmed} onChange={(e) => {
-                              const updated = [...matches];
-                              updated[idx].confirmed = e.target.checked;
-                              setMatches(updated);
-                            }} />
-                          </div>
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
-                            <div>📋 ในชีต: <strong>{csvItem?.fullName || "(ไม่มีคู่ชาร์ต)"}</strong> ({csvItem?.postalCode})</div>
-                            <div>📄 ใบเสร็จพัสดุ: <strong style={{ fontFamily: "monospace" }}>{pdfItem?.tracking || "(ว่าง)"}</strong> [{pdfItem?.recipientName}]</div>
-                          </div>
+                        <div key={idx} className="card" style={{ padding: "0", overflow: "hidden", border: `1px solid ${m.confirmed ? mainColor : 'var(--br2)'}`, transition: "all 0.2s" }}>
+                           {/* Card Header (Score & Badge) */}
+                           <div style={{ padding: "10px 16px", background: "var(--bg)", borderBottom: "1px solid var(--br2)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                               <span style={{ fontSize: "12px", color: "var(--t3)", fontWeight: "600" }}>#{idx + 1}</span>
+                               <span style={{ padding: "4px 10px", background: `${mainColor}20`, color: mainColor, borderRadius: "20px", fontSize: "11px", fontWeight: "600" }}>{labelMap[m.status]}</span>
+                             </div>
+                             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                               {m.score > 0 && <span style={{ fontSize: "13px", color: "var(--t2)", fontWeight: "500" }}>ความแม่นยำ: {m.score}%</span>}
+                               <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "500", color: m.confirmed ? mainColor : "var(--t2)" }}>
+                                 <input type="checkbox" checked={m.confirmed} onChange={(e) => {
+                                   const newMatches = [...matches]; newMatches[idx].confirmed = e.target.checked; setMatches(newMatches);
+                                 }} style={{ accentColor: mainColor, width: "16px", height: "16px", cursor: "pointer" }} />
+                                 {m.confirmed ? "พร้อมเซฟ" : "ยืนยัน"}
+                               </label>
+                             </div>
+                           </div>
+                           
+                           {/* Progress Bar */}
+                           {m.score > 0 && <div style={{ height: "3px", width: "100%", background: "var(--br2)" }}><div style={{ height: "100%", width: `${m.score}%`, background: mainColor, transition: "width 0.5s" }}></div></div>}
+
+                           {/* Data Comparison Grid */}
+                           <div style={{ display: "grid", gridTemplateColumns: "1fr 40px 1fr", minHeight: "100px", sm: { gridTemplateColumns: "1fr" } }}>
+                              {/* Left: CSV */}
+                              <div style={{ padding: "16px 20px" }}>
+                                <div style={{ fontSize: "11px", textTransform: "uppercase", color: "var(--t3)", fontWeight: "700", letterSpacing: "1px", marginBottom: "8px" }}>📋 ข้อมูลจาก Sheet</div>
+                                {csv ? (
+                                  <>
+                                    <div style={{ fontSize: "16px", fontWeight: "600", color: "var(--text)", marginBottom: "4px" }}>{csv.fullName}</div>
+                                    <div style={{ fontSize: "13px", color: "var(--t2)" }}>📞 {csv.phone || "-"}</div>
+                                    <div style={{ fontSize: "13px", color: "var(--teal)", fontWeight: "500", marginTop: "8px" }}>📍 รหัสไปรษณีย์: <span style={{ background: "var(--teal-bg)", padding: "2px 6px", borderRadius: "4px" }}>{csv.postalCode || "-"}</span></div>
+                                  </>
+                                ) : <div style={{ fontSize: "13px", color: "var(--t3)", fontStyle: "italic", marginTop: "12px" }}>ไม่มีข้อมูลใน Sheet</div>}
+                              </div>
+                              
+                              {/* Center Divider */}
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", borderLeft: "1px dashed var(--br2)", borderRight: "1px dashed var(--br2)", background: "var(--bg)", color: "var(--t3)" }}>➡️</div>
+                              
+                              {/* Right: PDF */}
+                              <div style={{ padding: "16px 20px" }}>
+                                <div style={{ fontSize: "11px", textTransform: "uppercase", color: "var(--t3)", fontWeight: "700", letterSpacing: "1px", marginBottom: "8px" }}>📄 ข้อมูลพัสดุ (PDF)</div>
+                                {pdf ? (
+                                  <>
+                                    <div style={{ fontSize: "18px", fontFamily: "monospace", fontWeight: "700", color: "var(--text)", letterSpacing: "1px", marginBottom: "4px" }}>{pdf.tracking}</div>
+                                    <div style={{ fontSize: "12px", color: "var(--t2)" }}>(สกัดชื่อ: {pdf.recipientName})</div>
+                                    <div style={{ fontSize: "13px", color: "var(--acc)", fontWeight: "500", marginTop: "8px" }}>📍 รหัสไปรษณีย์: <span style={{ background: "var(--acc2)", padding: "2px 6px", borderRadius: "4px" }}>{pdf.postalCode || "-"}</span></div>
+                                  </>
+                                ) : <div style={{ fontSize: "13px", color: "var(--t3)", fontStyle: "italic", marginTop: "12px" }}>ไม่มีรหัสพัสดุ</div>}
+                              </div>
+                           </div>
                         </div>
-                      );
+                      )
                     })}
                   </div>
                 </div>
@@ -778,84 +597,43 @@ export default function Tracking() {
             </div>
           )}
 
-          {/* ----------------- TAB 5: DATABASE ARCHIVE MANAGEMENT ----------------- */}
-          {adminTab === "manage" && (
+          {/* --- TAB: MANAGE RECORDS (Database) --- */}
+          {(adminTab === "manage" || adminTab === "prep-manage") && (
             <div className="card" style={{ padding: "24px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                <h3>🗃️ คลังข้อมูลพัสดุฝั่งคลังข้อมูลในระบบทั้งหมด ({savedRecords.length})</h3>
-                <button className="btn btn-outline btn-sm" style={{ color: "red" }} onClick={async () => {
-                  if(!confirm("ยืนยันการลบประวัติการส่งออกและพัสดุทั้งหมดถาวร?")) return;
-                  setIsUserLoading(true);
-                  const snap = await getDocs(collection(db, "records"));
-                  const batch = writeBatch(db);
-                  snap.docs.forEach(d => batch.delete(d.ref));
-                  await batch.commit();
-                  fetchRecords();
-                }}>ล้างดาต้าเบสทั้งหมด</button>
-              </div>
-
-              <div className="tbl-wrap">
-                <table className="rec-table">
-                  <thead>
-                    <tr><th>#</th><th>ชื่อผู้รับ</th><th>เบอร์โทร</th><th>เลขพัสดุ Tracking</th><th>รหัสไปรษณีย์</th><th>สถานะ</th><th>จัดการ</th></tr>
-                  </thead>
-                  <tbody>
-                    {savedRecords.map((r, i) => (
-                      <tr key={r.id}>
-                        <td>{i + 1}</td>
-                        <td>{r.fullName}</td>
-                        <td>{r.phone || "-"}</td>
-                        <td style={{ fontFamily: "monospace", fontWeight: "600" }}>{r.trackingNumber}</td>
-                        <td>{r.postalCode}</td>
-                        <td><span className="badge badge-teal">{r.status || "จัดส่งสำเร็จ"}</span></td>
-                        <td>
-                          <button className="btn btn-outline btn-sm" style={{ color: "red", padding: "2px 6px" }} onClick={async () => {
-                            if(!confirm("ลบประวัติรายการนี้?")) return;
-                            await deleteDoc(doc(db, "records", r.id));
-                            fetchRecords();
-                          }}>ถอดถอน</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+                  <h3 style={{ fontSize: "18px" }}>{adminTab === "manage" ? "🗂️ ฐานข้อมูลพัสดุส่งออก" : "📝 ฐานข้อมูลรายชื่อรอจัดส่ง"}</h3>
+                  <div style={{ color: "var(--t2)", fontSize: "13px" }}>จำนวนทั้งหมด: <strong style={{ color: "var(--teal)" }}>{adminTab === "manage" ? savedRecords.length : savedRecipients.length}</strong></div>
+               </div>
+               
+               {isEngineRunning ? <div style={{ textAlign: "center", padding: "40px", color: "var(--t3)" }}>⏳ กำลังโหลดข้อมูล...</div> : (
+                 <div style={{ overflowX: "auto", border: "1px solid var(--br2)", borderRadius: "8px" }}>
+                   <table style={{ width: "100%", fontSize: "13px", textAlign: "left", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+                     <thead style={{ background: "var(--bg)" }}>
+                       <tr>
+                         <th style={{ padding: "12px 16px" }}>ชื่อผู้รับ</th>
+                         <th style={{ padding: "12px 16px" }}>เบอร์โทรศัพท์</th>
+                         {adminTab === "manage" && <th style={{ padding: "12px 16px" }}>เลข Tracking</th>}
+                         <th style={{ padding: "12px 16px" }}>รหัสไปรษณีย์</th>
+                       </tr>
+                     </thead>
+                     <tbody>
+                       {(adminTab === "manage" ? savedRecords : savedRecipients).map((r, i) => (
+                         <tr key={i} style={{ borderTop: "1px solid var(--br2)" }}>
+                           <td style={{ padding: "10px 16px", fontWeight: "500" }}>{r.fullName}</td>
+                           <td style={{ padding: "10px 16px", color: "var(--t2)" }}>{r.phone || "-"}</td>
+                           {adminTab === "manage" && <td style={{ padding: "10px 16px", fontFamily: "monospace", color: "var(--teal)", fontWeight: "600" }}>{r.trackingNumber}</td>}
+                           <td style={{ padding: "10px 16px", color: "var(--t2)" }}>{r.postalCode || "-"}</td>
+                         </tr>
+                       ))}
+                     </tbody>
+                   </table>
+                 </div>
+               )}
             </div>
           )}
+
         </div>
       )}
-
-      {/* ====================================================================== */}
-      {/* 🏷️ MODAL ENGINE: LABEL MANAGER & PRINTER DASHBOARD                    */}
-      {/* ====================================================================== */}
-      {activeModal === "label-manager" && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: "16px" }}>
-          <div className="card animate-fade-in" style={{ background: "var(--card)", padding: "28px", maxWidth: "600px", width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
-            <h3 style={{ marginBottom: "8px" }}>📐 ตั้งค่าพิมพ์สติกเกอร์บาร์โค้ดจ่าหน้าซอง (Thermal)</h3>
-            <p style={{ fontSize: "12px", color: "var(--t2)", marginBottom: "20px" }}>ตั้งค่าหน้ากระดาษจ่าหน้าเครื่องพิมพ์ความร้อนแบบม้วน</p>
-            
-            <div style={{ marginBottom: "16px" }}>
-              <label style={{ display: "block", fontSize: "12px", marginBottom: "6px" }}>ที่อยู่ส่งกลับขององค์กร (Sender Address)</label>
-              <input type="text" className="inp" style={{ marginBottom: "8px" }} placeholder="ชื่อผู้ส่ง..." value={senderInfo.name} onChange={(e) => setSenderInfo({ ...senderInfo, name: e.target.value })} />
-              <input type="text" className="inp" placeholder="ที่อยู่ผู้ส่งแบบละเอียด..." value={senderInfo.addr} onChange={(e) => setSenderInfo({ ...senderInfo, addr: e.target.value })} />
-            </div>
-
-            <div style={{ marginBottom: "24px" }}>
-              <label style={{ display: "block", fontSize: "12px", marginBottom: "6px" }}>เลือกขนาดสติกเกอร์จ่าหน้า</label>
-              <select className="inp" value={labelSize} onChange={(e) => setLabelSize(e.target.value)}>
-                <option value="therm-150x100">150 x 100 มิลลิเมตร (แนวนอนมาตรฐาน)</option>
-                <option value="therm-100x150">100 x 150 มิลลิเมตร (แนวตั้งยาว)</option>
-              </select>
-            </div>
-
-            <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
-              <button className="btn btn-outline" onClick={() => setActiveModal(null)}>ปิดหน้าต่าง</button>
-              <button className="btn btn-teal" onClick={executeLabelPrinting}>🖨️ สั่งพิมพ์ลาเบลทั้งหมด ({savedRecipients.length} ใบ)</button>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
