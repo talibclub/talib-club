@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { collection, query, where, getDocs } from "firebase/firestore";
-import { db } from ""../src/lib/firebase""; // ดึงการเชื่อมต่อมาจากไฟล์ที่เราสร้าง
+import { db } from "../../src/lib/firebase"; // ดึงการเชื่อมต่อมาจากไฟล์ที่เราสร้าง
 
 export default function Tracking() {
   const [searchQuery, setSearchQuery] = useState("");
