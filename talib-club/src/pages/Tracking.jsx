@@ -22,6 +22,10 @@ export default function Tracking() {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [secretClicks, setSecretClicks] = useState(0);
+
+  // --- Custom Dialog State ---
+  const [dialogConfig, setDialogConfig] = useState(null);
 
   // --- Public State ---
   const [userQuery, setUserQuery] = useState("");
@@ -57,14 +61,54 @@ export default function Tracking() {
   }, [adminTab, isAdminAuthenticated]);
 
   // ==========================================
+  // ★ CUSTOM DIALOG MANAGER (แทนที่ window.alert/confirm)
+  // ==========================================
+  const showDialog = (options) => {
+    return new Promise((resolve) => {
+      setDialogConfig({
+        ...options,
+        onConfirm: (val) => { setDialogConfig(null); resolve({ isConfirmed: true, value: val }); },
+        onCancel: () => { setDialogConfig(null); resolve({ isConfirmed: false }); }
+      });
+    });
+  };
+
+  const myAlert = async (msg, title = "แจ้งเตือน") => {
+    await showDialog({ type: 'alert', title, message: msg });
+  };
+
+  const myConfirm = async (msg, title = "ยืนยันการดำเนินการ") => {
+    const res = await showDialog({ type: 'confirm', title, message: msg });
+    return res.isConfirmed;
+  };
+
+  const myPrompt = async (msg, title = "ระบุข้อมูล") => {
+    const res = await showDialog({ type: 'prompt', title, message: msg });
+    return res.isConfirmed ? res.value : null;
+  };
+
+  // ==========================================
   // ★ FIREBASE FETCHING
   // ==========================================
+  const sortDataLikeCSV = (data) => {
+    return data.sort((a, b) => {
+      const tA = a.createdAt?.toMillis() || 0;
+      const tB = b.createdAt?.toMillis() || 0;
+      // ถ้าข้อมูลถูกสร้างพร้อมกันในเวลาใกล้กัน (ต่างกันไม่เกิน 2 วินาที) ให้เรียงตาม csvIndex แบบที่อยู่ในไฟล์
+      if (Math.abs(tA - tB) < 2000) {
+        return (a.csvIndex || 0) - (b.csvIndex || 0);
+      }
+      // เรียงล็อตใหม่ไว้บนสุด
+      return tB - tA;
+    });
+  };
+
   const fetchRecipients = async () => {
     setIsLoading(true);
     try {
       const snap = await getDocs(collection(db, "recipients"));
-      const items = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.createdAt?.toMillis()||0) - (a.createdAt?.toMillis()||0));
-      setRecipients(items);
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setRecipients(sortDataLikeCSV(items));
       setSelectedRecipients([]);
     } catch (e) { console.error(e); }
     setIsLoading(false);
@@ -74,8 +118,8 @@ export default function Tracking() {
     setIsLoading(true);
     try {
       const snap = await getDocs(collection(db, "records"));
-      const items = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.createdAt?.toMillis()||0) - (a.createdAt?.toMillis()||0));
-      setRecords(items);
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setRecords(sortDataLikeCSV(items));
       setSelectedRecords([]);
     } catch (e) { console.error(e); }
     setIsLoading(false);
@@ -84,6 +128,16 @@ export default function Tracking() {
   // ==========================================
   // ★ PUBLIC SEARCH (หน้าบ้านผู้ใช้)
   // ==========================================
+  const handleSecretClick = () => {
+    const newCount = secretClicks + 1;
+    setSecretClicks(newCount);
+    if (newCount >= 3) {
+      setView("admin-login");
+      setSecretClicks(0);
+    }
+    setTimeout(() => setSecretClicks(0), 1500);
+  };
+
   const handlePublicSearch = async (e, mode) => {
     e.preventDefault();
     if (!userQuery.trim()) return;
@@ -117,7 +171,7 @@ export default function Tracking() {
           let count = 0;
           const now = Timestamp.now();
           
-          res.data.forEach((row) => {
+          res.data.forEach((row, idx) => {
             // ค้นหาคอลัมน์จากชื่อที่ใกล้เคียงเผื่อหัวข้อในไฟล์เพี้ยน
             const getVal = (keys) => {
               for (const k of Object.keys(row)) {
@@ -135,6 +189,7 @@ export default function Tracking() {
               address: getVal(['ที่อยู่', 'address']).trim(),
               postalCode: getVal(['รหัสไปรษณีย์', 'zip']).trim() || (getVal(['ที่อยู่', 'address']).match(/\b\d{5}\b/)?.[0] || ""),
               bonusNote: getVal(['โบนัส', 'พิเศษ', 'bonus']).trim(),
+              csvIndex: idx, // เก็บตำแหน่งเพื่อเรียงให้ตรงกับ Excel
               createdAt: now
             };
 
@@ -150,15 +205,15 @@ export default function Tracking() {
 
           if (count > 0) {
             await batch.commit();
-            alert(`บันทึกข้อมูลสำเร็จ ${count} รายการเข้าสู่ระบบ`);
+            await myAlert(`บันทึกข้อมูลสำเร็จ ${count} รายการเข้าสู่ระบบ`, "สำเร็จ");
             if (targetCollection === "recipients") setAdminTab(2);
             else setAdminTab(4);
           } else {
-            alert("ไม่พบข้อมูลที่ถูกต้องในไฟล์ CSV (ต้องมีคอลัมน์ชื่อ)");
+            await myAlert("ไม่พบข้อมูลที่ถูกต้องในไฟล์ CSV\n\nโปรดตรวจสอบให้แน่ใจว่าในไฟล์มีคอลัมน์ 'ชื่อ' หรือ 'name'");
           }
         } catch (err) {
           console.error(err);
-          alert("เกิดข้อผิดพลาดในการบันทึกฐานข้อมูล");
+          await myAlert("เกิดข้อผิดพลาดในการบันทึกฐานข้อมูล", "ข้อผิดพลาด");
         }
         setIsLoading(false);
         e.target.value = ""; // reset input
@@ -171,8 +226,13 @@ export default function Tracking() {
   // ==========================================
   const handleBulkDelete = async (collectionName, selectedIds, clearAll = false) => {
     let idsToDelete = clearAll ? (collectionName === "recipients" ? recipients : records).map(r => r.id) : selectedIds;
-    if (idsToDelete.length === 0) return alert("กรุณาเลือกรายการที่ต้องการลบ");
-    if (!confirm(`ยืนยันการลบข้อมูล ${idsToDelete.length} รายการ?`)) return;
+    if (idsToDelete.length === 0) {
+      await myAlert("กรุณาเลือกรายการที่ต้องการลบ");
+      return;
+    }
+    
+    const isConfirmed = await myConfirm(`ยืนยันการลบข้อมูลจำนวน ${idsToDelete.length} รายการใช่หรือไม่?`);
+    if (!isConfirmed) return;
 
     setIsLoading(true);
     try {
@@ -181,16 +241,23 @@ export default function Tracking() {
         batch.delete(doc(db, collectionName, id));
       });
       await batch.commit();
-      alert("ลบข้อมูลสำเร็จ");
+      await myAlert("ลบข้อมูลออกจากระบบสำเร็จ", "สำเร็จ");
       if (collectionName === "recipients") fetchRecipients();
       else fetchRecords();
-    } catch (e) { console.error(e); alert("เกิดข้อผิดพลาด"); }
+    } catch (e) { 
+      console.error(e); 
+      await myAlert("เกิดข้อผิดพลาดในการลบข้อมูล", "ข้อผิดพลาด"); 
+    }
     setIsLoading(false);
   };
 
   const handleBulkBonus = async (collectionName, selectedIds) => {
-    if (selectedIds.length === 0) return alert("กรุณาเลือกรายการที่ต้องการเพิ่มโบนัส");
-    const note = prompt("ระบุข้อความโบนัส/หมายเหตุพิเศษ:");
+    if (selectedIds.length === 0) {
+      await myAlert("กรุณาเลือกรายการที่ต้องการเพิ่มโบนัส");
+      return;
+    }
+    
+    const note = await myPrompt("ระบุข้อความโบนัส/หมายเหตุพิเศษ ที่ต้องการเพิ่มให้กับรายชื่อที่เลือก:");
     if (note === null) return;
 
     setIsLoading(true);
@@ -200,15 +267,21 @@ export default function Tracking() {
         batch.update(doc(db, collectionName, id), { bonusNote: note.trim() });
       });
       await batch.commit();
-      alert("เพิ่มโบนัสสำเร็จ");
+      await myAlert(`เพิ่มโบนัสสำเร็จจำนวน ${selectedIds.length} รายการ`, "สำเร็จ");
       if (collectionName === "recipients") fetchRecipients();
       else fetchRecords();
-    } catch (e) { console.error(e); alert("เกิดข้อผิดพลาด"); }
+    } catch (e) { 
+      console.error(e); 
+      await myAlert("เกิดข้อผิดพลาดในการเพิ่มโบนัส", "ข้อผิดพลาด"); 
+    }
     setIsLoading(false);
   };
 
-  const exportCSV = (data, isRecords) => {
-    if (!data.length) return alert("ไม่มีข้อมูลให้ Export");
+  const exportCSV = async (data, isRecords) => {
+    if (!data.length) {
+      await myAlert("ไม่มีข้อมูลให้ Export", "แจ้งเตือน");
+      return;
+    }
     const bom = "\uFEFF";
     let csvContent = "";
     
@@ -238,16 +311,22 @@ export default function Tracking() {
       setActiveModal(null);
       if (collectionName === "recipients") fetchRecipients();
       else fetchRecords();
-    } catch (e) { console.error(e); alert("บันทึกไม่สำเร็จ"); }
+    } catch (e) { 
+      console.error(e); 
+      await myAlert("เกิดข้อผิดพลาด บันทึกไม่สำเร็จ", "ข้อผิดพลาด"); 
+    }
     setIsLoading(false);
   };
 
   // ==========================================
   // ★ LABEL PRINTER
   // ==========================================
-  const printLabels = () => {
+  const printLabels = async () => {
     const listToPrint = recipients.filter(r => selectedRecipients.length === 0 || selectedRecipients.includes(r.id));
-    if (listToPrint.length === 0) return alert("ไม่มีรายชื่อให้พิมพ์");
+    if (listToPrint.length === 0) {
+      await myAlert("ไม่มีรายชื่อให้พิมพ์ กรุณาลงรายชื่อเตรียมจัดส่งก่อน");
+      return;
+    }
     
     const { name: sName, phone: sPhone, addr: sAddr, size } = labelSettings;
     const cssMap = {
@@ -300,7 +379,10 @@ export default function Tracking() {
       {/* --------------------------------------------------------- */}
       {view === "home" && (
         <div style={{ textAlign: "center", padding: "60px 16px" }}>
-          <div style={{ fontSize: "64px", marginBottom: "16px" }}>📮</div>
+          {/* Secret Trigger 📮 Click 3 times fast */}
+          <div onClick={handleSecretClick} style={{ fontSize: "64px", marginBottom: "16px", cursor: "pointer", display: "inline-block", userSelect: "none", transition: "transform 0.1s" }} className="hover:scale-110">
+            📮
+          </div>
           <h1 style={{ fontSize: "36px", fontWeight: "700", marginBottom: "12px" }}>Talib Club Logistics</h1>
           <p style={{ color: "var(--t2)", marginBottom: "48px", fontSize: "15px" }}>ระบบตรวจสอบสิทธิ์รายชื่อจองหนังสือ และติดตามสถานะพัสดุ</p>
           
@@ -315,11 +397,6 @@ export default function Tracking() {
               <h2 style={{ color: "var(--text)", marginBottom: "8px", fontSize: "20px", fontWeight: "600" }}>ตรวจสอบเลข Track</h2>
               <p style={{ fontSize: "13px", color: "var(--t2)" }}>ค้นหารหัสไปรษณีย์และเลขพัสดุสำหรับกล่องที่ดำเนินการส่งออกไปแล้ว</p>
             </div>
-          </div>
-          
-          <div style={{ marginTop: "60px", display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--t3)", cursor: "pointer", opacity: 0.6 }} onClick={() => setView("admin-login")}>
-             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-             Admin Console Management
           </div>
         </div>
       )}
@@ -402,8 +479,8 @@ export default function Tracking() {
             <h1 style={{ fontSize: "24px", marginBottom: "8px", fontWeight: "600", color: "#1a3a5c" }}>Admin Dashboard</h1>
             <p style={{ color: "var(--t2)", fontSize: "13px", marginBottom: "24px" }}>จัดการข้อมูลแบบครบวงจร</p>
             <input type="password" className="inp" placeholder="Password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} style={{ marginBottom: "16px", textAlign: "center" }} />
-            <button className="btn btn-main style-full" style={{ width: "100%", background: "#1a3a5c", color: "white" }} onClick={() => {
-              if (adminPassword === "admin1234") { setIsAdminAuthenticated(true); localStorage.setItem("talib_admin_auth", "true"); setView("admin-dashboard"); } else { alert("รหัสผ่านไม่ถูกต้อง"); }
+            <button className="btn btn-main style-full" style={{ width: "100%", background: "#1a3a5c", color: "white" }} onClick={async () => {
+              if (adminPassword === "admin1234") { setIsAdminAuthenticated(true); localStorage.setItem("talib_admin_auth", "true"); setView("admin-dashboard"); } else { await myAlert("รหัสผ่านไม่ถูกต้อง"); }
             }}>เข้าสู่ระบบ</button>
             <button className="btn btn-outline btn-sm" style={{ width: "100%", marginTop: "12px", border: "none" }} onClick={() => setView("home")}>← กลับหน้าหลัก</button>
           </div>
@@ -711,6 +788,39 @@ export default function Tracking() {
                <button className="btn" style={{ background: "#1a3a5c", color: "white" }} onClick={printLabels}>🖨️ พิมพ์ลาเบลที่เลือก</button>
              </div>
           </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 🛎️ CUSTOM DIALOG: ALERT / CONFIRM / PROMPT */}
+      {/* ========================================================= */}
+      {dialogConfig && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+           <div className="card animate-fade-in" style={{ width: "100%", maxWidth: "400px", padding: "24px", background: "white", borderRadius: "12px", textAlign: "center", boxShadow: "0 10px 25px rgba(0,0,0,0.2)" }}>
+              <div style={{ fontSize: "48px", marginBottom: "16px" }}>
+                 {dialogConfig.type === 'alert' ? (dialogConfig.title === "ข้อผิดพลาด" ? '❌' : '✅') : dialogConfig.type === 'confirm' ? '❓' : '📝'}
+              </div>
+              <h3 style={{ fontSize: "18px", fontWeight: "700", color: "#1a3a5c", marginBottom: "8px" }}>{dialogConfig.title}</h3>
+              <p style={{ fontSize: "14px", color: "var(--t2)", marginBottom: "20px", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{dialogConfig.message}</p>
+              
+              {dialogConfig.type === 'prompt' && (
+                 <input type="text" className="inp" autoFocus placeholder="พิมพ์ข้อมูลที่นี่..." 
+                    style={{ marginBottom: "20px", textAlign: "left", background: "var(--bg)" }} 
+                    value={dialogConfig.inputValue || ''}
+                    onKeyDown={(e) => { if (e.key === 'Enter') dialogConfig.onConfirm(dialogConfig.inputValue); }}
+                    onChange={e => setDialogConfig({...dialogConfig, inputValue: e.target.value})} 
+                 />
+              )}
+              
+              <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+                 {dialogConfig.type !== 'alert' && (
+                    <button className="btn btn-outline" style={{ flex: 1, padding: "10px" }} onClick={dialogConfig.onCancel}>ยกเลิก</button>
+                 )}
+                 <button className="btn" style={{ background: "#1a3a5c", color: "white", flex: dialogConfig.type === 'alert' ? 0 : 1, minWidth: "120px", padding: "10px" }} onClick={() => dialogConfig.onConfirm(dialogConfig.inputValue)}>
+                    ตกลง
+                 </button>
+              </div>
+           </div>
         </div>
       )}
 
