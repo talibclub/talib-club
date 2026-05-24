@@ -117,7 +117,7 @@ export default function Nav({ page, go, theme, setTheme }) {
         )}
       </div>
 
-      {/* MOBILE DRAWER */}
+      {/* MOBILE DRAWER (ฝั่งซ้าย) */}
       {isMobile && menuOpen && (
         <>
           <div onClick={() => setMenuOpen(false)} style={{
@@ -125,11 +125,13 @@ export default function Nav({ page, go, theme, setTheme }) {
             zIndex: 150, backdropFilter: "blur(2px)",
           }} />
           <div style={{
-            position: "fixed", top: 0, right: 0, bottom: 0, width: 260,
-            background: "var(--bg)", borderLeft: ".5px solid var(--br)",
+            position: "fixed", top: 0, left: 0, bottom: 0, width: 260,
+            background: "var(--bg)", borderRight: ".5px solid var(--br)",
             zIndex: 160, padding: "60px 0 24px",
             display: "flex", flexDirection: "column",
-            boxShadow: "-8px 0 32px rgba(0,0,0,.4)",
+            boxShadow: "8px 0 32px rgba(0,0,0,.4)",
+            transform: menuOpen ? "translateX(0)" : "translateX(-100%)",
+            transition: "transform .25s ease-in-out"
           }}>
             {NAV_LINKS.map(l => (
               <button key={l.id} onClick={() => nav(l.id)} style={{
