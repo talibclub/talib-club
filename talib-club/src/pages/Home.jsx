@@ -1,9 +1,14 @@
 import { ARTICLES, BOOKS, MEDIA, SITE } from "../data/index.js"
+import { useContentCollection, useSiteSettings } from "../lib/contentStore.js"
 
 export default function Home({ go }) {
-  const recent     = ARTICLES.slice(0, 3)
-  const newBooks   = BOOKS.slice(0, 4)
-  const recentMedia= MEDIA.slice(0, 3)
+  const { items: articles } = useContentCollection("articles", ARTICLES)
+  const { items: books } = useContentCollection("books", BOOKS)
+  const { items: media } = useContentCollection("media", MEDIA)
+  const { site } = useSiteSettings(SITE)
+  const recent     = articles.slice(0, 3)
+  const newBooks   = books.slice(0, 4)
+  const recentMedia= media.slice(0, 3)
 
   return (
     <div>
@@ -11,13 +16,13 @@ export default function Home({ go }) {
       <div style={{ padding: "40px 0 36px", borderBottom: ".5px solid var(--br2)", marginBottom: 32 }}>
         <div className="badge badge-acc" style={{ marginBottom: 16 }}>
           <span style={{ width:5, height:5, background:"var(--teal)", borderRadius:"50%", display:"inline-block" }}></span>
-          {SITE.location} · {SITE.tagline}
+          {site.location} · {site.tagline}
         </div>
         <h1 style={{ marginBottom: 10 }}>
           ศึกษาอิสลาม<br/>
           <span style={{ color:"var(--teal)" }}>อย่างจริงจัง</span>
         </h1>
-        <p style={{ maxWidth: 480, marginBottom: 24 }}>{SITE.desc}</p>
+        <p style={{ maxWidth: 480, marginBottom: 24 }}>{site.desc}</p>
         <div className="hero-actions" style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
           <button className="btn btn-main" onClick={() => go("articles")}>
             <i className="ti ti-book" style={{ marginRight:6, fontSize:13 }}></i>เริ่มอ่าน
@@ -41,9 +46,9 @@ export default function Home({ go }) {
           <div className="ayah-ar" style={{
             fontSize:18, color:"var(--text)", direction:"rtl", textAlign:"right",
             lineHeight:1.7, marginBottom:6, fontFamily:"serif"
-          }}>{SITE.ayah.ar}</div>
+          }}>{site.ayah.ar}</div>
           <div style={{ fontSize:12, color:"var(--t2)", fontWeight:300, lineHeight:1.5 }}>
-            {SITE.ayah.th} — {SITE.ayah.ref}
+            {site.ayah.th} — {site.ayah.ref}
           </div>
         </div>
       </div>
@@ -51,10 +56,10 @@ export default function Home({ go }) {
       {/* STATS */}
       <div className="grid4" style={{ marginBottom:32 }}>
         {[
-          { n: SITE.stats.followers, l: SITE.stats.followersLabel, icon: "ti-users" },
-          { n: ARTICLES.length + "+", l: "บทความ", icon: "ti-file-text" },
-          { n: BOOKS.length + "+", l: "หนังสือ/วารสาร", icon: "ti-books" },
-          { n: MEDIA.length + "+", l: "มีเดีย", icon: "ti-player-play" },
+          { n: site.stats.followers, l: site.stats.followersLabel, icon: "ti-users" },
+          { n: articles.length + "+", l: "บทความ", icon: "ti-file-text" },
+          { n: books.length + "+", l: "หนังสือ/วารสาร", icon: "ti-books" },
+          { n: media.length + "+", l: "มีเดีย", icon: "ti-player-play" },
         ].map((s, i) => (
           <div key={i} className="card" style={{ padding:"16px", textAlign:"center" }}>
             <i className={`ti ${s.icon}`} style={{ fontSize:20, color:"var(--teal)", display:"block", marginBottom:6 }}></i>

@@ -1,19 +1,6 @@
 import { useState, useEffect } from "react";
-import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs, writeBatch, doc, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
-
-// --- Firebase Configuration ---
-const firebaseConfig = {
-  apiKey: "AIzaSyAqz8d5xKNI-2LRAzFlTURJgYva0hOe3UE",
-  authDomain: "talib-trackingnumber.firebaseapp.com",
-  projectId: "talib-trackingnumber",
-  storageBucket: "talib-trackingnumber.firebasestorage.app",
-  messagingSenderId: "495823490887",
-  appId: "1:495823490887:web:59062f61596514eb764662"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+import { collection, getDocs, writeBatch, doc, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
+import { trackingDb as db } from "../lib/trackingFirebase.js";
 
 export default function Tracking() {
   // --- View & Routing State ---

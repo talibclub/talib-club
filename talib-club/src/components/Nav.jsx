@@ -1,18 +1,20 @@
-import { useState, useEffect } from "react"
+import { useEffect, useRef, useState } from "react"
 import { SITE } from "../data/index.js"
 
 const NAV_LINKS = [
-  { id: "home",     label: "หน้าหลัก",  icon: "ti-home" },
-  { id: "articles", label: "บทความ",    icon: "ti-file-text" },
-  { id: "library",  label: "ห้องสมุด",  icon: "ti-books" },
-  { id: "media",    label: "มีเดีย",    icon: "ti-player-play" },
-  { id: "scholars", label: "อุลามาอ์",  icon: "ti-users" },
-  { id: "tracking", label: "ตรวจสอบพัสดุ", icon: "ti-package" },
+  { id: "home", label: "หน้าหลัก", icon: "ti-home" },
+  { id: "articles", label: "บทความ", icon: "ti-file-text" },
+  { id: "library", label: "ห้องสมุด", icon: "ti-books" },
+  { id: "media", label: "มีเดีย", icon: "ti-player-play" },
+  { id: "scholars", label: "อุลามาอฺ", icon: "ti-users" },
+  { id: "tracking", label: "ตรวจพัสดุ", icon: "ti-package" },
 ]
 
-export default function Nav({ page, go, theme, setTheme }) {
+export default function Nav({ page, go, theme, setTheme, authState }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const accountRef = useRef(null)
 
   useEffect(() => {
     const fn = () => {
@@ -24,22 +26,46 @@ export default function Nav({ page, go, theme, setTheme }) {
     return () => window.removeEventListener("resize", fn)
   }, [])
 
-  function nav(id) {
-    go(id)
+  useEffect(() => {
+    function closeAccount(e) {
+      if (accountRef.current && !accountRef.current.contains(e.target)) setAccountOpen(false)
+    }
+    function closeOnEsc(e) {
+      if (e.key === "Escape") setAccountOpen(false)
+    }
+    document.addEventListener("mousedown", closeAccount)
+    document.addEventListener("keydown", closeOnEsc)
+    return () => {
+      document.removeEventListener("mousedown", closeAccount)
+      document.removeEventListener("keydown", closeOnEsc)
+    }
+  }, [])
+
+  function nav(id, data = null) {
+    go(id, data)
     setMenuOpen(false)
+    setAccountOpen(false)
   }
+
+  async function logout() {
+    await authState.logout()
+    nav("home")
+  }
+
+  const userName = authState?.profile?.displayName || authState?.user?.displayName || authState?.user?.email || "บัญชีของฉัน"
+  const userInitial = (userName.trim()[0] || "U").toUpperCase()
 
   return (
     <>
       <nav style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "12px 20px", borderBottom: ".5px solid var(--br2)",
-        position: "sticky", top: 0, zIndex: 100, // ต่ำกว่า Drawer
+        position: "sticky", top: 0, zIndex: 100,
         background: "var(--nav-bg)", backdropFilter: "blur(14px)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 15 }}>
           {isMobile && (
-            <button onClick={() => setMenuOpen(!menuOpen)} style={{ background: "transparent", border: "none", fontSize: 20, cursor: "pointer", color: "var(--text)" }}>
+            <button onClick={() => setMenuOpen(!menuOpen)} style={iconButtonStyle} aria-label={menuOpen ? "Close menu" : "Open menu"}>
               <i className={`ti ${menuOpen ? "ti-x" : "ti-menu-2"}`}></i>
             </button>
           )}
@@ -50,58 +76,157 @@ export default function Nav({ page, go, theme, setTheme }) {
 
         {!isMobile && (
           <div style={{ display: "flex", gap: "8px" }}>
-            {NAV_LINKS.map(l => (
-              <button key={l.id} onClick={() => nav(l.id)} style={{
-                background: page === l.id ? "var(--bg2)" : "transparent",
-                border: "none", cursor: "pointer", padding: "6px 12px",
-                borderRadius: 8, fontSize: 13, color: page === l.id ? "var(--text)" : "var(--t2)",
-              }}>
-                {l.label}
-              </button>
-            ))}
+            {NAV_LINKS.map(l => <DesktopNavButton key={l.id} item={l} page={page} nav={nav} />)}
           </div>
         )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div ref={accountRef} style={{ position: "relative" }}>
+            <button
+              onClick={() => authState?.user ? setAccountOpen(open => !open) : nav("auth")}
+              style={{
+                background: authState?.user ? "var(--teal-bg)" : "var(--bg2)",
+                border: "none", cursor: "pointer",
+                color: authState?.user ? "var(--teal)" : "var(--t3)",
+                padding: authState?.user ? 0 : "6px 10px",
+                borderRadius: 20, width: authState?.user ? 34 : "auto",
+                height: authState?.user ? 34 : "auto",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontFamily: "'Prompt',sans-serif", fontWeight: 600,
+              }}
+              title={authState?.user ? "บัญชีของฉัน" : "เข้าสู่ระบบ"}
+              aria-label={authState?.user ? "เมนูบัญชี" : "เข้าสู่ระบบ"}
+              aria-expanded={accountOpen}
+            >
+              {authState?.user ? (
+                authState.user?.photoURL
+                  ? <img src={authState.user.photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
+                  : userInitial
+              ) : <i className="ti ti-login"></i>}
+            </button>
+
+            {authState?.user && accountOpen && (
+              <AccountDropdown
+                name={userName}
+                email={authState.user?.email}
+                photoURL={authState.user?.photoURL}
+                isStaff={authState.isStaff}
+                nav={nav}
+                logout={logout}
+              />
+            )}
+          </div>
           <button onClick={() => setTheme(theme === "light" ? "dark" : "light")} style={{
             background: "var(--bg2)", border: "none", cursor: "pointer",
-            color: "var(--t3)", padding: "6px 10px", borderRadius: 20
-          }}>
+            color: "var(--t3)", padding: "6px 10px", borderRadius: 20,
+          }} title="เปลี่ยนธีม" aria-label={theme === "light" ? "Switch to dark theme" : "Switch to light theme"}>
             <i className={`ti ${theme === "light" ? "ti-moon" : "ti-sun"}`}></i>
           </button>
         </div>
       </nav>
 
-      {/* MOBILE DRAWER: แก้ไข zIndex และตำแหน่งให้ครอบคลุม */}
       {isMobile && menuOpen && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          zIndex: 999, // ให้สูงกว่าทุกอย่างในหน้าเว็บ
-        }}>
-          {/* Overlay โปร่งใส */}
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}>
           <div onClick={() => setMenuOpen(false)} style={{
-            position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)"
+            position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)",
           }} />
-          
-          {/* เมนูจริง */}
           <div style={{
             position: "absolute", top: 0, left: 0, bottom: 0, width: "280px",
             background: "var(--bg)", padding: "60px 20px",
-            borderRight: "1px solid var(--br2)", boxShadow: "5px 0 15px rgba(0,0,0,0.1)"
+            borderRight: "1px solid var(--br2)", boxShadow: "5px 0 15px rgba(0,0,0,0.1)",
           }}>
             {NAV_LINKS.map(l => (
-              <button key={l.id} onClick={() => nav(l.id)} style={{
-                display: "block", width: "100%", textAlign: "left", padding: "18px 10px",
-                fontSize: 16, background: "transparent", border: "none",
-                color: page === l.id ? "var(--teal)" : "var(--text)", cursor: "pointer"
-              }}>
+              <button key={l.id} onClick={() => nav(l.id)} style={mobileButtonStyle(page, l.id)}>
                 <i className={`ti ${l.icon}`} style={{ marginRight: 15 }}></i>
                 {l.label}
               </button>
             ))}
+            <button onClick={() => nav(authState?.user ? "member" : "auth")} style={mobileButtonStyle(page, authState?.user ? "member" : "auth")}>
+              <i className={`ti ${authState?.user ? "ti-user-circle" : "ti-login"}`} style={{ marginRight: 15 }}></i>
+              {authState?.user ? "บัญชีของฉัน" : "เข้าสู่ระบบ"}
+            </button>
           </div>
         </div>
       )}
     </>
   )
+}
+
+function AccountDropdown({ name, email, photoURL, isStaff, nav, logout }) {
+  return (
+    <div style={{
+      position: "absolute", right: 0, top: 42, width: 260,
+      background: "var(--card)", border: ".5px solid var(--br2)",
+      borderRadius: 12, boxShadow: "0 18px 45px rgba(0,0,0,.18)",
+      padding: 10, zIndex: 200, color: "var(--text)",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 8px 10px", borderBottom: ".5px solid var(--br2)" }}>
+        <div style={{
+          width: 34, height: 34, borderRadius: "50%", background: "var(--teal-bg)",
+          color: "var(--teal)", display: "flex", alignItems: "center", justifyContent: "center",
+          fontWeight: 600, overflow: "hidden",
+        }}>
+          {photoURL ? <img src={photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (name.trim()[0] || "U").toUpperCase()}
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+          {email && <div style={{ fontSize: 11, color: "var(--t3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</div>}
+        </div>
+      </div>
+
+      <DropdownItem icon="ti-layout-dashboard" label="แดชบอร์ดสมาชิก" onClick={() => nav("member", { view: "overview" })} />
+      <DropdownItem icon="ti-user-circle" label="โปรไฟล์ของฉัน" onClick={() => nav("member", { view: "profile" })} />
+      {isStaff && <DropdownItem icon="ti-briefcase" label="Staff Workspace" onClick={() => nav("staff")} />}
+      {isStaff && <DropdownItem icon="ti-shield-check" label="Admin Panel" onClick={() => nav("admin")} />}
+
+      <div style={{ borderTop: ".5px solid var(--br2)", marginTop: 6, paddingTop: 6 }}>
+        <DropdownItem icon="ti-logout" label="ออกจากระบบ" danger onClick={logout} />
+      </div>
+    </div>
+  )
+}
+
+function DropdownItem({ icon, label, onClick, danger }) {
+  return (
+    <button onClick={onClick} style={{
+      width: "100%", border: "none", background: "transparent", cursor: "pointer",
+      color: danger ? "#e05555" : "var(--text)", display: "flex", alignItems: "center",
+      gap: 10, padding: "10px 8px", borderRadius: 8, textAlign: "left",
+      fontFamily: "'Prompt',sans-serif", fontSize: 12,
+    }}>
+      <i className={`ti ${icon}`} style={{ fontSize: 15, color: danger ? "#e05555" : "var(--teal)" }}></i>
+      {label}
+    </button>
+  )
+}
+
+function DesktopNavButton({ item, page, nav }) {
+  return (
+    <button onClick={() => nav(item.id)} style={{
+      background: page === item.id ? "var(--bg2)" : "transparent",
+      border: "none", cursor: "pointer", padding: "6px 12px",
+      borderRadius: 8, fontSize: 13,
+      color: page === item.id ? "var(--text)" : "var(--t2)",
+      fontFamily: "'Prompt',sans-serif",
+    }}>
+      {item.label}
+    </button>
+  )
+}
+
+function mobileButtonStyle(page, id) {
+  return {
+    display: "block", width: "100%", textAlign: "left", padding: "18px 10px",
+    fontSize: 16, background: "transparent", border: "none",
+    color: page === id ? "var(--teal)" : "var(--text)", cursor: "pointer",
+    fontFamily: "'Prompt',sans-serif",
+  }
+}
+
+const iconButtonStyle = {
+  background: "transparent",
+  border: "none",
+  fontSize: 20,
+  cursor: "pointer",
+  color: "var(--text)",
 }

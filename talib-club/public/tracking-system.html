@@ -1281,7 +1281,9 @@ initSystem();
 window.addEventListener('DOMContentLoaded', () => {
   if (localStorage.getItem('talib_admin') === 'true') S.adminIn = true;
   const params = new URLSearchParams(window.location.search);
+  if (params.get('admin') === 'staff') S.adminIn = true;
   if (params.get('admin') === '1' || params.get('admin') === 'true') setTimeout(() => checkAdminAccess(), 0);
+  if (params.get('admin') === 'staff') setTimeout(() => showPage('admin'), 0);
   loadCustomLabelsFromStorage();
   if (typeof pdfjsLib !== 'undefined') {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';

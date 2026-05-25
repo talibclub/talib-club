@@ -1,26 +1,29 @@
 import { useState } from "react"
-import { MEDIA } from "../data/index.js"
+import { DEFAULT_TAXONOMY, MEDIA } from "../data/index.js"
+import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 
 export default function Media() {
+  const { items: media, loading } = useContentCollection("media", MEDIA)
+  const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   const [filter, setFilter] = useState("all")
   const [selected, setSelected] = useState(null)
 
-  const filtered = MEDIA.filter(m=>filter==="all"||m.type===filter)
+  const filtered = media.filter(m=>filter==="all"||m.type===filter)
 
   return (
     <div>
       <div style={{marginBottom:28}}>
         <h1 style={{marginBottom:8}}>มีเดีย</h1>
         <p>วิดีโอ YouTube และพอดแคสต์ Spotify จาก Talib Club</p>
+        {loading && <p style={{ marginTop: 8, fontSize: 12 }}>กำลังโหลดมีเดียล่าสุด...</p>}
       </div>
 
       {/* FILTER */}
       <div style={{display:"flex",gap:6,marginBottom:24}}>
-        {[
-          {id:"all",label:"ทั้งหมด",icon:"ti-layout-grid"},
-          {id:"youtube",label:"YouTube",icon:"ti-brand-youtube"},
-          {id:"spotify",label:"Spotify",icon:"ti-brand-spotify"},
-        ].map(f=>(
+        {[{id:"all",label:"ทั้งหมด",icon:"ti-layout-grid"}, ...(taxonomy.mediaTypes || []).map(item => ({
+          id: item, label: item === "youtube" ? "YouTube" : item === "spotify" ? "Spotify" : item,
+          icon: item === "youtube" ? "ti-brand-youtube" : item === "spotify" ? "ti-brand-spotify" : "ti-player-play",
+        }))].map(f=>(
           <button key={f.id} onClick={()=>setFilter(f.id)} style={{
             fontFamily:"'Prompt',sans-serif",fontSize:12,fontWeight:300,
             padding:"6px 14px",borderRadius:20,border:".5px solid var(--br)",
@@ -45,6 +48,26 @@ export default function Media() {
           <div style={{padding:"14px 16px"}}>
             <div style={{fontSize:14,fontWeight:500,color:"#fff",marginBottom:4}}>{selected.title}</div>
             <div style={{fontSize:12,color:"rgba(255,255,255,.5)",fontWeight:300}}>{selected.series}</div>
+          </div>
+        </div>
+      )}
+
+      {selected && selected.type==="spotify" && (
+        <div style={{marginBottom:28,borderRadius:12,overflow:"hidden",
+          border:".5px solid var(--br2)",background:"var(--card)"}}>
+          {selected.spotifyUrl ? (
+            <iframe style={{width:"100%",height:152,border:"none"}}
+              src={selected.spotifyUrl.includes("/embed/")
+                ? selected.spotifyUrl
+                : selected.spotifyUrl.replace("open.spotify.com/", "open.spotify.com/embed/")}
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              loading="lazy" title={selected.title}/>
+          ) : (
+            <div className="empty">ยังไม่ได้ใส่ Spotify URL</div>
+          )}
+          <div style={{padding:"14px 16px"}}>
+            <div style={{fontSize:14,fontWeight:500,color:"var(--text)",marginBottom:4}}>{selected.title}</div>
+            <div style={{fontSize:12,color:"var(--t3)",fontWeight:300}}>{selected.series}</div>
           </div>
         </div>
       )}

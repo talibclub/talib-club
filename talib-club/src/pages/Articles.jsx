@@ -1,28 +1,26 @@
 import { useState } from "react"
-import { ARTICLES, ARTICLE_CATEGORIES as CATEGORIES, SERIES } from "../data/index.js"
+import { ARTICLES, DEFAULT_TAXONOMY } from "../data/index.js"
+import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 
 export default function Articles({ go }) {
+  const { items: articles, loading } = useContentCollection("articles", ARTICLES)
+  const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   const [cat, setCat] = useState("all")
   const [search, setSearch] = useState("")
   const [type, setType] = useState("all")
 
-  const types = [
-    {id:"all",label:"ทั้งหมด"},
-    {id:"series",label:"ซีรีส์"},
-    {id:"general",label:"ทั่วไป"},
-    {id:"specific",label:"เฉพาะเรื่อง"},
-    {id:"social",label:"สังคมศาสตร์"},
-  ]
+  const types = [{ id: "all", label: "ทั้งหมด" }, ...(taxonomy.articleTypes || [])]
+  const categories = [{ id: "all", label: "ทั้งหมด" }, ...(taxonomy.articleCategories || [])]
 
-  const filtered = ARTICLES.filter(a=>{
+  const filtered = articles.filter(a=>{
     const matchCat = cat==="all" || a.category===cat
     const matchType = type==="all" || a.type===type
     const matchSearch = !search || a.title.toLowerCase().includes(search.toLowerCase())
     return matchCat && matchType && matchSearch
   })
 
-  const seriesGroups = SERIES.map(s=>({
-    ...s, articles: ARTICLES.filter(a=>a.type==="series"&&a.seriesId===s.id)
+  const seriesGroups = (taxonomy.articleSeries || []).map(s=>({
+    ...s, articles: articles.filter(a=>a.type==="series"&&a.seriesId===s.id)
   })).filter(s=>s.articles.length>0)
 
   return (
@@ -30,6 +28,7 @@ export default function Articles({ go }) {
       <div style={{marginBottom:28}}>
         <h1 style={{marginBottom:8}}>บทความ</h1>
         <p>คลังบทความวิชาการอิสลาม จัดหมวดหมู่และซีรีส์ให้ค้นหาง่าย</p>
+        {loading && <p style={{ marginTop: 8, fontSize: 12 }}>กำลังโหลดบทความล่าสุด...</p>}
       </div>
 
       {/* SEARCH + FILTER */}
@@ -48,7 +47,7 @@ export default function Articles({ go }) {
 
       {/* CATEGORY TABS */}
       <div style={{display:"flex",gap:6,marginBottom:24,flexWrap:"wrap"}}>
-        {CATEGORIES.map(c=>(
+        {categories.map(c=>(
           <button key={c.id} onClick={()=>setCat(c.id)} style={{
             fontFamily:"'Prompt',sans-serif",fontSize:12,fontWeight:300,
             padding:"5px 12px",borderRadius:20,border:".5px solid var(--br)",

@@ -1,12 +1,15 @@
 import { useState } from "react"
-import { BOOKS } from "../data/index.js"
+import { BOOKS, DEFAULT_TAXONOMY } from "../data/index.js"
+import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 
 export default function Library() {
+  const { items: books, loading } = useContentCollection("books", BOOKS)
+  const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   const [filter, setFilter] = useState("all")
   const [search, setSearch] = useState("")
-  const types = ["all","หนังสือ","วารสาร","PDF","รายงาน"]
+  const types = ["all", ...(taxonomy.bookTypes || [])]
 
-  const filtered = BOOKS.filter(b=>{
+  const filtered = books.filter(b=>{
     const matchType = filter==="all"||b.type===filter
     const matchSearch = !search||b.title.toLowerCase().includes(search.toLowerCase())||b.desc.includes(search)
     return matchType && matchSearch
@@ -17,6 +20,7 @@ export default function Library() {
       <div style={{marginBottom:28}}>
         <h1 style={{marginBottom:8}}>ห้องสมุด</h1>
         <p>หนังสือ วารสาร และสื่อดาวน์โหลดทั้งหมดของ Talib Club</p>
+        {loading && <p style={{ marginTop: 8, fontSize: 12 }}>กำลังโหลดรายการล่าสุด...</p>}
       </div>
 
       {/* SEARCH + FILTER */}
@@ -76,12 +80,16 @@ export default function Library() {
 
                 {/* Actions */}
                 <div style={{display:"flex",gap:8}}>
-                  <button className="btn btn-teal" style={{flex:1,fontSize:12,padding:"8px 0"}}>
+                  <a className="btn btn-teal" href={b.fileUrl || "#"} target="_blank" rel="noopener noreferrer"
+                    style={{flex:1,fontSize:12,padding:"8px 0",textDecoration:"none",textAlign:"center",
+                      pointerEvents:b.fileUrl?"auto":"none",opacity:b.fileUrl?1:.55}}>
                     <i className="ti ti-download" style={{marginRight:5,fontSize:12}}></i>ดาวน์โหลด
-                  </button>
-                  <button className="btn btn-outline" style={{fontSize:12,padding:"8px 12px"}}>
+                  </a>
+                  <a className="btn btn-outline" href={b.fileUrl || "#"} target="_blank" rel="noopener noreferrer"
+                    style={{fontSize:12,padding:"8px 12px",textDecoration:"none",
+                      pointerEvents:b.fileUrl?"auto":"none",opacity:b.fileUrl?1:.55}}>
                     <i className="ti ti-eye" style={{fontSize:12}}></i>
-                  </button>
+                  </a>
                 </div>
               </div>
             ))}

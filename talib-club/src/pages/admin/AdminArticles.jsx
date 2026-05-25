@@ -1,5 +1,6 @@
 import { useState } from "react"
-import { ARTICLES, ARTICLE_CATEGORIES, SERIES } from "../../data/index.js"
+import { ARTICLES, DEFAULT_TAXONOMY } from "../../data/index.js"
+import { useContentCollection, useTaxonomySettings } from "../../lib/contentStore.js"
 
 const EMPTY = {
   id: Date.now(), type: "general", seriesId: "", seriesName: "", part: null,
@@ -9,7 +10,8 @@ const EMPTY = {
 }
 
 export default function AdminArticles() {
-  const [items, setItems]   = useState(ARTICLES)
+  const { items, loading, error, saveItem, deleteItem, isUsingFallback } = useContentCollection("articles", ARTICLES)
+  const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   const [editing, setEdit]  = useState(null)
   const [search, setSearch] = useState("")
   const [saved, setSaved]   = useState(false)
@@ -18,35 +20,40 @@ export default function AdminArticles() {
     a.title.toLowerCase().includes(search.toLowerCase())
   )
 
-  function openNew() { setEdit({ ...EMPTY, id: Date.now() }) }
+  function openNew() { setEdit({ ...EMPTY, id: crypto.randomUUID() }) }
   function openEdit(a) { setEdit({ ...a, tags: [...(a.tags || [])] }) }
   function cancel() { setEdit(null) }
 
-  function save() {
+  async function save() {
     if (!editing.title.trim()) return alert("กรุณาใส่ชื่อบทความ")
-    setItems(prev => {
-      const idx = prev.findIndex(a => a.id === editing.id)
-      return idx >= 0
-        ? prev.map(a => a.id === editing.id ? editing : a)
-        : [...prev, editing]
-    })
-    setEdit(null)
-    flash()
+    try {
+      await saveItem(editing)
+      setEdit(null)
+      flash()
+    } catch (err) {
+      console.error(err)
+      alert("บันทึกบทความไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore หรือการเชื่อมต่ออินเทอร์เน็ต")
+    }
   }
 
-  function del(id) {
+  async function del(id) {
     if (!confirm("ลบบทความนี้?")) return
-    setItems(prev => prev.filter(a => a.id !== id))
-    flash()
+    try {
+      await deleteItem(id)
+      flash()
+    } catch (err) {
+      console.error(err)
+      alert("ลบบทความไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore หรือการเชื่อมต่ออินเทอร์เน็ต")
+    }
   }
 
   function flash() { setSaved(true); setTimeout(() => setSaved(false), 2500) }
 
-  if (editing) return <ArticleForm item={editing} setItem={setEdit} onSave={save} onCancel={cancel} />
+  if (editing) return <ArticleForm item={editing} setItem={setEdit} onSave={save} onCancel={cancel} taxonomy={taxonomy} />
 
   return (
     <div>
-      <SectionHead title="บทความ" count={items.length} saved={saved}
+      <SectionHead title="บทความ" count={items.length} saved={saved} loading={loading}
         onNew={openNew} search={search} setSearch={setSearch} />
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -81,13 +88,20 @@ export default function AdminArticles() {
         {filtered.length === 0 && <Empty text="ไม่พบบทความ" />}
       </div>
 
-      <CodeHint title="วิธีบันทึกถาวร — แก้ไฟล์นี้:" file="src/data/articles.js"
-        desc="เพิ่ม/แก้ object ในไฟล์ articles.js แล้ว push ขึ้น GitHub — เว็บจะอัปเดตเอง" />
+      {(error || isUsingFallback) && (
+        <CodeHint
+          title={error ? "ใช้ข้อมูลสำรองอยู่" : "ยังไม่มีข้อมูลใน Firestore"}
+          file="Firestore: content_articles"
+          desc={error
+            ? "ระบบกำลังแสดงข้อมูลตั้งต้นจากไฟล์ในโปรเจกต์ หากต้องการบันทึกจริงให้ตรวจการตั้งค่าและสิทธิ์ Firestore"
+            : "ตอนนี้แสดงข้อมูลตั้งต้นจากไฟล์เดิม เมื่อสตาฟกดบันทึกบทความ ระบบจะเผยแพร่บทความผ่าน Firestore"}
+        />
+      )}
     </div>
   )
 }
 
-function ArticleForm({ item, setItem, onSave, onCancel }) {
+function ArticleForm({ item, setItem, onSave, onCancel, taxonomy }) {
   const set = (k, v) => setItem(prev => ({ ...prev, [k]: v }))
   return (
     <div style={{ maxWidth: 720 }}>
@@ -101,15 +115,14 @@ function ArticleForm({ item, setItem, onSave, onCancel }) {
         </Field>
         <Field label="ประเภท">
           <select value={item.type} onChange={e => set("type", e.target.value)}>
-            <option value="general">ทั่วไป</option>
-            <option value="series">ซีรีส์</option>
-            <option value="specific">เฉพาะเรื่อง</option>
-            <option value="social">สังคมศาสตร์</option>
+            {(taxonomy.articleTypes || []).map(type =>
+              <option key={type.id} value={type.id}>{type.label}</option>
+            )}
           </select>
         </Field>
         <Field label="หมวดหมู่">
           <select value={item.category} onChange={e => set("category", e.target.value)}>
-            {ARTICLE_CATEGORIES.filter(c => c.id !== "all").map(c =>
+            {(taxonomy.articleCategories || []).map(c =>
               <option key={c.id} value={c.id}>{c.label}</option>
             )}
           </select>
@@ -118,7 +131,7 @@ function ArticleForm({ item, setItem, onSave, onCancel }) {
           <Field label="ซีรีส์">
             <select value={item.seriesId} onChange={e => set("seriesId", e.target.value)}>
               <option value="">-- เลือกซีรีส์ --</option>
-              {SERIES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {(taxonomy.articleSeries || []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </Field>
           <Field label="ตอนที่">
@@ -205,15 +218,16 @@ function BackBtn({ onClick }) {
   )
 }
 
-function SectionHead({ title, count, saved, onNew, search, setSearch }) {
+function SectionHead({ title, count, saved, loading, onNew, search, setSearch }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10,
       marginBottom: 16, flexWrap: "wrap" }}>
       <span style={{ fontSize: 15, fontWeight: 500, color: "var(--text)", flex: 1 }}>
         {title} <span style={{ fontSize: 12, color: "var(--t3)" }}>({count})</span>
       </span>
+      {loading && <span style={{ fontSize: 11, color: "var(--t3)", fontWeight: 400 }}>กำลังโหลดข้อมูล...</span>}
       {saved && <span style={{ fontSize: 11, color: "var(--teal)", fontWeight: 400 }}>
-        <i className="ti ti-check" style={{ marginRight: 4 }}></i>บันทึกแล้ว (ชั่วคราว)</span>}
+        <i className="ti ti-check" style={{ marginRight: 4 }}></i>บันทึกขึ้นเว็บแล้ว</span>}
       <input value={search} onChange={e => setSearch(e.target.value)}
         placeholder="ค้นหา..." style={{
           fontFamily: "'Prompt',sans-serif", fontSize: 12, padding: "6px 10px",

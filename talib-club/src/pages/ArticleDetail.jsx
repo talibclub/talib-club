@@ -1,11 +1,24 @@
+import { useEffect, useState } from "react"
 import { ARTICLES } from "../data/index.js"
 
+const READER_DEFAULTS = { size: "md", tone: "3" }
+const READER_STORAGE_KEY = "talibReaderPrefs"
+const READER_SIZE_LABELS = { sm: "ก-", md: "ก", lg: "ก+" }
+const READER_TONE_LABELS = { 1: "1", 2: "2", 3: "3", 4: "4", 5: "5" }
+
 export default function ArticleDetail({ item, go }) {
+  const [readerPrefs, setReaderPrefs] = useState(() => getSavedReaderPrefs())
+
+  useEffect(() => {
+    window.localStorage.setItem(READER_STORAGE_KEY, JSON.stringify(readerPrefs))
+  }, [readerPrefs])
+
   if (!item) { go("articles"); return null }
   const related = ARTICLES.filter(a=>a.id!==item.id&&a.category===item.category).slice(0,3)
+  const readerClass = `article-body reader-size-${readerPrefs.size} reader-tone-${readerPrefs.tone}`
 
   return (
-    <div style={{maxWidth:720,margin:"0 auto"}}>
+    <div className="article-page">
       <button className="btn btn-outline" onClick={()=>go("articles")}
         style={{marginBottom:24,padding:"6px 14px",fontSize:12}}>
         <i className="ti ti-arrow-left" style={{marginRight:6,fontSize:12}}></i>กลับ
@@ -17,7 +30,7 @@ export default function ArticleDetail({ item, go }) {
           {item.type==="series"&&<span className="tag tag-acc">ซีรีส์ {item.seriesId} ตอน {item.part}</span>}
           {item.type==="specific"&&item.seriesName&&<span className="tag tag-acc">{item.seriesName}</span>}
         </div>
-        <h1 style={{marginBottom:12}}>{item.title}</h1>
+        <h1 className="article-title">{item.title}</h1>
         <div style={{display:"flex",gap:16,color:"var(--t3)",fontSize:12,fontWeight:300,flexWrap:"wrap"}}>
           <span><i className="ti ti-user" style={{marginRight:4,fontSize:11}}></i>{item.author}</span>
           <span><i className="ti ti-calendar" style={{marginRight:4,fontSize:11}}></i>{item.date}</span>
@@ -27,16 +40,42 @@ export default function ArticleDetail({ item, go }) {
 
       <div className="divider"/>
 
+      <div className="reader-tools" aria-label="ตัวเลือกการอ่าน">
+        <div className="reader-control" aria-label="ขนาดตัวอักษร">
+          {Object.entries(READER_SIZE_LABELS).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className={`reader-btn ${readerPrefs.size === value ? "on" : ""}`}
+              onClick={() => setReaderPrefs(prev => ({ ...prev, size: value }))}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="reader-control" aria-label="ความเข้มตัวอักษร">
+          {Object.entries(READER_TONE_LABELS).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className={`reader-btn ${readerPrefs.tone === value ? "on" : ""}`}
+              onClick={() => setReaderPrefs(prev => ({ ...prev, tone: value }))}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* EXCERPT */}
-      <div style={{background:"var(--teal-bg)",border:".5px solid rgba(45,190,160,.2)",
-        borderRadius:10,padding:"14px 18px",marginBottom:28}}>
-        <p style={{color:"var(--teal)",fontWeight:400,fontSize:13}}>{item.excerpt}</p>
+      <div className="article-excerpt">
+        <p>{item.excerpt}</p>
       </div>
 
       {/* BODY */}
-      <div style={{fontSize:15,lineHeight:1.9,color:"var(--t2)",fontWeight:300}}>
+      <div className={readerClass}>
         {item.body.split("\n\n").map((para,i)=>(
-          <p key={i} style={{marginBottom:20,color:"var(--t2)"}}>{para}</p>
+          <p key={i}>{para}</p>
         ))}
       </div>
 
@@ -73,4 +112,16 @@ export default function ArticleDetail({ item, go }) {
       )}
     </div>
   )
+}
+
+function getSavedReaderPrefs() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(READER_STORAGE_KEY) || "{}")
+    return {
+      size: READER_SIZE_LABELS[saved.size] ? saved.size : READER_DEFAULTS.size,
+      tone: READER_TONE_LABELS[saved.tone] ? saved.tone : READER_DEFAULTS.tone,
+    }
+  } catch {
+    return READER_DEFAULTS
+  }
 }
