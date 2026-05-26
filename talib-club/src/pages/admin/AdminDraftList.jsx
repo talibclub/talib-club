@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react"
-// ลบการ import useContentCollection ที่ทำให้เกิด Error ในระบบจำลองออกไปก่อน
-// import { useContentCollection } from "../../lib/contentStore.js"
-import toast from 'react-hot-toast' // นำเข้า Toast
+import toast from 'react-hot-toast'
 
-// สร้าง Mock ของ useContentCollection ขึ้นมาเพื่อให้หน้าต่างพรีวิวทำงานได้
+// ==========================================
+// หมายเหตุ: โค้ดส่วนนี้ถูกปรับแก้เพื่อให้ระบบ Canvas/Preview ทำงานได้
+// สำหรับการใช้งานบน GitHub ของคุณ กรุณาลบส่วนนี้ทิ้งและนำคำสั่ง import ด้านล่างนี้กลับมาใช้:
+// import { useContentCollection } from "../../lib/contentStore.js"
+// ==========================================
 function useContentCollection(collectionName, initialItems) {
   return {
-    items: initialItems,
+    items: initialItems || [],
     loading: false,
     error: null,
     saveItem: async (item) => console.log('Saved', item),
@@ -14,6 +16,7 @@ function useContentCollection(collectionName, initialItems) {
     isUsingFallback: true
   }
 }
+// ==========================================
 
 export default function AdminDraftList({ title, collectionName, initialItems = [], fields = [], emptyItem = {} }) {
   const { items, loading, error, saveItem, deleteItem, isUsingFallback } = useContentCollection(collectionName, initialItems)
@@ -26,7 +29,6 @@ export default function AdminDraftList({ title, collectionName, initialItems = [
     return items.filter(item => fields.some(f => String(item[f.key] || "").toLowerCase().includes(q)))
   }, [items, search, fields])
 
-
   function openNew() {
     setEditing({ ...emptyItem, id: crypto.randomUUID() })
   }
@@ -35,7 +37,7 @@ export default function AdminDraftList({ title, collectionName, initialItems = [
     try {
       await saveItem(editing)
       setEditing(null)
-      toast.success('บันทึกข้อมูลเรียบร้อยแล้ว!') // ใช้ Toast 
+      toast.success('บันทึกข้อมูลเรียบร้อยแล้ว!')
     } catch (err) {
       console.error(err)
       toast.error("บันทึกไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
@@ -46,7 +48,7 @@ export default function AdminDraftList({ title, collectionName, initialItems = [
     if (!confirm("ยืนยันการลบรายการนี้?")) return
     try {
       await deleteItem(id)
-      toast.success('ลบรายการเรียบร้อยแล้ว') // ใช้ Toast
+      toast.success('ลบรายการเรียบร้อยแล้ว')
     } catch (err) {
       console.error(err)
       toast.error("ลบไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
@@ -55,7 +57,6 @@ export default function AdminDraftList({ title, collectionName, initialItems = [
 
   if (editing) {
     return (
-      // เพิ่ม margin: "0 auto" เพื่อให้ฟอร์มอยู่ตรงกลาง
       <div style={{ maxWidth: 760, margin: "0 auto" }}>
         <button className="btn btn-outline" style={{ marginBottom: 18 }} onClick={() => setEditing(null)}>
           <i className="ti ti-arrow-left" style={{ marginRight: 6 }}></i>กลับ
