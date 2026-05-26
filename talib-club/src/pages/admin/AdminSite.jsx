@@ -1,7 +1,7 @@
-import { SITE } from "../../data/index.js"
-import { useSiteSettings } from "../../lib/contentStore.js"
 import { useEffect, useState } from "react"
 import toast from 'react-hot-toast'
+import { SITE } from "../../data/index.js"
+import { useSiteSettings } from "../../lib/contentStore.js"
 
 // Mock Data และ Mock Hook สำหรับการพรีวิวใน Canvas
 const SITE_MOCK = {
@@ -19,8 +19,11 @@ const useSiteSettings = (defaultSite) => {
     loading: false,
     error: null,
     saveSiteSettings: async (data) => {
-      setSite(data)
-      return Promise.resolve()
+      // จำลองเวลาในการบันทึกข้อมูล
+      return new Promise((resolve) => setTimeout(() => {
+        setSite(data)
+        resolve()
+      }, 1000))
     }
   }
 }
@@ -118,8 +121,13 @@ export default function AdminSite() {
           <input value={form.ayahRef || ""} onChange={e => set("ayahRef", e.target.value)} />
         </Field>
 
-        <button className="btn btn-teal" onClick={save} disabled={busy} style={{ justifySelf: "start", marginTop: 10 }}>
-          <i className="ti ti-check" style={{ marginRight: 6 }}></i>
+        <button 
+          className="btn btn-teal" 
+          onClick={save} 
+          disabled={busy} 
+          style={{ justifySelf: "start", marginTop: 10 }}
+        >
+          <i className={`ti ${busy ? "ti-loader spin" : "ti-check"}`} style={{ marginRight: 6 }}></i>
           {busy ? "กำลังบันทึก..." : "บันทึกการตั้งค่า"}
         </button>
       </div>
