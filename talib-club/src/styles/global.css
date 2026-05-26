@@ -126,7 +126,10 @@ button.dashboard-card{cursor:pointer}
 .dashboard-card h2{margin-top:14px}
 .dashboard-card p{margin-top:8px}
 .staff-banner{margin-top:18px;padding:18px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
-.profile-layout{display:grid;grid-template-columns:minmax(320px,720px);justify-content:start;gap:14px}
+
+/* แก้ไขบรรทัดนี้ ให้ profile ตรงกลางจอ (เปลี่ยนจาก justify-content:start เป็น center) */
+.profile-layout{display:grid;grid-template-columns:minmax(320px,720px);justify-content:center;gap:14px}
+
 .profile-card{padding:24px}
 .profile-head{display:flex;gap:14px;align-items:center;margin-bottom:22px}
 .profile-head h2{margin-top:8px}
@@ -201,7 +204,7 @@ button.dashboard-card{cursor:pointer}
 .staff-mag-card em{display:inline-block;margin-top:10px;font-size:11px;color:var(--teal);font-style:normal}
 .staff-mag-card.current{border-color:var(--acc-br)}
 .staff-mag-card.mine{background:var(--teal-bg);border-color:rgba(15,110,86,.18)}
-.staff-profile-card{padding:28px;text-align:center;max-width:640px}
+.staff-profile-card{padding:28px;text-align:center;max-width:640px;margin:0 auto;} /* เพิ่ม margin ให้ตรงกลาง */
 .staff-profile-card .profile-avatar{margin:0 auto 12px}
 .spin{animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
