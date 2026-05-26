@@ -1,6 +1,29 @@
-import { useEffect, useState } from "react"
 import { SITE } from "../../data/index.js"
 import { useSiteSettings } from "../../lib/contentStore.js"
+import { useEffect, useState } from "react"
+import toast from 'react-hot-toast'
+
+// Mock Data และ Mock Hook สำหรับการพรีวิวใน Canvas
+const SITE_MOCK = {
+  name: "Talib Club",
+  tagline: "Academic Islamic Studies",
+  desc: "คลังความรู้อิสลามวิชาการ สำหรับมุสลิมและผู้สนใจทุกท่าน",
+  social: { facebook: "", youtube: "", spotify: "" },
+  ayah: { ar: "", th: "", ref: "" }
+}
+
+const useSiteSettings = (defaultSite) => {
+  const [site, setSite] = useState(defaultSite || SITE_MOCK)
+  return {
+    site,
+    loading: false,
+    error: null,
+    saveSiteSettings: async (data) => {
+      setSite(data)
+      return Promise.resolve()
+    }
+  }
+}
 
 function flattenSite(site) {
   return {
@@ -16,68 +39,64 @@ function flattenSite(site) {
 
 function expandSite(form) {
   return {
-    name: form.name,
-    tagline: form.tagline,
-    desc: form.desc,
-    location: form.location,
+    name: form.name || "",
+    tagline: form.tagline || "",
+    desc: form.desc || "",
     social: {
-      facebook: form.facebook,
-      youtube: form.youtube,
-      spotify: form.spotify,
+      facebook: form.facebook || "",
+      youtube: form.youtube || "",
+      spotify: form.spotify || "",
     },
     ayah: {
-      ar: form.ayahAr,
-      th: form.ayahTh,
-      ref: form.ayahRef,
-    },
-    stats: SITE.stats,
+      ar: form.ayahAr || "",
+      th: form.ayahTh || "",
+      ref: form.ayahRef || "",
+    }
   }
 }
 
 export default function AdminSite() {
-  const { site, loading, error, saveSiteSettings } = useSiteSettings(SITE)
-  const [form, setForm] = useState(() => flattenSite(site))
-  const [saved, setSaved] = useState(false)
+  const { site, loading, error, saveSiteSettings } = useSiteSettings(SITE_MOCK)
+  const [form, setForm] = useState(() => flattenSite(site || {}))
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    setForm(flattenSite(site))
+    if (site) {
+      setForm(flattenSite(site))
+    }
   }, [site])
 
   const set = (key, value) => setForm(prev => ({ ...prev, [key]: value }))
 
   async function save() {
+    setBusy(true)
     try {
-      await saveSiteSettings(expandSite(form))
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2200)
+      const dataToSave = expandSite(form)
+      await saveSiteSettings(dataToSave)
+      toast.success("บันทึกการตั้งค่าเว็บไซต์เรียบร้อยแล้ว!")
     } catch (err) {
       console.error(err)
-      alert("บันทึกตั้งค่าเว็บไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
+      toast.error("บันทึกไม่สำเร็จ กรุณาตรวจสอบสิทธิ์การเข้าถึง")
     }
+    setBusy(false)
   }
 
   return (
-    <div style={{ maxWidth: 760 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-        <h2 style={{ flex: 1 }}>ตั้งค่าเว็บ</h2>
-        {loading && <span style={{ fontSize: 12, color: "var(--t3)" }}>กำลังโหลดข้อมูล...</span>}
-        {saved && <span style={{ fontSize: 12, color: "var(--teal)" }}>บันทึกขึ้นเว็บแล้ว</span>}
-      </div>
-
-      <div className="card" style={{ padding: 18, display: "grid", gap: 14 }}>
-        <Field label="ชื่อเว็บ">
+    <div style={{ maxWidth: 720, margin: "0 auto" }}>
+      <h2 style={{ marginBottom: 16 }}>ตั้งค่าเว็บไซต์</h2>
+      
+      <div className="card" style={{ padding: 24, display: "grid", gap: 16 }}>
+        <Field label="ชื่อเว็บไซต์">
           <input value={form.name || ""} onChange={e => set("name", e.target.value)} />
         </Field>
-        <Field label="Tagline">
+        <Field label="สโลแกน (Tagline)">
           <input value={form.tagline || ""} onChange={e => set("tagline", e.target.value)} />
         </Field>
-        <Field label="คำอธิบายเว็บ">
-          <textarea rows={4} value={form.desc || ""} onChange={e => set("desc", e.target.value)} />
+        <Field label="คำอธิบายเว็บไซต์">
+          <textarea rows={3} value={form.desc || ""} onChange={e => set("desc", e.target.value)} />
         </Field>
-        <Field label="ที่ตั้ง">
-          <input value={form.location || ""} onChange={e => set("location", e.target.value)} />
-        </Field>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
+        
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
           <Field label="Facebook URL">
             <input value={form.facebook || ""} onChange={e => set("facebook", e.target.value)} />
           </Field>
@@ -88,6 +107,7 @@ export default function AdminSite() {
             <input value={form.spotify || ""} onChange={e => set("spotify", e.target.value)} />
           </Field>
         </div>
+
         <Field label="อายะฮ์ภาษาอาหรับ">
           <textarea rows={2} value={form.ayahAr || ""} onChange={e => set("ayahAr", e.target.value)} />
         </Field>
@@ -98,25 +118,19 @@ export default function AdminSite() {
           <input value={form.ayahRef || ""} onChange={e => set("ayahRef", e.target.value)} />
         </Field>
 
-        <button className="btn btn-teal" onClick={save} style={{ justifySelf: "start" }}>
-          <i className="ti ti-check" style={{ marginRight: 6 }}></i>บันทึกขึ้นเว็บ
+        <button className="btn btn-teal" onClick={save} disabled={busy} style={{ justifySelf: "start", marginTop: 10 }}>
+          <i className="ti ti-check" style={{ marginRight: 6 }}></i>
+          {busy ? "กำลังบันทึก..." : "บันทึกการตั้งค่า"}
         </button>
       </div>
-
-      {error && (
-        <div className="card" style={{ marginTop: 24, padding: 16 }}>
-          <h3>ใช้ข้อมูลสำรองอยู่</h3>
-          <p style={{ marginTop: 6 }}>ระบบกำลังแสดงข้อมูลตั้งต้นจากไฟล์ในโปรเจกต์ หากต้องการบันทึกจริงให้ตรวจการตั้งค่าและสิทธิ์ Firestore</p>
-        </div>
-      )}
     </div>
   )
 }
 
 function Field({ label, children }) {
   return (
-    <label>
-      <span style={{ display: "block", fontSize: 12, color: "var(--t2)", marginBottom: 6 }}>{label}</span>
+    <label style={{ display: "block" }}>
+      <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500, marginBottom: 6, display: "block" }}>{label}</span>
       {children}
     </label>
   )
