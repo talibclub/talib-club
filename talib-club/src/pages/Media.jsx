@@ -1,12 +1,57 @@
-import { useState } from "react"
-import { DEFAULT_TAXONOMY, MEDIA } from "../data/index.js"
-import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
+import { useState, useEffect } from "react"
 
-export default function Media() {
+// --- Mock Data & Hooks เพื่อการแสดงผล ---
+const DEFAULT_TAXONOMY = {
+  mediaTypes: ["youtube", "spotify"]
+}
+
+const MEDIA = [
+  {
+    id: "1",
+    type: "youtube",
+    title: "สิ่งที่ควรเตรียมตัวก่อนรอมฎอนมาถึง! | ชัยคุอับดุสลาม อัช-ชุวัยอิร",
+    channel: "Talib Club",
+    duration: "12:24",
+    embedId: "dQw4w9WgXcQ", 
+    series: "Talib Shorts"
+  },
+  {
+    id: "2",
+    type: "spotify",
+    title: "Talib Podcast - ทำความรู้จักอิสลามเบื้องต้น",
+    channel: "Talib Club",
+    duration: "45:30",
+    spotifyUrl: "https://open.spotify.com/embed/episode/7ouMYZmWJRxT7Fh7I3r04M",
+    series: "Podcast"
+  }
+]
+
+function useContentCollection(collectionName, initialData) {
+  const [items, setItems] = useState(initialData || []);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    const timer = setTimeout(() => {
+      setItems(initialData || []);
+      setLoading(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [collectionName, initialData]);
+
+  return { items, loading };
+}
+
+function useTaxonomySettings(initialTaxonomy) {
+  const [taxonomy] = useState(initialTaxonomy || {});
+  return { taxonomy };
+}
+// ----------------------------------------
+
+export default function Media({ go }) {
   const { items: media, loading } = useContentCollection("media", MEDIA)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   const [filter, setFilter] = useState("all")
-  const [selected, setSelected] = useState(null)
 
   const filtered = media.filter(m=>filter==="all"||m.type===filter)
 
@@ -35,48 +80,11 @@ export default function Media() {
         ))}
       </div>
 
-      {/* SELECTED EMBED */}
-      {selected && selected.type==="youtube" && (
-        <div style={{marginBottom:28,borderRadius:12,overflow:"hidden",
-          border:".5px solid var(--br2)",background:"#000"}}>
-          <div style={{position:"relative",paddingBottom:"56.25%",height:0}}>
-            <iframe style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
-              src={`https://www.youtube.com/embed/${selected.embedId}`}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen title={selected.title}/>
-          </div>
-          <div style={{padding:"14px 16px"}}>
-            <div style={{fontSize:14,fontWeight:500,color:"#fff",marginBottom:4}}>{selected.title}</div>
-            <div style={{fontSize:12,color:"rgba(255,255,255,.5)",fontWeight:300}}>{selected.series}</div>
-          </div>
-        </div>
-      )}
-
-      {selected && selected.type==="spotify" && (
-        <div style={{marginBottom:28,borderRadius:12,overflow:"hidden",
-          border:".5px solid var(--br2)",background:"var(--card)"}}>
-          {selected.spotifyUrl ? (
-            <iframe style={{width:"100%",height:152,border:"none"}}
-              src={selected.spotifyUrl.includes("/embed/")
-                ? selected.spotifyUrl
-                : selected.spotifyUrl.replace("open.spotify.com/", "open.spotify.com/embed/")}
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-              loading="lazy" title={selected.title}/>
-          ) : (
-            <div className="empty">ยังไม่ได้ใส่ Spotify URL</div>
-          )}
-          <div style={{padding:"14px 16px"}}>
-            <div style={{fontSize:14,fontWeight:500,color:"var(--text)",marginBottom:4}}>{selected.title}</div>
-            <div style={{fontSize:12,color:"var(--t3)",fontWeight:300}}>{selected.series}</div>
-          </div>
-        </div>
-      )}
-
-      {/* GRID */}
+      {/* GRID (ปรับให้คลิกแล้วไปหน้า MediaDetail) */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12}}>
         {filtered.map(m=>(
           <div key={m.id} className="card" style={{cursor:"pointer",overflow:"hidden"}}
-            onClick={()=>setSelected(m===selected?null:m)}>
+            onClick={() => go("media-detail", m)}>
             {/* Thumbnail */}
             <div style={{height:120,background:m.type==="youtube"
               ?"rgba(255,50,50,.08)":"rgba(30,215,96,.08)",
