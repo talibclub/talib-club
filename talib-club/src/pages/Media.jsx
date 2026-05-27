@@ -1,6 +1,4 @@
 import { useState } from "react"
-import { DEFAULT_TAXONOMY, MEDIA } from "../data/index.js"
-import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 
 export default function Media({ go }) {
   const { items: media, loading, error, isUsingFallback } = useContentCollection("media", MEDIA)

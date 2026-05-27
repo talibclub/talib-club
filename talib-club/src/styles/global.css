@@ -127,10 +127,6 @@ button.dashboard-card{cursor:pointer}
 .dashboard-card h2{margin-top:14px}
 .dashboard-card p{margin-top:8px}
 .staff-banner{margin-top:18px;padding:18px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
-.home-social-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
-.home-social-link{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:.5px solid var(--br);border-radius:20px;background:var(--card);color:var(--t2);font-size:12px;text-decoration:none}
-.home-social-link:hover{color:var(--teal);border-color:rgba(15,110,86,.25)}
-
 /* แก้ไขบรรทัดนี้ ให้ profile ตรงกลางจอ (เปลี่ยนจาก justify-content:start เป็น center) */
 .profile-layout{display:grid;grid-template-columns:minmax(320px,720px);justify-content:center;gap:14px}
 
