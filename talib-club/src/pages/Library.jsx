@@ -104,7 +104,7 @@ export default function Library() {
         </div>
         <p style={{fontSize:12,marginBottom:14}}>ติดต่อทีม Talib Club เพื่อนำเนื้อหาของท่านมาเผยแพร่</p>
         <a 
-          href="https://www.facebook.com/TalibPublisher" 
+          href="https://www.facebook.com/TalibClub" 
           target="_blank" 
           rel="noreferrer" 
           className="btn btn-main" 
@@ -113,3 +113,6 @@ export default function Library() {
           ติดต่อเรา
         </a>
       </div>
+    </div>
+  )
+}
