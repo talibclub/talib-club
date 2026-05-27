@@ -191,14 +191,11 @@ function Footer({ site }) {
 
   return (
     <footer style={{ padding: "24px 0 16px", marginTop: "40px", textAlign: "center", position: "relative", borderTop: ".5px solid var(--br2)" }}>
-      <div style={{ display: "flex", justifyContent: "center", gap: "16px", flexWrap: "wrap", marginBottom: "12px" }}>
-        <a href="#" style={{ color: "var(--text)", textDecoration: "none", fontSize: "13px", fontWeight: 500 }}>About our site</a>
-        <a href="#" style={{ color: "var(--text)", textDecoration: "none", fontSize: "13px", fontWeight: 500 }}>About the general supervisor</a>
-        <a href="#" style={{ color: "var(--text)", textDecoration: "none", fontSize: "13px", fontWeight: 500 }}>Privacy policy</a>
-      </div>
+      
       <div style={{ fontSize: "12px", color: "var(--t3)", marginBottom: "16px", fontWeight: 300 }}>
         All Rights Reserved for Talib Club {new Date().getFullYear()} ©
       </div>
+
       <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
         {links.map(item => (
           <a key={item.key} href={item.url} target="_blank" rel="noreferrer" style={{ width: "36px", height: "36px", backgroundColor: "var(--card)", border: ".5px solid var(--br)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t2)", textDecoration: "none", transition: "0.2s" }}
@@ -209,6 +206,7 @@ function Footer({ site }) {
           </a>
         ))}
       </div>
+
       <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} style={{ position: "absolute", right: "0", top: "24px", width: "38px", height: "38px", backgroundColor: "var(--teal-bg)", border: "1px solid rgba(15,110,86,0.1)", borderRadius: "50%", color: "var(--teal)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "0.2s" }}
       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--teal)"; e.currentTarget.style.color = "#fff"; }}
       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--teal-bg)"; e.currentTarget.style.color = "var(--teal)"; }}

@@ -7,7 +7,7 @@ import Articles from "./pages/Articles.jsx"
 import ArticleDetail from "./pages/ArticleDetail.jsx"
 import Library from "./pages/Library.jsx"
 import Media from "./pages/Media.jsx"
-import MediaDetail from "./pages/MediaDetail.jsx" /* 1. เพิ่มหน้าดูวิดีโอ */
+import MediaDetail from "./pages/MediaDetail.jsx"
 import Scholars from "./pages/Scholars.jsx"
 import Tracking from "./pages/Tracking.jsx"
 import Auth from "./pages/Auth.jsx"
@@ -16,7 +16,7 @@ import StaffDashboard from "./pages/StaffDashboard.jsx"
 import StaffWork from "./pages/StaffWork.jsx"
 import StaffTranslation from "./pages/StaffTranslation.jsx"
 import Admin from "./pages/Admin.jsx"
-import { Toaster } from "react-hot-toast" /* 2. เพิ่มระบบ Popup */
+import { Toaster } from "react-hot-toast"
 import "./styles/global.css"
 
 export default function App() {
@@ -37,11 +37,19 @@ export default function App() {
     setPage(p)
     setCtx(data)
     window.scrollTo({ top: 0, behavior: "smooth" })
+    
+    // --- ระบบเปลี่ยน URL อัตโนมัติโดยไม่โหลดหน้าใหม่ ---
+    let urlPath = "/";
+    if (p === "tracking") {
+      urlPath = "/tracking-system"; // ถ้าเป็นหน้าตรวจพัสดุ
+    } else if (p !== "home") {
+      urlPath = "/" + p; // หน้าอื่นๆ เช่น /articles, /library
+    }
+    window.history.pushState({}, "", urlPath);
   }
 
   return (
     <div className={`app ${theme}`}>
-      {/* 3. วาง Toaster ไว้ตรงนี้เพื่อให้มันลอยอยู่บนสุด */}
       <Toaster position="top-right" toastOptions={{ style: { fontFamily: "'Prompt', sans-serif", fontSize: 14 } }} />
       
       <Nav page={page} go={go} theme={theme} setTheme={setTheme} authState={authState} />
@@ -50,11 +58,8 @@ export default function App() {
         {page === "articles" && <Articles go={go} />}
         {page === "article" && <ArticleDetail item={ctx} go={go} />}
         {page === "library" && <Library />}
-        
-        {/* 4. เพิ่ม go={go} ให้ Media และสร้างเส้นทาง media-detail */}
         {page === "media" && <Media go={go} />}
         {page === "media-detail" && <MediaDetail item={ctx} go={go} />}
-        
         {page === "scholars" && <Scholars />}
         {page === "tracking" && <Tracking />}
         {page === "auth" && <Auth authState={authState} go={go} />}
