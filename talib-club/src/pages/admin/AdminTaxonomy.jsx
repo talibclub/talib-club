@@ -12,6 +12,7 @@ const GROUPS = [
   { key: "mediaTypes", title: "ประเภทมีเดีย", mode: "string", labelLabel: "ชื่อประเภท" },
   { key: "scholarEras", title: "ยุคอุลามาอฺ", mode: "object", idLabel: "รหัสยุค", labelLabel: "ชื่อยุค" },
   { key: "scholarFields", title: "สาขาความรู้อุลามาอฺ", mode: "string", labelLabel: "ชื่อสาขา" },
+  { key: "staffCategories", title: "หมวดหมู่งานสตาฟ", mode: "string", labelLabel: "ชื่อหมวดหมู่" }, // <-- เพิ่มบรรทัดนี้
 ]
 
 function slugify(value) {

@@ -1,29 +1,31 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useTaxonomySettings } from "../lib/contentStore.js";
+import { DEFAULT_TAXONOMY } from "../data/index.js";
 
 const API_BASE_URL = "https://script.google.com/macros/s/AKfycby1TIKNbLnPZ4bYe4D8IxaTs7kBmqo3anpQz_AJfndlpgp629pd7ysifFIbPnnJm5z-8A/exec"
 
 const ADMIN_TEAM = ["อุสมาน", "ฟาดิล", "อนันดา"]
 const STAFF_TEAM = [
-  "ชาฟิน", "ชามิล", "ดาวูด", "ติรมีซี", "นิซอม", "แบยัง", "แบอัซมาวีย์",
-  "ฟาดิล", "มะห์ดี", "ยะฮฺ", "อนันดา", "อับดุสสลาม", "อับบาส", "อุสมาน", "ฮาฟิซ",
+  "ชาฟิน", "ชามิล", "ดาวูด", "แบยัง", "แบอัซมาวีย์",
+  "ฟาดิล", "มะห์ดี", "ยะฮฺ", "อนันดา",  "อุสมาน"
 ].sort()
 
 const MAGAZINE_QUEUE = [
   { month: "มกราคม", user: "แบยัง" },
-  { month: "กุมภาพันธ์", user: "นิซอม" },
-  { month: "มีนาคม", user: "อับดุสสลาม" },
+  { month: "กุมภาพันธ์", user: "บังอัสมาวี" },
+  { month: "มีนาคม", user: "อุสมาน" },
   { month: "เมษายน", user: "ชามิล" },
   { month: "พฤษภาคม", user: "อนันดา" },
-  { month: "มิถุนายน", user: "อับบาส" },
+  { month: "มิถุนายน", user: "แบยัง" },
   { month: "กรกฎาคม", user: "ฟาดิล" },
   { month: "สิงหาคม", user: "ชาฟิน" },
   { month: "กันยายน", user: "อุสมาน" },
   { month: "ตุลาคม", user: "ดาวูด" },
-  { month: "พฤศจิกายน", user: "ฮาฟิซ" },
+  { month: "พฤศจิกายน", user: "ชาฟิน" },
   { month: "ธันวาคม", user: "มะห์ดี" },
 ]
 
-const CATEGORIES = [
+const DEFAULT_CATEGORIES = [
   "วารสารอัซซอลิฮีน",
   "ทำความเข้าใจอิสลามอย่างง่าย",
   "The Articles | Al-Maqaalaat",
@@ -73,6 +75,10 @@ const emptySubmission = {
 }
 
 export default function StaffWork({ authState, go }) {
+  // --- ระบบดึงหมวดหมู่จาก Admin Taxonomy ---
+  const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY);
+  const CATEGORIES = taxonomy.staffCategories?.length ? taxonomy.staffCategories : DEFAULT_CATEGORIES;
+
   const [staffName, setStaffName] = useStaffName(authState)
   const isAdmin = ADMIN_TEAM.includes(staffName)
   const [tab, setTab] = useState("work")
@@ -148,7 +154,7 @@ export default function StaffWork({ authState, go }) {
       {tab === "work" && <WorkCenter posts={postsApi.posts} staffName={staffName} onUpdate={postsApi.updatePost} onDelete={postsApi.deletePost} flash={flash} />}
       {tab === "submit" && <SubmitWork staffName={staffName} createSubmission={submissionsApi.createSubmission} flash={flash} />}
       {tab === "review" && <ReviewQueue submissions={submissionsApi.submissions} staffName={staffName} isAdmin={isAdmin} updateSubmission={submissionsApi.updateSubmission} deleteSubmission={submissionsApi.deleteSubmission} flash={flash} />}
-      {tab === "archive" && <ArchiveView posts={postsApi.posts} staffName={staffName} createPost={postsApi.createPost} updatePost={postsApi.updatePost} deletePost={postsApi.deletePost} flash={flash} />}
+      {tab === "archive" && <ArchiveView posts={postsApi.posts} staffName={staffName} createPost={postsApi.createPost} updatePost={postsApi.updatePost} deletePost={postsApi.deletePost} flash={flash} CATEGORIES={CATEGORIES} />}
       {tab === "magazine" && <MagazineQueue staffName={staffName} />}
       {tab === "profile" && <StaffProfile staffName={staffName} posts={postsApi.posts} />}
     </div>
@@ -289,7 +295,7 @@ function ReviewQueue({ submissions, staffName, isAdmin, updateSubmission, delete
   )
 }
 
-function ArchiveView({ posts, staffName, createPost, updatePost, deletePost, flash }) {
+function ArchiveView({ posts, staffName, createPost, updatePost, deletePost, flash, CATEGORIES }) {
   const [form, setForm] = useState({ ...emptyPost, ResponsibleAdmin: staffName })
   const [query, setQuery] = useState("")
   const [busy, setBusy] = useState(false)

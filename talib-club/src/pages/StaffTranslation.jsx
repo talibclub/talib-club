@@ -44,41 +44,54 @@ export default function StaffTranslation({ go }) {
     }
   }
 
-  async function runScrape() {
-    const ok = await confirmAction({
-      title: "กวาดข้อมูลจาก abuiyaad.com?",
-      message: "ระบบจะดึงชื่อบทความและลิงก์ แล้วบันทึกเข้าฐานข้อมูลงานแปล โดยสถานะเดิมจะไม่ถูกทับ",
-      confirmText: "เริ่มกวาดข้อมูล",
-    })
-    if (!ok) return
-
-    setScraping(true)
+ async function scrapeAbuIyaad() {
+    setScraping(true);
     try {
-      const response = await fetch("/api/abuiyaad-scrape?maxPages=80")
-      const data = await response.json()
-      if (!response.ok || data.error) throw new Error(data.error || "Scrape failed")
+      let allArticles = [];
+      let page = 1;
+      let totalPages = 1;
 
-      const existing = new Map(items.map(item => [item.url, item]))
-      const batch = writeBatch(db)
-      data.articles.forEach(article => {
-        const current = existing.get(article.url)
-        batch.set(doc(db, COLLECTION, docId(article.url)), {
-          ...article,
-          status: current?.status || STATUS.pending,
-          notes: current?.notes || "",
-          translator: current?.translator || "",
-          importedAt: current?.importedAt || serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        }, { merge: true })
-      })
-      await batch.commit()
-      notifySuccess(`ดึงบทความได้ ${data.count} รายการ`)
-      await loadItems()
+      // ลูปดึงข้อมูลหน้าละ 100 บทความ จนกว่าจะครบทุกหน้า
+      do {
+        const response = await fetch(`https://abuiyaad.com/wp-json/wp/v2/posts?per_page=100&page=${page}`);
+        
+        // ถ้า API พ่น Error หรือหน้าหมดแล้วให้หยุดลูป
+        if (!response.ok) break;
+
+        // ดึงจำนวนหน้าทั้งหมดจาก Header ที่ WordPress ส่งมาให้
+        totalPages = parseInt(response.headers.get('x-wp-totalpages') || "1");
+        const posts = await response.json();
+
+        // นำข้อมูลมาแปลงให้อยู่ในฟอร์แมตที่ต้องการ
+        const mappedPosts = posts.map(post => ({
+          id: docId(post.link), // หรือฟังก์ชันสร้าง ID ของคุณ
+          title: post.title.rendered.replace(/<[^>]+>/g, ''), // ล้างแท็ก HTML
+          url: post.link,
+          status: STATUS.pending,
+          translator: "",
+          notes: "",
+        }));
+
+        allArticles = [...allArticles, ...mappedPosts];
+        page++;
+      } while (page <= totalPages);
+
+      // --- ส่วนนี้นำ allArticles ไปบันทึกลง Firestore (ใช้ Batch เหมือนเดิม) ---
+      const batch = writeBatch(db);
+      allArticles.forEach(article => {
+        const docRef = doc(db, COLLECTION, article.id);
+        batch.set(docRef, article, { merge: true }); // merge: true ป้องกันการทับสถานะเก่า
+      });
+      await batch.commit();
+
+      notifySuccess(`ดึงข้อมูลสำเร็จ! พบทั้งหมด ${allArticles.length} บทความ`);
+      loadItems(); // โหลดข้อมูลมาแสดงใหม่
+
     } catch (error) {
-      console.error(error)
-      notifyError("กวาดข้อมูลไม่สำเร็จ ถ้ารันใน localhost ให้ทดสอบหลัง deploy บน Vercel หรือใช้ Vercel dev")
+      console.error(error);
+      notifyError("กวาดข้อมูลไม่สำเร็จ กรุณาลองใหม่");
     } finally {
-      setScraping(false)
+      setScraping(false);
     }
   }
 
