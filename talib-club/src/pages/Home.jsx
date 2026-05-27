@@ -180,21 +180,44 @@ export default function Home({ go }) {
 }
 
 function SocialLinks({ site }) {
+  // กำหนดสีประจำแบรนด์ของแต่ละแพลตฟอร์มให้ดูพรีเมียมขึ้น
   const links = [
-    { key: "facebook", label: "Facebook", icon: "ti-brand-facebook" },
-    { key: "youtube", label: "YouTube", icon: "ti-brand-youtube" },
-    { key: "spotify", label: "Spotify", icon: "ti-brand-spotify" },
-    { key: "instagram", label: "Instagram", icon: "ti-brand-instagram" },
+    { key: "facebook", label: "Facebook", icon: "ti-brand-facebook", color: "#1877F2" },
+    { key: "youtube", label: "YouTube", icon: "ti-brand-youtube", color: "#FF0000" },
+    { key: "spotify", label: "Spotify", icon: "ti-brand-spotify", color: "#1DB954" },
+    { key: "instagram", label: "Instagram", icon: "ti-brand-instagram", color: "#E4405F" },
   ].map(item => ({ ...item, url: site.social?.[item.key] })).filter(item => item.url)
 
   if (!links.length) return null
 
   return (
-    <div className="home-social-links">
+    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "20px" }}>
       {links.map(item => (
-        <a key={item.key} href={item.url} target="_blank" rel="noreferrer" className="home-social-link" title={item.label}>
-          <i className={`ti ${item.icon}`}></i>
-          <span>{item.label}</span>
+        <a
+          key={item.key}
+          href={item.url}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "8px 16px",
+            background: "var(--card, #ffffff)",
+            border: "1px solid var(--br, #eaeaea)",
+            borderRadius: "30px", // ทำขอบมนแบบแคปซูล
+            textDecoration: "none", // เอาขีดเส้นใต้ออก
+            color: "var(--t2, #555)",
+            fontSize: "13px",
+            fontWeight: "500",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.02)", // เพิ่มมิติเงาบางๆ
+            transition: "all 0.2s ease"
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.borderColor = item.color}
+          onMouseLeave={(e) => e.currentTarget.style.borderColor = "var(--br, #eaeaea)"}
+        >
+          <i className={`ti ${item.icon}`} style={{ color: item.color, fontSize: "16px" }}></i>
+          {item.label}
         </a>
       ))}
     </div>
