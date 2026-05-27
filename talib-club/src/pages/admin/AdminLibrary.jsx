@@ -9,7 +9,17 @@ export default function AdminLibrary() {
       title="หนังสือและ PDF"
       collectionName="books"
       initialItems={BOOKS}
-      emptyItem={{ title: "", author: "Talib Club", source: "Talib Club", type: taxonomy.bookTypes?.[0] || "", category: "", year: new Date().getFullYear() + 543, fileUrl: "", coverUrl: "", desc: "" }}
+      emptyItem={{
+        title: "",
+        author: "Talib Club",
+        source: "Talib Club",
+        type: taxonomy.bookTypes?.[0] || "",
+        category: "",
+        year: new Date().getFullYear() + 543,
+        fileUrl: "",
+        coverUrl: "",
+        desc: "",
+      }}
       fields={[
         { key: "title", label: "ชื่อหนังสือ" },
         { key: "author", label: "ผู้เขียน/ผู้จัดทำ" },

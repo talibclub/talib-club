@@ -91,6 +91,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--acc-br)}
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .grid-art{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:10px}
 .grid-auto{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.grid2,.grid3,.grid4,.grid-auto{justify-content:center}
 .flex-col{display:flex;flex-direction:column;gap:8px}
 .pill{font-family:'Prompt',sans-serif;font-size:12px;font-weight:300;padding:5px 12px;border-radius:20px;border:.5px solid var(--br);cursor:pointer;transition:all .15s;background:var(--card);color:var(--t2)}
 .pill.on{background:var(--teal);color:#fff;border-color:var(--teal)}
@@ -126,7 +127,13 @@ button.dashboard-card{cursor:pointer}
 .dashboard-card h2{margin-top:14px}
 .dashboard-card p{margin-top:8px}
 .staff-banner{margin-top:18px;padding:18px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
-.profile-layout{display:grid;grid-template-columns:minmax(320px,720px);justify-content:start;gap:14px}
+.home-social-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+.home-social-link{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:.5px solid var(--br);border-radius:20px;background:var(--card);color:var(--t2);font-size:12px;text-decoration:none}
+.home-social-link:hover{color:var(--teal);border-color:rgba(15,110,86,.25)}
+
+/* แก้ไขบรรทัดนี้ ให้ profile ตรงกลางจอ (เปลี่ยนจาก justify-content:start เป็น center) */
+.profile-layout{display:grid;grid-template-columns:minmax(320px,720px);justify-content:center;gap:14px}
+
 .profile-card{padding:24px}
 .profile-head{display:flex;gap:14px;align-items:center;margin-bottom:22px}
 .profile-head h2{margin-top:8px}
@@ -201,8 +208,18 @@ button.dashboard-card{cursor:pointer}
 .staff-mag-card em{display:inline-block;margin-top:10px;font-size:11px;color:var(--teal);font-style:normal}
 .staff-mag-card.current{border-color:var(--acc-br)}
 .staff-mag-card.mine{background:var(--teal-bg);border-color:rgba(15,110,86,.18)}
-.staff-profile-card{padding:28px;text-align:center;max-width:640px}
+.staff-profile-card{padding:28px;text-align:center;max-width:640px;margin:0 auto;} /* เพิ่ม margin ให้ตรงกลาง */
 .staff-profile-card .profile-avatar{margin:0 auto 12px}
+.staff-tool-grid{grid-template-columns:repeat(auto-fit,minmax(280px,520px))}
+.translation-page{max-width:1120px;margin:0 auto}
+.translation-toolbar{padding:14px;display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:10px;margin-bottom:14px}
+.translation-table{overflow:hidden}
+.translation-row{display:grid;grid-template-columns:minmax(260px,1.5fr) 170px 150px minmax(160px,1fr);gap:10px;align-items:center;padding:12px 14px;border-top:.5px solid var(--br2)}
+.translation-row:first-child{border-top:0}
+.translation-head{background:var(--acc2);color:var(--t2);font-size:12px;font-weight:500}
+.translation-row a{color:var(--text);font-size:13px;font-weight:500;text-decoration:none}
+.translation-row a:hover{color:var(--teal)}
+.translation-row small{display:block;margin-top:3px;color:var(--t3);font-size:10px;word-break:break-all}
 .spin{animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
@@ -265,6 +282,9 @@ button.dashboard-card{cursor:pointer}
   .staff-tabs .pill{flex:1;text-align:center}
   .staff-form-grid,.staff-archive-layout{grid-template-columns:1fr}
   .staff-form-actions .btn{width:100%}
+  .translation-toolbar{grid-template-columns:1fr}
+  .translation-row{grid-template-columns:1fr;padding:14px}
+  .translation-head{display:none}
 
   /* hide non-essential on mobile */
   .hide-mobile{display:none !important}

@@ -8,9 +8,10 @@ const STAFF_TOOLS = [
   },
   {
     title: "แอพแปลบทความ",
-    desc: "พื้นที่สำหรับเครื่องมือช่วยแปลบทความจากเว็บต่าง ๆ เพื่อนำมาจัดทำเป็นเนื้อหา",
+    desc: "กวาดบทความจาก abuiyaad.com เข้าฐานข้อมูล และติดตามสถานะงานแปลของทีม",
     icon: "ti-language",
-    status: "รอใส่ลิงก์/ฝังแอพ",
+    status: "พร้อมสแกน/ติดตาม",
+    page: "staff-translation",
   },
 ]
 
@@ -32,7 +33,7 @@ export default function StaffDashboard({ authState, go }) {
         <div>
           <span className="badge badge-teal">Staff</span>
           <h1 style={{ marginTop: 10, fontSize: 28 }}>Staff Workspace</h1>
-          <p style={{ marginTop: 6 }}>จัดการบทความ หนังสือ มีเดีย รายชื่ออุลามาอฺ และเครื่องมือทำงานของทีม</p>
+          <p style={{ marginTop: 6 }}>จัดการเนื้อหา ตรวจงาน และใช้เครื่องมือทำงานของทีม Talib Club</p>
         </div>
         <button className="btn btn-outline" onClick={authState.logout}>
           <i className="ti ti-logout" style={{ marginRight: 6 }}></i>ออกจากระบบ
@@ -46,7 +47,7 @@ export default function StaffDashboard({ authState, go }) {
       </div>
 
       <h2 style={{ marginTop: 28, marginBottom: 12 }}>เครื่องมือของสตาฟ</h2>
-      <div className="grid2">
+      <div className="grid2 staff-tool-grid">
         {STAFF_TOOLS.map(tool => (
           <button key={tool.title} className="card" onClick={() => tool.page && go(tool.page)} style={{
             padding: 18,

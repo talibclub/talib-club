@@ -34,6 +34,7 @@ export default function Home({ go }) {
             <i className="ti ti-player-play" style={{ marginRight:6, fontSize:13 }}></i>ฟังธรรม
           </button>
         </div>
+        <SocialLinks site={site} />
       </div>
 
       {/* AYAH */}
@@ -174,6 +175,28 @@ export default function Home({ go }) {
         </div>
         <button className="btn btn-teal">บริจาคสนับสนุน</button>
       </div>
+    </div>
+  )
+}
+
+function SocialLinks({ site }) {
+  const links = [
+    { key: "facebook", label: "Facebook", icon: "ti-brand-facebook" },
+    { key: "youtube", label: "YouTube", icon: "ti-brand-youtube" },
+    { key: "spotify", label: "Spotify", icon: "ti-brand-spotify" },
+    { key: "instagram", label: "Instagram", icon: "ti-brand-instagram" },
+  ].map(item => ({ ...item, url: site.social?.[item.key] })).filter(item => item.url)
+
+  if (!links.length) return null
+
+  return (
+    <div className="home-social-links">
+      {links.map(item => (
+        <a key={item.key} href={item.url} target="_blank" rel="noreferrer" className="home-social-link" title={item.label}>
+          <i className={`ti ${item.icon}`}></i>
+          <span>{item.label}</span>
+        </a>
+      ))}
     </div>
   )
 }

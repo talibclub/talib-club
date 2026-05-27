@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { SITE } from "../../data/index.js"
 import { useSiteSettings } from "../../lib/contentStore.js"
+import { notifyError, notifySuccess } from "../../utils/feedback.jsx"
 
 function flattenSite(site) {
   return {
@@ -8,76 +9,95 @@ function flattenSite(site) {
     facebook: site.social?.facebook || "",
     youtube: site.social?.youtube || "",
     spotify: site.social?.spotify || "",
+    instagram: site.social?.instagram || "",
     ayahAr: site.ayah?.ar || "",
     ayahTh: site.ayah?.th || "",
     ayahRef: site.ayah?.ref || "",
+    followers: site.stats?.followers || "",
+    followersLabel: site.stats?.followersLabel || "",
   }
 }
 
 function expandSite(form) {
   return {
-    name: form.name,
-    tagline: form.tagline,
-    desc: form.desc,
-    location: form.location,
+    name: form.name || "",
+    nameAr: form.nameAr || "",
+    tagline: form.tagline || "",
+    desc: form.desc || "",
+    location: form.location || "",
+    founded: form.founded || "",
     social: {
-      facebook: form.facebook,
-      youtube: form.youtube,
-      spotify: form.spotify,
+      facebook: form.facebook || "",
+      youtube: form.youtube || "",
+      spotify: form.spotify || "",
+      instagram: form.instagram || "",
     },
     ayah: {
-      ar: form.ayahAr,
-      th: form.ayahTh,
-      ref: form.ayahRef,
+      ar: form.ayahAr || "",
+      th: form.ayahTh || "",
+      ref: form.ayahRef || "",
     },
-    stats: SITE.stats,
+    stats: {
+      followers: form.followers || "",
+      followersLabel: form.followersLabel || "",
+    },
   }
 }
 
 export default function AdminSite() {
   const { site, loading, error, saveSiteSettings } = useSiteSettings(SITE)
-  const [form, setForm] = useState(() => flattenSite(site))
-  const [saved, setSaved] = useState(false)
+  const [form, setForm] = useState(() => flattenSite(site || SITE))
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    setForm(flattenSite(site))
+    if (site) setForm(flattenSite(site))
   }, [site])
 
   const set = (key, value) => setForm(prev => ({ ...prev, [key]: value }))
 
   async function save() {
+    setBusy(true)
     try {
       await saveSiteSettings(expandSite(form))
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2200)
+      notifySuccess("บันทึกการตั้งค่าเว็บไซต์เรียบร้อยแล้ว")
     } catch (err) {
       console.error(err)
-      alert("บันทึกตั้งค่าเว็บไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
+      notifyError("บันทึกไม่สำเร็จ กรุณาตรวจสอบสิทธิ์ Firestore")
+    } finally {
+      setBusy(false)
     }
   }
 
   return (
-    <div style={{ maxWidth: 760 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-        <h2 style={{ flex: 1 }}>ตั้งค่าเว็บ</h2>
-        {loading && <span style={{ fontSize: 12, color: "var(--t3)" }}>กำลังโหลดข้อมูล...</span>}
-        {saved && <span style={{ fontSize: 12, color: "var(--teal)" }}>บันทึกขึ้นเว็บแล้ว</span>}
-      </div>
+    <div style={{ maxWidth: 720, margin: "0 auto" }}>
+      <h2 style={{ marginBottom: 16 }}>ตั้งค่าเว็บไซต์</h2>
+      {loading && <p style={{ marginBottom: 12 }}>กำลังโหลดข้อมูล...</p>}
+      {error && <p style={{ marginBottom: 12, color: "#e05555" }}>โหลดข้อมูลจาก Firestore ไม่สำเร็จ กำลังแสดงข้อมูลตั้งต้น</p>}
 
-      <div className="card" style={{ padding: 18, display: "grid", gap: 14 }}>
-        <Field label="ชื่อเว็บ">
+      <div className="card" style={{ padding: 24, display: "grid", gap: 16 }}>
+        <Field label="ชื่อเว็บไซต์">
           <input value={form.name || ""} onChange={e => set("name", e.target.value)} />
         </Field>
-        <Field label="Tagline">
+        <Field label="ชื่อภาษาอาหรับ">
+          <input value={form.nameAr || ""} onChange={e => set("nameAr", e.target.value)} />
+        </Field>
+        <Field label="สโลแกน">
           <input value={form.tagline || ""} onChange={e => set("tagline", e.target.value)} />
         </Field>
-        <Field label="คำอธิบายเว็บ">
-          <textarea rows={4} value={form.desc || ""} onChange={e => set("desc", e.target.value)} />
+        <Field label="คำอธิบายเว็บไซต์">
+          <textarea rows={3} value={form.desc || ""} onChange={e => set("desc", e.target.value)} />
         </Field>
-        <Field label="ที่ตั้ง">
-          <input value={form.location || ""} onChange={e => set("location", e.target.value)} />
-        </Field>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Location">
+            <input value={form.location || ""} onChange={e => set("location", e.target.value)} />
+          </Field>
+          <Field label="Founded">
+            <input value={form.founded || ""} onChange={e => set("founded", e.target.value)} />
+          </Field>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <Field label="Facebook URL">
             <input value={form.facebook || ""} onChange={e => set("facebook", e.target.value)} />
           </Field>
@@ -87,36 +107,43 @@ export default function AdminSite() {
           <Field label="Spotify URL">
             <input value={form.spotify || ""} onChange={e => set("spotify", e.target.value)} />
           </Field>
+          <Field label="Instagram URL">
+            <input value={form.instagram || ""} onChange={e => set("instagram", e.target.value)} />
+          </Field>
         </div>
-        <Field label="อายะฮ์ภาษาอาหรับ">
+
+        <Field label="อายะห์ภาษาอาหรับ">
           <textarea rows={2} value={form.ayahAr || ""} onChange={e => set("ayahAr", e.target.value)} />
         </Field>
-        <Field label="คำแปลอายะฮ์">
+        <Field label="คำแปลอายะห์">
           <textarea rows={2} value={form.ayahTh || ""} onChange={e => set("ayahTh", e.target.value)} />
         </Field>
-        <Field label="อ้างอิงอายะฮ์">
+        <Field label="อ้างอิงอายะห์">
           <input value={form.ayahRef || ""} onChange={e => set("ayahRef", e.target.value)} />
         </Field>
 
-        <button className="btn btn-teal" onClick={save} style={{ justifySelf: "start" }}>
-          <i className="ti ti-check" style={{ marginRight: 6 }}></i>บันทึกขึ้นเว็บ
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="จำนวนผู้ติดตาม">
+            <input value={form.followers || ""} onChange={e => set("followers", e.target.value)} />
+          </Field>
+          <Field label="ป้ายผู้ติดตาม">
+            <input value={form.followersLabel || ""} onChange={e => set("followersLabel", e.target.value)} />
+          </Field>
+        </div>
+
+        <button className="btn btn-teal" onClick={save} disabled={busy} style={{ justifySelf: "start", marginTop: 10 }}>
+          <i className={`ti ${busy ? "ti-loader-2" : "ti-check"}`} style={{ marginRight: 6 }}></i>
+          {busy ? "กำลังบันทึก..." : "บันทึกการตั้งค่า"}
         </button>
       </div>
-
-      {error && (
-        <div className="card" style={{ marginTop: 24, padding: 16 }}>
-          <h3>ใช้ข้อมูลสำรองอยู่</h3>
-          <p style={{ marginTop: 6 }}>ระบบกำลังแสดงข้อมูลตั้งต้นจากไฟล์ในโปรเจกต์ หากต้องการบันทึกจริงให้ตรวจการตั้งค่าและสิทธิ์ Firestore</p>
-        </div>
-      )}
     </div>
   )
 }
 
 function Field({ label, children }) {
   return (
-    <label>
-      <span style={{ display: "block", fontSize: 12, color: "var(--t2)", marginBottom: 6 }}>{label}</span>
+    <label style={{ display: "block" }}>
+      <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500, marginBottom: 6, display: "block" }}>{label}</span>
       {children}
     </label>
   )

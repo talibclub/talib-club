@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { DEFAULT_TAXONOMY } from "../../data/index.js"
 import { useTaxonomySettings } from "../../lib/contentStore.js"
+import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
 
 const GROUPS = [
   { key: "articleCategories", title: "หมวดหมู่บทความ", mode: "object", idLabel: "รหัส", labelLabel: "ชื่อหมวด" },
@@ -37,7 +38,7 @@ function emptyItem(group) {
 export default function AdminTaxonomy() {
   const { taxonomy, loading, error, saveTaxonomySettings } = useTaxonomySettings(DEFAULT_TAXONOMY)
   const [draft, setDraft] = useState(taxonomy)
-  const [saved, setSaved] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     setDraft(taxonomy)
@@ -48,13 +49,15 @@ export default function AdminTaxonomy() {
   }
 
   async function save() {
+    setBusy(true)
     try {
       await saveTaxonomySettings(draft)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2200)
+      notifySuccess("บันทึกหมวดและตัวเลือกเรียบร้อยแล้ว")
     } catch (err) {
       console.error(err)
-      alert("บันทึกหมวด/ตัวเลือกไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
+      notifyError("บันทึกหมวด/ตัวเลือกไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -66,9 +69,9 @@ export default function AdminTaxonomy() {
           <p style={{ marginTop: 6 }}>จัดการรายการที่ใช้ใน dropdown ของบทความ หนังสือ มีเดีย และอุลามาอฺ</p>
         </div>
         {loading && <span style={{ fontSize: 12, color: "var(--t3)" }}>กำลังโหลด...</span>}
-        {saved && <span style={{ fontSize: 12, color: "var(--teal)" }}>บันทึกขึ้นเว็บแล้ว</span>}
-        <button className="btn btn-teal" onClick={save}>
-          <i className="ti ti-check" style={{ marginRight: 6 }}></i>บันทึกทั้งหมด
+        <button className="btn btn-teal" onClick={save} disabled={busy}>
+          <i className={`ti ${busy ? "ti-loader-2" : "ti-check"}`} style={{ marginRight: 6 }}></i>
+          {busy ? "กำลังบันทึก..." : "บันทึกทั้งหมด"}
         </button>
       </div>
 
@@ -110,9 +113,16 @@ function TaxonomyGroup({ group, items, onChange }) {
     setNewItem(emptyItem(group))
   }
 
-  function removeItem(index) {
-    if (!confirm("ลบรายการนี้? รายการเดิมที่ใช้อยู่ในเนื้อหาจะยังเก็บค่าเดิมไว้")) return
-    onChange(items.filter((_, idx) => idx !== index))
+  async function removeItem(index) {
+    const item = items[index]
+    const label = group.mode === "string" ? item : item.name || item.label || item.id
+    const ok = await confirmAction({
+      title: "ลบรายการนี้?",
+      message: `รายการ "${label}" จะหายจากตัวเลือกใหม่ แต่เนื้อหาเดิมที่เคยใช้ค่านี้ยังเก็บค่าเดิมไว้`,
+      confirmText: "ลบรายการ",
+      danger: true,
+    })
+    if (ok) onChange(items.filter((_, idx) => idx !== index))
   }
 
   return (

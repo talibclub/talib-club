@@ -54,6 +54,8 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
 
   const userName = authState?.profile?.displayName || authState?.user?.displayName || authState?.user?.email || "บัญชีของฉัน"
   const userInitial = (userName.trim()[0] || "U").toUpperCase()
+  const [avatarBroken, setAvatarBroken] = useState(false)
+  const photoURL = avatarBroken ? "" : authState?.user?.photoURL
 
   return (
     <>
@@ -99,8 +101,8 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
               aria-expanded={accountOpen}
             >
               {authState?.user ? (
-                authState.user?.photoURL
-                  ? <img src={authState.user.photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
+                photoURL
+                  ? <img src={photoURL} alt="" onError={() => setAvatarBroken(true)} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
                   : userInitial
               ) : <i className="ti ti-login"></i>}
             </button>
@@ -109,7 +111,7 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
               <AccountDropdown
                 name={userName}
                 email={authState.user?.email}
-                photoURL={authState.user?.photoURL}
+                photoURL={photoURL}
                 isStaff={authState.isStaff}
                 nav={nav}
                 logout={logout}

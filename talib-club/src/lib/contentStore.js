@@ -87,9 +87,9 @@ export function useContentCollection(name, fallbackItems = []) {
   }, [collectionName, name])
 
   const items = useMemo(() => {
-    const source = mergeWithFallback(fallbackItems, remoteItems)
+    const source = loading && remoteItems === null ? [] : mergeWithFallback(fallbackItems, remoteItems)
     return [...source].sort(byNewestDate)
-  }, [fallbackItems, remoteItems])
+  }, [fallbackItems, loading, remoteItems])
 
   async function saveItem(item) {
     const id = String(item.id || crypto.randomUUID())
@@ -113,7 +113,7 @@ export function useContentCollection(name, fallbackItems = []) {
     items,
     loading,
     error,
-    isUsingFallback: !remoteItems || remoteItems.length === 0,
+    isUsingFallback: !loading && (!remoteItems || remoteItems.length === 0),
     saveItem,
     deleteItem,
   }

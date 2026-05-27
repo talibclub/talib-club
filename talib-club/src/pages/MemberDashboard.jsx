@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react"
+import toast from 'react-hot-toast'
 
 export default function MemberDashboard({ authState, go, initialView = "overview" }) {
   const [view, setView] = useState("overview")
   const [copied, setCopied] = useState("")
-  const user = authState.user
-  const profile = authState.profile || {}
+  // การเรียกใช้ object 'user' หรือ properties อาจจะเกิด error ได้หาก authState ไม่มีข้อมูลที่สมบูรณ์
+  // ดังนั้นควรใช้ optional chaining (?.) เพื่อป้องกัน
+  const user = authState?.user
+  const profile = authState?.profile || {}
   const name = profile.displayName || user?.displayName || user?.email || "สมาชิก"
   const role = profile.role || "member"
 
@@ -17,9 +20,11 @@ export default function MemberDashboard({ authState, go, initialView = "overview
     try {
       await navigator.clipboard.writeText(value)
       setCopied(label)
+      toast.success("คัดลอกข้อความแล้ว")
       window.setTimeout(() => setCopied(""), 1800)
     } catch (err) {
       console.error("Cannot copy text", err)
+      toast.error("คัดลอกไม่สำเร็จ")
       setCopied("")
     }
   }
@@ -33,7 +38,7 @@ export default function MemberDashboard({ authState, go, initialView = "overview
           <p>พื้นที่สมาชิกสำหรับติดตามการอ่าน บันทึกหนังสือ และจัดการข้อมูลบัญชี Talib Club</p>
         </div>
         <div className="member-actions">
-          <button className="btn btn-outline" onClick={authState.logout}>
+          <button className="btn btn-outline" onClick={authState?.logout}>
             <i className="ti ti-logout" style={{ marginRight: 6 }}></i>ออกจากระบบ
           </button>
         </div>
@@ -59,7 +64,7 @@ export default function MemberDashboard({ authState, go, initialView = "overview
 
 function Overview({ authState, go, setView }) {
   return (
-    <>
+    <div>
       <div className="grid3">
         <DashboardCard icon="ti-user-circle" title="โปรไฟล์ของฉัน" text="จัดการข้อมูลบัญชี" onClick={() => setView("profile")} />
         <DashboardCard icon="ti-book-2" title="ชั้นหนังสือของฉัน" text="บันทึกหนังสือที่กำลังอ่านและอ่านจบ" />
@@ -71,13 +76,13 @@ function Overview({ authState, go, setView }) {
         <DashboardCard icon="ti-bell" title="การแจ้งเตือน" text="ข่าวสาร กิจกรรม และหนังสือใหม่" />
         <DashboardCard icon="ti-settings" title="ตั้งค่าบัญชี" text="จัดการข้อมูลส่วนตัวและการเข้าสู่ระบบ" onClick={() => setView("profile")} />
       </div>
-    </>
+    </div>
   )
 }
 
 function ProfilePanel({ authState, copied, copyText, go }) {
-  const user = authState.user
-  const profile = authState.profile || {}
+  const user = authState?.user
+  const profile = authState?.profile || {}
   const role = profile.role || "member"
   const displayName = profile.displayName || user?.displayName || "-"
   const email = user?.email || profile.email || "-"
@@ -85,6 +90,7 @@ function ProfilePanel({ authState, copied, copyText, go }) {
   const isStaff = role === "staff"
   const emailVerified = Boolean(user?.emailVerified)
   const needsPasswordReauth = user?.providerData?.some(item => item.providerId === "password")
+  
   const [form, setForm] = useState({
     displayName: displayName === "-" ? "" : displayName,
     email,
@@ -92,8 +98,6 @@ function ProfilePanel({ authState, copied, copyText, go }) {
   })
   const emailChanged = formEmailChanged(form.email, email)
   const [busy, setBusy] = useState("")
-  const [message, setMessage] = useState("")
-  const [error, setError] = useState("")
 
   useEffect(() => {
     setForm({
@@ -108,66 +112,65 @@ function ProfilePanel({ authState, copied, copyText, go }) {
   async function saveProfile(e) {
     e.preventDefault()
     setBusy("profile")
-    setMessage("")
-    setError("")
     try {
-      await authState.updateUserProfile({
-        displayName: form.displayName,
-      })
-      setMessage("บันทึกโปรไฟล์แล้ว")
+      if (authState?.updateUserProfile) {
+         await authState.updateUserProfile({
+           displayName: form.displayName,
+         })
+      }
+      toast.success("บันทึกโปรไฟล์เรียบร้อยแล้ว!")
     } catch (err) {
       console.error(err)
-      setError("บันทึกโปรไฟล์ไม่สำเร็จ กรุณาลองเข้าสู่ระบบใหม่อีกครั้ง")
+      toast.error("บันทึกโปรไฟล์ไม่สำเร็จ กรุณาลองใหม่")
     }
     setBusy("")
   }
 
   async function requestEmailChange() {
     setBusy("email")
-    setMessage("")
-    setError("")
     try {
       if (needsPasswordReauth && !form.password.trim()) {
-        setError("กรุณากรอกรหัสผ่านปัจจุบันเพื่อยืนยันก่อนเปลี่ยนอีเมล")
+        toast.error("กรุณากรอกรหัสผ่านเพื่อยืนยันก่อนเปลี่ยนอีเมล")
         setBusy("")
         return
       }
-      await authState.reauthenticateForSensitiveAction(form.password)
-      await authState.requestEmailChange(form.email)
+      if (authState?.reauthenticateForSensitiveAction && authState?.requestEmailChange) {
+         await authState.reauthenticateForSensitiveAction(form.password)
+         await authState.requestEmailChange(form.email)
+      }
       set("password", "")
-      setMessage("ส่งคำขอเปลี่ยนอีเมลแล้ว กรุณายืนยันจากอีเมลใหม่")
+      toast.success("ส่งคำขอแล้ว! กรุณายืนยันจากอีเมลใหม่")
     } catch (err) {
       console.error(err)
-      const message = getEmailChangeError(err)
-      setError(message)
+      toast.error(getEmailChangeError(err))
     }
     setBusy("")
   }
 
   async function verifyCurrentEmail() {
     setBusy("verify")
-    setMessage("")
-    setError("")
     try {
-      await authState.sendCurrentEmailVerification()
-      setMessage("ส่งคำขอยืนยันอีเมลแล้ว")
+      if (authState?.sendCurrentEmailVerification) {
+          await authState.sendCurrentEmailVerification()
+      }
+      toast.success("ส่งคำขอยืนยันอีเมลแล้ว เช็คกล่องข้อความของคุณได้เลย")
     } catch (err) {
       console.error(err)
-      setError("ส่งลิงก์ยืนยันอีเมลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง")
+      toast.error("ส่งลิงก์ยืนยันอีเมลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง")
     }
     setBusy("")
   }
 
   async function resetPassword() {
     setBusy("password")
-    setMessage("")
-    setError("")
     try {
-      await authState.sendPasswordReset()
-      setMessage("ส่งคำขอเปลี่ยนรหัสผ่านแล้ว")
+      if (authState?.sendPasswordReset) {
+         await authState.sendPasswordReset()
+      }
+      toast.success("ส่งลิงก์เปลี่ยนรหัสผ่านแล้ว กรุณาเช็คอีเมล")
     } catch (err) {
       console.error(err)
-      setError("ส่งลิงก์เปลี่ยนรหัสผ่านไม่สำเร็จ")
+      toast.error("ส่งลิงก์เปลี่ยนรหัสผ่านไม่สำเร็จ")
     }
     setBusy("")
   }
@@ -256,8 +259,6 @@ function ProfilePanel({ authState, copied, copyText, go }) {
         </section>
 
         <InfoRow label="สถานะบัญชี" value={isStaff ? "Staff" : "Member"} />
-        {message && <div className="auth-info" style={{ marginTop: 12 }}>{message}</div>}
-        {error && <div className="auth-error" style={{ marginTop: 12 }}>{error}</div>}
       </form>
     </div>
   )

@@ -9,10 +9,18 @@ export default function AdminScholars() {
       title="รายชื่ออุลามาอฺ"
       collectionName="scholars"
       initialItems={SCHOLARS}
-      emptyItem={{ name: "", hijri: "", ad: "", era: taxonomy.scholarEras?.[0]?.id || "1", field: taxonomy.scholarFields?.[0] || "", note: "", refs: "" }}
+      emptyItem={{
+        name: "",
+        hijri: "",
+        ad: "",
+        era: taxonomy.scholarEras?.[0]?.id || "1",
+        field: taxonomy.scholarFields?.[0] || "",
+        note: "",
+        refs: "",
+      }}
       fields={[
         { key: "name", label: "ชื่ออุลามาอฺ" },
-        { key: "hijri", label: "ปีฮิจเราะฮ์" },
+        { key: "hijri", label: "ปีฮิจเราะห์" },
         { key: "ad", label: "ปีคริสต์ศักราช" },
         { key: "era", label: "ยุค", type: "select", options: (taxonomy.scholarEras || []).map(item => ({ value: item.id, label: item.label })) },
         { key: "field", label: "สาขาความรู้", type: "select", options: taxonomy.scholarFields || [] },

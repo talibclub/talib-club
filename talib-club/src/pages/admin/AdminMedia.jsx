@@ -9,7 +9,16 @@ export default function AdminMedia() {
       title="มีเดีย"
       collectionName="media"
       initialItems={MEDIA}
-      emptyItem={{ type: taxonomy.mediaTypes?.[0] || "youtube", title: "", channel: "Talib Club", duration: "", embedId: "", spotifyUrl: "", series: "", date: new Date().toISOString().slice(0, 10) }}
+      emptyItem={{
+        type: taxonomy.mediaTypes?.[0] || "youtube",
+        title: "",
+        channel: "Talib Club",
+        duration: "",
+        embedId: "",
+        spotifyUrl: "",
+        series: "",
+        date: new Date().toISOString().slice(0, 10),
+      }}
       fields={[
         { key: "title", label: "ชื่อรายการ/ตอน" },
         { key: "type", label: "ประเภท", type: "select", options: taxonomy.mediaTypes || [] },

@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react"
 import { useContentCollection } from "../../lib/contentStore.js"
+import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
 
 export default function AdminDraftList({ title, collectionName, initialItems = [], fields = [], emptyItem = {} }) {
   const { items, loading, error, saveItem, deleteItem, isUsingFallback } = useContentCollection(collectionName, initialItems)
   const [editing, setEditing] = useState(null)
   const [search, setSearch] = useState("")
-  const [saved, setSaved] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -13,40 +14,45 @@ export default function AdminDraftList({ title, collectionName, initialItems = [
     return items.filter(item => fields.some(f => String(item[f.key] || "").toLowerCase().includes(q)))
   }, [items, search, fields])
 
-  function flash() {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2200)
-  }
-
   function openNew() {
     setEditing({ ...emptyItem, id: crypto.randomUUID() })
   }
 
   async function save() {
+    setBusy(true)
     try {
       await saveItem(editing)
       setEditing(null)
-      flash()
+      notifySuccess("บันทึกข้อมูลขึ้นเว็บไซต์เรียบร้อยแล้ว")
     } catch (err) {
       console.error(err)
-      alert("บันทึกไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore หรือการเชื่อมต่ออินเทอร์เน็ต")
+      notifyError("บันทึกไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
+    } finally {
+      setBusy(false)
     }
   }
 
-  async function remove(id) {
-    if (!confirm("ยืนยันการลบรายการนี้?")) return
+  async function remove(item) {
+    const ok = await confirmAction({
+      title: "ลบรายการนี้?",
+      message: `รายการ "${item.title || item.name || item.channel || item.id}" จะถูกซ่อนจากหน้าเว็บไซต์`,
+      confirmText: "ลบรายการ",
+      danger: true,
+    })
+    if (!ok) return
+
     try {
-      await deleteItem(id)
-      flash()
+      await deleteItem(item.id)
+      notifySuccess("ลบรายการเรียบร้อยแล้ว")
     } catch (err) {
       console.error(err)
-      alert("ลบไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore หรือการเชื่อมต่ออินเทอร์เน็ต")
+      notifyError("ลบไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
     }
   }
 
   if (editing) {
     return (
-      <div style={{ maxWidth: 760 }}>
+      <div style={{ maxWidth: 760, margin: "0 auto" }}>
         <button className="btn btn-outline" style={{ marginBottom: 18 }} onClick={() => setEditing(null)}>
           <i className="ti ti-arrow-left" style={{ marginRight: 6 }}></i>กลับ
         </button>
@@ -70,9 +76,10 @@ export default function AdminDraftList({ title, collectionName, initialItems = [
               )}
             </label>
           ))}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button className="btn btn-teal" onClick={save}>
-              <i className="ti ti-check" style={{ marginRight: 6 }}></i>บันทึกขึ้นเว็บ
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+            <button className="btn btn-teal" onClick={save} disabled={busy}>
+              <i className={`ti ${busy ? "ti-loader-2" : "ti-check"}`} style={{ marginRight: 6 }}></i>
+              {busy ? "กำลังบันทึก..." : "บันทึกขึ้นเว็บ"}
             </button>
             <button className="btn btn-outline" onClick={() => setEditing(null)}>ยกเลิก</button>
           </div>
@@ -86,7 +93,6 @@ export default function AdminDraftList({ title, collectionName, initialItems = [
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <h2 style={{ flex: 1 }}>{title} <span style={{ fontSize: 12, color: "var(--t3)" }}>({items.length})</span></h2>
         {loading && <span style={{ fontSize: 12, color: "var(--t3)" }}>กำลังโหลดข้อมูล...</span>}
-        {saved && <span style={{ fontSize: 12, color: "var(--teal)" }}>บันทึกขึ้นเว็บแล้ว</span>}
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="ค้นหา..." style={{ maxWidth: 200 }} />
         <button className="btn btn-teal" onClick={openNew}>
           <i className="ti ti-plus" style={{ marginRight: 6 }}></i>เพิ่มใหม่
@@ -104,7 +110,7 @@ export default function AdminDraftList({ title, collectionName, initialItems = [
               <button className="btn btn-outline" onClick={() => setEditing(item)}>
                 <i className="ti ti-pencil" style={{ marginRight: 5 }}></i>แก้ไข
               </button>
-              <button className="btn btn-outline" style={{ color: "#e05555", borderColor: "rgba(224,85,85,.3)" }} onClick={() => remove(item.id)}>
+              <button className="btn btn-outline" style={{ color: "#e05555", borderColor: "rgba(224,85,85,.3)" }} onClick={() => remove(item)}>
                 <i className="ti ti-trash" style={{ marginRight: 5 }}></i>ลบ
               </button>
             </div>
@@ -118,8 +124,8 @@ export default function AdminDraftList({ title, collectionName, initialItems = [
           <h3>{error ? "ใช้ข้อมูลสำรองอยู่" : "ยังไม่มีข้อมูลใน Firestore"}</h3>
           <p style={{ marginTop: 6 }}>
             {error
-              ? "ระบบกำลังแสดงข้อมูลตั้งต้นจากไฟล์ในโปรเจกต์ หากต้องการบันทึกจริงให้ตรวจการตั้งค่าและสิทธิ์ Firestore"
-              : "ตอนนี้แสดงข้อมูลตั้งต้นจากไฟล์เดิม เมื่อสตาฟกดบันทึกรายการแรก ระบบจะเผยแพร่ข้อมูลชุดนั้นผ่าน Firestore"}
+              ? "ระบบโหลดข้อมูลจาก Firestore ไม่ได้ จึงแสดงข้อมูลตั้งต้นจากโปรเจกต์ก่อน"
+              : "ตอนนี้แสดงข้อมูลตั้งต้นจากไฟล์เดิม เมื่อบันทึกรายการแรก ระบบจะเผยแพร่ผ่าน Firestore และหน้า member จะเห็นข้อมูลชุดเดียวกัน"}
           </p>
         </div>
       )}
