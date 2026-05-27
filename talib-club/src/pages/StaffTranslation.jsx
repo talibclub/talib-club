@@ -47,7 +47,7 @@ export default function StaffTranslation({ go }) {
   async function runScrape() {
     const ok = await confirmAction({
       title: "กวาดข้อมูลจาก abuiyaad.com?",
-      message: "ระบบจะดึงรายชื่อบทความทั้งหมดมาใส่ฐานข้อมูล",
+      message: "ระบบจะใช้ Proxy ดึงข้อมูลบทความทั้งหมดมาใส่ฐานข้อมูล",
       confirmText: "เริ่มกวาดข้อมูล",
     })
     if (!ok) return
@@ -58,19 +58,24 @@ export default function StaffTranslation({ go }) {
       let page = 1;
       let totalPages = 1;
 
+      // ใช้ allorigins เพื่อแก้ปัญหา CORS Block
       do {
-        const response = await fetch(`https://abuiyaad.com/wp-json/wp/v2/posts?per_page=100&page=${page}`);
+        const url = `https://abuiyaad.com/wp-json/wp/v2/posts?per_page=100&page=${page}`;
+        const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
         if (!response.ok) break;
-        totalPages = parseInt(response.headers.get('x-wp-totalpages') || "1");
-        const posts = await response.json();
+        
+        const data = await response.json();
+        const posts = JSON.parse(data.contents);
+
+        totalPages = parseInt(data.status.headers['x-wp-totalpages'] || "1");
+
         const mappedPosts = posts.map(post => ({
           id: docId(post.link),
           title: post.title.rendered.replace(/<[^>]+>/g, '').replace(/&#8211;/g, '-').replace(/&#8217;/g, "'"),
           url: post.link,
           status: STATUS.pending,
-          translator: "",
-          notes: "",
         }));
+
         allArticles = [...allArticles, ...mappedPosts];
         page++;
       } while (page <= totalPages);
@@ -91,7 +96,7 @@ export default function StaffTranslation({ go }) {
       })
 
       await batch.commit()
-      notifySuccess(`ดึงบทความได้ทั้งหมด ${allArticles.length} รายการ`)
+      notifySuccess(`ดึงข้อมูลสำเร็จ! รวม ${allArticles.length} รายการ`)
       await loadItems()
     } catch (error) {
       console.error(error)
@@ -142,7 +147,7 @@ export default function StaffTranslation({ go }) {
         </div>
         <button className="btn btn-teal" onClick={runScrape} disabled={scraping}>
           <i className={`ti ${scraping ? "ti-loader-2 spin" : "ti-world-search"}`} style={{ marginRight: 6 }}></i>
-          {scraping ? "กำลังกวาดข้อมูล..." : "กวาดข้อมูลจากเว็บ"}
+          {scraping ? "กำลังกวาด..." : "กวาดข้อมูลจากเว็บ"}
         </button>
       </div>
 
