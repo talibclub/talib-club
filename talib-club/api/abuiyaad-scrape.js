@@ -32,7 +32,7 @@ export default async function handler(req, res) {
       source: "abuiyaad.com",
     }))
 
-    res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=86400")
+    res.setHeader("Cache-Control", "no-store")
     res.status(200).json({
       source: "https://abuiyaad.com/",
       count: articles.length,
