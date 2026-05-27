@@ -17,6 +17,7 @@ export default function AdminMedia() {
         embedId: "",
         spotifyUrl: "",
         series: "",
+        coverUrl: "",
         date: new Date().toISOString().slice(0, 10),
       }}
       fields={[
@@ -27,6 +28,7 @@ export default function AdminMedia() {
         { key: "embedId", label: "YouTube Video ID" },
         { key: "spotifyUrl", label: "Spotify URL" },
         { key: "series", label: "ซีรีส์" },
+        { key: "coverUrl", label: "ลิงก์รูปปก (ปล่อยว่างได้ ถ้าระบุ YouTube ID แล้วระบบจะดึงปกอัตโนมัติ)" },
         { key: "date", label: "วันที่", type: "date" },
       ]}
     />

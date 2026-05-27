@@ -199,9 +199,7 @@ function Footer({ site }) {
     }}>
       {/* ใช้ข้อความภาษาอังกฤษตามภาพอ้างอิง */}
       <div style={{ display: "flex", justifyContent: "center", gap: "16px", flexWrap: "wrap", marginBottom: "12px" }}>
-        <a href="#" style={{ color: "var(--text)", textDecoration: "none", fontSize: "13px", fontWeight: 500 }}>About our site</a>
-        <a href="#" style={{ color: "var(--text)", textDecoration: "none", fontSize: "13px", fontWeight: 500 }}>About the general supervisor</a>
-        <a href="#" style={{ color: "var(--text)", textDecoration: "none", fontSize: "13px", fontWeight: 500 }}>Privacy policy</a>
+        <a style={{ color: "var(--text)", textDecoration: "none", fontSize: "13px", fontWeight: 500 }}>QURAN SUNNAH AND THE UNDERSTANDING OF SALAF</a>
       </div>
 
       <div style={{ fontSize: "12px", color: "var(--t3)", marginBottom: "16px", fontWeight: 300 }}>

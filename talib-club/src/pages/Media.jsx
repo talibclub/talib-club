@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { MEDIA, DEFAULT_TAXONOMY, SITE } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings, useSiteSettings } from "../lib/contentStore.js"
 
@@ -7,7 +7,11 @@ export default function Media({ go }) {
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   const { site } = useSiteSettings(SITE)
   const [filter, setFilter] = useState("all")
-  const [selectedPlaylist, setSelectedPlaylist] = useState(null) // สถานะสำหรับจัดการการเลือกเพลย์ลิสต์
+  
+  // State สำหรับ Playlist และ Pagination
+  const [selectedPlaylist, setSelectedPlaylist] = useState(null)
+  const [page, setPage] = useState(1)
+  const ITEMS_PER_PAGE = 9
 
   const filters = [
     { id: "all", label: "ทั้งหมด", icon: "ti-layout-grid" },
@@ -18,7 +22,7 @@ export default function Media({ go }) {
     })),
   ]
 
-  // ระบบจัดกลุ่มข้อมูลวิดีโอเดี่ยวๆ ให้กลายเป็นโครงสร้าง Playlist อัตโนมัติ
+  // จัดกลุ่มเพลย์ลิสต์
   const playlists = []
   media.forEach(item => {
     const playlistName = item.series || "วิดีโอทั่วไป"
@@ -37,19 +41,25 @@ export default function Media({ go }) {
 
   const filteredPlaylists = playlists.filter(pl => filter === "all" || pl.type === filter)
 
+  // จัดการข้อมูลหน้า Pagination สำหรับ Playlist ที่กำลังเปิดอยู่
+  const currentItems = useMemo(() => {
+    if (!selectedPlaylist) return []
+    const startIndex = (page - 1) * ITEMS_PER_PAGE
+    return selectedPlaylist.items.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+  }, [selectedPlaylist, page])
+
+  const totalPages = selectedPlaylist ? Math.ceil(selectedPlaylist.items.length / ITEMS_PER_PAGE) : 0
+
   return (
     <div>
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ marginBottom: 8 }}>มีเดีย</h1>
         <p>วิดีโอ YouTube และพอดแคสต์ Spotify จาก Talib Club</p>
         {loading && <p style={{ marginTop: 8, fontSize: 12 }}>กำลังโหลดข้อมูล...</p>}
-        {error && <p style={{ marginTop: 8, fontSize: 12, color: "#e05555" }}>โหลดข้อมูลจาก Firestore ไม่สำเร็จ กำลังแสดงข้อมูลสำรอง</p>}
       </div>
 
-      {/* สลับหน้าจอระหว่าง หน้ารวม Playlist กับ หน้าแสดงคลิปข้างใน */}
       {!selectedPlaylist ? (
         <>
-          {/* FILTER BUTTONS */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 24 }}>
             {filters.map(item => (
               <button
@@ -62,7 +72,6 @@ export default function Media({ go }) {
             ))}
           </div>
 
-          {/* PLAYLIST GRID (ดีไซน์สไตล์เดียวกับเรฟเฟอเรนซ์) */}
           {filteredPlaylists.length === 0 ? (
             <div className="empty">ไม่พบรายการมีเดีย</div>
           ) : (
@@ -75,7 +84,7 @@ export default function Media({ go }) {
                     </div>
                     <div style={{ width: 85, backgroundColor: "#111a22", color: "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
                       <i className="ti ti-menu-2" style={{ fontSize: 16, opacity: 0.8 }}></i>
-                      <span style={{ fontSize: 12, fontWeight: 400 }}>{pl.items.length} วิดีโอ</span>
+                      <span style={{ fontSize: 12, fontWeight: 400 }}>{pl.items.length} คลิป</span>
                     </div>
                   </div>
                   <div style={{ padding: 16, display: "flex", flexDirection: "column", flex: 1 }}>
@@ -87,10 +96,10 @@ export default function Media({ go }) {
                     </div>
                     <button 
                       className="btn btn-outline" 
-                      onClick={() => setSelectedPlaylist(pl)}
+                      onClick={() => { setSelectedPlaylist(pl); setPage(1); }}
                       style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12, padding: "8px 0", borderColor: "rgba(15,110,86,0.3)", color: "var(--teal)" }}
                     >
-                      <i className="ti ti-play-circle" style={{ fontSize: 13 }}></i> เรียนบทนี้
+                      <i className="ti ti-play-circle" style={{ fontSize: 13 }}></i> ดูเพลย์ลิสต์
                     </button>
                   </div>
                 </div>
@@ -99,39 +108,70 @@ export default function Media({ go }) {
           )}
         </>
       ) : (
-        /* INSIDE PLAYLIST VIEW (เมื่อกดเข้ามาเรียนวิชานั้นๆ) */
+        /* INSIDE PLAYLIST (แบบบล็อกพร้อมปก Thumbnail และ Pagination) */
         <div>
           <button className="btn btn-outline" style={{ marginBottom: 20, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, padding: "6px 12px" }} onClick={() => setSelectedPlaylist(null)}>
             <i className="ti ti-arrow-left"></i> กลับหน้ารวมมีเดีย
           </button>
           
-          <div className="card" style={{ padding: 18, marginBottom: 20, background: "var(--acc2)" }}>
-            <div style={{ fontSize: 12, color: "var(--teal)", marginBottom: 4, fontWeight: 500 }}>คอร์สเรียนโดย: {selectedPlaylist.teacher}</div>
+          <div className="card" style={{ padding: 18, marginBottom: 24, background: "var(--acc2)" }}>
+            <div style={{ fontSize: 12, color: "var(--teal)", marginBottom: 4, fontWeight: 500 }}>{selectedPlaylist.teacher}</div>
             <h2 style={{ fontSize: 18, fontWeight: 500 }}>{selectedPlaylist.name}</h2>
-            <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 4 }}>รวมเนื้อหาทั้งหมด {selectedPlaylist.items.length} ตอนบรรยาย</p>
+            <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 4 }}>รวมเนื้อหาทั้งหมด {selectedPlaylist.items.length} คลิป (หน้าที่ {page}/{totalPages})</p>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {selectedPlaylist.items.map((item, index) => (
-              <div 
-                key={item.id} 
-                className="card" 
-                style={{ padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}
-                onClick={() => go ? go("media-detail", item) : undefined}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-                  <span style={{ fontSize: 12, color: "var(--t3)", fontWeight: 500, width: 16 }}>{index + 1}</span>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</div>
-                    <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 2 }}>{item.channel}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
+            {currentItems.map((item) => {
+              // ดึงภาพปกจาก YouTube หากไม่มีการใส่ CoverUrl
+              const thumbUrl = item.coverUrl || (item.type === "youtube" && item.embedId ? `https://img.youtube.com/vi/${item.embedId}/hqdefault.jpg` : null)
+              
+              return (
+                <div 
+                  key={item.id} 
+                  className="card" 
+                  style={{ padding: 0, overflow: "hidden", cursor: "pointer", display: "flex", flexDirection: "column" }}
+                  onClick={() => go ? go("media-detail", item) : undefined}
+                >
+                  <div style={{ height: 150, background: "var(--acc2)", position: "relative" }}>
+                    {thumbUrl ? (
+                      <img src={thumbUrl} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <i className={`ti ${item.type === "youtube" ? "ti-brand-youtube" : "ti-brand-spotify"}`} style={{ fontSize: 40, color: "var(--t3)" }}></i>
+                      </div>
+                    )}
+                    {item.duration && (
+                      <span style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,0.8)", color: "#fff", fontSize: 10, padding: "2px 6px", borderRadius: 4 }}>
+                        {item.duration}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ padding: 14, flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", marginBottom: 6 }}>
+                      {item.title}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--t3)" }}>{item.channel}</div>
                   </div>
                 </div>
-                {item.duration && (
-                  <span className="tag" style={{ background: "var(--bg2)", color: "var(--t2)", fontSize: 11 }}>{item.duration}</span>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 32 }}>
+              {Array.from({ length: totalPages }).map((_, i) => (
+                <button 
+                  key={i} 
+                  onClick={() => { setPage(i + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  className={page === i + 1 ? "btn btn-teal" : "btn btn-outline"} 
+                  style={{ padding: "6px 14px", fontSize: 12 }}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
