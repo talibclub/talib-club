@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
-import { collection, doc, getDocs, serverTimestamp, setDoc, writeBatch } from "firebase/firestore"
+import { collection, doc, getDocs, serverTimestamp, writeBatch } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
-import { confirmAction, notifyError, notifySuccess } from "../utils/feedback.jsx"
+import { notifyError, notifySuccess } from "../utils/feedback.jsx"
 
 const COLLECTION = "translation_abuiyaad"
 const STATUS = { pending: "Pending", progress: "In progress", completed: "Completed" }
@@ -15,6 +15,7 @@ export default function StaffTranslation({ go }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [scraping, setScraping] = useState(false)
+  const [progress, setProgress] = useState(0)
   const [query, setQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
 
@@ -33,42 +34,58 @@ export default function StaffTranslation({ go }) {
   }
 
   async function runScrape() {
-    setScraping(true);
+    setScraping(true)
+    setProgress(0)
     try {
-      // ใช้ API ของ allorigins เพื่อเป็นตัวกลางดึงข้อมูลจากเว็บเป้าหมาย
-      const targetUrl = "https://abuiyaad.com/wp-json/wp/v2/posts?per_page=100";
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+      // 1. ดึงหน้าแรกเพื่อหาจำนวนหน้าทั้งหมด (x-wp-totalpages)
+      const firstPageRes = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent("https://abuiyaad.com/wp-json/wp/v2/posts?per_page=100&page=1")}`)
+      const firstPageJson = await firstPageRes.json()
       
-      const response = await fetch(proxyUrl);
-      const json = await response.json();
-      const posts = JSON.parse(json.contents); // แปลงข้อมูลที่ได้จาก Proxy
+      // ดึง header จากข้อมูลที่ allorigins ส่งกลับมา
+      const totalPages = parseInt(firstPageJson.status.headers["x-wp-totalpages"] || "1")
+      
+      let allPosts = JSON.parse(firstPageJson.contents)
+      setProgress(Math.round((1 / totalPages) * 100))
 
-      // นำไปเก็บลง Firestore
-      const batch = writeBatch(db);
-      posts.forEach(post => {
-        const id = docId(post.link);
-        batch.set(doc(db, COLLECTION, id), {
-          title: post.title.rendered.replace(/<[^>]+>/g, ''),
-          url: post.link,
-          status: STATUS.pending,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-      });
+      // 2. วนลูปดึงหน้าที่เหลือ
+      for (let page = 2; page <= totalPages; page++) {
+        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(`https://abuiyaad.com/wp-json/wp/v2/posts?per_page=100&page=${page}`)}`)
+        const data = await res.json()
+        const newPosts = JSON.parse(data.contents)
+        allPosts = [...allPosts, ...newPosts]
+        setProgress(Math.round((page / totalPages) * 100))
+      }
+
+      // 3. บันทึกลง Firestore แบบ Batch (ทำทีละ 500 รายการเพื่อป้องกันข้อจำกัด)
+      for (let i = 0; i < allPosts.length; i += 500) {
+        const batch = writeBatch(db)
+        const chunk = allPosts.slice(i, i + 500)
+        chunk.forEach(post => {
+          batch.set(doc(db, COLLECTION, docId(post.link)), {
+            title: post.title.rendered.replace(/<[^>]+>/g, ''),
+            url: post.link,
+            status: STATUS.pending,
+            updatedAt: serverTimestamp()
+          }, { merge: true })
+        })
+        await batch.commit()
+      }
       
-      await batch.commit();
-      notifySuccess("กวาดข้อมูลสำเร็จ!");
-      loadItems();
+      notifySuccess(`กวาดข้อมูลสำเร็จ! รวม ${allPosts.length} รายการ`)
+      loadItems()
     } catch (err) {
-      console.error(err);
-      notifyError("กวาดข้อมูลไม่ได้: " + err.message);
+      notifyError("กวาดข้อมูลผิดพลาด: " + err.message)
     } finally {
-      setScraping(false);
+      setScraping(false)
+      setProgress(0)
     }
   }
 
   async function updateItem(item, patch) {
     try {
-      await setDoc(doc(db, COLLECTION, item.id), { ...patch, updatedAt: serverTimestamp() }, { merge: true })
+      const batch = writeBatch(db)
+      batch.set(doc(db, COLLECTION, item.id), { ...patch, updatedAt: serverTimestamp() }, { merge: true })
+      await batch.commit()
       setItems(prev => prev.map(row => row.id === item.id ? { ...row, ...patch } : row))
       notifySuccess("อัปเดตสถานะแล้ว")
     } catch {
@@ -88,8 +105,17 @@ export default function StaffTranslation({ go }) {
           <button className="btn btn-outline" onClick={() => go("staff")}><i className="ti ti-arrow-left"></i> กลับ</button>
           <h1>Translation Tracker</h1>
         </div>
-        <button className="btn btn-teal" onClick={runScrape} disabled={scraping}>{scraping ? "กำลังกวาด..." : "กวาดข้อมูลจากเว็บ"}</button>
+        <button className="btn btn-teal" onClick={runScrape} disabled={scraping}>
+          {scraping ? `กำลังกวาด... ${progress}%` : "กวาดข้อมูลจากเว็บทั้งหมด"}
+        </button>
       </div>
+
+      {scraping && (
+        <div style={{ width: '100%', background: '#e0e0e0', height: '8px', margin: '15px 0', borderRadius: '4px', overflow: 'hidden' }}>
+          <div style={{ width: `${progress}%`, background: '#008080', height: '100%', transition: 'width 0.3s ease' }}></div>
+        </div>
+      )}
+
       <div className="card translation-table">
         {loading ? <div>กำลังโหลดข้อมูล...</div> : filtered.map(item => (
           <div className="translation-row" key={item.id}>
