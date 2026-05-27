@@ -55,32 +55,18 @@ const SUBMISSION_STATUS = {
 }
 const SUBMISSION_TYPES = ["บทความ", "เอกสาร", "รูปภาพ", "คลิป", "เสียง"]
 
-const emptyPost = {
-  Title: "",
-  Content: "",
-  PosterUrl: "",
-  Category: "",
-  DateScheduled: "",
-  Platforms: [],
-  ResponsibleAdmin: "",
-  ContentAuthor: "",
-  PosterDesigner: "",
-}
-
-const emptySubmission = {
-  Title: "",
-  SubmissionType: "",
-  SubmissionLink: "",
-  SubmissionContent: "",
-}
+const emptyPost = { Title: "", Content: "", PosterUrl: "", Category: "", DateScheduled: "", Platforms: [], ResponsibleAdmin: "", ContentAuthor: "", PosterDesigner: "" }
+const emptySubmission = { Title: "", SubmissionType: "", SubmissionLink: "", SubmissionContent: "" }
 
 export default function StaffWork({ authState, go }) {
-  // --- ระบบดึงหมวดหมู่จาก Admin Taxonomy ---
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY);
   const CATEGORIES = taxonomy.staffCategories?.length ? taxonomy.staffCategories : DEFAULT_CATEGORIES;
 
   const [staffName, setStaffName] = useStaffName(authState)
-  const isAdmin = ADMIN_TEAM.includes(staffName)
+  
+  // แก้ไข: ประกาศ isAdmin ครั้งเดียวและใช้ staffName เป็นตัวตั้งต้น
+  const isAdmin = useMemo(() => ADMIN_TEAM.includes(staffName), [staffName]);
+  
   const [tab, setTab] = useState("work")
   const [notice, setNotice] = useState("")
   const postsApi = useSheetPosts(staffName)
@@ -119,15 +105,13 @@ export default function StaffWork({ authState, go }) {
             </select>
           </label>
           <button className="btn btn-outline" onClick={refreshAll} disabled={postsApi.loading || submissionsApi.loading}>
-            <i className={`ti ti-refresh ${postsApi.loading || submissionsApi.loading ? "spin" : ""}`} style={{ marginRight: 6 }}></i>รีเฟรช
+            <i className={`ti ${postsApi.loading || submissionsApi.loading ? "ti-loader-2 spin" : "ti-refresh"}`} style={{ marginRight: 6 }}></i>รีเฟรช
           </button>
         </div>
       </div>
 
       {notice && <div className="auth-info staff-work-notice">{notice}</div>}
-      {(postsApi.error || submissionsApi.error) && (
-        <div className="auth-error staff-work-notice">โหลดข้อมูลบางส่วนไม่สำเร็จ กรุณาลองรีเฟรชอีกครั้ง</div>
-      )}
+      {(postsApi.error || submissionsApi.error) && <div className="auth-error staff-work-notice">โหลดข้อมูลไม่สำเร็จ</div>}
 
       <div className="staff-stat-grid">
         <StatCard label="รอลง" value={stats.pending} tone="warn" />
@@ -160,6 +144,8 @@ export default function StaffWork({ authState, go }) {
     </div>
   )
 }
+
+// ... (คงเดิมตั้งแต่ฟังก์ชัน WorkCenter ลงไปจนจบไฟล์ครับ)
 
 function WorkCenter({ posts, staffName, onUpdate, onDelete, flash }) {
   const [mineOnly, setMineOnly] = useState(false)

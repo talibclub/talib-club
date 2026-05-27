@@ -44,54 +44,60 @@ export default function StaffTranslation({ go }) {
     }
   }
 
- async function scrapeAbuIyaad() {
-    setScraping(true);
+  async function runScrape() {
+    const ok = await confirmAction({
+      title: "กวาดข้อมูลจาก abuiyaad.com?",
+      message: "ระบบจะดึงรายชื่อบทความทั้งหมดมาใส่ฐานข้อมูล",
+      confirmText: "เริ่มกวาดข้อมูล",
+    })
+    if (!ok) return
+
+    setScraping(true)
     try {
       let allArticles = [];
       let page = 1;
       let totalPages = 1;
 
-      // ลูปดึงข้อมูลหน้าละ 100 บทความ จนกว่าจะครบทุกหน้า
       do {
         const response = await fetch(`https://abuiyaad.com/wp-json/wp/v2/posts?per_page=100&page=${page}`);
-        
-        // ถ้า API พ่น Error หรือหน้าหมดแล้วให้หยุดลูป
         if (!response.ok) break;
-
-        // ดึงจำนวนหน้าทั้งหมดจาก Header ที่ WordPress ส่งมาให้
         totalPages = parseInt(response.headers.get('x-wp-totalpages') || "1");
         const posts = await response.json();
-
-        // นำข้อมูลมาแปลงให้อยู่ในฟอร์แมตที่ต้องการ
         const mappedPosts = posts.map(post => ({
-          id: docId(post.link), // หรือฟังก์ชันสร้าง ID ของคุณ
-          title: post.title.rendered.replace(/<[^>]+>/g, ''), // ล้างแท็ก HTML
+          id: docId(post.link),
+          title: post.title.rendered.replace(/<[^>]+>/g, '').replace(/&#8211;/g, '-').replace(/&#8217;/g, "'"),
           url: post.link,
           status: STATUS.pending,
           translator: "",
           notes: "",
         }));
-
         allArticles = [...allArticles, ...mappedPosts];
         page++;
       } while (page <= totalPages);
 
-      // --- ส่วนนี้นำ allArticles ไปบันทึกลง Firestore (ใช้ Batch เหมือนเดิม) ---
-      const batch = writeBatch(db);
+      const existing = new Map(items.map(item => [item.url, item]))
+      const batch = writeBatch(db)
+
       allArticles.forEach(article => {
-        const docRef = doc(db, COLLECTION, article.id);
-        batch.set(docRef, article, { merge: true }); // merge: true ป้องกันการทับสถานะเก่า
-      });
-      await batch.commit();
+        const current = existing.get(article.url)
+        batch.set(doc(db, COLLECTION, article.id), {
+          ...article,
+          status: current?.status || STATUS.pending,
+          notes: current?.notes || "",
+          translator: current?.translator || "",
+          importedAt: current?.importedAt || serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }, { merge: true })
+      })
 
-      notifySuccess(`ดึงข้อมูลสำเร็จ! พบทั้งหมด ${allArticles.length} บทความ`);
-      loadItems(); // โหลดข้อมูลมาแสดงใหม่
-
+      await batch.commit()
+      notifySuccess(`ดึงบทความได้ทั้งหมด ${allArticles.length} รายการ`)
+      await loadItems()
     } catch (error) {
-      console.error(error);
-      notifyError("กวาดข้อมูลไม่สำเร็จ กรุณาลองใหม่");
+      console.error(error)
+      notifyError("กวาดข้อมูลไม่สำเร็จ กรุณาลองใหม่")
     } finally {
-      setScraping(false);
+      setScraping(false)
     }
   }
 
