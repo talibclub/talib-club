@@ -11,17 +11,12 @@ const STATUS_LABEL = {
   [STATUS.progress]: "กำลังแปล",
   [STATUS.completed]: "แปลเสร็จแล้ว",
 }
-const STATUS_COLOR = {
-  [STATUS.pending]: { bg: "#fff8e1", color: "#f59e0b", border: "#ffe082" },
-  [STATUS.progress]: { bg: "#e3f2fd", color: "#2196f3", border: "#90caf9" },
-  [STATUS.completed]: { bg: "#e8f5e9", color: "#4caf50", border: "#a5d6a7" },
-}
 
 function docId(url) {
   return btoa(unescape(encodeURIComponent(url))).replace(/[+/=]/g, "_").slice(0, 120)
 }
 
-// ── Modal กรอกรายละเอียด ──────────────────────────────────────────
+// ── Modal ──────────────────────────────────────────────────────────
 function EditModal({ item, onClose, onSave }) {
   const [thaiTitle, setThaiTitle] = useState(item.thaiTitle || "")
   const [note, setNote] = useState(item.note || "")
@@ -36,66 +31,43 @@ function EditModal({ item, onClose, onSave }) {
 
   return (
     <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)",
       display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000
     }}>
-      <div style={{
-        background: "var(--card-bg, #fff)", borderRadius: "14px", padding: "28px",
-        width: "min(520px, 92vw)", boxShadow: "0 8px 40px rgba(0,0,0,0.18)"
-      }}>
-        {/* Header */}
-        <div style={{ marginBottom: "20px" }}>
-          <div style={{ fontSize: "11px", color: "#999", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>บทความต้นฉบับ</div>
+      <div className="card" style={{ width: "min(520px,92vw)", padding: "28px" }}>
+        <div style={{ marginBottom: "18px" }}>
+          <div style={{ fontSize: "11px", color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>บทความต้นฉบับ</div>
           <a href={item.url} target="_blank" rel="noreferrer"
-            style={{ fontSize: "14px", color: "#008080", fontWeight: 500, wordBreak: "break-word" }}>
+            style={{ fontSize: "13px", color: "var(--teal)", fontWeight: 500, wordBreak: "break-word" }}>
             {item.title}
           </a>
         </div>
 
-        {/* หัวข้อภาษาไทย */}
-        <div style={{ marginBottom: "16px" }}>
-          <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+        <div style={{ display: "grid", gap: "14px", marginBottom: "22px" }}>
+          <label style={{ display: "grid", gap: "6px", fontSize: "12px", color: "var(--t2)" }}>
             หัวข้อภาษาไทย
+            <input
+              type="text"
+              value={thaiTitle}
+              onChange={e => setThaiTitle(e.target.value)}
+              placeholder="กรอกหัวข้อภาษาไทย..."
+            />
           </label>
-          <input
-            type="text"
-            value={thaiTitle}
-            onChange={e => setThaiTitle(e.target.value)}
-            placeholder="กรอกหัวข้อภาษาไทย..."
-            style={{
-              width: "100%", padding: "10px 12px", borderRadius: "8px",
-              border: "1px solid #ddd", fontSize: "14px", boxSizing: "border-box",
-              background: "var(--input-bg, #f9f9f9)"
-            }}
-          />
+          <label style={{ display: "grid", gap: "6px", fontSize: "12px", color: "var(--t2)" }}>
+            หมายเหตุ <span style={{ color: "var(--t3)", display: "inline" }}>(ไม่บังคับ)</span>
+            <textarea
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              placeholder="เช่น กำลังรอตรวจสอบ, ต้องการความช่วยเหลือ..."
+              rows={3}
+              style={{ resize: "vertical" }}
+            />
+          </label>
         </div>
 
-        {/* หมายเหตุ */}
-        <div style={{ marginBottom: "24px" }}>
-          <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
-            หมายเหตุ <span style={{ fontWeight: 400, color: "#999" }}>(ไม่บังคับ)</span>
-          </label>
-          <textarea
-            value={note}
-            onChange={e => setNote(e.target.value)}
-            placeholder="เช่น กำลังรอตรวจสอบ, ต้องการความช่วยเหลือ..."
-            rows={3}
-            style={{
-              width: "100%", padding: "10px 12px", borderRadius: "8px",
-              border: "1px solid #ddd", fontSize: "14px", resize: "vertical",
-              boxSizing: "border-box", background: "var(--input-bg, #f9f9f9)"
-            }}
-          />
-        </div>
-
-        {/* Buttons */}
-        <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-          <button onClick={onClose}
-            style={{ padding: "9px 20px", borderRadius: "8px", border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: "14px" }}>
-            ยกเลิก
-          </button>
-          <button onClick={handleSave} disabled={saving}
-            style={{ padding: "9px 20px", borderRadius: "8px", border: "none", background: "#008080", color: "#fff", cursor: "pointer", fontSize: "14px", fontWeight: 600 }}>
+        <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+          <button className="btn btn-outline" onClick={onClose}>ยกเลิก</button>
+          <button className="btn btn-teal" onClick={handleSave} disabled={saving}>
             {saving ? "กำลังบันทึก..." : "บันทึก"}
           </button>
         </div>
@@ -104,13 +76,13 @@ function EditModal({ item, onClose, onSave }) {
   )
 }
 
-// ── Main Component ────────────────────────────────────────────────
+// ── Main ───────────────────────────────────────────────────────────
 export default function StaffTranslation({ go }) {
   const { profile } = useAuth()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [scraping, setScraping] = useState(false)
-  const [progress, setProgress] = useState(0)
+  const [scrapeProgress, setScrapeProgress] = useState(0)
   const [query, setQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [editItem, setEditItem] = useState(null)
@@ -121,7 +93,7 @@ export default function StaffTranslation({ go }) {
     setLoading(true)
     try {
       const snap = await getDocs(collection(db, COLLECTION))
-      setItems(snap.docs.map(item => ({ id: item.id, ...item.data() })))
+      setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     } catch {
       notifyError("โหลดฐานข้อมูลงานแปลไม่สำเร็จ")
     } finally {
@@ -131,17 +103,16 @@ export default function StaffTranslation({ go }) {
 
   async function runScrape() {
     setScraping(true)
-    setProgress(30)
+    setScrapeProgress(30)
     try {
       const res = await fetch("/api/abuiyaad-scrape")
       const data = await res.json()
       if (!data.articles) throw new Error(data.error)
-      setProgress(70)
+      setScrapeProgress(70)
       const BATCH_LIMIT = 499
       for (let i = 0; i < data.articles.length; i += BATCH_LIMIT) {
         const batch = writeBatch(db)
-        const chunk = data.articles.slice(i, i + BATCH_LIMIT)
-        for (const post of chunk) {
+        for (const post of data.articles.slice(i, i + BATCH_LIMIT)) {
           const id = docId(post.url)
           batch.set(doc(db, COLLECTION, id),
             { title: post.title, url: post.url, status: STATUS.pending },
@@ -150,14 +121,14 @@ export default function StaffTranslation({ go }) {
         }
         await batch.commit()
       }
-      setProgress(100)
+      setScrapeProgress(100)
       notifySuccess(`สำเร็จ! ได้บทความทั้งหมด ${data.count} รายการ`)
       loadItems()
     } catch (err) {
       notifyError("กวาดข้อมูลไม่ได้: " + err.message)
     } finally {
       setScraping(false)
-      setProgress(0)
+      setScrapeProgress(0)
     }
   }
 
@@ -166,17 +137,21 @@ export default function StaffTranslation({ go }) {
       const batch = writeBatch(db)
       batch.set(doc(db, COLLECTION, item.id), { ...patch, updatedAt: serverTimestamp() }, { merge: true })
       await batch.commit()
-      setItems(prev => prev.map(row => row.id === item.id ? { ...row, ...patch } : row))
+      setItems(prev => prev.map(r => r.id === item.id ? { ...r, ...patch } : r))
     } catch {
       notifyError("อัปเดตไม่สำเร็จ")
     }
   }
 
-  // รับงาน — ใส่ชื่อ user ที่ login อัตโนมัติ
   async function claimItem(item) {
     const name = profile?.displayName || profile?.email || "ไม่ระบุ"
     await updateItem(item, { status: STATUS.progress, assignee: name, claimedAt: serverTimestamp() })
-    notifySuccess(`รับงานแล้ว: ${name}`)
+    notifySuccess("รับงานแล้ว")
+  }
+
+  async function unclaimItem(item) {
+    await updateItem(item, { status: STATUS.pending, assignee: "", claimedAt: null })
+    notifySuccess("ยกเลิกงานแล้ว")
   }
 
   async function saveEdit(item, patch) {
@@ -202,80 +177,84 @@ export default function StaffTranslation({ go }) {
 
   return (
     <div className="translation-page">
+
       {/* Header */}
       <div className="staff-section-head">
         <div>
           <button className="btn btn-outline" onClick={() => go("staff")}>
-            <i className="ti ti-arrow-left"></i> กลับ
+            <i className="ti ti-arrow-left" /> กลับ
           </button>
-          <h1>Translation Tracker</h1>
+          <h1 style={{ marginTop: "10px" }}>Translation Tracker</h1>
+          <p style={{ marginTop: "4px" }}>ติดตามสถานะการแปลบทความจาก abuiyaad.com</p>
         </div>
         <button className="btn btn-teal" onClick={runScrape} disabled={scraping}>
-          {scraping ? `กำลังกวาด... ${progress}%` : "กวาดข้อมูลจากเว็บทั้งหมด"}
+          <i className={`ti ${scraping ? "ti-loader-2 spin" : "ti-refresh"}`} style={{ marginRight: "6px" }} />
+          {scraping ? `กำลังกวาด... ${scrapeProgress}%` : "กวาดข้อมูลจากเว็บ"}
         </button>
       </div>
 
-      {/* Scrape progress bar */}
+      {/* Scrape progress */}
       {scraping && (
-        <div style={{ width: "100%", background: "#e0e0e0", height: "8px", margin: "15px 0", borderRadius: "4px", overflow: "hidden" }}>
-          <div style={{ width: `${progress}%`, background: "#008080", height: "100%", transition: "width 0.3s ease" }} />
+        <div style={{ width: "100%", background: "var(--br)", height: "4px", borderRadius: "2px", overflow: "hidden", marginBottom: "16px" }}>
+          <div style={{ width: `${scrapeProgress}%`, background: "var(--teal)", height: "100%", transition: "width 0.3s ease" }} />
         </div>
       )}
 
-      {/* Summary Cards */}
+      {/* Summary */}
       {!loading && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", margin: "16px 0" }}>
-            {[
-              { label: "บทความทั้งหมด", value: total, bg: "#f8f9fa", color: "#333", border: "#e9ecef" },
-              { label: "ยังไม่แปล", value: pending, bg: "#fff8e1", color: "#f59e0b", border: "#ffe082" },
-              { label: "กำลังแปล", value: inProgress, bg: "#e3f2fd", color: "#2196f3", border: "#90caf9" },
-              { label: "แปลเสร็จแล้ว", value: completed, bg: "#e8f5e9", color: "#4caf50", border: "#a5d6a7" },
-            ].map(card => (
-              <div key={card.label} style={{
-                background: card.bg, borderRadius: "10px", padding: "16px",
-                textAlign: "center", border: `1px solid ${card.border}`
-              }}>
-                <div style={{ fontSize: "30px", fontWeight: "bold", color: card.color }}>{card.value}</div>
-                <div style={{ fontSize: "12px", color: "#888", marginTop: "4px" }}>{card.label}</div>
-              </div>
-            ))}
+          <div className="staff-stat-grid" style={{ marginBottom: "16px" }}>
+            <div className="card staff-stat">
+              <span>บทความทั้งหมด</span>
+              <strong>{total}</strong>
+            </div>
+            <div className="card staff-stat warn">
+              <span>ยังไม่แปล</span>
+              <strong>{pending}</strong>
+            </div>
+            <div className="card staff-stat info">
+              <span>กำลังแปล</span>
+              <strong>{inProgress}</strong>
+            </div>
+            <div className="card staff-stat ok">
+              <span>แปลเสร็จแล้ว</span>
+              <strong>{completed}</strong>
+            </div>
           </div>
 
-          {/* Progress bar รวม */}
           {total > 0 && (
             <div style={{ marginBottom: "20px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#666", marginBottom: "6px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--t2)", marginBottom: "6px" }}>
                 <span>ความคืบหน้าการแปล</span>
-                <span style={{ fontWeight: 600 }}>{completedPct}% เสร็จแล้ว · {inProgressPct}% กำลังแปล</span>
+                <span>{completedPct}% เสร็จแล้ว · {inProgressPct}% กำลังแปล</span>
               </div>
-              <div style={{ width: "100%", background: "#e0e0e0", height: "12px", borderRadius: "6px", overflow: "hidden", display: "flex" }}>
-                <div style={{ width: `${completedPct}%`, background: "#4caf50", height: "100%", transition: "width 0.5s ease" }} />
-                <div style={{ width: `${inProgressPct}%`, background: "#2196f3", height: "100%", transition: "width 0.5s ease" }} />
+              <div style={{ width: "100%", background: "var(--bg2)", height: "8px", borderRadius: "4px", overflow: "hidden", display: "flex" }}>
+                <div style={{ width: `${completedPct}%`, background: "var(--teal)", height: "100%", transition: "width 0.5s ease" }} />
+                <div style={{ width: `${inProgressPct}%`, background: "#3b73c4", height: "100%", transition: "width 0.5s ease" }} />
               </div>
-              <div style={{ display: "flex", gap: "16px", marginTop: "6px", fontSize: "12px", color: "#888" }}>
-                <span><span style={{ color: "#4caf50" }}>■</span> เสร็จแล้ว</span>
-                <span><span style={{ color: "#2196f3" }}>■</span> กำลังแปล</span>
-                <span><span style={{ color: "#ddd" }}>■</span> ยังไม่แปล</span>
+              <div style={{ display: "flex", gap: "16px", marginTop: "6px", fontSize: "11px", color: "var(--t3)" }}>
+                <span><span style={{ color: "var(--teal)" }}>■</span> เสร็จแล้ว</span>
+                <span><span style={{ color: "#3b73c4" }}>■</span> กำลังแปล</span>
+                <span><span style={{ color: "var(--bg2)" }}>■</span> ยังไม่แปล</span>
               </div>
             </div>
           )}
         </>
       )}
 
-      {/* Filter & Search */}
+      {/* Search & Filter */}
       <div style={{ display: "flex", gap: "10px", marginBottom: "12px", flexWrap: "wrap" }}>
         <input
           type="text"
-          placeholder="ค้นหาบทความ (ภาษาอังกฤษหรือไทย)..."
+          placeholder="ค้นหาบทความ (อังกฤษหรือไทย)..."
           value={query}
           onChange={e => setQuery(e.target.value)}
-          style={{ flex: 1, minWidth: "200px", padding: "9px 12px", borderRadius: "8px", border: "1px solid #ddd", fontSize: "14px" }}
+          style={{ flex: 1, minWidth: "200px" }}
         />
         <select
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value)}
-          style={{ padding: "9px 12px", borderRadius: "8px", border: "1px solid #ddd", fontSize: "14px" }}
+          style={{ width: "auto" }}
         >
           <option value="all">ทั้งหมด ({total})</option>
           <option value={STATUS.pending}>ยังไม่แปล ({pending})</option>
@@ -287,97 +266,87 @@ export default function StaffTranslation({ go }) {
       {/* Table */}
       <div className="card translation-table">
         {loading ? (
-          <div style={{ padding: "24px", textAlign: "center", color: "#888" }}>กำลังโหลดข้อมูล...</div>
+          <div className="empty">
+            <i className="ti ti-loader-2 spin" style={{ fontSize: "24px", color: "var(--teal)" }} />
+            <p style={{ marginTop: "10px" }}>กำลังโหลดข้อมูล...</p>
+          </div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: "24px", textAlign: "center", color: "#888" }}>ไม่พบบทความ</div>
-        ) : filtered.map(item => {
-          const sc = STATUS_COLOR[item.status] || STATUS_COLOR[STATUS.pending]
-          return (
-            <div className="translation-row" key={item.id}
-              style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "12px", alignItems: "start", padding: "12px 0", borderBottom: "1px solid #f0f0f0" }}>
+          <div className="empty">ไม่พบบทความ</div>
+        ) : filtered.map(item => (
+          <div key={item.id} style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0,1fr) auto",
+            gap: "12px",
+            alignItems: "start",
+            padding: "14px",
+            borderTop: ".5px solid var(--br2)"
+          }}>
+            {/* ข้อมูล */}
+            <div>
+              <a href={item.url} target="_blank" rel="noreferrer"
+                style={{ fontSize: "13px", fontWeight: 500, color: "var(--text)", display: "block", marginBottom: "3px" }}>
+                {item.title}
+              </a>
 
-              {/* ข้อมูลบทความ */}
-              <div>
-                {/* หัวข้ออังกฤษ */}
-                <a href={item.url} target="_blank" rel="noreferrer"
-                  style={{ fontSize: "14px", fontWeight: 500, color: "#008080", display: "block", marginBottom: "3px" }}>
-                  {item.title}
-                </a>
+              {item.thaiTitle ? (
+                <div style={{ fontSize: "13px", color: "var(--teal)", marginBottom: "5px" }}>
+                  {item.thaiTitle}
+                </div>
+              ) : (
+                <div style={{ fontSize: "11px", color: "var(--t3)", marginBottom: "5px", fontStyle: "italic" }}>
+                  ยังไม่มีหัวข้อภาษาไทย
+                </div>
+              )}
 
-                {/* หัวข้อไทย */}
-                {item.thaiTitle ? (
-                  <div style={{ fontSize: "13px", color: "#555", marginBottom: "4px" }}>
-                    🇹🇭 {item.thaiTitle}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: "12px", color: "#bbb", marginBottom: "4px", fontStyle: "italic" }}>
-                    ยังไม่มีหัวข้อภาษาไทย
-                  </div>
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                {item.assignee && (
+                  <span className="badge badge-teal" style={{ fontSize: "11px" }}>
+                    <i className="ti ti-user" style={{ fontSize: "11px" }} /> {item.assignee}
+                  </span>
                 )}
-
-                {/* ผู้รับผิดชอบ + หมายเหตุ */}
-                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
-                  {item.assignee && (
-                    <span style={{ fontSize: "12px", color: "#666" }}>
-                      👤 {item.assignee}
-                    </span>
-                  )}
-                  {item.note && (
-                    <span style={{ fontSize: "12px", color: "#999", fontStyle: "italic" }}>
-                      📝 {item.note}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Controls */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-end", minWidth: "140px" }}>
-                {/* Status badge + dropdown */}
-                <select
-                  value={item.status || STATUS.pending}
-                  onChange={e => updateItem(item, { status: e.target.value })}
-                  style={{
-                    padding: "5px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: 600,
-                    border: `1px solid ${sc.border}`, background: sc.bg, color: sc.color, cursor: "pointer"
-                  }}
-                >
-                  {Object.values(STATUS).map(s => (
-                    <option key={s} value={s}>{STATUS_LABEL[s]}</option>
-                  ))}
-                </select>
-
-                <div style={{ display: "flex", gap: "6px" }}>
-                  {/* ปุ่มรับงาน */}
-                  {(!item.assignee || item.assignee === "") && item.status !== STATUS.completed && (
-                    <button
-                      onClick={() => claimItem(item)}
-                      style={{
-                        padding: "4px 10px", borderRadius: "6px", fontSize: "12px",
-                        border: "1px solid #008080", background: "transparent",
-                        color: "#008080", cursor: "pointer", whiteSpace: "nowrap"
-                      }}>
-                      รับงาน
-                    </button>
-                  )}
-
-                  {/* ปุ่มแก้ไข */}
-                  <button
-                    onClick={() => setEditItem(item)}
-                    style={{
-                      padding: "4px 10px", borderRadius: "6px", fontSize: "12px",
-                      border: "1px solid #ddd", background: "transparent",
-                      color: "#555", cursor: "pointer"
-                    }}>
-                    ✏️ แก้ไข
-                  </button>
-                </div>
+                {item.note && (
+                  <span style={{ fontSize: "11px", color: "var(--t3)", fontStyle: "italic" }}>
+                    {item.note}
+                  </span>
+                )}
               </div>
             </div>
-          )
-        })}
+
+            {/* Controls */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-end" }}>
+              <select
+                value={item.status || STATUS.pending}
+                onChange={e => updateItem(item, { status: e.target.value })}
+                style={{ width: "auto", fontSize: "12px", padding: "5px 10px" }}
+              >
+                {Object.values(STATUS).map(s => (
+                  <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+                ))}
+              </select>
+
+              <div style={{ display: "flex", gap: "6px" }}>
+                {!item.assignee && item.status !== STATUS.completed && (
+                  <button className="btn btn-outline" style={{ padding: "5px 12px", fontSize: "12px" }}
+                    onClick={() => claimItem(item)}>
+                    รับงาน
+                  </button>
+                )}
+                {item.assignee && item.status !== STATUS.completed && (
+                  <button className="btn btn-outline" style={{ padding: "5px 12px", fontSize: "12px", color: "var(--t3)" }}
+                    onClick={() => unclaimItem(item)}>
+                    ยกเลิก
+                  </button>
+                )}
+                <button className="btn btn-outline" style={{ padding: "5px 12px", fontSize: "12px" }}
+                  onClick={() => setEditItem(item)}>
+                  <i className="ti ti-pencil" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* Modal */}
       {editItem && (
         <EditModal
           item={editItem}

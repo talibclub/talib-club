@@ -25,13 +25,26 @@ export default function App() {
   const [page, setPage] = useState("home")
   const [ctx, setCtx] = useState(null)
 
-  useEffect(() => {
-    if (authState.loading || !authState.user) return
-    if (window.sessionStorage.getItem("talibAfterLogin") !== "member") return
-    window.sessionStorage.removeItem("talibAfterLogin")
-    setPage("member")
-    setCtx(null)
-  }, [authState.loading, authState.user])
+  // อ่าน URL ตอนโหลดหน้าครั้งแรก
+useEffect(() => {
+  const path = window.location.pathname.replace("/", "")
+  const urlToPage = {
+    "": "home",
+    "articles": "articles",
+    "library": "library",
+    "media": "media",
+    "scholars": "scholars",
+    "tracking-system": "tracking",
+    "auth": "auth",
+    "member": "member",
+    "staff": "staff",
+    "staff-work": "staff-work",
+    "staff-translation": "staff-translation",
+    "admin": "admin",
+  }
+  const mapped = urlToPage[path]
+  if (mapped) setPage(mapped)
+}, [])
 
   const go = (p, data = null) => {
     setPage(p)
