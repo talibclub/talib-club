@@ -32,43 +32,26 @@ export default function StaffTranslation({ go }) {
     }
   }
 
+  // เปลี่ยนฟังก์ชัน runScrape ใหม่เป็น:
   async function runScrape() {
-    const ok = await confirmAction({ title: "กวาดข้อมูลจาก abuiyaad.com?", message: "ดึงบทความทั้งหมดผ่าน Proxy เพื่อป้องกัน Error", confirmText: "เริ่มกวาดข้อมูล" })
-    if (!ok) return
-    setScraping(true)
+    setScraping(true);
     try {
-      let allArticles = [];
-      let page = 1;
-      let totalPages = 1;
-      // ใช้ allorigins.win เป็น Proxy แก้ปัญหา CORS
-      do {
-        const url = `https://abuiyaad.com/wp-json/wp/v2/posts?per_page=100&page=${page}`;
-        const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
-        if (!response.ok) break;
-        const data = await response.json();
-        const posts = JSON.parse(data.contents);
-        totalPages = parseInt(data.status.headers['x-wp-totalpages'] || "1");
-        const mappedPosts = posts.map(post => ({
-          id: docId(post.link),
-          title: post.title.rendered.replace(/<[^>]+>/g, '').replace(/&#8211;/g, '-').replace(/&#8217;/g, "'"),
-          url: post.link,
-          status: STATUS.pending
-        }));
-        allArticles = [...allArticles, ...mappedPosts];
-        page++;
-      } while (page <= totalPages);
-
-      const batch = writeBatch(db)
+      // เรียกผ่าน Google Script ของคุณเอง (ข้ามปัญหา CORS 100%)
+      const response = await fetch(`${API_BASE_URL}?sheet=RawArticles`);
+      const allArticles = await response.json();
+      
+      // บันทึกลง Firestore เหมือนเดิม
+      const batch = writeBatch(db);
       allArticles.forEach(article => {
-        batch.set(doc(db, COLLECTION, article.id), { ...article, updatedAt: serverTimestamp() }, { merge: true })
-      })
-      await batch.commit()
-      notifySuccess(`ดึงข้อมูลสำเร็จ! รวม ${allArticles.length} รายการ`)
-      await loadItems()
+        batch.set(doc(db, COLLECTION, docId(article.url)), { ...article, status: STATUS.pending }, { merge: true });
+      });
+      await batch.commit();
+      notifySuccess("ดึงข้อมูลจาก Sheets เรียบร้อย");
+      loadItems();
     } catch (err) {
-      notifyError("กวาดข้อมูลไม่สำเร็จ (ลองใหม่อีกครั้ง)")
+      notifyError("ดึงข้อมูลไม่ได้ ตรวจสอบ Google Script");
     } finally {
-      setScraping(false)
+      setScraping(false);
     }
   }
 
