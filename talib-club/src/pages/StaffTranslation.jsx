@@ -34,53 +34,55 @@ export default function StaffTranslation({ go }) {
   }
 
   async function runScrape() {
-    setScraping(true)
-    setProgress(0)
+    setScraping(true);
+    setProgress(0);
     try {
-      // 1. ดึงหน้าแรกเพื่อหาจำนวนหน้าทั้งหมด (x-wp-totalpages)
-      const firstPageRes = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent("https://abuiyaad.com/wp-json/wp/v2/posts?per_page=100&page=1")}`)
-      const firstPageJson = await firstPageRes.json()
+      // ดึงแค่หน้าแรกเพื่อเช็คจำนวนหน้า
+      const firstPageRes = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent("https://abuiyaad.com/wp-json/wp/v2/posts?per_page=100&page=1")}`);
+      if (!firstPageRes.ok) throw new Error("ไม่สามารถเชื่อมต่อ Proxy ได้");
+      const firstPageJson = await firstPageRes.json();
       
-      // ดึง header จากข้อมูลที่ allorigins ส่งกลับมา
-      const totalPages = parseInt(firstPageJson.status.headers["x-wp-totalpages"] || "1")
+      // ตรวจสอบข้อมูลก่อน parse
+      if (!firstPageJson.contents) throw new Error("ไม่ได้รับข้อมูลจากเว็บไซต์");
       
-      let allPosts = JSON.parse(firstPageJson.contents)
-      setProgress(Math.round((1 / totalPages) * 100))
+      const totalPages = parseInt(firstPageJson.status?.headers?.["x-wp-totalpages"] || "1");
+      let allPosts = JSON.parse(firstPageJson.contents);
+      setProgress(Math.round((1 / totalPages) * 100));
 
-      // 2. วนลูปดึงหน้าที่เหลือ
+      // วนลูปโดยมีการหน่วงเวลา (Delay) เพื่อไม่ให้ Proxy มองว่าเรากำลังโจมตีเว็บ
       for (let page = 2; page <= totalPages; page++) {
-        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(`https://abuiyaad.com/wp-json/wp/v2/posts?per_page=100&page=${page}`)}`)
-        const data = await res.json()
-        const newPosts = JSON.parse(data.contents)
-        allPosts = [...allPosts, ...newPosts]
-        setProgress(Math.round((page / totalPages) * 100))
+        // หน่วงเวลา 1 วินาทีในแต่ละหน้า
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(`https://abuiyaad.com/wp-json/wp/v2/posts?per_page=100&page=${page}`)}`);
+        if (res.ok) {
+          const data = await res.json();
+          allPosts = [...allPosts, ...JSON.parse(data.contents)];
+          setProgress(Math.round((page / totalPages) * 100));
+        }
       }
 
-      // 3. บันทึกลง Firestore แบบ Batch (ทำทีละ 500 รายการเพื่อป้องกันข้อจำกัด)
-      for (let i = 0; i < allPosts.length; i += 500) {
-        const batch = writeBatch(db)
-        const chunk = allPosts.slice(i, i + 500)
-        chunk.forEach(post => {
-          batch.set(doc(db, COLLECTION, docId(post.link)), {
-            title: post.title.rendered.replace(/<[^>]+>/g, ''),
-            url: post.link,
-            status: STATUS.pending,
-            updatedAt: serverTimestamp()
-          }, { merge: true })
-        })
-        await batch.commit()
-      }
+      // บันทึกข้อมูล
+      const batch = writeBatch(db);
+      allPosts.forEach(post => {
+        batch.set(doc(db, COLLECTION, docId(post.link)), {
+          title: post.title.rendered.replace(/<[^>]+>/g, ''),
+          url: post.link,
+          status: STATUS.pending,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      });
+      await batch.commit();
       
-      notifySuccess(`กวาดข้อมูลสำเร็จ! รวม ${allPosts.length} รายการ`)
-      loadItems()
+      notifySuccess(`กวาดข้อมูลสำเร็จ! รวม ${allPosts.length} รายการ`);
+      loadItems();
     } catch (err) {
-      notifyError("กวาดข้อมูลผิดพลาด: " + err.message)
+      notifyError("กวาดข้อมูลไม่ได้: " + err.message);
     } finally {
-      setScraping(false)
-      setProgress(0)
+      setScraping(false);
+      setProgress(0);
     }
   }
-
   async function updateItem(item, patch) {
     try {
       const batch = writeBatch(db)
