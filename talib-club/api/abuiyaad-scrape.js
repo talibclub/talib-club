@@ -55,7 +55,7 @@ export default async function handler(req, res) {
     const queue = [SOURCE]
     const seenPages = new Set()
     const articles = new Map()
-    const maxPages = Number(req.query.maxPages || 300)
+    const maxPages = Number(req.query.maxPages || 600)
 
     while (queue.length && seenPages.size < maxPages) {
       const url = queue.shift()
