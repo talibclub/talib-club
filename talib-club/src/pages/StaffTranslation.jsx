@@ -32,24 +32,35 @@ export default function StaffTranslation({ go }) {
     }
   }
 
-  // เปลี่ยนฟังก์ชัน runScrape ใหม่เป็น:
   async function runScrape() {
     setScraping(true);
     try {
-      // เรียกผ่าน Google Script ของคุณเอง (ข้ามปัญหา CORS 100%)
-      const response = await fetch(`${API_BASE_URL}?sheet=RawArticles`);
-      const allArticles = await response.json();
+      // ใช้ API ของ allorigins เพื่อเป็นตัวกลางดึงข้อมูลจากเว็บเป้าหมาย
+      const targetUrl = "https://abuiyaad.com/wp-json/wp/v2/posts?per_page=100";
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
       
-      // บันทึกลง Firestore เหมือนเดิม
+      const response = await fetch(proxyUrl);
+      const json = await response.json();
+      const posts = JSON.parse(json.contents); // แปลงข้อมูลที่ได้จาก Proxy
+
+      // นำไปเก็บลง Firestore
       const batch = writeBatch(db);
-      allArticles.forEach(article => {
-        batch.set(doc(db, COLLECTION, docId(article.url)), { ...article, status: STATUS.pending }, { merge: true });
+      posts.forEach(post => {
+        const id = docId(post.link);
+        batch.set(doc(db, COLLECTION, id), {
+          title: post.title.rendered.replace(/<[^>]+>/g, ''),
+          url: post.link,
+          status: STATUS.pending,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
       });
+      
       await batch.commit();
-      notifySuccess("ดึงข้อมูลจาก Sheets เรียบร้อย");
+      notifySuccess("กวาดข้อมูลสำเร็จ!");
       loadItems();
     } catch (err) {
-      notifyError("ดึงข้อมูลไม่ได้ ตรวจสอบ Google Script");
+      console.error(err);
+      notifyError("กวาดข้อมูลไม่ได้: " + err.message);
     } finally {
       setScraping(false);
     }
