@@ -102,11 +102,9 @@ export default function Scholars() {
         )
       })}
 
-      {filtered.length===0 && <div className="empty">ไม่พบอุลามาอ์ที่ตรงกับการค้นหา</div>}
+     {filtered.length===0 && <div className="empty">ไม่พบอุลามาอ์ที่ตรงกับการค้นหา</div>}
 
-      <div style={{marginTop:32,padding:"16px 20px",background:"var(--acc2)",
-        border:".5px solid var(--acc-br)",borderRadius:12,textAlign:"center"}}>
-       {/* CONTACT */}
+      {/* CONTACT */}
       <div style={{marginTop:32,padding:"20px 24px",background:"var(--acc2)",
         border:".5px solid var(--acc-br)",borderRadius:14,textAlign:"center"}}>
         <div style={{fontSize:14,fontWeight:500,color:"var(--text)",marginBottom:6}}>
@@ -122,7 +120,6 @@ export default function Scholars() {
         >
           ติดต่อเรา
         </a>
-      </div>
       </div>
     </div>
   )
