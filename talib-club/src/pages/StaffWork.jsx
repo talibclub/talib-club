@@ -1,32 +1,20 @@
-import { useEffect, useMemo, useState, useRef } from "react"
+import React, { useEffect, useMemo, useState, useRef } from "react"
 import { 
   collection, onSnapshot, query, updateDoc, doc, 
-  serverTimestamp, addDoc, deleteDoc, setDoc, orderBy, getFirestore 
+  serverTimestamp, addDoc, deleteDoc, setDoc, orderBy 
 } from "firebase/firestore"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { initializeApp, getApps } from "firebase/app"
 import toast from "react-hot-toast"
+
+// --- วิธีแก้ Error ในหน้า Preview ---
+// ในระบบเว็บพรีวิวนี้ เราจะใช้เส้นทางสมมติ (Mock) ของ Firebase ให้รันผ่านก่อน
+// **แต่ตอนนำไปวางใน VS Code จริง** ให้เปลี่ยนบรรทัดที่ 16 เป็น:
+// import { db } from "../lib/firebase.js"
+import { db } from "./firebase.js" 
 
 // ฟังก์ชันสำหรับแจ้งเตือน
 const notifySuccess = (msg) => toast.success(msg)
 const notifyError = (msg) => toast.error(msg)
-
-// --- เริ่ม: โค้ดตั้งค่า Firebase (เพื่อให้ระบบ Preview ด้านขวามือทำงานได้) ---
-const firebaseConfig = {
-  apiKey: "AIzaSyC8HoWaAu0XWy3he_pMxqUIWwREDPdeUpg",
-  authDomain: "talib-club-web.firebaseapp.com",
-  projectId: "talib-club-web",
-  storageBucket: "talib-club-web.firebasestorage.app",
-  messagingSenderId: "300903382422",
-  appId: "1:300903382422:web:887e6f03a6c4f0092db1b7"
-};
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const db = getFirestore(app);
-
-// ⚠️ หมายเหตุสำหรับคุณอุสมาน: เมื่อนำโค้ดไปใช้ใน VS Code จริงของโปรเจกต์ 
-// ให้ลบ Block การตั้งค่า Firebase ด้านบนนี้ออกทั้งหมด
-// แล้วพิมพ์เรียกใช้งานบรรทัดนี้เหมือนเดิมครับ -> import { db } from "../lib/firebase.js"
-// --- จบ: โค้ดตั้งค่า Firebase ---
 
 // ━━━ CONFIGURATION ━━━
 const ADMIN_TEAM = ["อุสมาน", "ฟาดิล", "อนันดา"] 
@@ -46,6 +34,7 @@ const DEFAULT_MAGAZINE = [
 ]
 
 // ━━━ TELEGRAM NOTIFICATION CONFIG ━━━
+// รหัส Token และ Chat ID ของกลุ่มคุณอุสมาน (ยิงตรงไม่ต้องผ่าน Make.com)
 const TELEGRAM_BOT_TOKEN = "8683156343:AAEn8qfYjvhq2XhOkb0UuO3HP2re8U1emgk";
 const TELEGRAM_CHAT_ID = "-1003358204239";
 
@@ -65,7 +54,6 @@ const sendBotNotification = async (message) => {
 
 const formatDate = (date) => {
   if (!date) return "-"
-  // รองรับ Firebase Timestamp หรือ Date ธรรมดา
   const d = date?.toDate ? date.toDate() : (date.seconds ? new Date(date.seconds * 1000) : new Date(date))
   if (isNaN(d.getTime())) return "-"
   return new Intl.DateTimeFormat("th-TH", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(d)
@@ -99,14 +87,14 @@ export default function StaffWork({ authState, go }) {
   const [feedback, setFeedback] = useState("")
   const [postingId, setPostingId] = useState(null)
   const [postingForm, setPostingForm] = useState({ scheduleDate: "", platforms: [], postLink: "" })
+  const [itemToDelete, setItemToDelete] = useState(null)
 
   const fileInputRef = useRef(null)
   
-  // ⚡️ แก้ไขตรงนี้: ดึงชื่อจาก localStorage โดยตรง จะตรงกับคนที่ Login แน่นอน ⚡️
+  // ⚡️ ดึงชื่อจาก localStorage โดยตรง จะตรงกับคนที่ Login แน่นอน
   const currentUser = localStorage.getItem("talib_user") || "ผู้เยี่ยมชม"
   const isAdmin = ADMIN_TEAM.includes(currentUser)
 
-  // ดึงข้อมูลทั้งหมดจาก Firebase แบบ Real-time
   useEffect(() => {
     setLoading(true)
 
@@ -159,7 +147,6 @@ export default function StaffWork({ authState, go }) {
     posted: subs.filter(s => s.status === STATUS_OPTIONS.POSTED).length,
   }), [subs])
 
-  // --- Admin Methods (Update Firebase Settings) ---
   const handleAddStaff = async () => {
     if (!newStaffName.trim()) return
     const updatedTeam = [...staffTeam, newStaffName.trim()].sort()
@@ -174,15 +161,13 @@ export default function StaffWork({ authState, go }) {
   }
 
   const handleRemoveStaff = async (name) => {
-    if (window.confirm(`คุณแน่ใจหรือไม่ที่จะลบ "${name}" ออกจากระบบ?`)) {
-      const updatedTeam = staffTeam.filter(n => n !== name)
-      try {
-        await setDoc(doc(db, "settings", "staff"), { members: updatedTeam }, { merge: true })
-        notifySuccess(`ลบ "${name}" ออกจากระบบแล้ว`)
-      } catch (e) {
-        console.error(e)
-        notifyError("เกิดข้อผิดพลาดในการลบทีมงาน")
-      }
+    const updatedTeam = staffTeam.filter(n => n !== name)
+    try {
+      await setDoc(doc(db, "settings", "staff"), { members: updatedTeam }, { merge: true })
+      notifySuccess(`ลบ "${name}" ออกจากระบบแล้ว`)
+    } catch (e) {
+      console.error(e)
+      notifyError("เกิดข้อผิดพลาดในการลบทีมงาน")
     }
   }
 
@@ -198,7 +183,6 @@ export default function StaffWork({ authState, go }) {
     }
   }
 
-  // --- File Handlers ---
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
       setForm(prev => ({ ...prev, files: [...prev.files, ...Array.from(e.target.files)] }))
@@ -216,7 +200,6 @@ export default function StaffWork({ authState, go }) {
     setForm(prev => ({ ...prev, files: prev.files.filter((_, i) => i !== idx) }))
   }
 
-  // --- Submission Actions (Firebase) ---
   const handleCreateSubmission = async (e) => {
     e.preventDefault()
     if (!form.title || !form.type) {
@@ -227,7 +210,7 @@ export default function StaffWork({ authState, go }) {
     
     try {
       const fileLinks = []
-      const storage = getStorage(app) 
+      const storage = getStorage(db.app) 
       
       if (form.files && form.files.length > 0) {
         for (const file of form.files) {
@@ -255,7 +238,7 @@ export default function StaffWork({ authState, go }) {
       
       notifySuccess("ส่งงานเข้าระบบแล้ว รอแอดมินตรวจสอบ")
       
-      // ส่งแจ้งเตือน Telegram
+      // ส่งแจ้งเตือน Telegram ทันที
       await sendBotNotification(`📬 [ส่งงานใหม่] โดย: ${currentUser}\n📌 หัวข้อ: "${form.title}"\n🏷️ ประเภท: ${form.type}\n\n👥 ทีมงานที่รับผิดชอบ:\n✍️ ผู้เขียน: ${form.writer || "-"}\n🎨 กราฟิก: ${form.graphic || "-"}\n📢 ผู้โพสต์: ${form.adminPost || "-"}\n\nรอแอดมินตรวจสอบความถูกต้องครับ 🚀`)
       
       setForm({ title: "", type: "", description: "", writer: "", graphic: "", adminPost: "", files: [] })
@@ -313,15 +296,16 @@ export default function StaffWork({ authState, go }) {
     }
   }
 
-  const handleDeleteSub = async (id, title) => {
-    if (window.confirm(`คุณแน่ใจหรือไม่ที่จะลบงาน "${title}" ออกจากระบบถาวร?`)) {
-      try {
-        await deleteDoc(doc(db, "submissions", id))
-        notifySuccess("ลบงานเรียบร้อยแล้ว")
-      } catch (e) {
-        console.error(e)
-        notifyError("ลบงานล้มเหลว")
-      }
+  const handleDeleteSub = async () => {
+    if (!itemToDelete) return;
+    try {
+      await deleteDoc(doc(db, "submissions", itemToDelete.id))
+      notifySuccess("ลบงานเรียบร้อยแล้ว")
+      setItemToDelete(null)
+    } catch (e) {
+      console.error(e)
+      notifyError("ลบงานล้มเหลว")
+      setItemToDelete(null)
     }
   }
 
@@ -391,10 +375,11 @@ export default function StaffWork({ authState, go }) {
                         {sub.description && <p style={{ marginTop: "8px", color: "var(--t2)", whiteSpace: "pre-wrap" }}>{sub.description}</p>}
                       </div>
                       {(isAdmin || sub.staffName === currentUser) && (
-                        <button className="btn btn-outline danger" onClick={() => handleDeleteSub(sub.id, sub.title)} style={{ padding: "4px 8px", fontSize: "11px" }}>🗑️ ลบ</button>
+                        <button className="btn btn-outline danger" onClick={() => setItemToDelete(sub)} style={{ padding: "4px 8px", fontSize: "11px" }}>🗑️ ลบ</button>
                       )}
                     </div>
 
+                    {/* แสดงป้ายแยกหน้าที่ชัดเจน */}
                     <div style={{ marginTop: "14px", display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
                       <span style={{ fontSize: "11px", color: "var(--t3)", fontWeight: "500" }}>👥 ทีมผู้รับผิดชอบ:</span>
                       {sub.writer && (
@@ -504,6 +489,20 @@ export default function StaffWork({ authState, go }) {
                 )
               })
             )}
+
+            {/* Modal ยืนยันการลบงาน */}
+            {itemToDelete && (
+              <div className="card animate-fade-in" style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 100, padding: "24px", maxWidth: "340px", width: "90%", background: "var(--bg)", border: "1px solid var(--br)", boxShadow: "0 10px 30px rgba(0,0,0,0.15)" }}>
+                <h3 style={{ marginBottom: "12px", color: "#d84f4f" }}>⚠️ ยืนยันการลบงาน</h3>
+                <p style={{ fontSize: "13px", color: "var(--t2)", marginBottom: "20px" }}>คุณแน่ใจหรือไม่ที่จะลบงาน <strong>"{itemToDelete.title}"</strong> ออกจากระบบถาวร?</p>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                  <button className="btn btn-outline" onClick={() => setItemToDelete(null)}>ยกเลิก</button>
+                  <button className="btn" style={{ background: "#d84f4f", color: "white" }} onClick={handleDeleteSub}>ยืนยันลบ</button>
+                </div>
+              </div>
+            )}
+            {itemToDelete && <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 99 }} onClick={() => setItemToDelete(null)}></div>}
+
           </div>
         )}
 
