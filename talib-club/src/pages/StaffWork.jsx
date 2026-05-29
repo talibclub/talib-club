@@ -1,20 +1,32 @@
 import React, { useEffect, useMemo, useState, useRef } from "react"
+import { initializeApp, getApps } from "firebase/app"
 import { 
-  collection, onSnapshot, query, updateDoc, doc, 
-  serverTimestamp, addDoc, deleteDoc, setDoc, orderBy 
+  collection, onSnapshot, query, updateDoc, doc, getDoc,
+  serverTimestamp, addDoc, deleteDoc, setDoc, orderBy, getFirestore 
 } from "firebase/firestore"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import toast from "react-hot-toast"
+import { toast } from "react-hot-toast"
 
-// --- วิธีแก้ Error ในหน้า Preview ---
-// ในระบบเว็บพรีวิวนี้ เราจะใช้เส้นทางสมมติ (Mock) ของ Firebase ให้รันผ่านก่อน
-// **แต่ตอนนำไปวางใน VS Code จริง** ให้เปลี่ยนบรรทัดที่ 16 เป็น:
-// import { db } from "../lib/firebase.js"
-import { db } from "./firebase.js" 
-
-// ฟังก์ชันสำหรับแจ้งเตือน
+// ฟังก์ชันสำหรับแจ้งเตือนโดยเรียกใช้งาน toast แบบ Named Import แทน
 const notifySuccess = (msg) => toast.success(msg)
 const notifyError = (msg) => toast.error(msg)
+
+// --- เริ่ม: โค้ดตั้งค่า Firebase (เพื่อให้ระบบ Preview ด้านขวามือทำงานได้) ---
+const firebaseConfig = {
+  apiKey: "AIzaSyC8HoWaAu0XWy3he_pMxqUIWwREDPdeUpg",
+  authDomain: "talib-club-web.firebaseapp.com",
+  projectId: "talib-club-web",
+  storageBucket: "talib-club-web.firebasestorage.app",
+  messagingSenderId: "300903382422",
+  appId: "1:300903382422:web:887e6f03a6c4f0092db1b7"
+};
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const db = getFirestore(app);
+
+// ⚠️ หมายเหตุสำหรับคุณอุสมาน: เมื่อนำโค้ดไปใช้ใน VS Code จริงของโปรเจกต์ 
+// ให้ลบ Block การตั้งค่า Firebase ด้านบนนี้ออกทั้งหมด
+// แล้วพิมพ์เรียกใช้งานบรรทัดนี้เหมือนเดิมครับ -> import { db } from "../lib/firebase.js"
+// --- จบ: โค้ดตั้งค่า Firebase ---
 
 // ━━━ CONFIGURATION ━━━
 const ADMIN_TEAM = ["อุสมาน", "ฟาดิล", "อนันดา"] 
@@ -34,7 +46,6 @@ const DEFAULT_MAGAZINE = [
 ]
 
 // ━━━ TELEGRAM NOTIFICATION CONFIG ━━━
-// รหัส Token และ Chat ID ของกลุ่มคุณอุสมาน (ยิงตรงไม่ต้องผ่าน Make.com)
 const TELEGRAM_BOT_TOKEN = "8683156343:AAEn8qfYjvhq2XhOkb0UuO3HP2re8U1emgk";
 const TELEGRAM_CHAT_ID = "-1003358204239";
 
@@ -68,7 +79,7 @@ const getFileIcon = (filename) => {
   return "📎"
 }
 
-export default function StaffWork({ authState, go }) {
+export default function StaffWork({ authState, user, go }) {
   const [tab, setTab] = useState("dashboard")
   const [subs, setSubs] = useState([])
   const [loading, setLoading] = useState(true)
@@ -87,17 +98,21 @@ export default function StaffWork({ authState, go }) {
   const [feedback, setFeedback] = useState("")
   const [postingId, setPostingId] = useState(null)
   const [postingForm, setPostingForm] = useState({ scheduleDate: "", platforms: [], postLink: "" })
+  
+  // Custom Modals State
   const [itemToDelete, setItemToDelete] = useState(null)
+  const [itemToConfirmRemoveStaff, setItemToConfirmRemoveStaff] = useState(null)
 
   const fileInputRef = useRef(null)
   
-  // ⚡️ ดึงชื่อจาก localStorage โดยตรง จะตรงกับคนที่ Login แน่นอน
-  const currentUser = localStorage.getItem("talib_user") || "ผู้เยี่ยมชม"
+  // ⚡️ แก้ปัญหาการดึงชื่อ: ลองรับจากหลายทาง (Prop user > Prop authState > LocalStorage)
+  const currentUser = user || authState?.user?.name || localStorage.getItem("talib_user") || "ผู้เยี่ยมชม"
   const isAdmin = ADMIN_TEAM.includes(currentUser)
 
   useEffect(() => {
     setLoading(true)
 
+    // ดึงข้อมูลงาน (Submissions)
     const qSubs = query(collection(db, "submissions"), orderBy("createdAt", "desc"))
     const unsubSubs = onSnapshot(qSubs, (snap) => {
       setSubs(snap.docs.map(d => ({ id: d.id, ...d.data() })))
@@ -108,6 +123,7 @@ export default function StaffWork({ authState, go }) {
       setLoading(false)
     })
 
+    // ดึงข้อมูลทีมงาน
     const unsubStaff = onSnapshot(doc(db, "settings", "staff"), (docSnap) => {
       if (docSnap.exists() && docSnap.data().members) {
         setStaffTeam(docSnap.data().members)
@@ -116,6 +132,7 @@ export default function StaffWork({ authState, go }) {
       }
     })
 
+    // ดึงคิววารสาร
     const unsubMag = onSnapshot(doc(db, "settings", "magazine"), (docSnap) => {
       if (docSnap.exists() && docSnap.data().queue) {
         setMagazineQueue(docSnap.data().queue)
@@ -124,12 +141,44 @@ export default function StaffWork({ authState, go }) {
       }
     })
 
+    // ฟังก์ชันเช็คการแจ้งเตือนคิววารสารเมื่อเปิดระบบ
+    const checkAndNotifyMagazineQueue = async () => {
+      if (!isAdmin) return; // ให้แอดมินคนใดคนหนึ่งเป็นคนทริกเกอร์
+      const today = new Date();
+      const currentMonthIndex = today.getMonth(); // 0 = มกราคม, 1 = กุมภาพันธ์
+      const currentYear = today.getFullYear();
+      const notifKey = `mag_notif_${currentYear}_${currentMonthIndex}`;
+      
+      try {
+        const notifDocRef = doc(db, "settings", "magazine_notifications");
+        const notifDocSnap = await getDoc(notifDocRef);
+        
+        // ถ้ายังไม่มีการบันทึกว่าเดือนนี้แจ้งเตือนไปแล้ว
+        if (!notifDocSnap.exists() || !notifDocSnap.data()[notifKey]) {
+           const magDocRef = doc(db, "settings", "magazine");
+           const magDocSnap = await getDoc(magDocRef);
+           const currentQueue = magDocSnap.exists() && magDocSnap.data().queue ? magDocSnap.data().queue : DEFAULT_MAGAZINE;
+           const personInCharge = currentQueue[currentMonthIndex]?.user || "ยังไม่ได้กำหนด";
+           const monthName = currentQueue[currentMonthIndex]?.month || "";
+
+           await sendBotNotification(`📅 [อัปเดตคิววารสาร] เข้าสู่เดือน ${monthName} แล้วครับ\n\n📌 ผู้ที่รับผิดชอบทำวารสารในเดือนนี้คือ: ${personInCharge}\n\nฝากทีมงานเตรียมตัวและประสานงานกันด้วยนะครับ 🚀`);
+           
+           // บันทึกว่าเดือนนี้แจ้งเตือนแล้ว
+           await setDoc(notifDocRef, { [notifKey]: true }, { merge: true });
+        }
+      } catch (error) {
+        console.error("Error checking magazine notification:", error);
+      }
+    }
+
+    checkAndNotifyMagazineQueue();
+
     return () => {
       unsubSubs()
       unsubStaff()
       unsubMag()
     }
-  }, [])
+  }, [isAdmin])
 
   const filteredSubs = useMemo(() => {
     return subs.filter(s => {
@@ -160,14 +209,17 @@ export default function StaffWork({ authState, go }) {
     }
   }
 
-  const handleRemoveStaff = async (name) => {
-    const updatedTeam = staffTeam.filter(n => n !== name)
+  const confirmRemoveStaff = async () => {
+    if (!itemToConfirmRemoveStaff) return;
+    const updatedTeam = staffTeam.filter(n => n !== itemToConfirmRemoveStaff)
     try {
       await setDoc(doc(db, "settings", "staff"), { members: updatedTeam }, { merge: true })
-      notifySuccess(`ลบ "${name}" ออกจากระบบแล้ว`)
+      notifySuccess(`ลบ "${itemToConfirmRemoveStaff}" ออกจากระบบแล้ว`)
+      setItemToConfirmRemoveStaff(null)
     } catch (e) {
       console.error(e)
       notifyError("เกิดข้อผิดพลาดในการลบทีมงาน")
+      setItemToConfirmRemoveStaff(null)
     }
   }
 
@@ -649,7 +701,7 @@ export default function StaffWork({ authState, go }) {
                   <div key={name} className="pill" style={{ display: "flex", alignItems: "center", gap: "8px", background: "var(--bg2)" }}>
                     {name}
                     <button 
-                      onClick={() => handleRemoveStaff(name)} 
+                      onClick={() => setItemToConfirmRemoveStaff(name)} 
                       style={{ background: "none", border: "none", color: "#d84f4f", cursor: "pointer", fontSize: "12px", fontWeight: "bold" }}
                       title="ลบรายชื่อ"
                     >×</button>
@@ -657,6 +709,20 @@ export default function StaffWork({ authState, go }) {
                 ))}
               </div>
             </div>
+
+            {/* Modal ยืนยันการลบรายชื่อทีมงาน */}
+            {itemToConfirmRemoveStaff && (
+              <div className="card animate-fade-in" style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 100, padding: "24px", maxWidth: "340px", width: "90%", background: "var(--bg)", border: "1px solid var(--br)", boxShadow: "0 10px 30px rgba(0,0,0,0.15)" }}>
+                <h3 style={{ marginBottom: "12px", color: "#d84f4f" }}>⚠️ ยืนยันการลบรายชื่อ</h3>
+                <p style={{ fontSize: "13px", color: "var(--t2)", marginBottom: "20px" }}>คุณแน่ใจหรือไม่ที่จะลบรายชื่อ <strong>"{itemToConfirmRemoveStaff}"</strong> ออกจากระบบทีมงาน?</p>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                  <button className="btn btn-outline" onClick={() => setItemToConfirmRemoveStaff(null)}>ยกเลิก</button>
+                  <button className="btn" style={{ background: "#d84f4f", color: "white" }} onClick={confirmRemoveStaff}>ยืนยันลบ</button>
+                </div>
+              </div>
+            )}
+            {itemToConfirmRemoveStaff && <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 99 }} onClick={() => setItemToConfirmRemoveStaff(null)}></div>}
+
 
             {/* Section 2: จัดการคิววารสาร */}
             <div className="card" style={{ padding: "24px" }}>
