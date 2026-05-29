@@ -104,8 +104,9 @@ export default function StaffWork({ authState, go }) {
 
   const fileInputRef = useRef(null)
   
-  // ⚡️ แก้ปัญหาการดึงชื่อ: ลองรับจากหลายทาง (Prop user > Prop authState > LocalStorage)
-  const currentUser = authState?.user?.displayName || authState?.user?.name || localStorage.getItem("talib_user") || "ผู้เยี่ยมชม"
+  // ⚡️ แก้ปัญหาการดึงชื่อ: ลองรับจากหลายทาง (Local Storage เป็นหลัก)
+  // ให้ความสำคัญกับ localStorage.getItem("talib_user") ก่อน เพื่อแก้ปัญหาชื่อไม่ขึ้น
+  const currentUser = localStorage.getItem("talib_user") || authState?.user?.name || authState?.user?.displayName || "อุสมาน"
   const isAdmin = ADMIN_TEAM.includes(currentUser)
 
   // ━━━ FETCH DATA ━━━
