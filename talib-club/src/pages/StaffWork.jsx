@@ -1,17 +1,17 @@
 import React, { useEffect, useMemo, useState, useRef } from "react"
 import { initializeApp, getApps } from "firebase/app"
 import { 
-  collection, onSnapshot, query, updateDoc, doc, getDoc,
+  collection, onSnapshot, query, updateDoc, doc, 
   serverTimestamp, addDoc, deleteDoc, setDoc, orderBy, getFirestore 
 } from "firebase/firestore"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { toast } from "react-hot-toast"
 
-// ฟังก์ชันสำหรับแจ้งเตือนโดยเรียกใช้งาน toast แบบ Named Import แทน
+// ฟังก์ชันแจ้งเตือนด้วย Toast
 const notifySuccess = (msg) => toast.success(msg)
 const notifyError = (msg) => toast.error(msg)
 
-// --- เริ่ม: โค้ดตั้งค่า Firebase (เพื่อให้ระบบ Preview ด้านขวามือทำงานได้) ---
+// --- เริ่ม: โค้ดตั้งค่า Firebase สำหรับระบบ Preview ด้านขวามือ ---
 const firebaseConfig = {
   apiKey: "AIzaSyC8HoWaAu0XWy3he_pMxqUIWwREDPdeUpg",
   authDomain: "talib-club-web.firebaseapp.com",
@@ -23,9 +23,9 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const db = getFirestore(app);
 
-// ⚠️ หมายเหตุสำหรับคุณอุสมาน: เมื่อนำโค้ดไปใช้ใน VS Code จริงของโปรเจกต์ 
-// ให้ลบ Block การตั้งค่า Firebase ด้านบนนี้ออกทั้งหมด
-// แล้วพิมพ์เรียกใช้งานบรรทัดนี้เหมือนเดิมครับ -> import { db } from "../lib/firebase.js"
+// ⚠️ หมายเหตุ: เมื่อนำโค้ดไปใช้ใน VS Code ของโปรเจกต์คุณ
+// 1. ให้ลบ Block โค้ดตั้งค่า Firebase นี้ออกทั้งหมด (ลบบรรทัดที่ 14 ถึง 26 ทิ้ง)
+// 2. พิมพ์เรียกใช้งานบรรทัดนี้แทน -> import { db } from "../lib/firebase.js"
 // --- จบ: โค้ดตั้งค่า Firebase ---
 
 // ━━━ CONFIGURATION ━━━
@@ -34,7 +34,6 @@ const SUBMISSION_TYPES = ["บทความ", "เอกสาร", "รูป
 const STATUS_OPTIONS = { PENDING: "รอตรวจ", REJECTED: "ตีกลับ", APPROVED: "อนุมัติแล้ว", POSTED: "ลงงานแล้ว" }
 const PLATFORMS = ["Facebook", "Instagram", "YouTube", "TikTok", "Spotify"]
 
-// ค่า Default กรณีเพิ่งเปิดระบบครั้งแรกและยังไม่มีข้อมูลใน Firebase
 const DEFAULT_STAFF = ["ชาฟิน", "ชามิล", "ดาวูด", "ติรมีซี", "นิซอม", "แบยัง", "แบอัซมาวีย์", "ฟาดิล", "มะห์ดี", "ยะฮฺ", "อนันดา", "อับดุสสลาม", "อับบาส", "อุสมาน", "ฮาฟิซ"]
 const DEFAULT_MAGAZINE = [
   { month: "มกราคม", user: "แบยัง" }, { month: "กุมภาพันธ์", user: "แบอัซมาวีย์" },
@@ -45,7 +44,7 @@ const DEFAULT_MAGAZINE = [
   { month: "พฤศจิกายน", user: "ฮาฟิซ" }, { month: "ธันวาคม", user: "มะห์ดี" }
 ]
 
-// ━━━ TELEGRAM NOTIFICATION CONFIG ━━━
+// ━━━ TELEGRAM CONFIG ━━━
 const TELEGRAM_BOT_TOKEN = "8683156343:AAEn8qfYjvhq2XhOkb0UuO3HP2re8U1emgk";
 const TELEGRAM_CHAT_ID = "-1003358204239";
 
@@ -79,111 +78,86 @@ const getFileIcon = (filename) => {
   return "📎"
 }
 
-export default function StaffWork({ authState, user, go }) {
+export default function StaffWork({ authState, go }) {
   const [tab, setTab] = useState("dashboard")
   const [subs, setSubs] = useState([])
   const [loading, setLoading] = useState(true)
   const [myTasksOnly, setMyTasksOnly] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  
+  // Modal State สำหรับลบข้อมูล
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: "", text: "", onConfirm: null })
 
-  // Dynamic Data States (โหลดจาก Firebase)
+  // Dynamic Data States
   const [staffTeam, setStaffTeam] = useState(DEFAULT_STAFF)
   const [magazineQueue, setMagazineQueue] = useState(DEFAULT_MAGAZINE)
   const [newStaffName, setNewStaffName] = useState("")
 
-  // Form State (แยกหน้าที่มีผู้เขียน, กราฟิก, แอดมินโพสต์)
-  const [form, setForm] = useState({ title: "", type: "", description: "", writer: "", graphic: "", adminPost: "", files: [] })
+  // Form State (แยกหน้าที่ชัดเจน)
+  const [form, setForm] = useState({ title: "", type: "", description: "", writer: "", graphic: "", poster: "", files: [] })
   const [uploading, setUploading] = useState(false)
+  
   const [reviewingId, setReviewingId] = useState(null)
   const [feedback, setFeedback] = useState("")
   const [postingId, setPostingId] = useState(null)
   const [postingForm, setPostingForm] = useState({ scheduleDate: "", platforms: [], postLink: "" })
-  
-  // Custom Modals State
-  const [itemToDelete, setItemToDelete] = useState(null)
-  const [itemToConfirmRemoveStaff, setItemToConfirmRemoveStaff] = useState(null)
 
   const fileInputRef = useRef(null)
   
   // ⚡️ แก้ปัญหาการดึงชื่อ: ลองรับจากหลายทาง (Prop user > Prop authState > LocalStorage)
-  const currentUser = user || authState?.user?.name || localStorage.getItem("talib_user") || "ผู้เยี่ยมชม"
+  const currentUser = authState?.user?.displayName || authState?.user?.name || localStorage.getItem("talib_user") || "ผู้เยี่ยมชม"
   const isAdmin = ADMIN_TEAM.includes(currentUser)
 
+  // ━━━ FETCH DATA ━━━
   useEffect(() => {
     setLoading(true)
 
-    // ดึงข้อมูลงาน (Submissions)
     const qSubs = query(collection(db, "submissions"), orderBy("createdAt", "desc"))
     const unsubSubs = onSnapshot(qSubs, (snap) => {
       setSubs(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)
     }, (err) => {
-      console.error("Error fetching submissions:", err)
+      console.error("Fetch sub error:", err)
       notifyError("โหลดข้อมูลงานล้มเหลว")
       setLoading(false)
     })
 
-    // ดึงข้อมูลทีมงาน
     const unsubStaff = onSnapshot(doc(db, "settings", "staff"), (docSnap) => {
-      if (docSnap.exists() && docSnap.data().members) {
-        setStaffTeam(docSnap.data().members)
-      } else {
-        setStaffTeam(DEFAULT_STAFF)
-      }
+      if (docSnap.exists() && docSnap.data().members) setStaffTeam(docSnap.data().members)
     })
 
-    // ดึงคิววารสาร
     const unsubMag = onSnapshot(doc(db, "settings", "magazine"), (docSnap) => {
-      if (docSnap.exists() && docSnap.data().queue) {
-        setMagazineQueue(docSnap.data().queue)
-      } else {
-        setMagazineQueue(DEFAULT_MAGAZINE)
-      }
+      if (docSnap.exists() && docSnap.data().queue) setMagazineQueue(docSnap.data().queue)
     })
 
-    // ฟังก์ชันเช็คการแจ้งเตือนคิววารสารเมื่อเปิดระบบ
-    const checkAndNotifyMagazineQueue = async () => {
-      if (!isAdmin) return; // ให้แอดมินคนใดคนหนึ่งเป็นคนทริกเกอร์
-      const today = new Date();
-      const currentMonthIndex = today.getMonth(); // 0 = มกราคม, 1 = กุมภาพันธ์
-      const currentYear = today.getFullYear();
-      const notifKey = `mag_notif_${currentYear}_${currentMonthIndex}`;
-      
-      try {
-        const notifDocRef = doc(db, "settings", "magazine_notifications");
-        const notifDocSnap = await getDoc(notifDocRef);
-        
-        // ถ้ายังไม่มีการบันทึกว่าเดือนนี้แจ้งเตือนไปแล้ว
-        if (!notifDocSnap.exists() || !notifDocSnap.data()[notifKey]) {
-           const magDocRef = doc(db, "settings", "magazine");
-           const magDocSnap = await getDoc(magDocRef);
-           const currentQueue = magDocSnap.exists() && magDocSnap.data().queue ? magDocSnap.data().queue : DEFAULT_MAGAZINE;
-           const personInCharge = currentQueue[currentMonthIndex]?.user || "ยังไม่ได้กำหนด";
-           const monthName = currentQueue[currentMonthIndex]?.month || "";
+    return () => { unsubSubs(); unsubStaff(); unsubMag(); }
+  }, [])
 
-           await sendBotNotification(`📅 [อัปเดตคิววารสาร] เข้าสู่เดือน ${monthName} แล้วครับ\n\n📌 ผู้ที่รับผิดชอบทำวารสารในเดือนนี้คือ: ${personInCharge}\n\nฝากทีมงานเตรียมตัวและประสานงานกันด้วยนะครับ 🚀`);
-           
-           // บันทึกว่าเดือนนี้แจ้งเตือนแล้ว
-           await setDoc(notifDocRef, { [notifKey]: true }, { merge: true });
+  // ━━━ ออโต้แจ้งเตือนคิววารสารทุกต้นเดือน ━━━
+  useEffect(() => {
+    if (!isAdmin || magazineQueue.length === 0) return;
+
+    const checkMonthlyQueue = async () => {
+      const now = new Date();
+      const currentMonthIndex = now.getMonth();
+      const yearMonthKey = `mag_notified_${now.getFullYear()}_${currentMonthIndex}`;
+
+      // ถ้ายังไม่เคยแจ้งเตือนในเดือนนี้ ให้ส่งเข้า Telegram ทันที
+      if (!localStorage.getItem(yearMonthKey)) {
+        const currentQueue = magazineQueue[currentMonthIndex];
+        if (currentQueue && currentQueue.user) {
+          await sendBotNotification(`📚 [แจ้งเตือนคิววารสาร]\nเข้าสู่เดือน ${currentQueue.month} แล้ว!\n\nรับผิดชอบวารสารหลักเดือนนี้คือ: 🌟 ${currentQueue.user} 🌟\n\nเตรียมตัววางแผนงานได้เลยครับ 🚀`);
+          localStorage.setItem(yearMonthKey, "true");
         }
-      } catch (error) {
-        console.error("Error checking magazine notification:", error);
       }
     }
-
-    checkAndNotifyMagazineQueue();
-
-    return () => {
-      unsubSubs()
-      unsubStaff()
-      unsubMag()
-    }
-  }, [isAdmin])
+    checkMonthlyQueue();
+  }, [magazineQueue, isAdmin])
 
   const filteredSubs = useMemo(() => {
     return subs.filter(s => {
       if (myTasksOnly) {
-        return s.staffName === currentUser || s.writer === currentUser || s.graphic === currentUser || s.adminPost === currentUser
+        return s.staffName === currentUser || s.writer === currentUser || s.graphic === currentUser || s.poster === currentUser
       }
       return true
     })
@@ -196,6 +170,7 @@ export default function StaffWork({ authState, user, go }) {
     posted: subs.filter(s => s.status === STATUS_OPTIONS.POSTED).length,
   }), [subs])
 
+  // ━━━ ADMIN ACTIONS ━━━
   const handleAddStaff = async () => {
     if (!newStaffName.trim()) return
     const updatedTeam = [...staffTeam, newStaffName.trim()].sort()
@@ -204,23 +179,22 @@ export default function StaffWork({ authState, user, go }) {
       setNewStaffName("")
       notifySuccess(`เพิ่ม "${newStaffName}" เข้าระบบแล้ว`)
     } catch (e) {
-      console.error(e)
       notifyError("เกิดข้อผิดพลาดในการเพิ่มทีมงาน")
     }
   }
 
-  const confirmRemoveStaff = async () => {
-    if (!itemToConfirmRemoveStaff) return;
-    const updatedTeam = staffTeam.filter(n => n !== itemToConfirmRemoveStaff)
-    try {
-      await setDoc(doc(db, "settings", "staff"), { members: updatedTeam }, { merge: true })
-      notifySuccess(`ลบ "${itemToConfirmRemoveStaff}" ออกจากระบบแล้ว`)
-      setItemToConfirmRemoveStaff(null)
-    } catch (e) {
-      console.error(e)
-      notifyError("เกิดข้อผิดพลาดในการลบทีมงาน")
-      setItemToConfirmRemoveStaff(null)
-    }
+  const handleRemoveStaff = (name) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "ลบทีมงาน",
+      text: `คุณแน่ใจหรือไม่ที่จะลบ "${name}" ออกจากระบบ?`,
+      onConfirm: async () => {
+        const updatedTeam = staffTeam.filter(n => n !== name)
+        await setDoc(doc(db, "settings", "staff"), { members: updatedTeam }, { merge: true })
+        notifySuccess(`ลบ "${name}" แล้ว`)
+        setConfirmDialog({ isOpen: false })
+      }
+    })
   }
 
   const handleUpdateMagazine = async (index, newUser) => {
@@ -230,11 +204,11 @@ export default function StaffWork({ authState, user, go }) {
       await setDoc(doc(db, "settings", "magazine"), { queue: updatedQueue }, { merge: true })
       notifySuccess(`อัปเดตคิววารสารสำเร็จ`)
     } catch (e) {
-      console.error(e)
       notifyError("เกิดข้อผิดพลาดในการอัปเดตคิววารสาร")
     }
   }
 
+  // ━━━ FILE & FORM HANDLERS ━━━
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
       setForm(prev => ({ ...prev, files: [...prev.files, ...Array.from(e.target.files)] }))
@@ -262,8 +236,7 @@ export default function StaffWork({ authState, user, go }) {
     
     try {
       const fileLinks = []
-      const storage = getStorage(db.app) 
-      
+      const storage = getStorage(db.app)
       if (form.files && form.files.length > 0) {
         for (const file of form.files) {
           const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
@@ -278,9 +251,9 @@ export default function StaffWork({ authState, user, go }) {
         title: form.title,
         type: form.type,
         description: form.description,
-        writer: form.writer,
-        graphic: form.graphic,
-        adminPost: form.adminPost,
+        writer: form.writer || "-",
+        graphic: form.graphic || "-",
+        poster: form.poster || "-",
         files: fileLinks,
         staffName: currentUser,
         status: STATUS_OPTIONS.PENDING,
@@ -290,14 +263,16 @@ export default function StaffWork({ authState, user, go }) {
       
       notifySuccess("ส่งงานเข้าระบบแล้ว รอแอดมินตรวจสอบ")
       
-      // ส่งแจ้งเตือน Telegram ทันที
-      await sendBotNotification(`📬 [ส่งงานใหม่] โดย: ${currentUser}\n📌 หัวข้อ: "${form.title}"\n🏷️ ประเภท: ${form.type}\n\n👥 ทีมงานที่รับผิดชอบ:\n✍️ ผู้เขียน: ${form.writer || "-"}\n🎨 กราฟิก: ${form.graphic || "-"}\n📢 ผู้โพสต์: ${form.adminPost || "-"}\n\nรอแอดมินตรวจสอบความถูกต้องครับ 🚀`)
+      await sendBotNotification(
+        `📬 [งานใหม่] ส่งโดย: ${currentUser}\nหัวข้อ: "${form.title}"\nประเภท: ${form.type}\n` +
+        `✍️ เขียน/แปล: ${form.writer || "-"}\n🎨 กราฟิก: ${form.graphic || "-"}\n📢 คนลงโพสต์: ${form.poster || "-"}\n\nรอแอดมินตรวจสอบครับ 🚀`
+      )
       
-      setForm({ title: "", type: "", description: "", writer: "", graphic: "", adminPost: "", files: [] })
+      setForm({ title: "", type: "", description: "", writer: "", graphic: "", poster: "", files: [] })
       setTab("dashboard")
     } catch (err) {
-      console.error("Upload Error:", err)
-      notifyError("เกิดข้อผิดพลาดในการส่งงาน กรุณาลองใหม่")
+      console.error(err)
+      notifyError("เกิดข้อผิดพลาดในการส่งงาน")
     } finally {
       setUploading(false)
     }
@@ -310,18 +285,16 @@ export default function StaffWork({ authState, user, go }) {
         feedback: feedbackText,
         updatedAt: serverTimestamp()
       })
-      
       notifySuccess("บันทึกผลการตรวจสอบแล้ว")
       setReviewingId(null)
 
       const targetSub = subs.find(s => s.id === id)
       if (nextStatus === STATUS_OPTIONS.APPROVED) {
-        await sendBotNotification(`✅ [อนุมัติแล้ว] งาน "${targetSub.title}"\nของคุณ ${targetSub.staffName} ได้รับการอนุมัติแล้ว 🎉 เตรียมตัวจัดตารางลงงานได้เลย!`)
+        await sendBotNotification(`✅ [อนุมัติแล้ว] งาน "${targetSub.title}"\nตรวจผ่านแล้ว 🎉 เตรียมจัดคิวลงแพลตฟอร์มได้เลย!`)
       } else if (nextStatus === STATUS_OPTIONS.REJECTED) {
-        await sendBotNotification(`⚠️ [ถูกตีกลับ] งาน "${targetSub.title}"\nของ ${targetSub.staffName} ถูกตีกลับให้แก้ไข!\n\n💬 ฟีดแบ็กจากแอดมิน:\n"${feedbackText}"\n\nรีบเข้าไปแก้ไขด้วยนะครับ 🛠️`)
+        await sendBotNotification(`⚠️ [ถูกตีกลับ] งาน "${targetSub.title}"\nของถูกตีกลับให้แก้ไข!\n\n💬 ฟีดแบ็กจากแอดมิน:\n"${feedbackText}"\n\nรีบเข้าไปแก้ไขด้วยนะครับ 🛠️`)
       }
     } catch (e) {
-      console.error(e)
       notifyError("อัปเดตสถานะล้มเหลว")
     }
   }
@@ -335,30 +308,32 @@ export default function StaffWork({ authState, user, go }) {
         postLink: postingForm.postLink,
         updatedAt: serverTimestamp()
       })
-      
-      notifySuccess("บันทึกการโพสต์ลงงานเรียบร้อย!")
+      notifySuccess("บันทึกการลงงานเรียบร้อย!")
       setPostingId(null)
       const targetSub = subs.find(s => s.id === id)
       setPostingForm({ scheduleDate: "", platforms: [], postLink: "" })
 
-      await sendBotNotification(`📢 [ลงงานเรียบร้อย] อัลฮัมดุลิลละฮฺ\nงานหัวข้อ "${targetSub.title}" โพสต์เผยแพร่เรียบร้อยแล้ว!\n\n📱 แพลตฟอร์ม: ${postingForm.platforms.join(", ")}\n🔗 ลิงก์โพสต์: ${postingForm.postLink || "ไม่ได้ระบุ"}`)
+      await sendBotNotification(`📢 [ลงโพสต์เรียบร้อย]\nงาน: "${targetSub.title}"\n\n📱 แพลตฟอร์ม: ${postingForm.platforms.join(", ")}\n🔗 ลิงก์: ${postingForm.postLink || "ไม่ได้ระบุ"}`)
     } catch (e) {
-      console.error(e)
       notifyError("บันทึกการโพสต์ล้มเหลว")
     }
   }
 
-  const handleDeleteSub = async () => {
-    if (!itemToDelete) return;
-    try {
-      await deleteDoc(doc(db, "submissions", itemToDelete.id))
-      notifySuccess("ลบงานเรียบร้อยแล้ว")
-      setItemToDelete(null)
-    } catch (e) {
-      console.error(e)
-      notifyError("ลบงานล้มเหลว")
-      setItemToDelete(null)
-    }
+  const handleDeleteSub = (id, title) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "ยืนยันการลบงาน",
+      text: `คุณแน่ใจหรือไม่ที่จะลบงาน "${title}" ออกจากระบบถาวร? ข้อมูลที่ถูกลบจะไม่สามารถกู้คืนได้`,
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, "submissions", id))
+          notifySuccess("ลบงานเรียบร้อยแล้ว")
+          setConfirmDialog({ isOpen: false })
+        } catch (e) {
+          notifyError("ลบงานล้มเหลว")
+        }
+      }
+    })
   }
 
   if (loading && subs.length === 0) {
@@ -372,6 +347,24 @@ export default function StaffWork({ authState, user, go }) {
 
   return (
     <div className="staff-work animate-fade-in" style={{ padding: "24px" }}>
+      
+      {/* ━━━ CUSTOM MODAL (แทนที่ Alert เบราว์เซอร์) ━━━ */}
+      {confirmDialog.isOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <div className="card animate-fade-in" style={{ background: 'var(--bg)', padding: '24px', width: '100%', maxWidth: '420px', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', color: '#d84f4f' }}>
+              <i className="ti ti-alert-triangle" style={{ fontSize: '28px' }}></i>
+              <h2 style={{ fontSize: '20px', color: 'var(--text)' }}>{confirmDialog.title}</h2>
+            </div>
+            <p style={{ color: 'var(--t2)', marginBottom: '24px', lineHeight: '1.6' }}>{confirmDialog.text}</p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button className="btn btn-outline" onClick={() => setConfirmDialog({ isOpen: false })}>ยกเลิก</button>
+              <button className="btn" style={{ background: '#d84f4f', color: '#fff', border: 'none' }} onClick={confirmDialog.onConfirm}>ยืนยันการลบ</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ━━━ UPPER BANNER ━━━ */}
       <div className="card" style={{ padding: "24px", marginBottom: "24px", borderLeft: "4px solid var(--teal)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
@@ -413,49 +406,36 @@ export default function StaffWork({ authState, user, go }) {
                 const isRejected = sub.status === STATUS_OPTIONS.REJECTED
                 const isApproved = sub.status === STATUS_OPTIONS.APPROVED
                 const isPosted = sub.status === STATUS_OPTIONS.POSTED
+                
+                // เช็คว่าเราคือหนึ่งในผู้รับผิดชอบไหม เพื่อไฮไลต์ชื่อเรา
+                const hl = (name) => name === currentUser ? <strong style={{color: "var(--teal)"}}>{name}</strong> : name;
 
                 return (
                   <div key={sub.id} className="card animate-fade-in" style={{ padding: "20px", borderLeft: `4px solid ${isPending ? "#bd7a13" : isRejected ? "#d84f4f" : isApproved ? "var(--teal)" : "#3b73c4"}` }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", flexWrap: "wrap" }}>
-                      <div>
+                      <div style={{ flex: 1 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
                           <span className="tag tag-acc">{sub.type}</span>
                           <span className={`staff-status ${isPending ? "warn" : isRejected ? "bad" : isApproved ? "ok" : "info"}`}>{sub.status}</span>
-                          <span style={{ fontSize: "11px", color: "var(--t3)" }}>คนส่ง: {sub.staffName} • {formatDate(sub.createdAt)}</span>
+                          <span style={{ fontSize: "11px", color: "var(--t3)" }}>ส่งโดย: {sub.staffName} • {formatDate(sub.createdAt)}</span>
                         </div>
                         <h2 style={{ fontSize: "18px", fontWeight: "600", color: "var(--text)", lineHeight: "1.3" }}>{sub.title}</h2>
                         {sub.description && <p style={{ marginTop: "8px", color: "var(--t2)", whiteSpace: "pre-wrap" }}>{sub.description}</p>}
                       </div>
                       {(isAdmin || sub.staffName === currentUser) && (
-                        <button className="btn btn-outline danger" onClick={() => setItemToDelete(sub)} style={{ padding: "4px 8px", fontSize: "11px" }}>🗑️ ลบ</button>
+                        <button className="btn btn-outline danger" onClick={() => handleDeleteSub(sub.id, sub.title)} style={{ padding: "4px 8px", fontSize: "11px", borderColor: "rgba(216,79,79,0.3)", color: "#d84f4f" }}>🗑️ ลบ</button>
                       )}
                     </div>
 
-                    {/* แสดงป้ายแยกหน้าที่ชัดเจน */}
-                    <div style={{ marginTop: "14px", display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-                      <span style={{ fontSize: "11px", color: "var(--t3)", fontWeight: "500" }}>👥 ทีมผู้รับผิดชอบ:</span>
-                      {sub.writer && (
-                        <span className="tag tag-acc" style={{ background: sub.writer === currentUser ? "var(--teal-bg)" : "var(--inp)", color: sub.writer === currentUser ? "var(--teal)" : "var(--t2)", padding: "4px 10px", fontSize: "11px", border: sub.writer === currentUser ? "1px solid var(--teal)" : "1px solid transparent" }}>
-                          ✍️ ผู้เขียน: {sub.writer}
-                        </span>
-                      )}
-                      {sub.graphic && (
-                        <span className="tag tag-acc" style={{ background: sub.graphic === currentUser ? "var(--teal-bg)" : "var(--inp)", color: sub.graphic === currentUser ? "var(--teal)" : "var(--t2)", padding: "4px 10px", fontSize: "11px", border: sub.graphic === currentUser ? "1px solid var(--teal)" : "1px solid transparent" }}>
-                          🎨 กราฟิก: {sub.graphic}
-                        </span>
-                      )}
-                      {sub.adminPost && (
-                        <span className="tag tag-acc" style={{ background: sub.adminPost === currentUser ? "var(--teal-bg)" : "var(--inp)", color: sub.adminPost === currentUser ? "var(--teal)" : "var(--t2)", padding: "4px 10px", fontSize: "11px", border: sub.adminPost === currentUser ? "1px solid var(--teal)" : "1px solid transparent" }}>
-                          📢 โพสต์: {sub.adminPost}
-                        </span>
-                      )}
-                      {!sub.writer && !sub.graphic && !sub.adminPost && (
-                        <span style={{ fontSize: "11px", color: "var(--t3)" }}>- ไม่ได้ระบุ -</span>
-                      )}
+                    {/* แสดงหน้าที่ความรับผิดชอบชัดเจน */}
+                    <div style={{ marginTop: "14px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "8px", background: "var(--bg2)", padding: "10px", borderRadius: "8px" }}>
+                      <div style={{ fontSize: "12px", color: "var(--t2)" }}>✍️ เขียน/แปล: {hl(sub.writer)}</div>
+                      <div style={{ fontSize: "12px", color: "var(--t2)" }}>🎨 กราฟิก: {hl(sub.graphic)}</div>
+                      <div style={{ fontSize: "12px", color: "var(--t2)" }}>📢 ลงโพสต์: {hl(sub.poster)}</div>
                     </div>
 
                     {sub.files && sub.files.length > 0 && (
-                      <div style={{ marginTop: "14px", paddingTop: "12px", borderTop: ".5px solid var(--br2)" }}>
+                      <div style={{ marginTop: "14px", paddingTop: "12px" }}>
                         <span style={{ fontSize: "12px", color: "var(--t2)", display: "block", marginBottom: "6px" }}>📎 ไฟล์แนบ (ดาวน์โหลดได้):</span>
                         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                           {sub.files.map((file, i) => (
@@ -468,13 +448,13 @@ export default function StaffWork({ authState, user, go }) {
                     )}
 
                     {sub.feedback && (
-                      <div className="staff-feedback" style={{ marginTop: "14px" }}>
-                        <strong>💬 ฟีดแบ็กแอดมิน:</strong> {sub.feedback}
+                      <div className="staff-feedback" style={{ marginTop: "14px", background: "rgba(189,122,19,0.1)", color: "#bd7a13", padding: "10px", borderRadius: "8px", fontSize: "13px" }}>
+                        <strong>⚠️ ฟีดแบ็กแอดมิน:</strong> {sub.feedback}
                       </div>
                     )}
 
                     {isPosted && (
-                      <div style={{ marginTop: "14px", padding: "12px", background: "var(--inp)", borderRadius: "8px", fontSize: "12px" }}>
+                      <div style={{ marginTop: "14px", padding: "12px", background: "rgba(45,190,160,0.05)", border: "1px solid rgba(45,190,160,0.2)", borderRadius: "8px", fontSize: "12px" }}>
                         <p>📆 <strong>ลงงานจริง:</strong> {formatDate(sub.scheduleDate)}</p>
                         <p style={{ marginTop: "4px" }}>📱 <strong>แพลตฟอร์ม:</strong> {sub.platforms?.join(", ")}</p>
                         {sub.postLink && <p style={{ marginTop: "4px" }}>🔗 <strong>ลิงก์:</strong> <a href={sub.postLink} target="_blank" rel="noreferrer" style={{ color: "var(--teal)" }}>กดเพื่อดูโพสต์</a></p>}
@@ -484,8 +464,8 @@ export default function StaffWork({ authState, user, go }) {
                     <div style={{ marginTop: "16px", display: "flex", justifyContent: "flex-end", gap: "8px", flexWrap: "wrap" }}>
                       {isAdmin && isPending && reviewingId !== sub.id && (
                         <>
-                          <button className="btn btn-outline" onClick={() => { setReviewingId(sub.id); setFeedback(sub.feedback || "") }} style={{ color: "#bd7a13", borderColor: "rgba(189,122,19,0.3)" }}>⚠️ ตีกลับ</button>
-                          <button className="btn btn-teal" onClick={() => handleReviewAction(sub.id, STATUS_OPTIONS.APPROVED)}>✅ อนุมัติ</button>
+                          <button className="btn btn-outline" onClick={() => { setReviewingId(sub.id); setFeedback(sub.feedback || "") }} style={{ color: "#bd7a13", borderColor: "rgba(189,122,19,0.3)" }}>⚠️ ตีกลับให้แก้</button>
+                          <button className="btn btn-teal" onClick={() => handleReviewAction(sub.id, STATUS_OPTIONS.APPROVED)}>✅ ตรวจผ่าน/อนุมัติ</button>
                         </>
                       )}
 
@@ -501,7 +481,7 @@ export default function StaffWork({ authState, user, go }) {
                       )}
 
                       {isAdmin && isApproved && postingId !== sub.id && (
-                        <button className="btn btn-main" onClick={() => setPostingId(sub.id)}>📱 บันทึกการลงงาน</button>
+                        <button className="btn btn-main" onClick={() => setPostingId(sub.id)}>📱 บันทึกการลงแพลตฟอร์ม</button>
                       )}
 
                       {postingId === sub.id && (
@@ -541,27 +521,13 @@ export default function StaffWork({ authState, user, go }) {
                 )
               })
             )}
-
-            {/* Modal ยืนยันการลบงาน */}
-            {itemToDelete && (
-              <div className="card animate-fade-in" style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 100, padding: "24px", maxWidth: "340px", width: "90%", background: "var(--bg)", border: "1px solid var(--br)", boxShadow: "0 10px 30px rgba(0,0,0,0.15)" }}>
-                <h3 style={{ marginBottom: "12px", color: "#d84f4f" }}>⚠️ ยืนยันการลบงาน</h3>
-                <p style={{ fontSize: "13px", color: "var(--t2)", marginBottom: "20px" }}>คุณแน่ใจหรือไม่ที่จะลบงาน <strong>"{itemToDelete.title}"</strong> ออกจากระบบถาวร?</p>
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
-                  <button className="btn btn-outline" onClick={() => setItemToDelete(null)}>ยกเลิก</button>
-                  <button className="btn" style={{ background: "#d84f4f", color: "white" }} onClick={handleDeleteSub}>ยืนยันลบ</button>
-                </div>
-              </div>
-            )}
-            {itemToDelete && <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 99 }} onClick={() => setItemToDelete(null)}></div>}
-
           </div>
         )}
 
         {/* ━━━ TAB: SUBMIT ━━━ */}
         {tab === "submit" && (
           <div className="card" style={{ padding: "24px", maxWidth: "700px", margin: "0 auto" }}>
-            <h2 style={{ marginBottom: "16px", fontSize: "20px" }}>📤 ส่งผลงานชิ้นใหม่ (รองรับทุกไฟล์)</h2>
+            <h2 style={{ marginBottom: "16px", fontSize: "20px" }}>📤 ส่งผลงานชิ้นใหม่</h2>
             <form onSubmit={handleCreateSubmission} className="staff-form" style={{ padding: 0 }}>
               
               <div className="staff-form-grid">
@@ -584,33 +550,30 @@ export default function StaffWork({ authState, user, go }) {
               </div>
 
               {/* แบ่งหน้าที่ชัดเจน */}
-              <div className="staff-form-grid" style={{ marginTop: "12px", background: "var(--inp)", padding: "16px", borderRadius: "12px", border: "1px solid var(--br2)" }}>
-                <div style={{ gridColumn: "1 / -1", marginBottom: "8px" }}>
-                  <label style={{ fontWeight: "600", color: "var(--text)" }}>👥 ระบุทีมงานผู้รับผิดชอบตามหน้าที่ (เลือกได้ตามความเหมาะสม)</label>
-                </div>
-                
-                <div>
-                  <label style={{ fontSize: "11px", color: "var(--t2)", display: "block", marginBottom: "6px" }}>✍️ ผู้เขียน / ผู้แปลเนื้อหา</label>
-                  <select value={form.writer} onChange={(e) => setForm({ ...form, writer: e.target.value })} style={{ fontSize: "12px" }}>
-                    <option value="">-- ไม่ระบุ --</option>
-                    {staffTeam.map(name => <option key={name} value={name}>{name}</option>)}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ fontSize: "11px", color: "var(--t2)", display: "block", marginBottom: "6px" }}>🎨 กราฟิก / ตัดต่อวิดีโอ</label>
-                  <select value={form.graphic} onChange={(e) => setForm({ ...form, graphic: e.target.value })} style={{ fontSize: "12px" }}>
-                    <option value="">-- ไม่ระบุ --</option>
-                    {staffTeam.map(name => <option key={name} value={name}>{name}</option>)}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ fontSize: "11px", color: "var(--t2)", display: "block", marginBottom: "6px" }}>📢 แอดมินผู้ตรวจ / ผู้โพสต์ลงเพจ</label>
-                  <select value={form.adminPost} onChange={(e) => setForm({ ...form, adminPost: e.target.value })} style={{ fontSize: "12px" }}>
-                    <option value="">-- ไม่ระบุ --</option>
-                    {staffTeam.map(name => <option key={name} value={name}>{name}</option>)}
-                  </select>
+              <div style={{ background: "var(--bg2)", padding: "16px", borderRadius: "12px", display: "grid", gap: "12px" }}>
+                <h3 style={{ fontSize: "14px" }}>👥 หน้าที่ความรับผิดชอบ</h3>
+                <div className="grid3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+                  <div>
+                    <label style={{ fontSize: "11px", color: "var(--t2)" }}>✍️ ผู้เขียน/แปล</label>
+                    <select value={form.writer} onChange={(e) => setForm({ ...form, writer: e.target.value })} style={{ marginTop: "4px" }}>
+                      <option value="">-- ระบุชื่อ --</option>
+                      {staffTeam.map(name => <option key={name} value={name}>{name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: "11px", color: "var(--t2)" }}>🎨 ผู้ทำกราฟิก</label>
+                    <select value={form.graphic} onChange={(e) => setForm({ ...form, graphic: e.target.value })} style={{ marginTop: "4px" }}>
+                      <option value="">-- ระบุชื่อ --</option>
+                      {staffTeam.map(name => <option key={name} value={name}>{name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: "11px", color: "var(--t2)" }}>📢 ผู้โพสต์ลงแพลตฟอร์ม</label>
+                    <select value={form.poster} onChange={(e) => setForm({ ...form, poster: e.target.value })} style={{ marginTop: "4px" }}>
+                      <option value="">-- ระบุชื่อ --</option>
+                      {staffTeam.map(name => <option key={name} value={name}>{name}</option>)}
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -619,7 +582,6 @@ export default function StaffWork({ authState, user, go }) {
                 onDragLeave={handleDragLeave} 
                 onDrop={handleDrop}
                 style={{ 
-                  marginTop: "16px",
                   border: `2px dashed ${isDragging ? "var(--teal)" : "var(--br2)"}`, 
                   padding: "30px 24px", 
                   borderRadius: "12px", 
@@ -629,7 +591,7 @@ export default function StaffWork({ authState, user, go }) {
                 }}>
                 <i className="ti ti-cloud-upload" style={{ fontSize: "40px", color: isDragging ? "var(--teal)" : "var(--t3)" }}></i>
                 <p style={{ margin: "8px 0", fontSize: "14px", fontWeight: "500" }}>ลากไฟล์มาวาง หรือ กดเพื่ออัปโหลด</p>
-                <p style={{ margin: "0 0 12px 0", fontSize: "11px", color: "var(--t3)" }}>รองรับวิดีโอ (MP4), ไฟล์เสียง, รูปภาพ, PDF, Word</p>
+                <p style={{ margin: "0 0 12px 0", fontSize: "11px", color: "var(--t3)" }}>รองรับวิดีโอ, เสียง, รูปภาพ, PDF, Word</p>
                 <button type="button" className="btn btn-outline" onClick={() => fileInputRef.current?.click()} style={{ background: "var(--card)" }}>📎 เลือกไฟล์</button>
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} multiple style={{ display: "none" }} />
 
@@ -650,7 +612,7 @@ export default function StaffWork({ authState, user, go }) {
 
               <div className="staff-form-actions" style={{ marginTop: "12px" }}>
                 <button type="submit" className="btn btn-teal" disabled={uploading} style={{ width: "100%", padding: "14px", fontSize: "14px", fontWeight: "600" }}>
-                  {uploading ? "⏳ กำลังอัปโหลดไฟล์ขึ้นระบบ..." : "🚀 ส่งผลงานเข้าคิวรอตรวจ"}
+                  {uploading ? "⏳ กำลังอัปโหลดไฟล์..." : "🚀 ส่งผลงานเข้าคิวรอตรวจ"}
                 </button>
               </div>
             </form>
@@ -683,7 +645,6 @@ export default function StaffWork({ authState, user, go }) {
         {tab === "admin" && isAdmin && (
           <div style={{ display: "grid", gap: "24px" }}>
             
-            {/* Section 1: จัดการรายชื่อทีมงาน */}
             <div className="card" style={{ padding: "24px" }}>
               <h2 style={{ marginBottom: "16px" }}>👥 จัดการรายชื่อทีมงานในระบบ</h2>
               <div style={{ display: "flex", gap: "8px", marginBottom: "16px", maxWidth: "400px" }}>
@@ -701,7 +662,7 @@ export default function StaffWork({ authState, user, go }) {
                   <div key={name} className="pill" style={{ display: "flex", alignItems: "center", gap: "8px", background: "var(--bg2)" }}>
                     {name}
                     <button 
-                      onClick={() => setItemToConfirmRemoveStaff(name)} 
+                      onClick={() => handleRemoveStaff(name)} 
                       style={{ background: "none", border: "none", color: "#d84f4f", cursor: "pointer", fontSize: "12px", fontWeight: "bold" }}
                       title="ลบรายชื่อ"
                     >×</button>
@@ -710,24 +671,9 @@ export default function StaffWork({ authState, user, go }) {
               </div>
             </div>
 
-            {/* Modal ยืนยันการลบรายชื่อทีมงาน */}
-            {itemToConfirmRemoveStaff && (
-              <div className="card animate-fade-in" style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 100, padding: "24px", maxWidth: "340px", width: "90%", background: "var(--bg)", border: "1px solid var(--br)", boxShadow: "0 10px 30px rgba(0,0,0,0.15)" }}>
-                <h3 style={{ marginBottom: "12px", color: "#d84f4f" }}>⚠️ ยืนยันการลบรายชื่อ</h3>
-                <p style={{ fontSize: "13px", color: "var(--t2)", marginBottom: "20px" }}>คุณแน่ใจหรือไม่ที่จะลบรายชื่อ <strong>"{itemToConfirmRemoveStaff}"</strong> ออกจากระบบทีมงาน?</p>
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
-                  <button className="btn btn-outline" onClick={() => setItemToConfirmRemoveStaff(null)}>ยกเลิก</button>
-                  <button className="btn" style={{ background: "#d84f4f", color: "white" }} onClick={confirmRemoveStaff}>ยืนยันลบ</button>
-                </div>
-              </div>
-            )}
-            {itemToConfirmRemoveStaff && <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 99 }} onClick={() => setItemToConfirmRemoveStaff(null)}></div>}
-
-
-            {/* Section 2: จัดการคิววารสาร */}
             <div className="card" style={{ padding: "24px" }}>
               <h2 style={{ marginBottom: "16px" }}>📚 กำหนดคิวผู้รับผิดชอบวารสาร</h2>
-              <div className="grid3">
+              <div className="grid3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
                 {magazineQueue.map((item, i) => (
                   <div key={i} style={{ padding: "12px", background: "var(--bg2)", borderRadius: "8px" }}>
                     <label style={{ fontSize: "11px", color: "var(--t2)", display: "block", marginBottom: "6px" }}>{item.month}</label>
