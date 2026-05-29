@@ -5,9 +5,9 @@ import {
   serverTimestamp, addDoc, deleteDoc, setDoc, orderBy, getFirestore 
 } from "firebase/firestore"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { toast } from "react-hot-toast"
+import toast from "react-hot-toast" // แก้ไข: นำเข้าแบบ Default Import เพื่อแก้บัค 'reading default'
 
-// ฟังก์ชันสำหรับแจ้งเตือนโดยเรียกใช้งาน toast แบบ Named Import แทน
+// ฟังก์ชันสำหรับแจ้งเตือน
 const notifySuccess = (msg) => toast.success(msg)
 const notifyError = (msg) => toast.error(msg)
 
@@ -237,7 +237,8 @@ export default function StaffWork({ authState, go }) {
     
     try {
       const fileLinks = []
-      const storage = getStorage() // เรียกใช้ Storage จาก Firebase 
+      // แก้ไข: บังคับให้ Storage ดึง App ตัวเดียวกับที่ Firestore (db) ถูกคอนฟิกไว้
+      const storage = getStorage(db.app) 
       
       // อัปโหลดไฟล์ขึ้น Firebase Storage
       if (form.files && form.files.length > 0) {
