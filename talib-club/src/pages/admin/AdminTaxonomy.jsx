@@ -10,9 +10,10 @@ const GROUPS = [
   { key: "bookTypes", title: "ประเภทหนังสือ/PDF", mode: "string", labelLabel: "ชื่อประเภท" },
   { key: "bookSources", title: "แหล่งที่มาหนังสือ", mode: "string", labelLabel: "ชื่อแหล่งที่มา" },
   { key: "mediaTypes", title: "ประเภทมีเดีย", mode: "string", labelLabel: "ชื่อประเภท" },
+  { key: "mediaPlaylists", title: "เพลย์ลิสต์มีเดีย", mode: "string", labelLabel: "ชื่อเพลย์ลิสต์" }, // <-- เพิ่มบรรทัดนี้แล้ว
   { key: "scholarEras", title: "ยุคอุลามาอฺ", mode: "object", idLabel: "รหัสยุค", labelLabel: "ชื่อยุค" },
   { key: "scholarFields", title: "สาขาความรู้อุลามาอฺ", mode: "string", labelLabel: "ชื่อสาขา" },
-  { key: "staffCategories", title: "หมวดหมู่งานสตาฟ", mode: "string", labelLabel: "ชื่อหมวดหมู่" }, // <-- เพิ่มบรรทัดนี้
+  { key: "staffCategories", title: "หมวดหมู่งานสตาฟ", mode: "string", labelLabel: "ชื่อหมวดหมู่" },
 ]
 
 function slugify(value) {
