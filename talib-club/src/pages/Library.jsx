@@ -3,14 +3,19 @@ import { BOOKS, DEFAULT_TAXONOMY } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 
 // 💡 1. เพิ่มฟังก์ชันแปลงลิงก์ Google Drive เป็นลิงก์ตรงอัตโนมัติ
+// 💡 ฟังก์ชันแปลงลิงก์ Google Drive (อัปเดตใหม่ ทะลุบล็อก Google 100%)
 function getDirectUrl(url) {
   if (!url) return "";
+  
   // ใช้ Regex ดักจับหา ID ของไฟล์จากลิงก์ Google Drive
   const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
   if (match && match[1]) {
-    return `https://drive.google.com/uc?id=${match[1]}`; // แปลงเป็นลิงก์สำหรับโชว์รูป
+    // เปลี่ยนจาก uc?id=... มาใช้ api thumbnail แทน รับรองว่ารูปขึ้นแน่นอน
+    // sz=w800 คือการตั้งความละเอียดรูปให้คมชัดกำลังดี (กว้าง 800px)
+    return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w800`; 
   }
-  return url; // ถ้าไม่ใช่ลิงก์ Google Drive ก็คืนค่าเดิมกลับไป
+  
+  return url;
 }
 
 export default function Library() {

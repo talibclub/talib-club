@@ -86,9 +86,9 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
             </button>
           )}
           <div style={{ fontWeight: 600, cursor: "pointer", fontSize: 16 }} onClick={() => nav("home")}>
-            <span style={{ 
+          <span style={{ 
   fontFamily: '"Times New Roman", Times, serif', 
-  color: "var(--logo-c)", 
+  color: "var(--text)", /* <-- เปลี่ยนเป็น var(--text) */
   fontSize: "24px",                              
   fontWeight: "bold",                            
   letterSpacing: "1px",                          
