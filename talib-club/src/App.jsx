@@ -96,10 +96,7 @@ export default function App() {
       <Nav page={page} go={go} theme={theme} setTheme={setTheme} authState={authState} />
       <main>
         {page === "home" && <Home go={go} />}
-        {page === "articles" && <Articles go={go} authState={authState} ctx={ctx} />}
-        {/* ส่ง authState เข้าไปให้หน้าอ่านบทความ เพื่อให้ระบบรู้ว่าล็อกอินแล้ว */}
-        {page === "article" && <ArticleDetail item={ctx} go={go} authState={authState} />}
-        
+        {page === "articles" && <Articles go={go} authState={authState} ctx={ctx} />}      
         {page === "library" && <Library go={go} />}
         {page === "library-detail" && <LibraryDetail item={ctx} go={go} />}
         {page === "media" && <Media go={go} />}
@@ -134,7 +131,8 @@ export default function App() {
           </RequireStaff>
         )}
        {page === "donate" && <Donation />}
-       {page === "article" && <ArticleDetail item={ctx} go={go} authState={authState} />}
+       // ตัวอย่างที่ควรจะเป็นใน App.jsx
+{page === "article" && <ArticleDetail item={ctx} go={go} authState={authState} />}
       </main>
     </div>
   )
