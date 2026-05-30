@@ -9,7 +9,10 @@ const READER_SIZE_LABELS = { sm: "ก-", md: "ก", lg: "ก+" }
 const READER_TONE_LABELS = { 1: "1", 2: "2", 3: "3", 4: "4", 5: "5" }
 
 export default function ArticleDetail({ item, go, authState }) {
-  const { items: articles, loading, saveItem } = useContentCollection("articles", ARTICLES)
+  const { items: articles, loading: loadingArticles, saveItem } = useContentCollection("articles", ARTICLES)
+  
+  // 💡 สร้างคอลเลกชันย่อยบน Firestore สำหรับเก็บข้อมูลการบุ๊กมาร์กโดยตรง ไม่ยุ่งกับ LocalStorage
+  const { items: bookmarks, saveItem: saveBookmark, deleteItem: deleteBookmark } = useContentCollection("bookmarks", [])
   
   const urlId = new URLSearchParams(window.location.search).get("id")
   const hasIncrementedView = useRef(null)
@@ -22,39 +25,57 @@ export default function ArticleDetail({ item, go, authState }) {
   }, [item, urlId, articles])
 
   useEffect(() => {
-    if (displayItem && !loading && saveItem && hasIncrementedView.current !== displayItem.id) {
+    if (displayItem && !loadingArticles && saveItem && hasIncrementedView.current !== displayItem.id) {
       hasIncrementedView.current = displayItem.id;
       const updatedItem = { ...displayItem, views: (displayItem.views || 0) + 1 };
       saveItem(updatedItem).catch(e => console.error("อัปเดตยอดวิวไม่สำเร็จ", e));
     }
-  }, [displayItem, loading, saveItem])
+  }, [displayItem, loadingArticles, saveItem])
 
   useEffect(() => {
-    if (!loading && !displayItem) go("articles")
-  }, [displayItem, loading, go])
+    if (!loadingArticles && !displayItem) go("articles")
+  }, [displayItem, loadingArticles, go])
 
   const [readerPrefs, setReaderPrefs] = useState(() => getSavedReaderPrefs())
   useEffect(() => {
     window.localStorage.setItem(READER_STORAGE_KEY, JSON.stringify(readerPrefs))
   }, [readerPrefs])
 
-  const isLoggedIn = !!authState?.user;
-  const savedList = isLoggedIn ? (authState?.profile?.savedArticles || []) : [];
+  // --- ระบบเช็คสถานะการบันทึกจาก Firestore (อิงตาม UID ของสมาชิกที่ล็อกอินอยู่) ---
+  const uid = authState?.user?.uid;
+  
+  const savedList = useMemo(() => {
+    if (!uid) return [];
+    return bookmarks.filter(b => b.uid === uid).map(b => b.articleId);
+  }, [bookmarks, uid])
+
   const isSaved = displayItem ? savedList.includes(displayItem.id) : false;
 
   const toggleSave = async () => {
-    if (!isLoggedIn) {
+    if (!uid) {
       toast.error("กรุณาเข้าสู่ระบบก่อนบันทึกบทความ");
       go("auth");
       return;
     }
 
-    let nextList = isSaved ? savedList.filter(id => id !== displayItem.id) : [...savedList, displayItem.id];
+    const bookmarkId = `${uid}_${displayItem.id}`; // ใช้ UID ผสมกับรหัสบทความเพื่อทำเป็น ID เอกสาร
+
     try {
-      await authState.updateUserProfile({ savedArticles: nextList });
-      toast.success(isSaved ? "ยกเลิกการบันทึกแล้ว" : "บันทึกบทความไว้ในบัญชีของคุณแล้ว!");
+      if (isSaved) {
+        await deleteBookmark(bookmarkId);
+        toast.success("ยกเลิกการบันทึกแล้ว");
+      } else {
+        await saveBookmark({
+          id: bookmarkId,
+          uid: uid,
+          articleId: displayItem.id,
+          savedAt: new Date().toISOString()
+        });
+        toast.success("บันทึกบทความไว้ในบัญชีของคุณแล้ว!");
+      }
     } catch (err) {
-      toast.error("บันทึกไม่สำเร็จ กรุณาลองใหม่");
+      console.error(err);
+      toast.error("เกิดข้อผิดพลาดจากระบบฐานข้อมูล กรุณาลองใหม่");
     }
   }
 
@@ -68,11 +89,12 @@ export default function ArticleDetail({ item, go, authState }) {
 
   const handlePrint = () => window.print();
 
-  if (loading && !displayItem) {
+  if (loadingArticles && !displayItem) {
     return <div className="article-page" style={{textAlign: "center", padding: "100px 0"}}><i className="ti ti-loader-2 spin" style={{fontSize:32, color:"var(--teal)"}}></i></div>
   }
   if (!displayItem) return null
 
+  // ระบบแกะข้อความสร้างสารบัญอัตโนมัติ
   const toc = [];
   const parsedBody = (displayItem.body || "").split("\n\n").map((para, index) => {
     if (para.startsWith("## ")) {
@@ -168,24 +190,6 @@ export default function ArticleDetail({ item, go, authState }) {
           {displayItem.tags.map(t => (
             <span key={t} className="tag tag-acc" style={{ fontSize: 11 }}>#{t}</span>
           ))}
-        </div>
-      )}
-
-      {related.length > 0 && (
-        <div style={{ marginTop: 40 }}>
-          <div className="divider" />
-          <div className="sec-hd" style={{ marginBottom: 14 }}><span className="sec-title">บทความที่เกี่ยวข้อง</span></div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {related.map(r => (
-              <div key={r.id} className="card" style={{ padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }} onClick={() => go("article", r)}>
-                <div>
-                  <span className="tag tag-teal" style={{ marginRight: 8 }}>{r.category}</span>
-                  <span style={{ fontSize: 13, color: "var(--text)", fontWeight: 400 }}>{r.title}</span>
-                </div>
-                <i className="ti ti-arrow-right" style={{ color: "var(--t3)", flexShrink: 0 }}></i>
-              </div>
-            ))}
-          </div>
         </div>
       )}
     </div>

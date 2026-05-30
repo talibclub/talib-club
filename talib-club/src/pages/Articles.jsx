@@ -38,7 +38,7 @@ export default function Articles({ go, authState }) {
         {loading && <p style={{ marginTop: 8, fontSize: 12 }}>กำลังโหลดบทความล่าสุด...</p>}
       </div>
 
-      {/* ปุ่มลัดเข้าดูคลังส่วนตัว (โชว์เฉพาะคนล็อกอิน) */}
+      {/* ปุ่มลัดเข้าดูคลังส่วนตัว (โชว์เฉพาะคนล็อกอินเท่านั้น) */}
       {isLoggedIn && (
         <div style={{ marginBottom: 24 }}>
           <button 
@@ -127,11 +127,6 @@ export default function Articles({ go, authState }) {
                 </div>
               ))}
             </div>
-            {filtered.length > 6 && (
-              <button className="btn btn-outline" onClick={() => setShowAllBrowse(true)} style={{ margin: "28px auto 0", display: "block", fontSize: 12 }}>
-                ดูบทความทั้งหมด ({filtered.length} บทความ)
-              </button>
-            )}
           </div>
         </div>
       ) : (
@@ -151,8 +146,6 @@ export default function Articles({ go, authState }) {
                   <div style={{ padding: 16 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
                       <span className="tag tag-teal">{a.category}</span>
-                      {a.type === "series" && <span className="tag tag-acc">ซีรีส์ ตอน {a.part}</span>}
-                      {a.type === "specific" && a.seriesName && <span className="tag tag-acc">{a.seriesName}</span>}
                     </div>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", lineHeight: 1.45, marginBottom: 8 }}>{a.title}</div>
                     <p style={{ fontSize: 12, marginBottom: 10, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{a.excerpt}</p>

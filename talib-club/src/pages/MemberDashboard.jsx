@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import toast from 'react-hot-toast'
 import { ARTICLES } from "../data/index.js"
 import { useContentCollection } from "../lib/contentStore.js"
@@ -6,7 +6,7 @@ import { useContentCollection } from "../lib/contentStore.js"
 export default function MemberDashboard({ authState, go, initialView = "overview" }) {
   const [view, setView] = useState("overview")
   const [copied, setCopied] = useState("")
-
+  
   const user = authState?.user
   const profile = authState?.profile || {}
   const name = profile.displayName || user?.displayName || user?.email || "สมาชิก"
@@ -94,13 +94,20 @@ function Overview({ authState, go, setView }) {
   )
 }
 
-// โซนใหม่: หน้าแสดงบทความที่บันทึกไว้ของสมาชิก
+// แผงแสดงผลบทความบุ๊กมาร์กจริงจากคอลเลกชันใน Firestore
 function SavedArticlesPanel({ authState, go }) {
-  const { items: articles, loading } = useContentCollection("articles", ARTICLES)
-  const savedIds = authState?.profile?.savedArticles || []
-  const savedArticles = articles.filter(a => savedIds.includes(a.id))
+  const { items: articles, loading: loadingArticles } = useContentCollection("articles", ARTICLES)
+  const { items: bookmarks, loading: loadingBookmarks } = useContentCollection("bookmarks", [])
+  
+  const uid = authState?.user?.uid;
 
-  if (loading) return <div style={{textAlign: "center", padding: 40}}><i className="ti ti-loader-2 spin" style={{fontSize: 24, color: "var(--teal)"}}></i></div>
+  const savedArticles = useMemo(() => {
+    if (!uid) return [];
+    const savedIds = bookmarks.filter(b => b.uid === uid).map(b => b.articleId);
+    return articles.filter(a => savedIds.includes(a.id));
+  }, [articles, bookmarks, uid])
+
+  if (loadingArticles || loadingBookmarks) return <div style={{textAlign: "center", padding: 40}}><i className="ti ti-loader-2 spin" style={{fontSize: 24, color: "var(--teal)"}}></i></div>
 
   return (
     <div className="profile-layout">
@@ -111,7 +118,7 @@ function SavedArticlesPanel({ authState, go }) {
            </div>
            <div>
              <h2 style={{ fontSize: 18 }}>บทความที่บันทึกไว้</h2>
-             <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>{savedArticles.length} รายการในคลังส่วนตัว</p>
+             <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>{savedArticles.length} รายการในคลังส่วนตัวบนคลาวด์</p>
            </div>
         </div>
 
@@ -136,7 +143,6 @@ function SavedArticlesPanel({ authState, go }) {
 }
 
 function ProfilePanel({ authState, copied, copyText, go }) {
-  // โค้ดส่วน ProfilePanel ใช้ของเดิมที่คุณมีได้เลยครับ (ขอละไว้เพื่อความกระชับ)
   const user = authState?.user
   const profile = authState?.profile || {}
   const role = profile.role || "member"
@@ -144,15 +150,12 @@ function ProfilePanel({ authState, copied, copyText, go }) {
   const email = user?.email || profile.email || "-"
   const photoURL = user?.photoURL || ""
   const isStaff = role === "staff"
-  const emailVerified = Boolean(user?.emailVerified)
-  const needsPasswordReauth = user?.providerData?.some(item => item.providerId === "password")
   
   const [form, setForm] = useState({
     displayName: displayName === "-" ? "" : displayName,
     email,
     password: "",
   })
-  const emailChanged = formEmailChanged(form.email, email)
   const [busy, setBusy] = useState("")
 
   useEffect(() => {
