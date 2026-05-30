@@ -10,7 +10,8 @@ export default function Donation() {
       accountName: "นายสอบรีย์ บิลังโหลด",
       accountNumber: "704-287501-5",
       tag: "สมทบทุน",
-      logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Siam_Commercial_Bank_Logo.svg/256px-Siam_Commercial_Bank_Logo.svg.png" 
+      logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Siam_Commercial_Bank_Logo.svg/256px-Siam_Commercial_Bank_Logo.svg.png",
+      qrImage: "/scb-qr.png" // ใส่รูปภาพ QR Code ไว้ในโฟลเดอร์ public
     }
   ]
 
@@ -39,7 +40,7 @@ export default function Donation() {
         {/* ฝั่งซ้าย: บัญชีธนาคาร และ วัตถุประสงค์ */}
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           
-          {/* Card บัญชีธนาคาร */}
+          {/* Card บัญชีธนาคาร พร้อม QR Code */}
           {bankAccounts.map((acc) => (
             <div key={acc.id} style={{ 
               border: "1px solid #bbf7d0", 
@@ -47,12 +48,30 @@ export default function Donation() {
               padding: 20, 
               background: "#f0fdf4",
               display: "flex",
-              alignItems: "flex-start",
-              gap: 16
+              alignItems: "center",
+              gap: 24,
+              flexWrap: "wrap"
             }}>
-              <img src={acc.logo} alt={acc.bankName} style={{ width: 50, height: 50, objectFit: "contain", background: "#fff", padding: 4, borderRadius: 8, border: "1px solid #e5e7eb" }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+              
+              {/* ส่วนแสดง QR Code */}
+              <div style={{ 
+                background: "#fff", 
+                padding: 12, 
+                borderRadius: 12, 
+                border: "1px solid #e5e7eb",
+                textAlign: "center",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center"
+              }}>
+                <img src={acc.qrImage} alt="QR Code" style={{ width: 130, height: 130, objectFit: "contain" }} />
+                <span style={{ fontSize: 12, color: "#059669", marginTop: 8, fontWeight: 500 }}>สแกนเพื่อโอนเงิน</span>
+              </div>
+
+              {/* ส่วนแสดงข้อมูลบัญชี */}
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                  <img src={acc.logo} alt={acc.bankName} style={{ width: 32, height: 32, objectFit: "contain" }} />
                   <h3 style={{ margin: 0, fontSize: 16, color: "#1f2937" }}>{acc.bankName}</h3>
                   <span style={{ fontSize: 12, background: "#dcfce7", color: "#166534", padding: "2px 8px", borderRadius: 12 }}>{acc.tag}</span>
                 </div>
@@ -62,13 +81,13 @@ export default function Donation() {
                   <strong style={{ color: "#1f2937" }}>{acc.accountName}</strong>
                   
                   <span style={{ color: "#6b7280", alignSelf: "center" }}>เลขบัญชี:</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     <strong style={{ fontSize: 16, color: "#1f2937" }}>{acc.accountNumber}</strong>
                     <button 
                       onClick={() => handleCopy(acc.accountNumber)}
                       style={{ 
-                        background: "none", border: "none", color: "#059669", cursor: "pointer", 
-                        display: "flex", alignItems: "center", gap: 4, fontSize: 13, padding: 0
+                        background: "#047857", border: "none", color: "#fff", cursor: "pointer", 
+                        display: "flex", alignItems: "center", gap: 4, fontSize: 12, padding: "4px 10px", borderRadius: 6
                       }}
                     >
                       <i className="ti ti-copy"></i> คัดลอก
@@ -76,10 +95,11 @@ export default function Donation() {
                   </div>
                 </div>
               </div>
+
             </div>
           ))}
 
-          {/* Card วัตถุประสงค์ (ดึงจากโปสเตอร์) */}
+          {/* Card วัตถุประสงค์ */}
           <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 24, background: "#fff" }}>
             <h3 style={{ margin: "0 0 16px 0", fontSize: 16, color: "#1f2937" }}>
               เงินบริจาคจะถูกนำไปใช้ในการ:
@@ -105,7 +125,7 @@ export default function Donation() {
             </h3>
             
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-              <StepItem number="1" title="โอนเงินผ่านแอปพลิเคชันธนาคาร" desc="คัดลอกเลขบัญชี SCB ด้านซ้ายเพื่อทำการโอนเงินร่วมสมทบทุน" />
+              <StepItem number="1" title="สแกน QR Code หรือคัดลอกเลขบัญชี" desc="ใช้แอปพลิเคชันธนาคารของคุณสแกน QR Code หรือคัดลอกเลขบัญชี SCB ด้านซ้าย" />
               <StepItem number="2" title="สนับสนุนการทำงานของกลุ่ม" desc="ญะซากุมุลลอฮุค็อยร็อน (ขออัลลอฮฺทรงตอบแทนความดีงามแก่ท่าน) สำหรับการมีส่วนร่วมในงานดะวะฮฺ" />
             </div>
           </div>
