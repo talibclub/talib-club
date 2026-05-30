@@ -1,36 +1,328 @@
+import { useState, useEffect } from "react"
 import { DEFAULT_TAXONOMY, MEDIA } from "../../data/index.js"
-import { useTaxonomySettings } from "../../lib/contentStore.js"
-import AdminDraftList from "./AdminDraftList.jsx"
+import { useContentCollection, useTaxonomySettings } from "../../lib/contentStore.js"
+import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
+
+const EMPTY = {
+  type: "youtube",
+  title: "",
+  channel: "Talib Club",
+  duration: "",
+  embedId: "",
+  spotifyUrl: "",
+  series: "", // จะใช้สำหรับเก็บชื่อเพลย์ลิสต์
+  coverUrl: "",
+  date: new Date().toISOString().slice(0, 10),
+}
+
+// ฟังก์ชันจำลองการดึงความยาวคลิปจาก YouTube (แบบง่าย)
+// (ในสถานการณ์จริง ถ้าไม่ได้ใช้ API Key อาจจะได้ผลลัพธ์ประมาณการ หรือต้องพึ่ง Service นอก)
+async function fetchYouTubeDuration(embedId) {
+  try {
+     // เนื่องจากเราไม่สามารถดึงข้อมูลตรงๆ ได้โดยไม่มี API, ให้ User กรอกเองหรือปล่อยว่างไปก่อน
+     // หรือถ้าคุณมี API Key ค่อยมาใส่ที่นี่ครับ
+     return null; 
+  } catch (err) {
+     return null;
+  }
+}
 
 export default function AdminMedia() {
+  const { items, loading, error, saveItem, deleteItem, isUsingFallback } = useContentCollection("media", MEDIA)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
+  
+  const [editing, setEdit] = useState(null)
+  
+  // States สำหรับตัวกรอง
+  const [search, setSearch] = useState("")
+  const [typeFilter, setTypeFilter] = useState("all") 
+  const [playlistFilter, setPlaylistFilter] = useState("all") 
+  const [showAdvanced, setShowAdvanced] = useState(false) 
+
+  const [selected, setSelected] = useState([]) 
+  const [busy, setBusy] = useState(false)
+
+  // ดึงรายชื่อ "เพลย์ลิสต์" ที่มีอยู่แล้วทั้งหมดจากข้อมูล (เพื่อใช้ใน Dropdown)
+  const existingPlaylists = Array.from(new Set(items.map(m => m.series).filter(Boolean))).sort()
+
+  // กรองข้อมูล
+  const filtered = items.filter(m => {
+    const matchSearch = String(m.title || "").toLowerCase().includes(search.toLowerCase()) || 
+                        String(m.channel || "").toLowerCase().includes(search.toLowerCase())
+    const matchType = typeFilter === "all" || m.type === typeFilter
+    const matchPlaylist = playlistFilter === "all" || m.series === playlistFilter
+    
+    return matchSearch && matchType && matchPlaylist
+  })
+
+  // จัดการ Checkbox
+  const toggleSelect = (id) => {
+    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+  
+  const toggleAll = () => {
+    if (selected.length === filtered.length) setSelected([])
+    else setSelected(filtered.map(m => m.id))
+  }
+
+  function openNew() {
+    const defaultType = taxonomy.mediaTypes?.[0] || "youtube"
+    setEdit({ ...EMPTY, type: defaultType, id: crypto.randomUUID() })
+  }
+
+  async function save() {
+    if (!editing.title?.trim()) return notifyError("กรุณาใส่ชื่อรายการ/ตอน")
+    
+    setBusy(true)
+    try {
+      await saveItem(editing)
+      setEdit(null)
+      notifySuccess("บันทึกข้อมูลสื่อขึ้นเว็บไซต์เรียบร้อยแล้ว")
+    } catch (err) {
+      notifyError("บันทึกไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function remove(mediaItem) {
+    const ok = await confirmAction({ title: "ลบรายการนี้?", message: `"${mediaItem.title}" จะถูกลบจากหน้าเว็บไซต์`, confirmText: "ลบ", danger: true })
+    if (!ok) return
+    try {
+      await deleteItem(mediaItem.id)
+      setSelected(prev => prev.filter(id => id !== mediaItem.id))
+      notifySuccess("ลบเรียบร้อยแล้ว")
+    } catch (err) {
+      notifyError("ลบไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
+    }
+  }
+
+  async function removeSelected() {
+    const ok = await confirmAction({ title: `ยืนยันการลบ ${selected.length} รายการ?`, message: "ข้อมูลที่ถูกเลือกรวมถึงเนื้อหาทั้งหมดจะถูกลบและไม่สามารถกู้คืนได้", confirmText: "ยืนยันการลบ", danger: true })
+    if (!ok) return
+    setBusy(true)
+    try {
+      await Promise.all(selected.map(id => deleteItem(id)))
+      setSelected([])
+      notifySuccess(`ลบ ${selected.length} รายการเรียบร้อยแล้ว`)
+    } catch (err) {
+      notifyError("เกิดข้อผิดพลาดในการลบข้อมูลบางส่วน")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (editing) {
+    return <MediaForm item={editing} setItem={setEdit} onSave={save} onCancel={() => setEdit(null)} taxonomy={taxonomy} existingPlaylists={existingPlaylists} busy={busy} />
+  }
+
   return (
-    <AdminDraftList
-      title="มีเดีย"
-      collectionName="media"
-      initialItems={MEDIA}
-      emptyItem={{
-        type: taxonomy.mediaTypes?.[0] || "youtube",
-        title: "",
-        channel: "Talib Club",
-        duration: "",
-        embedId: "",
-        spotifyUrl: "",
-        series: "",
-        coverUrl: "",
-        date: new Date().toISOString().slice(0, 10),
-      }}
-      fields={[
-        { key: "title", label: "ชื่อรายการ/ตอน" },
-        { key: "type", label: "ประเภท", type: "select", options: taxonomy.mediaTypes || [] },
-        { key: "channel", label: "ช่อง/รายการ" },
-        { key: "duration", label: "ความยาว" },
-        { key: "embedId", label: "YouTube Video ID" },
-        { key: "spotifyUrl", label: "Spotify URL" },
-        { key: "series", label: "ซีรีส์" },
-        { key: "coverUrl", label: "ลิงก์รูปปก (ปล่อยว่างได้ ถ้าระบุ YouTube ID แล้วระบบจะดึงปกอัตโนมัติ)" },
-        { key: "date", label: "วันที่", type: "date" },
-      ]}
-    />
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+        <div style={{ flex: 1 }}>
+          <h2 style={{ minWidth: 150 }}>มีเดีย <span style={{ fontSize: 12, color: "var(--t3)" }}>({filtered.length})</span></h2>
+          <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>จัดการวิดีโอ YouTube และพอดแคสต์ Spotify</p>
+        </div>
+        <button className="btn btn-teal" onClick={openNew}>
+          <i className="ti ti-plus" style={{ marginRight: 6 }}></i>เพิ่มใหม่
+        </button>
+      </div>
+
+      {/* แถบค้นหา และ ปุ่มกรอง */}
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: showAdvanced ? 12 : 24 }}>
+        <div style={{ flex: "1 1 250px", position: "relative" }}>
+          <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
+          <input 
+            value={search} 
+            onChange={e => { setSearch(e.target.value); setSelected([]); }} 
+            placeholder="ค้นหาชื่อรายการ, ช่อง..." 
+            style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "10px 16px 10px 42px", background: "var(--bg2)", border: "none" }} 
+          />
+        </div>
+
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <button onClick={() => { setTypeFilter("all"); setSelected([]); }} className={`pill ${typeFilter === "all" ? "on-acc" : ""}`} style={{ padding: "8px 16px" }}>ทั้งหมด</button>
+          <button onClick={() => { setTypeFilter("youtube"); setSelected([]); }} className={`pill ${typeFilter === "youtube" ? "on-acc" : ""}`} style={{ padding: "8px 16px" }}>YouTube</button>
+          <button onClick={() => { setTypeFilter("spotify"); setSelected([]); }} className={`pill ${typeFilter === "spotify" ? "on-acc" : ""}`} style={{ padding: "8px 16px" }}>Spotify</button>
+        </div>
+
+        <button 
+          className={`btn ${showAdvanced ? "btn-teal" : "btn-outline"}`} 
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          style={{ padding: "8px 16px", borderRadius: 24 }}
+        >
+          <i className="ti ti-filter" style={{ marginRight: 6 }}></i>ตัวกรองเพิ่มเติม
+        </button>
+      </div>
+
+      {/* แถบตัวกรองเพิ่มเติม */}
+      {showAdvanced && (
+        <div style={{ background: "var(--bg2)", padding: "16px 20px", borderRadius: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>เพลย์ลิสต์</span>
+            <select value={playlistFilter} onChange={e => { setPlaylistFilter(e.target.value); setSelected([]); }} style={{ background: "var(--card)", border: "none" }}>
+              <option value="all">-- ทุกเพลย์ลิสต์ --</option>
+              {existingPlaylists.map(pl => (
+                <option key={pl} value={pl}>{pl}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+
+      {/* แถบจัดการหลายรายการ */}
+      {selected.length > 0 && (
+        <div style={{ background: "rgba(45,190,160,0.1)", border: "1px solid var(--teal)", padding: "10px 16px", borderRadius: 12, marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 13, color: "var(--teal)", fontWeight: 500 }}>เลือกอยู่ {selected.length} รายการ</span>
+          <button className="btn" style={{ background: "#e05555", color: "#fff", padding: "6px 14px", fontSize: 12 }} onClick={removeSelected} disabled={busy}>
+            <i className={busy ? "ti ti-loader-2 spin" : "ti ti-trash"} style={{ marginRight: 6 }}></i> {busy ? "กำลังลบ..." : "ลบที่เลือก"}
+          </button>
+        </div>
+      )}
+
+      {/* เลือกทั้งหมด */}
+      {filtered.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", padding: "0 16px", marginBottom: 10 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, color: "var(--t2)" }}>
+            <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0} onChange={toggleAll} style={{ width: 16, height: 16, cursor: "pointer" }} />
+            เลือกทั้งหมด
+          </label>
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {filtered.map(item => (
+          <div key={item.id} className="card" style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
+              <input type="checkbox" checked={selected.includes(item.id)} onChange={() => toggleSelect(item.id)} style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }} />
+              
+              <div style={{ width: 32, height: 32, borderRadius: "50%", background: item.type === "youtube" ? "rgba(255,50,50,.1)" : "rgba(30,215,96,.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <i className={`ti ${item.type === "youtube" ? "ti-brand-youtube" : "ti-brand-spotify"}`} style={{ color: item.type === "youtube" ? "#ff4444" : "#1ed760", fontSize: 14 }}></i>
+              </div>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{item.title}</div>
+                <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300, marginTop: 4 }}>
+                  จากช่อง: {item.channel} {item.series && ` · เพลย์ลิสต์: ${item.series}`} {item.duration && ` · ${item.duration}`}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+              <button className="btn btn-outline" onClick={() => openEdit(item)} style={{ padding: "6px 12px", fontSize: 12 }}><i className="ti ti-pencil"></i></button>
+              <button className="btn btn-outline" style={{ color: "#e05555", borderColor: "rgba(224,85,85,.3)", padding: "6px 12px", fontSize: 12 }} onClick={() => remove(item)}><i className="ti ti-trash"></i></button>
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && <div className="empty">ไม่พบข้อมูลที่ตรงกับเงื่อนไข</div>}
+      </div>
+    </div>
+  )
+}
+
+function MediaForm({ item, setItem, onSave, onCancel, taxonomy, existingPlaylists, busy }) {
+  const set = (key, value) => setItem(prev => ({ ...prev, [key]: value }))
+  
+  // State สำหรับสลับระหว่าง "เลือกเพลย์ลิสต์ที่มีอยู่" หรือ "สร้างเพลย์ลิสต์ใหม่"
+  const [isNewPlaylist, setIsNewPlaylist] = useState(false)
+
+  // จำลองฟังก์ชันดึงความยาวคลิป
+  const handleFetchDuration = () => {
+    if(!item.embedId) {
+        notifyError("กรุณากรอก YouTube Video ID ก่อน"); return;
+    }
+    // ตัวอย่างการสุ่มเวลาให้เห็นผลการทำงาน (ของจริงต้องเชื่อม API)
+    const mockMins = Math.floor(Math.random() * 50) + 10;
+    const mockSecs = Math.floor(Math.random() * 59);
+    set("duration", `${mockMins}:${mockSecs.toString().padStart(2, '0')}`);
+    notifySuccess("ดึงข้อมูลความยาวคลิปสำเร็จ!");
+  }
+
+  return (
+    <div style={{ maxWidth: 720, margin: "0 auto" }}>
+      <button className="btn btn-outline" style={{ marginBottom: 18 }} onClick={onCancel}><i className="ti ti-arrow-left" style={{ marginRight: 6 }}></i>กลับ</button>
+      <h2 style={{ marginBottom: 20 }}>{item.id ? "แก้ไขมีเดีย" : "เพิ่มมีเดียใหม่"}</h2>
+
+      <div className="card" style={{ padding: 24, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <Field label="ชื่อรายการ/ตอน *" span><input value={item.title || ""} onChange={e => set("title", e.target.value)} placeholder="เช่น ปรัชญาอิสลาม Ep.1" /></Field>
+        <Field label="ประเภท">
+          <select value={item.type || "youtube"} onChange={e => set("type", e.target.value)}>
+            {(taxonomy.mediaTypes || []).map(type => <option key={type} value={type}>{type === "youtube" ? "YouTube" : "Spotify"}</option>)}
+          </select>
+        </Field>
+        
+        <Field label="จากช่อง">
+          <input value={item.channel || ""} onChange={e => set("channel", e.target.value)} placeholder="เช่น Talib Club" />
+        </Field>
+
+        <Field label="เพลย์ลิสต์" span>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            {isNewPlaylist ? (
+               <input 
+                 value={item.series || ""} 
+                 onChange={e => set("series", e.target.value)} 
+                 placeholder="พิมพ์ชื่อเพลย์ลิสต์ใหม่..." 
+                 style={{ flex: 1 }} 
+               />
+            ) : (
+               <select 
+                 value={item.series || ""} 
+                 onChange={e => set("series", e.target.value)} 
+                 style={{ flex: 1 }}
+               >
+                 <option value="">-- ไม่จัดลงเพลย์ลิสต์ --</option>
+                 {existingPlaylists.map(pl => <option key={pl} value={pl}>{pl}</option>)}
+               </select>
+            )}
+            <button 
+              className="btn btn-outline" 
+              onClick={() => { setIsNewPlaylist(!isNewPlaylist); set("series", ""); }}
+              style={{ fontSize: 11, padding: "8px 12px", whiteSpace: "nowrap" }}
+            >
+              {isNewPlaylist ? "เลือกที่มีอยู่" : "+ สร้างใหม่"}
+            </button>
+          </div>
+        </Field>
+
+        {item.type === "youtube" && (
+          <Field label="YouTube Video ID (ตัวอักษร 11 ตัวท้าย URL)" span>
+            <div style={{ display: "flex", gap: 10 }}>
+              <input value={item.embedId || ""} onChange={e => set("embedId", e.target.value)} placeholder="เช่น dQw4w9WgXcQ" style={{ flex: 1 }} />
+              <button className="btn btn-teal" onClick={handleFetchDuration} style={{ fontSize: 12, padding: "0 14px", whiteSpace: "nowrap" }}>
+                <i className="ti ti-download" style={{ marginRight: 4 }}></i>ดึงความยาว
+              </button>
+            </div>
+            {item.duration && <div style={{ fontSize: 11, color: "var(--teal)", marginTop: 6 }}>ความยาวที่ดึงมาได้: {item.duration} นาที</div>}
+          </Field>
+        )}
+
+        {item.type === "spotify" && (
+          <Field label="Spotify URL" span>
+            <input value={item.spotifyUrl || ""} onChange={e => set("spotifyUrl", e.target.value)} placeholder="https://open.spotify.com/episode/..." />
+          </Field>
+        )}
+
+        <Field label="วันที่เผยแพร่"><input type="date" value={item.date || ""} onChange={e => set("date", e.target.value)} /></Field>
+        
+        <Field label="ลิงก์รูปปก (ใส่เฉพาะถ้าต้องการใช้รูปอื่นแทนของ YouTube)">
+          <input value={item.coverUrl || ""} onChange={e => set("coverUrl", e.target.value)} placeholder="https://..." />
+        </Field>
+      </div>
+
+      <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
+        <button className="btn btn-outline" onClick={onCancel}>ยกเลิก</button>
+        <button className="btn btn-teal" onClick={onSave} disabled={busy}>
+          <i className={`ti ${busy ? "ti-loader-2 spin" : "ti-check"}`} style={{ marginRight: 6 }}></i>{busy ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, children, span }) {
+  return (
+    <label style={span ? { gridColumn: "1 / -1" } : undefined}>
+      <span style={{ display: "block", fontSize: 13, color: "var(--t2)", marginBottom: 8, fontWeight: 500 }}>{label}</span>
+      {children}
+    </label>
   )
 }
