@@ -3,6 +3,7 @@ import { SITE } from "../../data/index.js"
 import { useSiteSettings } from "../../lib/contentStore.js"
 import { notifyError, notifySuccess } from "../../utils/feedback.jsx"
 
+// 1. ดึงข้อมูล tiktok จาก database มาใส่ใน state ของ form
 function flattenSite(site) {
   return {
     ...site,
@@ -10,6 +11,7 @@ function flattenSite(site) {
     youtube: site.social?.youtube || "",
     spotify: site.social?.spotify || "",
     instagram: site.social?.instagram || "",
+    tiktok: site.social?.tiktok || "", // <-- เพิ่มบรรทัดนี้
     ayahAr: site.ayah?.ar || "",
     ayahTh: site.ayah?.th || "",
     ayahRef: site.ayah?.ref || "",
@@ -18,6 +20,7 @@ function flattenSite(site) {
   }
 }
 
+// 2. จัดรูปแบบข้อมูลจาก form เตรียมส่งไปเซฟใน database
 function expandSite(form) {
   return {
     name: form.name || "",
@@ -31,6 +34,7 @@ function expandSite(form) {
       youtube: form.youtube || "",
       spotify: form.spotify || "",
       instagram: form.instagram || "",
+      tiktok: form.tiktok || "", // <-- เพิ่มบรรทัดนี้
     },
     ayah: {
       ar: form.ayahAr || "",
@@ -97,6 +101,7 @@ export default function AdminSite() {
           </Field>
         </div>
 
+        {/* 3. เพิ่มช่องกรอก TikTok ตรงนี้ */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <Field label="Facebook URL">
             <input value={form.facebook || ""} onChange={e => set("facebook", e.target.value)} />
@@ -109,6 +114,9 @@ export default function AdminSite() {
           </Field>
           <Field label="Instagram URL">
             <input value={form.instagram || ""} onChange={e => set("instagram", e.target.value)} />
+          </Field>
+          <Field label="TikTok URL">
+            <input value={form.tiktok || ""} onChange={e => set("tiktok", e.target.value)} />
           </Field>
         </div>
 

@@ -187,6 +187,7 @@ function Footer({ site }) {
     { key: "youtube", icon: "ti-brand-youtube" },
     { key: "spotify", icon: "ti-brand-spotify" },
     { key: "instagram", icon: "ti-brand-instagram" },
+    { key: "tiktok", icon: "ti-brand-tiktok" }, // <--- เพิ่มแค่บรรทัดนี้บรรทัดเดียวครับ!
   ].map(item => ({ ...item, url: site?.social?.[item.key] })).filter(item => item.url)
 
   return (

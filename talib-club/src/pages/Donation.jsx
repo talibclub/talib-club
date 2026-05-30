@@ -1,5 +1,6 @@
 import React from "react"
 import { toast } from "react-hot-toast"
+import { SITE } from "../data/index.js" // <-- เพิ่มบรรทัดนี้เข้ามา
 
 export default function Donation() {
   // ข้อมูลบัญชีธนาคารจากโปสเตอร์
@@ -130,25 +131,46 @@ export default function Donation() {
             </div>
           </div>
 
-          {/* Card ช่องทางติดตามผลงาน */}
+         {/* Card ช่องทางติดตามผลงาน */}
           <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 24, background: "#f8fafc" }}>
             <h3 style={{ margin: "0 0 16px 0", fontSize: 15, color: "#1f2937" }}>
               ติดตามผลงานของเราได้ตามช่องทาง
             </h3>
             <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 20, color: "#334155" }}>
-              <i className="ti ti-brand-facebook"></i>
-              <i className="ti ti-brand-instagram"></i>
-              <i className="ti ti-brand-tiktok"></i>
-              <i className="ti ti-brand-youtube"></i>
-              <i className="ti ti-brand-spotify"></i>
+              
+              {SITE?.social?.facebook && (
+                <a href={SITE.social.facebook} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#1877F2"} onMouseOut={(e) => e.target.style.color = "inherit"}>
+                  <i className="ti ti-brand-facebook"></i>
+                </a>
+              )}
+              
+              {SITE?.social?.instagram && (
+                <a href={SITE.social.instagram} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#E4405F"} onMouseOut={(e) => e.target.style.color = "inherit"}>
+                  <i className="ti ti-brand-instagram"></i>
+                </a>
+              )}
+              
+              {SITE?.social?.tiktok && (
+                <a href={SITE.social.tiktok} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#000000"} onMouseOut={(e) => e.target.style.color = "inherit"}>
+                  <i className="ti ti-brand-tiktok"></i>
+                </a>
+              )}
+              
+              {SITE?.social?.youtube && (
+                <a href={SITE.social.youtube} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#FF0000"} onMouseOut={(e) => e.target.style.color = "inherit"}>
+                  <i className="ti ti-brand-youtube"></i>
+                </a>
+              )}
+              
+              {SITE?.social?.spotify && (
+                <a href={SITE.social.spotify} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#1DB954"} onMouseOut={(e) => e.target.style.color = "inherit"}>
+                  <i className="ti ti-brand-spotify"></i>
+                </a>
+              )}
+
               <span style={{ fontSize: 16, fontWeight: "bold", marginLeft: 4, color: "#1f2937" }}>Talib Club</span>
             </div>
           </div>
-
-        </div>
-
-      </div>
-    </div>
   )
 }
 
