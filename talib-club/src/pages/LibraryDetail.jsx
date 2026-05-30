@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import toast from "react-hot-toast"
 import { BOOKS } from "../data/index.js"
 import { useContentCollection } from "../lib/contentStore.js"
@@ -25,9 +25,11 @@ function getPreviewUrl(url) {
 }
 
 export default function LibraryDetail({ item, go }) {
-  const { items: books, loading } = useContentCollection("books", BOOKS)
+  // ดึง saveItem ออกมาจากคอลเล็กชันเพื่อใช้อัปเดตข้อมูลขึ้น Firebase
+  const { items: books, loading, saveItem } = useContentCollection("books", BOOKS)
   
   const urlId = new URLSearchParams(window.location.search).get("id")
+  const hasIncrementedView = useRef(null) // ตัวรั้งสำหรับป้องกันการบวกยอดวิวซ้ำตอนเรนเดอร์
 
   const displayItem = useMemo(() => {
     if (item) return item;
@@ -35,15 +37,42 @@ export default function LibraryDetail({ item, go }) {
     return null;
   }, [item, urlId, books])
 
+  // --- ระบบนับยอดเข้าชมของจริง (ยิงขึ้น Firebase) ---
+  useEffect(() => {
+    if (displayItem && !loading && saveItem && hasIncrementedView.current !== displayItem.id) {
+      hasIncrementedView.current = displayItem.id // ล็อค ID ไว้ว่าเล่มนี้ถูกนับวิวในรอบนี้แล้ว
+      
+      const updatedItem = {
+        ...displayItem,
+        views: (displayItem.views || 0) + 1
+      }
+      
+      saveItem(updatedItem).catch(err => {
+        console.error("ไม่สามารถอัปเดตยอดเข้าชมได้:", err)
+      })
+    }
+  }, [displayItem, loading, saveItem])
+
   useEffect(() => {
     if (!loading && !displayItem) {
       go("library")
     }
   }, [displayItem, loading, go])
 
-  // --- นำตัวเลขสุ่มกลับมาให้แล้วครับ (ล็อคค่าไว้ไม่ให้เปลี่ยนไปมาตอนเลื่อนจอ) ---
-  const mockViews = useMemo(() => Math.floor(Math.random() * 3000) + 500, [])
-  const mockDownloads = useMemo(() => Math.floor(mockViews * 0.4), [mockViews])
+  // --- ระบบนับยอดดาวน์โหลดของจริง (ยิงขึ้น Firebase) ---
+  const handleDownloadClick = async () => {
+    if (!displayItem || !saveItem) return
+    
+    try {
+      const updatedItem = {
+        ...displayItem,
+        downloads: (displayItem.downloads || 0) + 1
+      }
+      await saveItem(updatedItem)
+    } catch (err) {
+      console.error("ไม่สามารถอัปเดตยอดดาวน์โหลดได้:", err)
+    }
+  }
 
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href)
@@ -74,10 +103,10 @@ export default function LibraryDetail({ item, go }) {
       <div style={{ textAlign: "center", marginBottom: 32 }}>
         <h1 style={{ fontSize: 28, marginBottom: 16, lineHeight: 1.4, wordBreak: "break-word" }}>{displayItem.title}</h1>
         
-        {/* --- ส่วนแสดงสถิติและปีพิมพ์ --- */}
+        {/* แสดงผลตัวเลขจริงจาก Firebase Firestore */}
         <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 16, color: "var(--t3)", fontSize: 12 }}>
-          <span title="ผู้เข้าชม"><i className="ti ti-eye" style={{ marginRight: 4 }}></i>{mockViews.toLocaleString()}</span>
-          <span title="ดาวน์โหลด"><i className="ti ti-download" style={{ marginRight: 4 }}></i>{mockDownloads.toLocaleString()}</span>
+          <span title="ผู้เข้าชม"><i className="ti ti-eye" style={{ marginRight: 4 }}></i>{(displayItem.views || 0).toLocaleString()}</span>
+          <span title="ดาวน์โหลด"><i className="ti ti-download" style={{ marginRight: 4 }}></i>{(displayItem.downloads || 0).toLocaleString()}</span>
           <span title="ปีที่พิมพ์"><i className="ti ti-calendar" style={{ marginRight: 4 }}></i>ปี {displayItem.year}</span>
         </div>
       </div>
@@ -119,6 +148,7 @@ export default function LibraryDetail({ item, go }) {
             target="_blank" 
             rel="noreferrer" 
             className="btn btn-teal" 
+            onClick={handleDownloadClick} // บันทึกยอดดาวน์โหลดเมื่อถูกคลิก
             style={{ flex: 1, minWidth: 160, textAlign: "center", textDecoration: "none", pointerEvents: displayItem.fileUrl ? "auto" : "none", opacity: displayItem.fileUrl ? 1 : 0.5 }}
           >
             <i className="ti ti-download" style={{ marginRight: 6 }}></i>ดาวน์โหลดไฟล์
