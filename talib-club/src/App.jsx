@@ -25,9 +25,7 @@ export default function App() {
   const [page, setPage] = useState("home")
   const [ctx, setCtx] = useState(null)
 
-  // อ่าน URL ตอนโหลดหน้าครั้งแรก
-useEffect(() => {
-  const path = window.location.pathname.replace("/", "")
+  // Mapping เส้นทาง URL กับชื่อหน้า
   const urlToPage = {
     "": "home",
     "articles": "articles",
@@ -42,23 +40,52 @@ useEffect(() => {
     "staff-translation": "staff-translation",
     "admin": "admin",
   }
-  const mapped = urlToPage[path]
-  if (mapped) setPage(mapped)
-}, [])
+
+  // จัดการการเปลี่ยนหน้าเมื่อกดปุ่ม Back / Forward บนเบราว์เซอร์
+  useEffect(() => {
+    const handlePopstate = (event) => {
+      // ถ้ามี State ที่เราบันทึกไว้ใน History (จากฟังก์ชัน go) ให้ดึงมาแสดงได้เลย
+      if (event && event.state && event.state.page) {
+        setPage(event.state.page)
+        setCtx(event.state.ctx || null)
+      } else {
+        // ถ้าไม่มี ให้อ่านจาก URL แทน
+        const path = window.location.pathname.replace(/^\//, "") // ลบ / ออกจากด้านหน้า
+        const mapped = urlToPage[path] || "home"
+        setPage(mapped)
+        setCtx(null)
+      }
+    }
+
+    // เซ็ต State เริ่มต้นตอนโหลดหน้าเว็บครั้งแรก เพื่อให้ปุ่ม Back ทำงานได้สมบูรณ์
+    const initialPath = window.location.pathname.replace(/^\//, "")
+    const initialPage = urlToPage[initialPath] || "home"
+    window.history.replaceState({ page: initialPage, ctx: null }, "", window.location.pathname)
+    setPage(initialPage)
+
+    // รับฟัง Event เมื่อผู้ใช้กดปุ่ม Back/Forward
+    window.addEventListener("popstate", handlePopstate)
+    
+    // คืนค่า Event กลับเมื่อ Component ถูก Unmount
+    return () => window.removeEventListener("popstate", handlePopstate)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const go = (p, data = null) => {
     setPage(p)
     setCtx(data)
     window.scrollTo({ top: 0, behavior: "smooth" })
     
-    // --- ระบบเปลี่ยน URL อัตโนมัติโดยไม่โหลดหน้าใหม่ ---
+    // --- ระบบเปลี่ยน URL อัตโนมัติและบันทึก History ---
     let urlPath = "/";
     if (p === "tracking") {
       urlPath = "/tracking-system"; // ถ้าเป็นหน้าตรวจพัสดุ
     } else if (p !== "home") {
       urlPath = "/" + p; // หน้าอื่นๆ เช่น /articles, /library
     }
-    window.history.pushState({}, "", urlPath);
+    
+    // บันทึกหน้าปัจจุบันลงใน History พร้อมข้อมูล Context
+    window.history.pushState({ page: p, ctx: data }, "", urlPath);
   }
 
   return (
