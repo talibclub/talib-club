@@ -1,5 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap');
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;max-width:100%}
 
 .app.dark{
   --bg:#0a0a0d;--bg2:rgba(255,255,255,0.04);--bg3:rgba(255,255,255,0.07);
@@ -7,7 +7,7 @@
   --acc:#e8e0d0;--acc2:rgba(232,224,208,0.07);--acc-br:rgba(232,224,208,0.15);
   --br:rgba(255,255,255,0.07);--br2:rgba(255,255,255,0.04);
   --card:rgba(255,255,255,0.03);--teal:#2dbea0;--teal-bg:rgba(45,190,160,0.08);
-  --logo-bg:#f0ede8; --logo-c:#f0ede8; /* <-- แก้ตรงนี้ */
+  --logo-bg:#f0ede8; --logo-c:#f0ede8;
   --nav-bg:rgba(10,10,13,0.92);
 }
 .app.light{
@@ -20,16 +20,17 @@
   --nav-bg:rgba(247,245,241,0.92);
 }
 
-body{background:var(--bg);color:var(--text);font-family:'Prompt',sans-serif;transition:background .3s,color .3s}
+body{background:var(--bg);color:var(--text);font-family:'Prompt',sans-serif;transition:background .3s,color .3s; overflow-x:hidden;}
 .app{min-height:100vh;background:var(--bg)}
 
-/* Main content — เว้น bottom bar บน mobile */
+/* Main content */
 main{
   max-width:1100px;margin:0 auto;
   padding:36px 24px 100px;
 }
 
 /* Typography */
+h1, h2, h3, p, span, div { overflow-wrap: break-word; word-wrap: break-word; }
 h1{font-size:34px;font-weight:600;line-height:1.2;color:var(--text)}
 h2{font-size:20px;font-weight:500}
 h3{font-size:15px;font-weight:500}
@@ -47,8 +48,8 @@ p{font-size:14px;line-height:1.8;color:var(--t2);font-weight:300}
 .btn-main{background:var(--acc);color:var(--bg)}
 .btn-teal{background:var(--teal);color:#fff}
 .btn-outline{background:transparent;color:var(--t2);border:.5px solid var(--br);font-weight:300}
-.card{background:var(--card);border:.5px solid var(--br2);border-radius:12px;transition:border-color .2s}
-.card:hover{border-color:var(--acc-br)}
+.card{background:var(--card);border:.5px solid var(--br2);border-radius:16px;box-shadow: 0 4px 16px rgba(0,0,0,0.03);transition:border-color .2s, box-shadow .2s; min-width:0;}
+.card:hover{border-color:var(--acc-br);box-shadow: 0 6px 20px rgba(0,0,0,0.05);}
 .divider{height:.5px;background:var(--br2);margin:28px 0}
 .tag{font-size:10px;font-weight:400;padding:2px 8px;border-radius:4px;display:inline-block}
 .tag-teal{background:var(--teal-bg);color:var(--teal)}
@@ -66,7 +67,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--acc-br)}
 .reader-control{display:inline-flex;gap:4px;padding:3px;border:.5px solid var(--br);border-radius:24px;background:var(--card)}
 .reader-btn{min-width:38px;border:none;border-radius:20px;background:transparent;color:var(--t2);font-family:'Prompt',sans-serif;font-size:12px;font-weight:400;padding:5px 10px;cursor:pointer}
 .reader-btn.on{background:var(--teal);color:#fff}
-.article-excerpt{background:var(--teal-bg);border:.5px solid rgba(15,110,86,.22);border-radius:10px;padding:15px 18px;margin-bottom:30px}
+.article-excerpt{background:var(--teal-bg);border:.5px solid rgba(15,110,86,.22);border-radius:12px;padding:15px 18px;margin-bottom:30px}
 .article-excerpt p{color:var(--teal);font-weight:500;font-size:13px;line-height:1.75}
 .article-body{font-size:16px;line-height:2;color:#3f3a34;font-weight:400}
 .article-body p{margin-bottom:22px;color:inherit;font-size:inherit;font-weight:inherit;line-height:inherit}
@@ -127,7 +128,6 @@ button.dashboard-card{cursor:pointer}
 .dashboard-card h2{margin-top:14px}
 .dashboard-card p{margin-top:8px}
 .staff-banner{margin-top:18px;padding:18px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
-/* แก้ไขบรรทัดนี้ ให้ profile ตรงกลางจอ (เปลี่ยนจาก justify-content:start เป็น center) */
 .profile-layout{display:grid;grid-template-columns:minmax(320px,720px);justify-content:center;gap:14px}
 
 .profile-card{padding:24px}
@@ -204,7 +204,7 @@ button.dashboard-card{cursor:pointer}
 .staff-mag-card em{display:inline-block;margin-top:10px;font-size:11px;color:var(--teal);font-style:normal}
 .staff-mag-card.current{border-color:var(--acc-br)}
 .staff-mag-card.mine{background:var(--teal-bg);border-color:rgba(15,110,86,.18)}
-.staff-profile-card{padding:28px;text-align:center;max-width:640px;margin:0 auto;} /* เพิ่ม margin ให้ตรงกลาง */
+.staff-profile-card{padding:28px;text-align:center;max-width:640px;margin:0 auto;} 
 .staff-profile-card .profile-avatar{margin:0 auto 12px}
 .staff-tool-grid{grid-template-columns:repeat(auto-fit,minmax(280px,520px))}
 .translation-page{max-width:1120px;margin:0 auto}
@@ -219,34 +219,25 @@ button.dashboard-card{cursor:pointer}
 .spin{animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-/* ─── MOBILE ─── */
+/* ─── MOBILE (ปรับปรุงพื้นที่และความกว้าง) ─── */
 @media(max-width:767px){
-  main{padding:20px 16px 90px}
+  main{padding:24px 20px 100px} /* เพิ่มช่องว่างด้านข้างให้โปร่งขึ้น */
   h1{font-size:24px}
   h2{font-size:17px}
-  p{font-size:13px}
+  p{font-size:14px;line-height:1.6} /* ปรับระยะบรรทัดเพื่อให้อ่านง่าย */
 
-  /* grids → 1 column on mobile */
-  .grid2{grid-template-columns:1fr}
-  .grid3{grid-template-columns:1fr}
-  .grid4{grid-template-columns:1fr 1fr}
-  .grid-art{grid-template-columns:1fr}
-  .grid-auto{grid-template-columns:1fr}
+  /* บังคับ Grid เป็น 1 คอลัมน์บนมือถือ */
+  .grid2, .grid3, .grid4, .grid-art, .grid-auto{grid-template-columns:1fr !important; gap:16px;}
+  
+  /* ปรับการ์ดบนมือถือให้สวยขึ้น */
+  .card { border-radius: 12px; padding: 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.04); }
 
-  /* hero adjustments */
   .hero-stat{display:none}
   .hero-actions{flex-wrap:wrap}
   .hero-actions .btn{flex:1;min-width:120px;text-align:center;justify-content:center}
-
-  /* ayah block */
   .ayah-block{padding:14px 16px !important}
   .ayah-block .ayah-ar{font-size:16px !important}
-
-  /* section header */
   .sec-hd{margin-bottom:12px}
-
-  /* cards */
-  .card{border-radius:10px}
 
   .auth-page{margin:18px auto}
   .auth-card{padding:20px}
@@ -263,14 +254,14 @@ button.dashboard-card{cursor:pointer}
   .profile-row div{text-align:left;margin-top:4px}
   .copy-btn{margin-left:0}
   .article-page{max-width:100%}
-  .article-title{font-size:26px;line-height:1.34}
+  .article-title{font-size:24px;line-height:1.4}
   .reader-tools{display:grid;grid-template-columns:1fr;gap:8px;margin-top:-8px}
   .reader-control{width:100%;justify-content:center}
   .reader-btn{flex:1}
   .reader-size-sm{font-size:14px}
   .reader-size-md{font-size:15.5px}
   .reader-size-lg{font-size:17.5px}
-  .article-body{line-height:1.95}
+  .article-body{line-height:1.8}
   .staff-work-head{grid-template-columns:1fr}
   .staff-stat-grid{grid-template-columns:1fr 1fr}
   .staff-section-head{display:block}
@@ -282,41 +273,32 @@ button.dashboard-card{cursor:pointer}
   .translation-row{grid-template-columns:1fr;padding:14px}
   .translation-head{display:none}
 
-  /* hide non-essential on mobile */
   .hide-mobile{display:none !important}
   .show-mobile{display:block !important}
 }
 
 /* ─── TABLET ─── */
 @media(min-width:768px) and (max-width:1024px){
-  main{padding:28px 20px 80px}
+  main{padding:28px 24px 90px}
   .grid4{grid-template-columns:repeat(2,1fr)}
   .grid-art{grid-template-columns:1fr 1fr}
   .grid3{grid-template-columns:1fr 1fr}
 }
 
 /* ─── DESKTOP ─── */
-/* ─── อัปเกรดขนาดฟอนต์เฉพาะบน Desktop (จอคอมพิวเตอร์) ─── */
 @media(min-width: 1025px) {
-  /* ข้อความทั่วไป */
-  p { font-size: 16px; line-height: 1.85; }
+  p { font-size: 15px; line-height: 1.8; }
+  h1 { font-size: 38px; }
+  h2 { font-size: 22px; }
+  h3 { font-size: 16px; }
+  .btn { font-size: 14px; padding: 10px 22px; }
+  .sec-title { font-size: 17px; }
+  .staff-task-card h3, .translation-row a { font-size: 15px; }
+  .staff-task-card p, .translation-row small { font-size: 13px; }
+  nav a, .nav-links a { font-size: 15px; }
   
-  /* หัวข้อ */
-  h1 { font-size: 44px; }
-  h2 { font-size: 24px; }
-  h3 { font-size: 18px; }
-  
-  /* ปุ่มและข้อความหัวข้อตาม Section */
-  .btn { font-size: 15px; padding: 10px 24px; }
-  .sec-title { font-size: 18px; }
-  
-  /* ข้อมูลในตารางหรือการ์ด */
-  .staff-task-card h3, .translation-row a { font-size: 16px; }
-  .staff-task-card p, .translation-row small { font-size: 14px; }
-  
-  /* ขนาดเมนูนำทาง (อิงจากโค้ดทั่วไป) */
-  nav a, .nav-links a { font-size: 16px; }
+  /* จัด Grid หน้าจอใหญ่ให้มี Space โปร่งขึ้น */
+  .grid-auto { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
 }
 
-/* Utility */
 .show-mobile{display:none}
