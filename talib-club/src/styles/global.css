@@ -296,8 +296,26 @@ button.dashboard-card{cursor:pointer}
 }
 
 /* ─── DESKTOP ─── */
-@media(min-width:1025px){
-  main{padding:36px 24px 80px}
+/* ─── อัปเกรดขนาดฟอนต์เฉพาะบน Desktop (จอคอมพิวเตอร์) ─── */
+@media(min-width: 1025px) {
+  /* ข้อความทั่วไป */
+  p { font-size: 16px; line-height: 1.85; }
+  
+  /* หัวข้อ */
+  h1 { font-size: 44px; }
+  h2 { font-size: 24px; }
+  h3 { font-size: 18px; }
+  
+  /* ปุ่มและข้อความหัวข้อตาม Section */
+  .btn { font-size: 15px; padding: 10px 24px; }
+  .sec-title { font-size: 18px; }
+  
+  /* ข้อมูลในตารางหรือการ์ด */
+  .staff-task-card h3, .translation-row a { font-size: 16px; }
+  .staff-task-card p, .translation-row small { font-size: 14px; }
+  
+  /* ขนาดเมนูนำทาง (อิงจากโค้ดทั่วไป) */
+  nav a, .nav-links a { font-size: 16px; }
 }
 
 /* Utility */
