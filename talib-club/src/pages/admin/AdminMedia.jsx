@@ -20,6 +20,7 @@ export default function AdminMedia() {
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   
   const [editing, setEdit] = useState(null)
+  
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState("all") 
   const [playlistFilter, setPlaylistFilter] = useState("all") 
@@ -28,7 +29,6 @@ export default function AdminMedia() {
   const [selected, setSelected] = useState([]) 
   const [busy, setBusy] = useState(false)
 
-  // Pagination States
   const [page, setPage] = useState(1)
   const ITEMS_PER_PAGE = 20
 
@@ -65,6 +65,11 @@ export default function AdminMedia() {
   function openNew() {
     const defaultType = taxonomy.mediaTypes?.[0] || "youtube"
     setEdit({ ...EMPTY, type: defaultType, id: crypto.randomUUID() })
+  }
+
+  // --- ฟังก์ชันที่หายไป เติมกลับมาให้แล้วครับ ---
+  function openEdit(mediaItem) {
+    setEdit({ ...mediaItem })
   }
 
   async function save() {
@@ -210,24 +215,17 @@ export default function AdminMedia() {
         {filtered.length === 0 && <div className="empty">ไม่พบข้อมูลที่ตรงกับเงื่อนไข</div>}
       </div>
 
-      {/* Pagination Controls */}
       {totalPages > 1 && (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 32, flexWrap: "wrap" }}>
           <button className="btn btn-outline" disabled={page === 1} onClick={() => { setPage(page - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ padding: "6px 12px", fontSize: 12 }}>ก่อนหน้า</button>
-          
           {Array.from({ length: totalPages }).map((_, i) => {
             const p = i + 1;
             if (p === 1 || p === totalPages || (p >= page - 1 && p <= page + 1)) {
-              return (
-                <button key={p} onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className={page === p ? "btn btn-teal" : "btn btn-outline"} style={{ padding: "6px 14px", fontSize: 12 }}>{p}</button>
-              )
+              return <button key={p} onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className={page === p ? "btn btn-teal" : "btn btn-outline"} style={{ padding: "6px 14px", fontSize: 12 }}>{p}</button>
             }
-            if (p === page - 2 || p === page + 2) {
-              return <span key={p} style={{ color: "var(--t3)", padding: "0 4px" }}>...</span>
-            }
+            if (p === page - 2 || p === page + 2) return <span key={p} style={{ color: "var(--t3)", padding: "0 4px" }}>...</span>
             return null;
           })}
-          
           <button className="btn btn-outline" disabled={page === totalPages} onClick={() => { setPage(page + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ padding: "6px 12px", fontSize: 12 }}>ถัดไป</button>
         </div>
       )}
@@ -237,7 +235,6 @@ export default function AdminMedia() {
 
 function MediaForm({ item, setItem, onSave, onCancel, taxonomy, existingPlaylists, busy }) {
   const set = (key, value) => setItem(prev => ({ ...prev, [key]: value }))
-  
   const [isNewPlaylist, setIsNewPlaylist] = useState(false)
 
   const handleFetchDuration = () => {
@@ -262,35 +259,19 @@ function MediaForm({ item, setItem, onSave, onCancel, taxonomy, existingPlaylist
             {(taxonomy.mediaTypes || []).map(type => <option key={type} value={type}>{type === "youtube" ? "YouTube" : "Spotify"}</option>)}
           </select>
         </Field>
+        <Field label="จากช่อง"><input value={item.channel || ""} onChange={e => set("channel", e.target.value)} placeholder="เช่น Talib Club" /></Field>
         
-        <Field label="จากช่อง">
-          <input value={item.channel || ""} onChange={e => set("channel", e.target.value)} placeholder="เช่น Talib Club" />
-        </Field>
-
         <Field label="เพลย์ลิสต์" span>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             {isNewPlaylist ? (
-               <input 
-                 value={item.series || ""} 
-                 onChange={e => set("series", e.target.value)} 
-                 placeholder="พิมพ์ชื่อเพลย์ลิสต์ใหม่ (และอย่าลืมไปตั้งค่าเพิ่มในเมนูหมวดตัวเลือกด้วยนะครับ)..." 
-                 style={{ flex: 1 }} 
-               />
+               <input value={item.series || ""} onChange={e => set("series", e.target.value)} placeholder="พิมพ์ชื่อเพลย์ลิสต์ใหม่ (และอย่าลืมไปตั้งค่าเพิ่มในเมนูหมวดตัวเลือกด้วยนะครับ)..." style={{ flex: 1 }} />
             ) : (
-               <select 
-                 value={item.series || ""} 
-                 onChange={e => set("series", e.target.value)} 
-                 style={{ flex: 1 }}
-               >
+               <select value={item.series || ""} onChange={e => set("series", e.target.value)} style={{ flex: 1 }}>
                  <option value="">-- ไม่จัดลงเพลย์ลิสต์ --</option>
                  {existingPlaylists.map(pl => <option key={pl} value={pl}>{pl}</option>)}
                </select>
             )}
-            <button 
-              className="btn btn-outline" 
-              onClick={() => { setIsNewPlaylist(!isNewPlaylist); set("series", ""); }}
-              style={{ fontSize: 11, padding: "8px 12px", whiteSpace: "nowrap" }}
-            >
+            <button className="btn btn-outline" onClick={() => { setIsNewPlaylist(!isNewPlaylist); set("series", ""); }} style={{ fontSize: 11, padding: "8px 12px", whiteSpace: "nowrap" }}>
               {isNewPlaylist ? "เลือกที่มีอยู่" : "+ สร้างพิมพ์เอง"}
             </button>
           </div>
@@ -300,32 +281,20 @@ function MediaForm({ item, setItem, onSave, onCancel, taxonomy, existingPlaylist
           <Field label="YouTube Video ID (ตัวอักษร 11 ตัวท้าย URL)" span>
             <div style={{ display: "flex", gap: 10 }}>
               <input value={item.embedId || ""} onChange={e => set("embedId", e.target.value)} placeholder="เช่น dQw4w9WgXcQ" style={{ flex: 1 }} />
-              <button className="btn btn-teal" onClick={handleFetchDuration} style={{ fontSize: 12, padding: "0 14px", whiteSpace: "nowrap" }}>
-                <i className="ti ti-download" style={{ marginRight: 4 }}></i>ดึงความยาว
-              </button>
+              <button className="btn btn-teal" onClick={handleFetchDuration} style={{ fontSize: 12, padding: "0 14px", whiteSpace: "nowrap" }}><i className="ti ti-download" style={{ marginRight: 4 }}></i>ดึงความยาว</button>
             </div>
             {item.duration && <div style={{ fontSize: 11, color: "var(--teal)", marginTop: 6 }}>ความยาวที่ดึงมาได้: {item.duration} นาที</div>}
           </Field>
         )}
 
-        {item.type === "spotify" && (
-          <Field label="Spotify URL" span>
-            <input value={item.spotifyUrl || ""} onChange={e => set("spotifyUrl", e.target.value)} placeholder="https://open.spotify.com/episode/..." />
-          </Field>
-        )}
-
+        {item.type === "spotify" && <Field label="Spotify URL" span><input value={item.spotifyUrl || ""} onChange={e => set("spotifyUrl", e.target.value)} placeholder="https://open.spotify.com/episode/..." /></Field>}
         <Field label="วันที่เผยแพร่"><input type="date" value={item.date || ""} onChange={e => set("date", e.target.value)} /></Field>
-        
-        <Field label="ลิงก์รูปปก (ใส่เฉพาะถ้าต้องการใช้รูปอื่นแทนของ YouTube)">
-          <input value={item.coverUrl || ""} onChange={e => set("coverUrl", e.target.value)} placeholder="https://..." />
-        </Field>
+        <Field label="ลิงก์รูปปก (ใส่เฉพาะถ้าต้องการใช้รูปอื่นแทนของ YouTube)"><input value={item.coverUrl || ""} onChange={e => set("coverUrl", e.target.value)} placeholder="https://..." /></Field>
       </div>
 
       <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
         <button className="btn btn-outline" onClick={onCancel}>ยกเลิก</button>
-        <button className="btn btn-teal" onClick={onSave} disabled={busy}>
-          <i className={`ti ${busy ? "ti-loader-2 spin" : "ti-check"}`} style={{ marginRight: 6 }}></i>{busy ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
-        </button>
+        <button className="btn btn-teal" onClick={onSave} disabled={busy}><i className={`ti ${busy ? "ti-loader-2 spin" : "ti-check"}`} style={{ marginRight: 6 }}></i>{busy ? "กำลังบันทึก..." : "บันทึกข้อมูล"}</button>
       </div>
     </div>
   )

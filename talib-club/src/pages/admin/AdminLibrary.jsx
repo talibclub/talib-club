@@ -21,7 +21,6 @@ export default function AdminLibrary() {
   
   const [editing, setEdit] = useState(null)
   
-  // States สำหรับค้นหาและตัวกรอง
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState("all") 
   const [categoryFilter, setCategoryFilter] = useState("all") 
@@ -31,7 +30,6 @@ export default function AdminLibrary() {
   const [selected, setSelected] = useState([]) 
   const [busy, setBusy] = useState(false)
 
-  // Pagination States
   const [page, setPage] = useState(1)
   const ITEMS_PER_PAGE = 20
 
@@ -65,6 +63,11 @@ export default function AdminLibrary() {
     const defaultType = taxonomy.bookTypes?.[0] || "วารสาร"
     const defaultSource = taxonomy.bookSources?.[0] || "Talib Club"
     setEdit({ ...EMPTY, type: defaultType, source: defaultSource, id: crypto.randomUUID() })
+  }
+
+  // --- ฟังก์ชันที่หายไป เติมกลับมาให้แล้วครับ ---
+  function openEdit(book) {
+    setEdit({ ...book })
   }
 
   async function save() {
@@ -127,7 +130,6 @@ export default function AdminLibrary() {
         </button>
       </div>
 
-      {/* แถบค้นหา และ ปุ่มกรอง */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: showAdvanced ? 12 : 24 }}>
         <div style={{ flex: "1 1 250px", position: "relative" }}>
           <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
@@ -222,24 +224,17 @@ export default function AdminLibrary() {
         {filtered.length === 0 && <div className="empty">ไม่พบข้อมูลที่ตรงกับเงื่อนไข</div>}
       </div>
 
-      {/* Pagination Controls */}
       {totalPages > 1 && (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 32, flexWrap: "wrap" }}>
           <button className="btn btn-outline" disabled={page === 1} onClick={() => { setPage(page - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ padding: "6px 12px", fontSize: 12 }}>ก่อนหน้า</button>
-          
           {Array.from({ length: totalPages }).map((_, i) => {
             const p = i + 1;
             if (p === 1 || p === totalPages || (p >= page - 1 && p <= page + 1)) {
-              return (
-                <button key={p} onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className={page === p ? "btn btn-teal" : "btn btn-outline"} style={{ padding: "6px 14px", fontSize: 12 }}>{p}</button>
-              )
+              return <button key={p} onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className={page === p ? "btn btn-teal" : "btn btn-outline"} style={{ padding: "6px 14px", fontSize: 12 }}>{p}</button>
             }
-            if (p === page - 2 || p === page + 2) {
-              return <span key={p} style={{ color: "var(--t3)", padding: "0 4px" }}>...</span>
-            }
+            if (p === page - 2 || p === page + 2) return <span key={p} style={{ color: "var(--t3)", padding: "0 4px" }}>...</span>
             return null;
           })}
-          
           <button className="btn btn-outline" disabled={page === totalPages} onClick={() => { setPage(page + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ padding: "6px 12px", fontSize: 12 }}>ถัดไป</button>
         </div>
       )}
