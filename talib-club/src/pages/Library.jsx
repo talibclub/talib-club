@@ -1,21 +1,25 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { BOOKS, DEFAULT_TAXONOMY } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 
-// 💡 1. เพิ่มฟังก์ชันแปลงลิงก์ Google Drive เป็นลิงก์ตรงอัตโนมัติ
-// 💡 ฟังก์ชันแปลงลิงก์ Google Drive (อัปเดตใหม่ ทะลุบล็อก Google 100%)
+// 💡 1. ฟังก์ชันดึงรูปปก (ทะลุบล็อก Google Drive)
 function getDirectUrl(url) {
   if (!url) return "";
-  
-  // ใช้ Regex ดักจับหา ID ของไฟล์จากลิงก์ Google Drive
   const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
   if (match && match[1]) {
-    // เปลี่ยนจาก uc?id=... มาใช้ api thumbnail แทน รับรองว่ารูปขึ้นแน่นอน
-    // sz=w800 คือการตั้งความละเอียดรูปให้คมชัดกำลังดี (กว้าง 800px)
     return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w800`; 
   }
-  
   return url;
+}
+
+// 💡 2. ฟังก์ชันแปลงลิงก์ให้เป็นแบบ "ดาวน์โหลดไฟล์ลงเครื่อง" อัตโนมัติ
+function getDownloadUrl(url) {
+  if (!url) return "";
+  const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) {
+    return `https://drive.google.com/uc?export=download&id=${match[1]}`;
+  }
+  return url; // ถ้าไม่ใช่ Google Drive ก็ใช้ลิงก์เดิม
 }
 
 export default function Library() {
@@ -25,11 +29,26 @@ export default function Library() {
   const [search, setSearch] = useState("")
   const types = ["all", ...(taxonomy.bookTypes || [])]
 
+  // --- ระบบ Pagination ---
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 12 // กำหนดให้แสดงหน้าละ 12 เล่ม
+
+  // ถ้ามีการพิมพ์ค้นหา หรือเปลี่ยนหมวดหมู่ ให้รีเซ็ตกลับไปหน้า 1 เสมอ
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, filter])
+
+  // กรองข้อมูลตามที่เลือก
   const filtered = books.filter(b=>{
     const matchType = filter==="all"||b.type===filter
     const matchSearch = !search||b.title.toLowerCase().includes(search.toLowerCase())||b.desc.includes(search)
     return matchType && matchSearch
   })
+
+  // คำนวณข้อมูลที่จะแสดงในหน้านั้นๆ
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const currentItems = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE)
 
   return (
     <div>
@@ -61,22 +80,23 @@ export default function Library() {
         </div>
       </div>
 
-      {/* BOOKS GRID (แบบมีหน้าปก) */}
+      {/* BOOKS GRID */}
       {filtered.length===0
         ? <div className="empty">ไม่พบรายการที่ตรงกับการค้นหา</div>
         : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))",gap:16}}>
-            {filtered.map(b=>(
+            {/* วนลูปเฉพาะหนังสือในหน้าปัจจุบัน (currentItems) */}
+            {currentItems.map(b=>(
               <div key={b.id} className="card" style={{padding:16,display:"flex",gap:16}}>
                 
                 {/* Left: Cover Image */}
                 <div style={{width: 90, flexShrink: 0}}>
-                 {b.coverUrl ? (
-  <img src={getDirectUrl(b.coverUrl)} alt={b.title} style={{width:"100%", borderRadius:6, objectFit:"cover", aspectRatio:"3/4", border:".5px solid var(--br2)", boxShadow:"0 4px 6px rgba(0,0,0,0.05)"}} />
-) : (
-  <div style={{width:"100%", aspectRatio:"3/4", borderRadius:6, background:"var(--acc2)", display:"flex", alignItems:"center", justifyContent:"center", border:".5px solid var(--br2)"}}>
-    <i className={`ti ${b.type==="วารสาร"?"ti-news":b.type==="PDF"?"ti-file-text":"ti-book"}`} style={{fontSize:24, color:"var(--acc)"}}></i>
-  </div>
-)}
+                  {b.coverUrl ? (
+                    <img src={getDirectUrl(b.coverUrl)} alt={b.title} style={{width:"100%", borderRadius:6, objectFit:"cover", aspectRatio:"3/4", border:".5px solid var(--br2)", boxShadow:"0 4px 6px rgba(0,0,0,0.05)"}} />
+                  ) : (
+                    <div style={{width:"100%", aspectRatio:"3/4", borderRadius:6, background:"var(--acc2)", display:"flex", alignItems:"center", justifyContent:"center", border:".5px solid var(--br2)"}}>
+                      <i className={`ti ${b.type==="วารสาร"?"ti-news":b.type==="PDF"?"ti-file-text":"ti-book"}`} style={{fontSize:24, color:"var(--acc)"}}></i>
+                    </div>
+                  )}
                 </div>
 
                 {/* Right: Info & Actions */}
@@ -92,11 +112,13 @@ export default function Library() {
                   
                   {/* Actions */}
                   <div style={{marginTop:"auto", display:"flex", gap:8}}>
-                    <a className="btn btn-teal" href={b.fileUrl || "#"} target="_blank" rel="noopener noreferrer"
+                    {/* ปุ่มดาวน์โหลด: ใช้ getDownloadUrl เพื่อบังคับโหลดไฟล์ */}
+                    <a className="btn btn-teal" href={getDownloadUrl(b.fileUrl)} target="_blank" rel="noopener noreferrer"
                       style={{flex:1,fontSize:11,padding:"6px 0",textDecoration:"none",textAlign:"center",
                         pointerEvents:b.fileUrl?"auto":"none",opacity:b.fileUrl?1:.55}}>
                       <i className="ti ti-download" style={{marginRight:4,fontSize:12}}></i>โหลด
                     </a>
+                    {/* ปุ่มดู: ใช้ลิงก์เดิมเพื่อเปิดดูในหน้าใหม่ */}
                     <a className="btn btn-outline" href={b.fileUrl || "#"} target="_blank" rel="noopener noreferrer"
                       style={{fontSize:11,padding:"6px 10px",textDecoration:"none",
                         pointerEvents:b.fileUrl?"auto":"none",opacity:b.fileUrl?1:.55}}>
@@ -109,6 +131,43 @@ export default function Library() {
             ))}
           </div>
       }
+
+      {/* PAGINATION CONTROLS */}
+      {totalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, marginTop: 32 }}>
+          {/* ปุ่มย้อนกลับ */}
+          <button 
+            onClick={() => { setCurrentPage(prev => Math.max(prev - 1, 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            disabled={currentPage === 1}
+            className="btn btn-outline"
+            style={{ padding: "6px 12px", opacity: currentPage === 1 ? 0.4 : 1, cursor: currentPage === 1 ? "not-allowed" : "pointer" }}
+          >
+            <i className="ti ti-chevron-left" style={{ fontSize: 14 }}></i>
+          </button>
+          
+          {/* หมายเลขหน้า */}
+          {Array.from({ length: totalPages }).map((_, i) => (
+            <button 
+              key={i} 
+              onClick={() => { setCurrentPage(i + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              className={currentPage === i + 1 ? "btn btn-teal" : "btn btn-outline"} 
+              style={{ padding: "6px 14px", fontSize: 12, minWidth: 32 }}
+            >
+              {i + 1}
+            </button>
+          ))}
+
+          {/* ปุ่มหน้าถัดไป */}
+          <button 
+            onClick={() => { setCurrentPage(prev => Math.min(prev + 1, totalPages)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            disabled={currentPage === totalPages}
+            className="btn btn-outline"
+            style={{ padding: "6px 12px", opacity: currentPage === totalPages ? 0.4 : 1, cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}
+          >
+            <i className="ti ti-chevron-right" style={{ fontSize: 14 }}></i>
+          </button>
+        </div>
+      )}
 
       {/* DONATE */}
       <div style={{marginTop:40,padding:"20px 24px",background:"var(--acc2)",
