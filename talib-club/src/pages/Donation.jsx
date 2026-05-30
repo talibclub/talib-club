@@ -1,8 +1,12 @@
 import React from "react"
 import { toast } from "react-hot-toast"
-import { SITE } from "../data/index.js" // <-- เพิ่มบรรทัดนี้เข้ามา
+import { SITE } from "../data/index.js"
+import { useSiteSettings } from "../lib/contentStore.js"
 
 export default function Donation() {
+  // ดึงข้อมูลการตั้งค่าเว็บล่าสุดจากฐานข้อมูล
+  const { site } = useSiteSettings(SITE)
+
   // ข้อมูลบัญชีธนาคารจากโปสเตอร์
   const bankAccounts = [
     {
@@ -12,7 +16,7 @@ export default function Donation() {
       accountNumber: "704-287501-5",
       tag: "สมทบทุน",
       logo: "/scb-logo.png",
-      qrImage: "/scb-qr.png" // ใส่รูปภาพ QR Code ไว้ในโฟลเดอร์ public
+      qrImage: "/scb-qr.png"
     }
   ]
 
@@ -138,32 +142,32 @@ export default function Donation() {
             </h3>
             <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 20, color: "#334155" }}>
               
-              {SITE?.social?.facebook && (
-                <a href={SITE.social.facebook} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#1877F2"} onMouseOut={(e) => e.target.style.color = "inherit"}>
+              {site?.social?.facebook && (
+                <a href={site.social.facebook} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#1877F2"} onMouseOut={(e) => e.target.style.color = "inherit"}>
                   <i className="ti ti-brand-facebook"></i>
                 </a>
               )}
               
-              {SITE?.social?.instagram && (
-                <a href={SITE.social.instagram} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#E4405F"} onMouseOut={(e) => e.target.style.color = "inherit"}>
+              {site?.social?.instagram && (
+                <a href={site.social.instagram} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#E4405F"} onMouseOut={(e) => e.target.style.color = "inherit"}>
                   <i className="ti ti-brand-instagram"></i>
                 </a>
               )}
               
-              {SITE?.social?.tiktok && (
-                <a href={SITE.social.tiktok} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#000000"} onMouseOut={(e) => e.target.style.color = "inherit"}>
+              {site?.social?.tiktok && (
+                <a href={site.social.tiktok} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#000000"} onMouseOut={(e) => e.target.style.color = "inherit"}>
                   <i className="ti ti-brand-tiktok"></i>
                 </a>
               )}
               
-              {SITE?.social?.youtube && (
-                <a href={SITE.social.youtube} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#FF0000"} onMouseOut={(e) => e.target.style.color = "inherit"}>
+              {site?.social?.youtube && (
+                <a href={site.social.youtube} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#FF0000"} onMouseOut={(e) => e.target.style.color = "inherit"}>
                   <i className="ti ti-brand-youtube"></i>
                 </a>
               )}
               
-              {SITE?.social?.spotify && (
-                <a href={SITE.social.spotify} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#1DB954"} onMouseOut={(e) => e.target.style.color = "inherit"}>
+              {site?.social?.spotify && (
+                <a href={site.social.spotify} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#1DB954"} onMouseOut={(e) => e.target.style.color = "inherit"}>
                   <i className="ti ti-brand-spotify"></i>
                 </a>
               )}
@@ -171,6 +175,10 @@ export default function Donation() {
               <span style={{ fontSize: 16, fontWeight: "bold", marginLeft: 4, color: "#1f2937" }}>Talib Club</span>
             </div>
           </div>
+        </div>
+
+      </div>
+    </div>
   )
 }
 
