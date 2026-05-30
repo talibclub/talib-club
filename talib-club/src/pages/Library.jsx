@@ -2,6 +2,17 @@ import { useState } from "react"
 import { BOOKS, DEFAULT_TAXONOMY } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 
+// 💡 1. เพิ่มฟังก์ชันแปลงลิงก์ Google Drive เป็นลิงก์ตรงอัตโนมัติ
+function getDirectUrl(url) {
+  if (!url) return "";
+  // ใช้ Regex ดักจับหา ID ของไฟล์จากลิงก์ Google Drive
+  const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) {
+    return `https://drive.google.com/uc?id=${match[1]}`; // แปลงเป็นลิงก์สำหรับโชว์รูป
+  }
+  return url; // ถ้าไม่ใช่ลิงก์ Google Drive ก็คืนค่าเดิมกลับไป
+}
+
 export default function Library() {
   const { items: books, loading } = useContentCollection("books", BOOKS)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
@@ -55,7 +66,8 @@ export default function Library() {
                 {/* Left: Cover Image */}
                 <div style={{width: 90, flexShrink: 0}}>
                   {b.coverUrl ? (
-                    <img src={b.coverUrl} alt={b.title} style={{width:"100%", borderRadius:6, objectFit:"cover", aspectRatio:"3/4", border:".5px solid var(--br2)", boxShadow:"0 4px 6px rgba(0,0,0,0.05)"}} />
+                    {/* 💡 2. เรียกใช้ฟังก์ชัน getDirectUrl ตรง src ของรูปภาพ */}
+                    <img src={getDirectUrl(b.coverUrl)} alt={b.title} style={{width:"100%", borderRadius:6, objectFit:"cover", aspectRatio:"3/4", border:".5px solid var(--br2)", boxShadow:"0 4px 6px rgba(0,0,0,0.05)"}} />
                   ) : (
                     <div style={{width:"100%", aspectRatio:"3/4", borderRadius:6, background:"var(--acc2)", display:"flex", alignItems:"center", justifyContent:"center", border:".5px solid var(--br2)"}}>
                       <i className={`ti ${b.type==="วารสาร"?"ti-news":b.type==="PDF"?"ti-file-text":"ti-book"}`} style={{fontSize:24, color:"var(--acc)"}}></i>

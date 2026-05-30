@@ -86,7 +86,16 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
             </button>
           )}
           <div style={{ fontWeight: 600, cursor: "pointer", fontSize: 16 }} onClick={() => nav("home")}>
-            {SITE.name}
+            <span style={{ 
+  fontFamily: '"Times New Roman", Times, serif', 
+  color: "var(--logo-c)", 
+  fontSize: "24px",                              
+  fontWeight: "bold",                            
+  letterSpacing: "1px",                          
+  textTransform: "uppercase"                     
+}}>
+  Talib
+</span>
           </div>
         </div>
 
