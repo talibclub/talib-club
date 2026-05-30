@@ -25,13 +25,10 @@ function getPreviewUrl(url) {
 }
 
 export default function LibraryDetail({ item, go }) {
-  // ดึงข้อมูลหนังสือทั้งหมดมาก่อน เพื่อเอาไว้เปรียบเทียบหาจาก URL ID
   const { items: books, loading } = useContentCollection("books", BOOKS)
   
-  // หา ID จาก URL ในกรณีที่คนเข้าผ่านลิงก์ที่ถูกแชร์มา
   const urlId = new URLSearchParams(window.location.search).get("id")
 
-  // เลือกแสดงผล: ถ้าเข้ามาจากการกดที่หน้าเว็บตรงๆ ใช้ `item` ถ้าเข้าผ่านลิงก์ ให้ค้นหาจาก `urlId`
   const displayItem = useMemo(() => {
     if (item) return item;
     if (urlId && books.length > 0) return books.find(b => String(b.id) === String(urlId));
@@ -39,18 +36,20 @@ export default function LibraryDetail({ item, go }) {
   }, [item, urlId, books])
 
   useEffect(() => {
-    // ถ้าระบบโหลดเสร็จแล้ว แต่ยังหาหนังสือเล่มนี้ไม่เจอ ให้เด้งกลับหน้าห้องสมุด
     if (!loading && !displayItem) {
       go("library")
     }
   }, [displayItem, loading, go])
+
+  // --- นำตัวเลขสุ่มกลับมาให้แล้วครับ (ล็อคค่าไว้ไม่ให้เปลี่ยนไปมาตอนเลื่อนจอ) ---
+  const mockViews = useMemo(() => Math.floor(Math.random() * 3000) + 500, [])
+  const mockDownloads = useMemo(() => Math.floor(mockViews * 0.4), [mockViews])
 
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href)
     toast.success("คัดลอกลิงก์เรียบร้อยแล้ว นำไปแชร์ให้เพื่อนได้เลย!")
   }
 
-  // หน้าจอตอนกำลังค้นหาข้อมูลจากลิงก์
   if (loading && !displayItem) {
     return (
       <div style={{ textAlign: "center", padding: "100px 20px" }}>
@@ -74,8 +73,12 @@ export default function LibraryDetail({ item, go }) {
 
       <div style={{ textAlign: "center", marginBottom: 32 }}>
         <h1 style={{ fontSize: 28, marginBottom: 16, lineHeight: 1.4, wordBreak: "break-word" }}>{displayItem.title}</h1>
+        
+        {/* --- ส่วนแสดงสถิติและปีพิมพ์ --- */}
         <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 16, color: "var(--t3)", fontSize: 12 }}>
-          <span title="ปีที่พิมพ์"><i className="ti ti-calendar" style={{ marginRight: 4 }}></i>พิมพ์ปี {displayItem.year}</span>
+          <span title="ผู้เข้าชม"><i className="ti ti-eye" style={{ marginRight: 4 }}></i>{mockViews.toLocaleString()}</span>
+          <span title="ดาวน์โหลด"><i className="ti ti-download" style={{ marginRight: 4 }}></i>{mockDownloads.toLocaleString()}</span>
+          <span title="ปีที่พิมพ์"><i className="ti ti-calendar" style={{ marginRight: 4 }}></i>ปี {displayItem.year}</span>
         </div>
       </div>
 
