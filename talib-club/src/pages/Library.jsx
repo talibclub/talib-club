@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { BOOKS, DEFAULT_TAXONOMY } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
- 
+
 // 💡 1. ฟังก์ชันดึงรูปปก (ทะลุบล็อก Google Drive)
 function getDirectUrl(url) {
   if (!url) return ""
@@ -11,7 +11,7 @@ function getDirectUrl(url) {
   }
   return url
 }
- 
+
 // 💡 2. ฟังก์ชันแปลงลิงก์ให้เป็นแบบ "ดาวน์โหลดไฟล์ลงเครื่อง" อัตโนมัติ
 function getDownloadUrl(url) {
   if (!url) return ""
@@ -21,41 +21,41 @@ function getDownloadUrl(url) {
   }
   return url
 }
- 
+
 export default function Library() {
   const { items: books, loading } = useContentCollection("books", BOOKS)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
- 
+
   const [filter, setFilter] = useState("all")
   const [search, setSearch] = useState("")
- 
+
   // --- State สำหรับตัวกรองขั้นสูง ---
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [sourceFilter, setSourceFilter] = useState("all")
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
- 
+
   // --- ระบบ Pagination ---
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 12
- 
+
   const types = ["all", ...(taxonomy.bookTypes || [])]
- 
+
   // สกัดรายชื่อ หมวดหมู่ และ แหล่งที่มา ทั้งหมดจากหนังสือที่มีอยู่
   const availableCategories = useMemo(() => {
     const cats = new Set(books.map(b => b.category).filter(Boolean))
     return ["all", ...Array.from(cats).sort()]
   }, [books])
- 
+
   const availableSources = useMemo(() => {
     const sources = new Set(books.map(b => b.source).filter(Boolean))
     return ["all", ...Array.from(sources).sort()]
   }, [books])
- 
+
   // รีเซ็ตหน้า 1 ทุกครั้งที่มีการเปลี่ยนตัวกรอง
   useEffect(() => {
     setCurrentPage(1)
   }, [search, filter, categoryFilter, sourceFilter])
- 
+
   // กรองข้อมูลตามที่เลือกไว้ทั้งหมด
   const filtered = useMemo(() => {
     return books.filter(b => {
@@ -70,17 +70,18 @@ export default function Library() {
       return matchType && matchCategory && matchSource && matchSearch
     })
   }, [books, filter, categoryFilter, sourceFilter, search])
- 
+
   // คำนวณข้อมูลหน้าปัจจุบัน
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
   const currentItems = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE)
- 
+
   return (
     <div style={{ marginBottom: 28 }}>
-      <h1 style={{ marginBottom: 8 }}>ห้องสมุดหนังสือ วารสาร และสื่อดาวน์โหลดทั้งหมดของ Talib Club</h1>
-      {loading && <p style={{ marginTop: 8, fontSize: 12 }}>กำลังโหลดรายการล่าสุด...</p>}
- 
+      <h1 style={{ marginBottom: 8 }}>ห้องสมุด</h1>
+      <p style={{ marginBottom: loading ? 4 : 24 }}>หนังสือ วารสาร และสื่อดาวน์โหลดทั้งหมดของ Talib Club</p>
+      {loading && <p style={{ marginBottom: 24, fontSize: 12 }}>กำลังโหลดรายการล่าสุด...</p>}
+
       {/* SEARCH + MAIN FILTER */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, minWidth: 250 }}>
@@ -116,7 +117,7 @@ export default function Library() {
               {t === "all" ? "ทั้งหมด" : t}
             </button>
           ))}
- 
+
           <button
             onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
             className={showAdvancedFilters ? "btn btn-teal" : "btn btn-outline"}
@@ -126,7 +127,7 @@ export default function Library() {
           </button>
         </div>
       </div>
- 
+
       {/* ADVANCED FILTERS */}
       {showAdvancedFilters && (
         <div
@@ -155,7 +156,7 @@ export default function Library() {
               ))}
             </select>
           </div>
- 
+
           <div>
             <label style={{ display: "block", fontSize: 11, color: "var(--t2)", marginBottom: 6, fontWeight: 500 }}>
               แหล่งที่มา / สำนักพิมพ์
@@ -173,7 +174,7 @@ export default function Library() {
           </div>
         </div>
       )}
- 
+
       {/* BOOKS GRID */}
       {filtered.length === 0 ? (
         <div className="empty">ไม่พบรายการที่ตรงกับการค้นหา หรือตัวกรองที่เลือก</div>
@@ -199,7 +200,7 @@ export default function Library() {
                   </div>
                 )}
               </div>
- 
+
               <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 4 }}>
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
@@ -210,25 +211,25 @@ export default function Library() {
                   </div>
                   {b.isNew && <span className="tag tag-new" style={{ fontSize: 10 }}>ใหม่</span>}
                 </div>
- 
+
                 <div
                   style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", lineHeight: 1.4, marginBottom: 4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
                 >
                   {b.title}
                 </div>
- 
+
                 {b.author && (
                   <div style={{ fontSize: 11, color: "var(--teal)", marginBottom: 6, fontWeight: 400 }}>
                     <i className="ti ti-pencil" style={{ marginRight: 4 }}></i>{b.author}
                   </div>
                 )}
- 
+
                 <p
                   style={{ fontSize: 11, lineHeight: 1.6, marginBottom: 8, color: "var(--t2)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
                 >
                   {b.desc || "ไม่มีคำอธิบายเพิ่มเติม"}
                 </p>
- 
+
                 <div style={{ marginTop: "auto", display: "flex", gap: 8 }}>
                   <a
                     className="btn btn-teal"
@@ -254,7 +255,7 @@ export default function Library() {
           ))}
         </div>
       )}
- 
+
       {/* PAGINATION CONTROLS */}
       {totalPages > 1 && (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, marginTop: 32 }}>
@@ -266,7 +267,7 @@ export default function Library() {
           >
             <i className="ti ti-chevron-left" style={{ fontSize: 14 }}></i>
           </button>
- 
+
           {Array.from({ length: totalPages }).map((_, i) => (
             <button
               key={i}
@@ -277,7 +278,7 @@ export default function Library() {
               {i + 1}
             </button>
           ))}
- 
+
           <button
             onClick={() => { setCurrentPage(prev => Math.min(prev + 1, totalPages)); window.scrollTo({ top: 0, behavior: "smooth" }) }}
             disabled={currentPage === totalPages}
@@ -288,7 +289,7 @@ export default function Library() {
           </button>
         </div>
       )}
- 
+
       {/* DONATE */}
       <div
         style={{ marginTop: 40, padding: "20px 24px", background: "var(--acc2)", border: ".5px solid var(--acc-br)", borderRadius: 14, textAlign: "center" }}
