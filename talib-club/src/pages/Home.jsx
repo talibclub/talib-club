@@ -192,11 +192,11 @@ function Footer({ site }) {
     { key: "youtube", icon: "ti-brand-youtube" },
     { key: "spotify", icon: "ti-brand-spotify" },
     { key: "instagram", icon: "ti-brand-instagram" },
-    { key: "tiktok", icon: "ti-brand-tiktok" }, // <--- เพิ่มแค่บรรทัดนี้บรรทัดเดียวครับ!
+    { key: "tiktok", icon: "ti-brand-tiktok" },
   ].map(item => ({ ...item, url: site?.social?.[item.key] })).filter(item => item.url)
 
   return (
-    <footer style={{ padding: "32px 0 20px", marginTop: "40px", textAlign: "center", position: "relative", borderTop: ".5px solid var(--br2)" }}>
+    <footer style={{ padding: "32px 0 20px", marginTop: "40px", textAlign: "center", borderTop: ".5px solid var(--br2)" }}>
       
       {/* ส่วนคำขวัญ QURAN SUNNAH */}
       <div style={{ fontSize: "14px", color: "var(--text)", fontWeight: 500, letterSpacing: "0.5px", marginBottom: "6px", textTransform: "uppercase" }}>
@@ -204,28 +204,32 @@ function Footer({ site }) {
       </div>
 
       {/* Copyright */}
-      <div style={{ fontSize: "12px", color: "var(--t3)", marginBottom: "16px", fontWeight: 300 }}>
+      <div style={{ fontSize: "12px", color: "var(--t3)", marginBottom: "20px", fontWeight: 300 }}>
         All Rights Reserved for Talib Club {new Date().getFullYear()} ©
       </div>
 
-      {/* ปุ่มโซเชียล */}
-      <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
+      {/* กลุ่มปุ่มโซเชียล และ ปุ่มขึ้นบน (จัดให้อยู่ด้วยกัน) */}
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
         {links.map(item => (
-          <a key={item.key} href={item.url} target="_blank" rel="noreferrer" style={{ width: "36px", height: "36px", backgroundColor: "var(--card)", border: ".5px solid var(--br)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t2)", textDecoration: "none", transition: "0.2s" }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--teal)"; e.currentTarget.style.color = "#fff"; e.currentTarget.style.borderColor = "var(--teal)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--card)"; e.currentTarget.style.color = "var(--t2)"; e.currentTarget.style.borderColor = "var(--br)"; }}
+          <a key={item.key} href={item.url} target="_blank" rel="noreferrer" 
+             style={{ width: "36px", height: "36px", backgroundColor: "var(--card)", border: ".5px solid var(--br)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t2)", textDecoration: "none", transition: "0.2s" }}
+             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--teal)"; e.currentTarget.style.color = "#fff"; e.currentTarget.style.borderColor = "var(--teal)"; }}
+             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--card)"; e.currentTarget.style.color = "var(--t2)"; e.currentTarget.style.borderColor = "var(--br)"; }}
           >
             <i className={`ti ${item.icon}`} style={{ fontSize: "16px" }}></i>
           </a>
         ))}
+
+        {/* ปุ่มลูกศรขึ้นบน (เอา absolute ออก แล้วเรียงต่อกันแทน) */}
+        <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} 
+                style={{ width: "36px", height: "36px", backgroundColor: "var(--teal-bg)", border: "1px solid rgba(15,110,86,0.1)", borderRadius: "50%", color: "var(--teal)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "0.2s", marginLeft: "10px" }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--teal)"; e.currentTarget.style.color = "#fff"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--teal-bg)"; e.currentTarget.style.color = "var(--teal)"; }}
+        >
+          <i className="ti ti-arrow-up" style={{ fontSize: "16px" }}></i>
+        </button>
       </div>
 
-      <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} style={{ position: "absolute", right: "0", top: "32px", width: "38px", height: "38px", backgroundColor: "var(--teal-bg)", border: "1px solid rgba(15,110,86,0.1)", borderRadius: "50%", color: "var(--teal)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "0.2s" }}
-      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--teal)"; e.currentTarget.style.color = "#fff"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--teal-bg)"; e.currentTarget.style.color = "var(--teal)"; }}
-      >
-        <i className="ti ti-arrow-up" style={{ fontSize: "16px" }}></i>
-      </button>
     </footer>
   )
 }

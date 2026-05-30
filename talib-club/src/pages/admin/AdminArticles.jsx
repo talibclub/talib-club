@@ -3,6 +3,7 @@ import { ARTICLES, DEFAULT_TAXONOMY } from "../../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
 
+// ลบ readTime และ coverEmoji ออกจากค่าเริ่มต้น
 const EMPTY = {
   type: "general",
   seriesId: "",
@@ -13,8 +14,6 @@ const EMPTY = {
   excerpt: "",
   author: "Talib Club",
   date: new Date().toISOString().slice(0, 10),
-  readTime: 5,
-  coverEmoji: "📖",
   tags: [],
   body: "",
 }
@@ -22,11 +21,32 @@ const EMPTY = {
 export default function AdminArticles() {
   const { items, loading, error, saveItem, deleteItem, isUsingFallback } = useContentCollection("articles", ARTICLES)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
+  
   const [editing, setEdit] = useState(null)
   const [search, setSearch] = useState("")
+  const [categoryFilter, setCategoryFilter] = useState("all") // State สำหรับกรองหมวดหมู่
+  const [selected, setSelected] = useState([]) // State สำหรับเก็บรายการที่ถูกติ๊กเลือก
   const [busy, setBusy] = useState(false)
 
-  const filtered = items.filter(a => String(a.title || "").toLowerCase().includes(search.toLowerCase()))
+  // กรองข้อมูลด้วย คำค้นหา + หมวดหมู่
+  const filtered = items.filter(a => {
+    const matchSearch = String(a.title || "").toLowerCase().includes(search.toLowerCase())
+    const matchCat = categoryFilter === "all" || a.category === categoryFilter
+    return matchSearch && matchCat
+  })
+
+  // จัดการ Checkbox
+  const toggleSelect = (id) => {
+    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+  
+  const toggleAll = () => {
+    if (selected.length === filtered.length) {
+      setSelected([])
+    } else {
+      setSelected(filtered.map(a => a.id))
+    }
+  }
 
   function openNew() {
     setEdit({ ...EMPTY, id: crypto.randomUUID() })
@@ -42,11 +62,13 @@ export default function AdminArticles() {
       return
     }
 
+    // ตัด readTime และ coverEmoji ออกจาก Payload ก่อนส่งขึ้น Firebase
     const payload = {
       ...editing,
       part: editing.type === "series" && editing.part ? Number(editing.part) : null,
-      readTime: Number(editing.readTime || 5),
     }
+    delete payload.readTime;
+    delete payload.coverEmoji;
 
     setBusy(true)
     try {
@@ -61,6 +83,7 @@ export default function AdminArticles() {
     }
   }
 
+  // ลบรายการเดียว
   async function remove(article) {
     const ok = await confirmAction({
       title: "ลบบทความนี้?",
@@ -72,10 +95,35 @@ export default function AdminArticles() {
 
     try {
       await deleteItem(article.id)
+      setSelected(prev => prev.filter(id => id !== article.id))
       notifySuccess("ลบบทความเรียบร้อยแล้ว")
     } catch (err) {
       console.error(err)
       notifyError("ลบไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
+    }
+  }
+
+  // ลบหลายรายการพร้อมกัน (Bulk Delete)
+  async function removeSelected() {
+    const ok = await confirmAction({
+      title: `ยืนยันการลบ ${selected.length} รายการ?`,
+      message: "ข้อมูลที่ถูกเลือกรวมถึงเนื้อหาทั้งหมดจะถูกลบและไม่สามารถกู้คืนได้",
+      confirmText: "ยืนยันการลบ",
+      danger: true,
+    })
+    if (!ok) return
+
+    setBusy(true)
+    try {
+      // สั่งลบพร้อมกันทุก ID ที่เลือกไว้
+      await Promise.all(selected.map(id => deleteItem(id)))
+      setSelected([])
+      notifySuccess(`ลบ ${selected.length} บทความเรียบร้อยแล้ว`)
+    } catch (err) {
+      console.error(err)
+      notifyError("เกิดข้อผิดพลาดในการลบข้อมูลบางส่วน")
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -85,34 +133,99 @@ export default function AdminArticles() {
 
   return (
     <div>
-      <SectionHead title="บทความ" count={items.length} loading={loading} onNew={openNew} search={search} setSearch={setSearch} />
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <h2 style={{ flex: 1, minWidth: 150 }}>บทความ <span style={{ fontSize: 12, color: "var(--t3)" }}>({filtered.length})</span></h2>
+        
+        {/* กล่องค้นหาและตัวกรอง */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", flex: 2, justifyContent: "flex-end" }}>
+          <select 
+            value={categoryFilter} 
+            onChange={e => { setCategoryFilter(e.target.value); setSelected([]); }}
+            style={{ maxWidth: 180 }}
+          >
+            <option value="all">ทุกหมวดหมู่</option>
+            {(taxonomy.articleCategories || []).map(cat => (
+              <option key={cat.id} value={cat.id}>{cat.label}</option>
+            ))}
+          </select>
+          <input 
+            value={search} 
+            onChange={e => { setSearch(e.target.value); setSelected([]); }} 
+            placeholder="ค้นหาชื่อบทความ..." 
+            style={{ maxWidth: 200 }} 
+          />
+          <button className="btn btn-teal" onClick={openNew}>
+            <i className="ti ti-plus" style={{ marginRight: 6 }}></i>เพิ่มใหม่
+          </button>
+        </div>
+      </div>
+
+      {/* แถบเครื่องมือจัดการหลายรายการ (จะโผล่มาเมื่อมีการติ๊กเลือก) */}
+      {selected.length > 0 && (
+        <div style={{ background: "rgba(45,190,160,0.1)", border: "1px solid var(--teal)", padding: "10px 16px", borderRadius: 12, marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 13, color: "var(--teal)", fontWeight: 500 }}>
+            เลือกอยู่ {selected.length} รายการ
+          </span>
+          <button className="btn" style={{ background: "#e05555", color: "#fff", padding: "6px 14px", fontSize: 12 }} onClick={removeSelected} disabled={busy}>
+            <i className={busy ? "ti ti-loader-2 spin" : "ti ti-trash"} style={{ marginRight: 6 }}></i>
+            {busy ? "กำลังลบ..." : "ลบที่เลือก"}
+          </button>
+        </div>
+      )}
+
+      {/* หัวตารางจำลอง สำหรับเลือกทั้งหมด */}
+      {filtered.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", padding: "0 16px", marginBottom: 10 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, color: "var(--t2)" }}>
+            <input 
+              type="checkbox" 
+              checked={selected.length === filtered.length && filtered.length > 0} 
+              onChange={toggleAll}
+              style={{ width: 16, height: 16, cursor: "pointer" }}
+            />
+            เลือกทั้งหมด
+          </label>
+        </div>
+      )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {filtered.map(article => (
           <div key={article.id} className="card" style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
-                <span className="tag tag-teal">{article.category}</span>
-                {article.type === "series" && <span className="tag">ซีรีส์ ตอน {article.part}</span>}
-              </div>
-              <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
-                {article.coverEmoji} {article.title}
-              </div>
-              <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300, marginTop: 3 }}>
-                {article.author} · {article.date} · {article.readTime} นาที
+            
+            <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
+              {/* Checkbox สำหรับแต่ละการ์ด */}
+              <input 
+                type="checkbox" 
+                checked={selected.includes(article.id)}
+                onChange={() => toggleSelect(article.id)}
+                style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }}
+              />
+              
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
+                  <span className="tag tag-teal">{article.category}</span>
+                  {article.type === "series" && <span className="tag">ซีรีส์ ตอน {article.part}</span>}
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                  {article.title}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300, marginTop: 4 }}>
+                  {article.author} · {article.date}
+                </div>
               </div>
             </div>
+
             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-              <button className="btn btn-outline" onClick={() => openEdit(article)}>
-                <i className="ti ti-pencil" style={{ marginRight: 5 }}></i>แก้ไข
+              <button className="btn btn-outline" onClick={() => openEdit(article)} style={{ padding: "6px 12px", fontSize: 12 }}>
+                <i className="ti ti-pencil"></i>
               </button>
-              <button className="btn btn-outline" style={{ color: "#e05555", borderColor: "rgba(224,85,85,.3)" }} onClick={() => remove(article)}>
-                <i className="ti ti-trash" style={{ marginRight: 5 }}></i>ลบ
+              <button className="btn btn-outline" style={{ color: "#e05555", borderColor: "rgba(224,85,85,.3)", padding: "6px 12px", fontSize: 12 }} onClick={() => remove(article)}>
+                <i className="ti ti-trash"></i>
               </button>
             </div>
           </div>
         ))}
-        {filtered.length === 0 && <div className="empty">ไม่พบบทความ</div>}
+        {filtered.length === 0 && <div className="empty">ไม่พบบทความที่ตรงกับเงื่อนไข</div>}
       </div>
 
       {(error || isUsingFallback) && (
@@ -137,22 +250,25 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
       <button className="btn btn-outline" style={{ marginBottom: 18 }} onClick={onCancel}>
         <i className="ti ti-arrow-left" style={{ marginRight: 6 }}></i>กลับ
       </button>
-      <h2 style={{ marginBottom: 20 }}>{item.id ? "แก้ไข/เพิ่มบทความ" : "เพิ่มบทความใหม่"}</h2>
+      <h2 style={{ marginBottom: 20 }}>{item.id ? "แก้ไขบทความ" : "เพิ่มบทความใหม่"}</h2>
 
-      <div className="card" style={{ padding: 18, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div className="card" style={{ padding: 24, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <Field label="ชื่อบทความ *" span>
           <input value={item.title || ""} onChange={e => set("title", e.target.value)} placeholder="ชื่อบทความ" />
         </Field>
+        
         <Field label="ประเภท">
           <select value={item.type || "general"} onChange={e => set("type", e.target.value)}>
             {(taxonomy.articleTypes || []).map(type => <option key={type.id} value={type.id}>{type.label}</option>)}
           </select>
         </Field>
+        
         <Field label="หมวดหมู่">
           <select value={item.category || ""} onChange={e => set("category", e.target.value)}>
             {(taxonomy.articleCategories || []).map(category => <option key={category.id} value={category.id}>{category.label}</option>)}
           </select>
         </Field>
+        
         {item.type === "series" && (
           <>
             <Field label="ซีรีส์">
@@ -166,40 +282,42 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
             </Field>
           </>
         )}
+        
         {item.type === "specific" && (
           <Field label="ชื่อหัวข้อย่อย" span>
             <input value={item.seriesName || ""} onChange={e => set("seriesName", e.target.value)} />
           </Field>
         )}
+        
         <Field label="ผู้เขียน">
           <input value={item.author || ""} onChange={e => set("author", e.target.value)} />
         </Field>
-        <Field label="วันที่">
+        
+        <Field label="วันที่เผยแพร่">
           <input type="date" value={item.date || ""} onChange={e => set("date", e.target.value)} />
         </Field>
-        <Field label="เวลาอ่าน (นาที)">
-          <input type="number" value={item.readTime || ""} onChange={e => set("readTime", e.target.value)} min="1" />
+        
+        {/* ลบ Input "เวลาอ่าน" และ "Emoji ปก" ออกไปแล้ว */}
+
+        <Field label="บทคัดย่อ (แสดงหน้าการ์ด)" span>
+          <textarea value={item.excerpt || ""} onChange={e => set("excerpt", e.target.value)} rows={2} placeholder="เนื้อหาสรุปสั้นๆ..." />
         </Field>
-        <Field label="Emoji ปก">
-          <input value={item.coverEmoji || ""} onChange={e => set("coverEmoji", e.target.value)} maxLength={4} />
+        
+        <Field label="Tags (คั่นด้วยลูกน้ำ ,)" span>
+          <input value={(item.tags || []).join(", ")} onChange={e => set("tags", e.target.value.split(",").map(tag => tag.trim()).filter(Boolean))} placeholder="เช่น ฟิกฮ์, อะกีดะฮ์" />
         </Field>
-        <Field label="บทคัดย่อ" span>
-          <textarea value={item.excerpt || ""} onChange={e => set("excerpt", e.target.value)} rows={2} />
-        </Field>
-        <Field label="Tags (คั่นด้วยจุลภาค)" span>
-          <input value={(item.tags || []).join(", ")} onChange={e => set("tags", e.target.value.split(",").map(tag => tag.trim()).filter(Boolean))} />
-        </Field>
-        <Field label="เนื้อหาบทความ" span>
-          <textarea value={item.body || ""} onChange={e => set("body", e.target.value)} rows={10} />
+        
+        <Field label="เนื้อหาบทความแบบเต็ม" span>
+          <textarea value={item.body || ""} onChange={e => set("body", e.target.value)} rows={12} placeholder="พิมพ์เนื้อหาที่นี่..." style={{ lineHeight: 1.6 }} />
         </Field>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
-        <button className="btn btn-teal" onClick={onSave} disabled={busy}>
-          <i className={`ti ${busy ? "ti-loader-2" : "ti-check"}`} style={{ marginRight: 6 }}></i>
-          {busy ? "กำลังบันทึก..." : "บันทึก"}
-        </button>
+      <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
         <button className="btn btn-outline" onClick={onCancel}>ยกเลิก</button>
+        <button className="btn btn-teal" onClick={onSave} disabled={busy}>
+          <i className={`ti ${busy ? "ti-loader-2 spin" : "ti-check"}`} style={{ marginRight: 6 }}></i>
+          {busy ? "กำลังบันทึก..." : "บันทึกบทความ"}
+        </button>
       </div>
     </div>
   )
@@ -208,21 +326,8 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
 function Field({ label, children, span }) {
   return (
     <label style={span ? { gridColumn: "1 / -1" } : undefined}>
-      <span style={{ display: "block", fontSize: 12, color: "var(--t2)", marginBottom: 6 }}>{label}</span>
+      <span style={{ display: "block", fontSize: 13, color: "var(--t2)", marginBottom: 8, fontWeight: 500 }}>{label}</span>
       {children}
     </label>
-  )
-}
-
-function SectionHead({ title, count, loading, onNew, search, setSearch }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-      <h2 style={{ flex: 1 }}>{title} <span style={{ fontSize: 12, color: "var(--t3)" }}>({count})</span></h2>
-      {loading && <span style={{ fontSize: 12, color: "var(--t3)" }}>กำลังโหลดข้อมูล...</span>}
-      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="ค้นหา..." style={{ maxWidth: 200 }} />
-      <button className="btn btn-teal" onClick={onNew}>
-        <i className="ti ti-plus" style={{ marginRight: 6 }}></i>เพิ่มใหม่
-      </button>
-    </div>
   )
 }

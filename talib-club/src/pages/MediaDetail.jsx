@@ -11,22 +11,22 @@ export default function MediaDetail({ item, go }) {
   if (!item) return null
 
   return (
-    <div className="article-page" style={{ maxWidth: 800, margin: "0 auto" }}>
+    <div className="article-page" style={{ maxWidth: 800, margin: "0 auto", paddingBottom: 40 }}>
       {/* ปุ่มย้อนกลับ */}
       <button 
         onClick={() => go("media")}
         className="sec-link" 
-        style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 20 }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 20, fontSize: 13 }}
       >
-        <i className="ti ti-arrow-left"></i> กลับไปหน้ารวมมีเดีย
+        <i className="ti ti-arrow-left"></i> กลับหน้ารวมมีเดีย
       </button>
 
       {/* ส่วนเล่นมีเดีย */}
       {item.type === "youtube" && (
         <div style={{
-          marginBottom: 24, borderRadius: 12, overflow: "hidden",
+          marginBottom: 24, borderRadius: 16, overflow: "hidden",
           border: ".5px solid var(--br2)", background: "#000",
-          boxShadow: "0 10px 30px -10px rgba(0,0,0,0.3)"
+          boxShadow: "0 10px 30px -10px rgba(0,0,0,0.2)"
         }}>
           <div style={{ position: "relative", paddingBottom: "56.25%", height: 0 }}>
             <iframe style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
@@ -39,7 +39,7 @@ export default function MediaDetail({ item, go }) {
 
       {item.type === "spotify" && (
         <div style={{
-          marginBottom: 24, borderRadius: 12, overflow: "hidden",
+          marginBottom: 24, borderRadius: 16, overflow: "hidden",
           border: ".5px solid var(--br2)", background: "var(--card)",
           boxShadow: "0 10px 30px -10px rgba(0,0,0,0.1)"
         }}>
@@ -47,7 +47,7 @@ export default function MediaDetail({ item, go }) {
             <iframe style={{ width: "100%", height: 152, border: "none" }}
               src={item.spotifyUrl.includes("/embed/")
                 ? item.spotifyUrl
-                : item.spotifyUrl.replace("open.spotify.com/", "open.spotify.com/embed/")}
+                : item.spotifyUrl.replace("https://open.spotify.com/", "https://open.spotify.com/embed/")}
               allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
               loading="lazy" title={item.title} />
           ) : (
@@ -56,12 +56,12 @@ export default function MediaDetail({ item, go }) {
         </div>
       )}
 
-      {/* ข้อมูลรายละเอียด */}
-      <div>
+      {/* ข้อมูลรายละเอียด (ใส่ไว้ในกล่อง Card ให้สวยขึ้น) */}
+      <div className="card" style={{ padding: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           <span className="tag" style={{
             background: item.type === "youtube" ? "rgba(255,50,50,.08)" : "rgba(30,215,96,.08)",
-            color: item.type === "youtube" ? "#ff4444" : "#1ed760", fontSize: 11
+            color: item.type === "youtube" ? "#ff4444" : "#1ed760", fontSize: 11, padding: "4px 10px", borderRadius: 20
           }}>
             <i className={`ti ${item.type === "youtube" ? "ti-brand-youtube" : "ti-brand-spotify"}`} style={{ marginRight: 4 }}></i>
             {item.type === "youtube" ? "YouTube" : "Spotify"}
@@ -69,28 +69,32 @@ export default function MediaDetail({ item, go }) {
           <span style={{ fontSize: 13, color: "var(--t3)", fontWeight: 300 }}>{item.series}</span>
         </div>
         
-        <h1 style={{ fontSize: 24, marginBottom: 16 }}>{item.title}</h1>
+        <h1 style={{ fontSize: 22, marginBottom: 20, lineHeight: 1.4 }}>{item.title}</h1>
         
-        <div style={{ display: "flex", alignItems: "center", gap: 16, borderTop: ".5px solid var(--br2)", paddingTop: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--bg2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <i className="ti ti-user" style={{ color: "var(--t2)" }}></i>
+        <div style={{ display: "flex", alignItems: "center", gap: 20, borderTop: ".5px solid var(--br2)", paddingTop: 16, flexWrap: "wrap" }}>
+          
+          {/* จากช่อง : */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--teal-bg)", color: "var(--teal)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <i className="ti ti-device-tv"></i>
             </div>
             <div>
-              <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>ช่อง/ผู้จัดทำ</div>
-              <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>{item.channel}</div>
+              <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>จากช่อง :</div>
+              <div style={{ fontSize: 14, color: "var(--text)", fontWeight: 500 }}>{item.channel}</div>
             </div>
           </div>
           
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
-            <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--bg2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <i className="ti ti-clock" style={{ color: "var(--t2)" }}></i>
+          {/* ความยาว */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto" }}>
+            <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--bg2)", color: "var(--t2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <i className="ti ti-clock"></i>
             </div>
             <div>
               <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>ความยาว</div>
-              <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>{item.duration || "ไม่ได้ระบุ"}</div>
+              <div style={{ fontSize: 14, color: "var(--text)", fontWeight: 500 }}>{item.duration || "ไม่ได้ระบุ"}</div>
             </div>
           </div>
+          
         </div>
       </div>
     </div>
