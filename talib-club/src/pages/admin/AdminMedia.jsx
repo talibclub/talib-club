@@ -10,21 +10,9 @@ const EMPTY = {
   duration: "",
   embedId: "",
   spotifyUrl: "",
-  series: "", // จะใช้สำหรับเก็บชื่อเพลย์ลิสต์
+  series: "",
   coverUrl: "",
   date: new Date().toISOString().slice(0, 10),
-}
-
-// ฟังก์ชันจำลองการดึงความยาวคลิปจาก YouTube (แบบง่าย)
-// (ในสถานการณ์จริง ถ้าไม่ได้ใช้ API Key อาจจะได้ผลลัพธ์ประมาณการ หรือต้องพึ่ง Service นอก)
-async function fetchYouTubeDuration(embedId) {
-  try {
-     // เนื่องจากเราไม่สามารถดึงข้อมูลตรงๆ ได้โดยไม่มี API, ให้ User กรอกเองหรือปล่อยว่างไปก่อน
-     // หรือถ้าคุณมี API Key ค่อยมาใส่ที่นี่ครับ
-     return null; 
-  } catch (err) {
-     return null;
-  }
 }
 
 export default function AdminMedia() {
@@ -32,8 +20,6 @@ export default function AdminMedia() {
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   
   const [editing, setEdit] = useState(null)
-  
-  // States สำหรับตัวกรอง
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState("all") 
   const [playlistFilter, setPlaylistFilter] = useState("all") 
@@ -42,10 +28,19 @@ export default function AdminMedia() {
   const [selected, setSelected] = useState([]) 
   const [busy, setBusy] = useState(false)
 
-  // ดึงรายชื่อ "เพลย์ลิสต์" ที่มีอยู่แล้วทั้งหมดจากข้อมูล (เพื่อใช้ใน Dropdown)
-  const existingPlaylists = Array.from(new Set(items.map(m => m.series).filter(Boolean))).sort()
+  // Pagination States
+  const [page, setPage] = useState(1)
+  const ITEMS_PER_PAGE = 20
 
-  // กรองข้อมูล
+  useEffect(() => {
+    setPage(1)
+  }, [search, typeFilter, playlistFilter])
+
+  const existingPlaylists = Array.from(new Set([
+    ...(taxonomy.mediaPlaylists || []),
+    ...items.map(m => m.series).filter(Boolean)
+  ])).sort()
+
   const filtered = items.filter(m => {
     const matchSearch = String(m.title || "").toLowerCase().includes(search.toLowerCase()) || 
                         String(m.channel || "").toLowerCase().includes(search.toLowerCase())
@@ -55,7 +50,9 @@ export default function AdminMedia() {
     return matchSearch && matchType && matchPlaylist
   })
 
-  // จัดการ Checkbox
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
+  const currentItems = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+
   const toggleSelect = (id) => {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
@@ -72,7 +69,6 @@ export default function AdminMedia() {
 
   async function save() {
     if (!editing.title?.trim()) return notifyError("กรุณาใส่ชื่อรายการ/ตอน")
-    
     setBusy(true)
     try {
       await saveItem(editing)
@@ -120,30 +116,31 @@ export default function AdminMedia() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
         <div style={{ flex: 1 }}>
-          <h2 style={{ minWidth: 150 }}>มีเดีย <span style={{ fontSize: 12, color: "var(--t3)" }}>({filtered.length})</span></h2>
-          <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>จัดการวิดีโอ YouTube และพอดแคสต์ Spotify</p>
+          <h2 style={{ minWidth: 150 }}>มีเดีย <span style={{ fontSize: 12, color: "var(--t3)" }}>({filtered.length} รายการ)</span></h2>
+          <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>
+            จัดการวิดีโอ YouTube และพอดแคสต์ Spotify {totalPages > 0 && `(หน้า ${page}/${totalPages})`}
+          </p>
         </div>
         <button className="btn btn-teal" onClick={openNew}>
           <i className="ti ti-plus" style={{ marginRight: 6 }}></i>เพิ่มใหม่
         </button>
       </div>
 
-      {/* แถบค้นหา และ ปุ่มกรอง */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: showAdvanced ? 12 : 24 }}>
         <div style={{ flex: "1 1 250px", position: "relative" }}>
           <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
           <input 
             value={search} 
-            onChange={e => { setSearch(e.target.value); setSelected([]); }} 
+            onChange={e => setSearch(e.target.value)} 
             placeholder="ค้นหาชื่อรายการ, ช่อง..." 
             style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "10px 16px 10px 42px", background: "var(--bg2)", border: "none" }} 
           />
         </div>
 
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          <button onClick={() => { setTypeFilter("all"); setSelected([]); }} className={`pill ${typeFilter === "all" ? "on-acc" : ""}`} style={{ padding: "8px 16px" }}>ทั้งหมด</button>
-          <button onClick={() => { setTypeFilter("youtube"); setSelected([]); }} className={`pill ${typeFilter === "youtube" ? "on-acc" : ""}`} style={{ padding: "8px 16px" }}>YouTube</button>
-          <button onClick={() => { setTypeFilter("spotify"); setSelected([]); }} className={`pill ${typeFilter === "spotify" ? "on-acc" : ""}`} style={{ padding: "8px 16px" }}>Spotify</button>
+          <button onClick={() => setTypeFilter("all")} className={`pill ${typeFilter === "all" ? "on-acc" : ""}`} style={{ padding: "8px 16px" }}>ทั้งหมด</button>
+          <button onClick={() => setTypeFilter("youtube")} className={`pill ${typeFilter === "youtube" ? "on-acc" : ""}`} style={{ padding: "8px 16px" }}>YouTube</button>
+          <button onClick={() => setTypeFilter("spotify")} className={`pill ${typeFilter === "spotify" ? "on-acc" : ""}`} style={{ padding: "8px 16px" }}>Spotify</button>
         </div>
 
         <button 
@@ -155,12 +152,11 @@ export default function AdminMedia() {
         </button>
       </div>
 
-      {/* แถบตัวกรองเพิ่มเติม */}
       {showAdvanced && (
         <div style={{ background: "var(--bg2)", padding: "16px 20px", borderRadius: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
           <label style={{ display: "grid", gap: 6 }}>
             <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>เพลย์ลิสต์</span>
-            <select value={playlistFilter} onChange={e => { setPlaylistFilter(e.target.value); setSelected([]); }} style={{ background: "var(--card)", border: "none" }}>
+            <select value={playlistFilter} onChange={e => setPlaylistFilter(e.target.value)} style={{ background: "var(--card)", border: "none" }}>
               <option value="all">-- ทุกเพลย์ลิสต์ --</option>
               {existingPlaylists.map(pl => (
                 <option key={pl} value={pl}>{pl}</option>
@@ -170,28 +166,26 @@ export default function AdminMedia() {
         </div>
       )}
 
-      {/* แถบจัดการหลายรายการ */}
       {selected.length > 0 && (
         <div style={{ background: "rgba(45,190,160,0.1)", border: "1px solid var(--teal)", padding: "10px 16px", borderRadius: 12, marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontSize: 13, color: "var(--teal)", fontWeight: 500 }}>เลือกอยู่ {selected.length} รายการ</span>
           <button className="btn" style={{ background: "#e05555", color: "#fff", padding: "6px 14px", fontSize: 12 }} onClick={removeSelected} disabled={busy}>
-            <i className={busy ? "ti ti-loader-2 spin" : "ti ti-trash"} style={{ marginRight: 6 }}></i> {busy ? "กำลังลบ..." : "ลบที่เลือก"}
+            <i className={busy ? "ti ti-loader-2 spin" : "ti ti-trash"} style={{ marginRight: 6 }}></i> {busy ? "กำลังลบ..." : "ลบที่เลือกทั้งหมด"}
           </button>
         </div>
       )}
 
-      {/* เลือกทั้งหมด */}
       {filtered.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", padding: "0 16px", marginBottom: 10 }}>
           <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, color: "var(--t2)" }}>
             <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0} onChange={toggleAll} style={{ width: 16, height: 16, cursor: "pointer" }} />
-            เลือกทั้งหมด
+            เลือกทั้งหมด {filtered.length} รายการที่ค้นเจอ
           </label>
         </div>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {filtered.map(item => (
+        {currentItems.map(item => (
           <div key={item.id} className="card" style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
               <input type="checkbox" checked={selected.includes(item.id)} onChange={() => toggleSelect(item.id)} style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }} />
@@ -215,6 +209,28 @@ export default function AdminMedia() {
         ))}
         {filtered.length === 0 && <div className="empty">ไม่พบข้อมูลที่ตรงกับเงื่อนไข</div>}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 32, flexWrap: "wrap" }}>
+          <button className="btn btn-outline" disabled={page === 1} onClick={() => { setPage(page - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ padding: "6px 12px", fontSize: 12 }}>ก่อนหน้า</button>
+          
+          {Array.from({ length: totalPages }).map((_, i) => {
+            const p = i + 1;
+            if (p === 1 || p === totalPages || (p >= page - 1 && p <= page + 1)) {
+              return (
+                <button key={p} onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className={page === p ? "btn btn-teal" : "btn btn-outline"} style={{ padding: "6px 14px", fontSize: 12 }}>{p}</button>
+              )
+            }
+            if (p === page - 2 || p === page + 2) {
+              return <span key={p} style={{ color: "var(--t3)", padding: "0 4px" }}>...</span>
+            }
+            return null;
+          })}
+          
+          <button className="btn btn-outline" disabled={page === totalPages} onClick={() => { setPage(page + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ padding: "6px 12px", fontSize: 12 }}>ถัดไป</button>
+        </div>
+      )}
     </div>
   )
 }
@@ -222,15 +238,12 @@ export default function AdminMedia() {
 function MediaForm({ item, setItem, onSave, onCancel, taxonomy, existingPlaylists, busy }) {
   const set = (key, value) => setItem(prev => ({ ...prev, [key]: value }))
   
-  // State สำหรับสลับระหว่าง "เลือกเพลย์ลิสต์ที่มีอยู่" หรือ "สร้างเพลย์ลิสต์ใหม่"
   const [isNewPlaylist, setIsNewPlaylist] = useState(false)
 
-  // จำลองฟังก์ชันดึงความยาวคลิป
   const handleFetchDuration = () => {
     if(!item.embedId) {
         notifyError("กรุณากรอก YouTube Video ID ก่อน"); return;
     }
-    // ตัวอย่างการสุ่มเวลาให้เห็นผลการทำงาน (ของจริงต้องเชื่อม API)
     const mockMins = Math.floor(Math.random() * 50) + 10;
     const mockSecs = Math.floor(Math.random() * 59);
     set("duration", `${mockMins}:${mockSecs.toString().padStart(2, '0')}`);
@@ -260,7 +273,7 @@ function MediaForm({ item, setItem, onSave, onCancel, taxonomy, existingPlaylist
                <input 
                  value={item.series || ""} 
                  onChange={e => set("series", e.target.value)} 
-                 placeholder="พิมพ์ชื่อเพลย์ลิสต์ใหม่..." 
+                 placeholder="พิมพ์ชื่อเพลย์ลิสต์ใหม่ (และอย่าลืมไปตั้งค่าเพิ่มในเมนูหมวดตัวเลือกด้วยนะครับ)..." 
                  style={{ flex: 1 }} 
                />
             ) : (
@@ -278,7 +291,7 @@ function MediaForm({ item, setItem, onSave, onCancel, taxonomy, existingPlaylist
               onClick={() => { setIsNewPlaylist(!isNewPlaylist); set("series", ""); }}
               style={{ fontSize: 11, padding: "8px 12px", whiteSpace: "nowrap" }}
             >
-              {isNewPlaylist ? "เลือกที่มีอยู่" : "+ สร้างใหม่"}
+              {isNewPlaylist ? "เลือกที่มีอยู่" : "+ สร้างพิมพ์เอง"}
             </button>
           </div>
         </Field>

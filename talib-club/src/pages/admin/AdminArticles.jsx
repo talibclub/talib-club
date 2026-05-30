@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ARTICLES, DEFAULT_TAXONOMY } from "../../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
@@ -25,12 +25,21 @@ export default function AdminArticles() {
   
   // States สำหรับค้นหาและตัวกรอง
   const [search, setSearch] = useState("")
-  const [typeFilter, setTypeFilter] = useState("all") // สำหรับปุ่ม Pill
-  const [categoryFilter, setCategoryFilter] = useState("all") // สำหรับ Dropdown
-  const [showAdvanced, setShowAdvanced] = useState(false) // Toggle เปิดปิดตัวกรองเพิ่มเติม
+  const [typeFilter, setTypeFilter] = useState("all") 
+  const [categoryFilter, setCategoryFilter] = useState("all") 
+  const [showAdvanced, setShowAdvanced] = useState(false) 
   
   const [selected, setSelected] = useState([]) 
   const [busy, setBusy] = useState(false)
+
+  // Pagination States
+  const [page, setPage] = useState(1)
+  const ITEMS_PER_PAGE = 20
+
+  // รีเซ็ตหน้าเป็น 1 เสมอเมื่อมีการค้นหาหรือเปลี่ยนตัวกรอง
+  useEffect(() => {
+    setPage(1)
+  }, [search, typeFilter, categoryFilter])
 
   // กรองข้อมูล
   const filtered = items.filter(a => {
@@ -42,7 +51,10 @@ export default function AdminArticles() {
     return matchSearch && matchType && matchCat
   })
 
-  // จัดการ Checkbox
+  // คำนวณข้อมูลสำหรับหน้าปัจจุบัน
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
+  const currentItems = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+
   const toggleSelect = (id) => {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
@@ -110,39 +122,37 @@ export default function AdminArticles() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
         <div style={{ flex: 1 }}>
-          <h2 style={{ minWidth: 150 }}>บทความ <span style={{ fontSize: 12, color: "var(--t3)" }}>({filtered.length})</span></h2>
-          <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>บทความวิชาการอิสลามทั้งหมดของ Talib Club</p>
+          <h2 style={{ minWidth: 150 }}>บทความ <span style={{ fontSize: 12, color: "var(--t3)" }}>({filtered.length} รายการ)</span></h2>
+          <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>
+            บทความวิชาการอิสลามทั้งหมดของ Talib Club {totalPages > 0 && `(หน้า ${page}/${totalPages})`}
+          </p>
         </div>
         <button className="btn btn-teal" onClick={openNew}>
           <i className="ti ti-plus" style={{ marginRight: 6 }}></i>เพิ่มใหม่
         </button>
       </div>
 
-      {/* แถบค้นหา และ ปุ่มกรอง (UI ใหม่) */}
+      {/* แถบค้นหา และ ปุ่มกรอง */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: showAdvanced ? 12 : 24 }}>
-        
-        {/* ช่องค้นหา */}
         <div style={{ flex: "1 1 250px", position: "relative" }}>
           <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
           <input 
             value={search} 
-            onChange={e => { setSearch(e.target.value); setSelected([]); }} 
+            onChange={e => setSearch(e.target.value)} 
             placeholder="ค้นหาชื่อบทความ, ผู้เขียน..." 
             style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "10px 16px 10px 42px", background: "var(--bg2)", border: "none" }} 
           />
         </div>
 
-        {/* ปุ่มประเภท (Pills) */}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          <button onClick={() => { setTypeFilter("all"); setSelected([]); }} className={`pill ${typeFilter === "all" ? "on-acc" : ""}`} style={{ padding: "8px 16px" }}>ทั้งหมด</button>
+          <button onClick={() => setTypeFilter("all")} className={`pill ${typeFilter === "all" ? "on-acc" : ""}`} style={{ padding: "8px 16px" }}>ทั้งหมด</button>
           {(taxonomy.articleTypes || []).map(type => (
-            <button key={type.id} onClick={() => { setTypeFilter(type.id); setSelected([]); }} className={`pill ${typeFilter === type.id ? "on-acc" : ""}`} style={{ padding: "8px 16px" }}>
+            <button key={type.id} onClick={() => setTypeFilter(type.id)} className={`pill ${typeFilter === type.id ? "on-acc" : ""}`} style={{ padding: "8px 16px" }}>
               {type.label}
             </button>
           ))}
         </div>
 
-        {/* ปุ่มเปิดตัวกรองเพิ่มเติม */}
         <button 
           className={`btn ${showAdvanced ? "btn-teal" : "btn-outline"}`} 
           onClick={() => setShowAdvanced(!showAdvanced)}
@@ -152,12 +162,11 @@ export default function AdminArticles() {
         </button>
       </div>
 
-      {/* แถบตัวกรองเพิ่มเติม (Drop-down) */}
       {showAdvanced && (
         <div style={{ background: "var(--bg2)", padding: "16px 20px", borderRadius: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
           <label style={{ display: "grid", gap: 6 }}>
             <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>หมวดหมู่บทความ</span>
-            <select value={categoryFilter} onChange={e => { setCategoryFilter(e.target.value); setSelected([]); }} style={{ background: "var(--card)", border: "none" }}>
+            <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={{ background: "var(--card)", border: "none" }}>
               <option value="all">-- ทุกหมวดหมู่ --</option>
               {(taxonomy.articleCategories || []).map(cat => (
                 <option key={cat.id} value={cat.id}>{cat.label}</option>
@@ -172,7 +181,7 @@ export default function AdminArticles() {
         <div style={{ background: "rgba(45,190,160,0.1)", border: "1px solid var(--teal)", padding: "10px 16px", borderRadius: 12, marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontSize: 13, color: "var(--teal)", fontWeight: 500 }}>เลือกอยู่ {selected.length} รายการ</span>
           <button className="btn" style={{ background: "#e05555", color: "#fff", padding: "6px 14px", fontSize: 12 }} onClick={removeSelected} disabled={busy}>
-            <i className={busy ? "ti ti-loader-2 spin" : "ti ti-trash"} style={{ marginRight: 6 }}></i> {busy ? "กำลังลบ..." : "ลบที่เลือก"}
+            <i className={busy ? "ti ti-loader-2 spin" : "ti ti-trash"} style={{ marginRight: 6 }}></i> {busy ? "กำลังลบ..." : "ลบที่เลือกทั้งหมด"}
           </button>
         </div>
       )}
@@ -182,13 +191,13 @@ export default function AdminArticles() {
         <div style={{ display: "flex", alignItems: "center", padding: "0 16px", marginBottom: 10 }}>
           <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, color: "var(--t2)" }}>
             <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0} onChange={toggleAll} style={{ width: 16, height: 16, cursor: "pointer" }} />
-            เลือกทั้งหมด
+            เลือกทั้งหมด {filtered.length} รายการที่ค้นเจอ
           </label>
         </div>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {filtered.map(article => (
+        {currentItems.map(article => (
           <div key={article.id} className="card" style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
               <input type="checkbox" checked={selected.includes(article.id)} onChange={() => toggleSelect(article.id)} style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }} />
@@ -209,6 +218,28 @@ export default function AdminArticles() {
         ))}
         {filtered.length === 0 && <div className="empty">ไม่พบบทความที่ตรงกับเงื่อนไข</div>}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 32, flexWrap: "wrap" }}>
+          <button className="btn btn-outline" disabled={page === 1} onClick={() => { setPage(page - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ padding: "6px 12px", fontSize: 12 }}>ก่อนหน้า</button>
+          
+          {Array.from({ length: totalPages }).map((_, i) => {
+            const p = i + 1;
+            if (p === 1 || p === totalPages || (p >= page - 1 && p <= page + 1)) {
+              return (
+                <button key={p} onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className={page === p ? "btn btn-teal" : "btn btn-outline"} style={{ padding: "6px 14px", fontSize: 12 }}>{p}</button>
+              )
+            }
+            if (p === page - 2 || p === page + 2) {
+              return <span key={p} style={{ color: "var(--t3)", padding: "0 4px" }}>...</span>
+            }
+            return null;
+          })}
+          
+          <button className="btn btn-outline" disabled={page === totalPages} onClick={() => { setPage(page + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ padding: "6px 12px", fontSize: 12 }}>ถัดไป</button>
+        </div>
+      )}
     </div>
   )
 }
