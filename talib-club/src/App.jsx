@@ -6,6 +6,7 @@ import Home from "./pages/Home.jsx"
 import Articles from "./pages/Articles.jsx"
 import ArticleDetail from "./pages/ArticleDetail.jsx"
 import Library from "./pages/Library.jsx"
+import LibraryDetail from "./pages/LibraryDetail.jsx" // <-- เพิ่มการ Import หน้าละเอียดหนังสือ
 import Media from "./pages/Media.jsx"
 import MediaDetail from "./pages/MediaDetail.jsx"
 import Scholars from "./pages/Scholars.jsx"
@@ -17,7 +18,6 @@ import StaffWork from "./pages/StaffWork.jsx"
 import StaffTranslation from "./pages/StaffTranslation.jsx"
 import Admin from "./pages/Admin.jsx"
 import Donation from "./pages/Donation.jsx"
-import LibraryDetail from "./pages/LibraryDetail.jsx"
 import { Toaster } from "react-hot-toast"
 import "./styles/global.css"
 
@@ -32,6 +32,7 @@ export default function App() {
     "": "home",
     "articles": "articles",
     "library": "library",
+    "library-detail": "library-detail", // <-- เพิ่มเส้นทาง URL ของหน้าละเอียดหนังสือ
     "media": "media",
     "scholars": "scholars",
     "tracking-system": "tracking",
@@ -42,18 +43,15 @@ export default function App() {
     "staff-translation": "staff-translation",
     "admin": "admin",
     "donate": "donate",
-    "library-detail": "library-detail",
   }
 
   // จัดการการเปลี่ยนหน้าเมื่อกดปุ่ม Back / Forward บนเบราว์เซอร์
   useEffect(() => {
     const handlePopstate = (event) => {
-      // ถ้ามี State ที่เราบันทึกไว้ใน History (จากฟังก์ชัน go) ให้ดึงมาแสดงได้เลย
       if (event && event.state && event.state.page) {
         setPage(event.state.page)
         setCtx(event.state.ctx || null)
       } else {
-        // ถ้าไม่มี ให้อ่านจาก URL แทน
         const path = window.location.pathname.replace(/^\//, "") // ลบ / ออกจากด้านหน้า
         const mapped = urlToPage[path] || "home"
         setPage(mapped)
@@ -61,16 +59,13 @@ export default function App() {
       }
     }
 
-    // เซ็ต State เริ่มต้นตอนโหลดหน้าเว็บครั้งแรก เพื่อให้ปุ่ม Back ทำงานได้สมบูรณ์
     const initialPath = window.location.pathname.replace(/^\//, "")
     const initialPage = urlToPage[initialPath] || "home"
     window.history.replaceState({ page: initialPage, ctx: null }, "", window.location.pathname)
     setPage(initialPage)
 
-    // รับฟัง Event เมื่อผู้ใช้กดปุ่ม Back/Forward
     window.addEventListener("popstate", handlePopstate)
     
-    // คืนค่า Event กลับเมื่อ Component ถูก Unmount
     return () => window.removeEventListener("popstate", handlePopstate)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -80,15 +75,13 @@ export default function App() {
     setCtx(data)
     window.scrollTo({ top: 0, behavior: "smooth" })
     
-    // --- ระบบเปลี่ยน URL อัตโนมัติและบันทึก History ---
     let urlPath = "/";
     if (p === "tracking") {
-      urlPath = "/tracking-system"; // ถ้าเป็นหน้าตรวจพัสดุ
+      urlPath = "/tracking-system";
     } else if (p !== "home") {
-      urlPath = "/" + p; // หน้าอื่นๆ เช่น /articles, /library
+      urlPath = "/" + p;
     }
     
-    // บันทึกหน้าปัจจุบันลงใน History พร้อมข้อมูล Context
     window.history.pushState({ page: p, ctx: data }, "", urlPath);
   }
 
@@ -101,7 +94,8 @@ export default function App() {
         {page === "home" && <Home go={go} />}
         {page === "articles" && <Articles go={go} />}
         {page === "article" && <ArticleDetail item={ctx} go={go} />}
-        {page === "library" && <Library />}
+        {page === "library" && <Library go={go} />} {/* <-- ส่งต่อฟังก์ชัน go เข้าไปในหน้าห้องสมุดหลัก */}
+        {page === "library-detail" && <LibraryDetail item={ctx} go={go} />} {/* <-- เปิดพื้นที่ให้หน้าละเอียดหนังสือแสดงผล */}
         {page === "media" && <Media go={go} />}
         {page === "media-detail" && <MediaDetail item={ctx} go={go} />}
         {page === "scholars" && <Scholars />}
@@ -133,7 +127,6 @@ export default function App() {
           </RequireStaff>
         )}
        {page === "donate" && <Donation />}
-       {page === "library-detail" && <LibraryDetail item={ctx} go={go} />}
       </main>
     </div>
   )
