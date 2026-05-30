@@ -1,204 +1,190 @@
-import { useEffect, useState, useMemo, useRef } from "react"
-import toast from "react-hot-toast"
-import { ARTICLES } from "../data/index.js"
-import { useContentCollection } from "../lib/contentStore.js"
+import { useEffect, useMemo, useState } from "react"
+import {
+  collection,
+  doc,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore"
+import { db } from "./firebase.js"
 
-const READER_DEFAULTS = { size: "md", tone: "3" }
-const READER_STORAGE_KEY = "talibReaderPrefs"
-const READER_SIZE_LABELS = { sm: "ก-", md: "ก", lg: "ก+" }
-const READER_TONE_LABELS = { 1: "1", 2: "2", 3: "3", 4: "4", 5: "5" }
+// 👇 จุดที่เพิ่มเข้ามา: เพิ่ม bookmarks ให้ระบบรู้จัก
+export const CONTENT_COLLECTIONS = {
+  articles: "content_articles",
+  books: "content_books",
+  media: "content_media",
+  scholars: "content_scholars",
+  bookmarks: "content_bookmarks", // <-- เพิ่มบรรทัดนี้ครับ
+}
 
-export default function ArticleDetail({ item, go, authState }) {
-  const { items: articles, loading: loadingArticles, saveItem } = useContentCollection("articles", ARTICLES)
-  
-  // 💡 สร้างคอลเลกชันย่อยบน Firestore สำหรับเก็บข้อมูลการบุ๊กมาร์กโดยตรง ไม่ยุ่งกับ LocalStorage
-  const { items: bookmarks, saveItem: saveBookmark, deleteItem: deleteBookmark } = useContentCollection("bookmarks", [])
-  
-  const urlId = new URLSearchParams(window.location.search).get("id")
-  const hasIncrementedView = useRef(null)
+export const SITE_DOC = { collection: "content_settings", id: "site" }
+export const TAXONOMY_DOC = { collection: "content_settings", id: "taxonomy" }
 
-  const displayItem = useMemo(() => {
-    if (item && !item.viewMode) return item;
-    if (urlId && articles.length > 0) return articles.find(a => String(a.id) === String(urlId));
-    if (item && item.id) return item;
-    return null;
-  }, [item, urlId, articles])
+function cleanForFirestore(value) {
+  if (Array.isArray(value)) return value.map(cleanForFirestore)
+  if (!value || typeof value !== "object") return value
 
-  useEffect(() => {
-    if (displayItem && !loadingArticles && saveItem && hasIncrementedView.current !== displayItem.id) {
-      hasIncrementedView.current = displayItem.id;
-      const updatedItem = { ...displayItem, views: (displayItem.views || 0) + 1 };
-      saveItem(updatedItem).catch(e => console.error("อัปเดตยอดวิวไม่สำเร็จ", e));
-    }
-  }, [displayItem, loadingArticles, saveItem])
-
-  useEffect(() => {
-    if (!loadingArticles && !displayItem) go("articles")
-  }, [displayItem, loadingArticles, go])
-
-  const [readerPrefs, setReaderPrefs] = useState(() => getSavedReaderPrefs())
-  useEffect(() => {
-    window.localStorage.setItem(READER_STORAGE_KEY, JSON.stringify(readerPrefs))
-  }, [readerPrefs])
-
-  // --- ระบบเช็คสถานะการบันทึกจาก Firestore (อิงตาม UID ของสมาชิกที่ล็อกอินอยู่) ---
-  const uid = authState?.user?.uid;
-  
-  const savedList = useMemo(() => {
-    if (!uid) return [];
-    return bookmarks.filter(b => b.uid === uid).map(b => b.articleId);
-  }, [bookmarks, uid])
-
-  const isSaved = displayItem ? savedList.includes(displayItem.id) : false;
-
-  const toggleSave = async () => {
-    if (!uid) {
-      toast.error("กรุณาเข้าสู่ระบบก่อนบันทึกบทความ");
-      go("auth");
-      return;
-    }
-
-    const bookmarkId = `${uid}_${displayItem.id}`; // ใช้ UID ผสมกับรหัสบทความเพื่อทำเป็น ID เอกสาร
-
-    try {
-      if (isSaved) {
-        await deleteBookmark(bookmarkId);
-        toast.success("ยกเลิกการบันทึกแล้ว");
-      } else {
-        await saveBookmark({
-          id: bookmarkId,
-          uid: uid,
-          articleId: displayItem.id,
-          savedAt: new Date().toISOString()
-        });
-        toast.success("บันทึกบทความไว้ในบัญชีของคุณแล้ว!");
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("เกิดข้อผิดพลาดจากระบบฐานข้อมูล กรุณาลองใหม่");
-    }
-  }
-
-  const handleShare = async () => {
-    navigator.clipboard.writeText(window.location.href);
-    toast.success("คัดลอกลิงก์สำหรับแชร์แล้ว");
-    if (saveItem && displayItem) {
-      saveItem({ ...displayItem, shares: (displayItem.shares || 0) + 1 }).catch(e => console.error(e));
-    }
-  }
-
-  const handlePrint = () => window.print();
-
-  if (loadingArticles && !displayItem) {
-    return <div className="article-page" style={{textAlign: "center", padding: "100px 0"}}><i className="ti ti-loader-2 spin" style={{fontSize:32, color:"var(--teal)"}}></i></div>
-  }
-  if (!displayItem) return null
-
-  // ระบบแกะข้อความสร้างสารบัญอัตโนมัติ
-  const toc = [];
-  const parsedBody = (displayItem.body || "").split("\n\n").map((para, index) => {
-    if (para.startsWith("## ")) {
-      const title = para.replace("## ", "");
-      const id = `toc-${index}`;
-      toc.push({ id, title, level: 2 });
-      return <h2 key={index} id={id} style={{ marginTop: 36, marginBottom: 16, fontSize: 22, color: "var(--teal)" }}>{title}</h2>;
-    }
-    if (para.startsWith("### ")) {
-      const title = para.replace("### ", "");
-      const id = `toc-${index}`;
-      toc.push({ id, title, level: 3 });
-      return <h3 key={index} id={id} style={{ marginTop: 24, marginBottom: 12, fontSize: 18 }}>{title}</h3>;
-    }
-    return <p key={index}>{para}</p>;
-  });
-
-  const related = articles.filter(a => a.id !== displayItem.id && a.category === displayItem.category).slice(0, 3)
-  const readerClass = `article-body reader-size-${readerPrefs.size} reader-tone-${readerPrefs.tone}`
-
-  return (
-    <div className="article-page" style={{ maxWidth: 800, margin: "0 auto" }}>
-      <button className="btn btn-outline" onClick={() => go("articles")} style={{ marginBottom: 24, padding: "6px 14px", fontSize: 12 }}>
-        <i className="ti ti-arrow-left" style={{ marginRight: 6, fontSize: 12 }}></i>กลับหน้าบทความ
-      </button>
-
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-          <span className="tag tag-teal">{displayItem.category}</span>
-          {displayItem.type === "series" && <span className="tag tag-acc">ซีรีส์ {displayItem.seriesId} ตอน {displayItem.part}</span>}
-          {displayItem.type === "specific" && displayItem.seriesName && <span className="tag tag-acc">{displayItem.seriesName}</span>}
-        </div>
-        <h1 className="article-title">{displayItem.title}</h1>
-        
-        <div style={{ display: "flex", gap: 16, color: "var(--t3)", fontSize: 12, fontWeight: 300, flexWrap: "wrap", marginTop: 12 }}>
-          <span><i className="ti ti-user" style={{ marginRight: 4, fontSize: 13 }}></i>{displayItem.author}</span>
-          <span><i className="ti ti-calendar" style={{ marginRight: 4, fontSize: 13 }}></i>{displayItem.date}</span>
-          <span title="ผู้เข้าชม"><i className="ti ti-eye" style={{ marginRight: 4, fontSize: 13 }}></i>{(displayItem.views || 0).toLocaleString()}</span>
-          <span title="แชร์"><i className="ti ti-share" style={{ marginRight: 4, fontSize: 13 }}></i>{(displayItem.shares || 0).toLocaleString()}</span>
-        </div>
-      </div>
-
-      <div className="divider" />
-
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 }}>
-        <button onClick={handleShare} className="btn btn-outline" style={{ fontSize: 12, flex: "1 1 100px", padding: "8px 0" }}>
-          <i className="ti ti-share" style={{ marginRight: 6, fontSize: 14 }}></i> คัดลอกลิงก์
-        </button>
-        <button onClick={handlePrint} className="btn btn-outline" style={{ fontSize: 12, flex: "1 1 100px", padding: "8px 0" }}>
-          <i className="ti ti-printer" style={{ marginRight: 6, fontSize: 14 }}></i> ปริ้น / PDF
-        </button>
-        <button onClick={toggleSave} className={`btn ${isSaved ? "btn-teal" : "btn-outline"}`} style={{ fontSize: 12, flex: "1 1 100px", padding: "8px 0" }}>
-          <i className={`ti ${isSaved ? "ti-bookmark-filled" : "ti-bookmark"}`} style={{ marginRight: 6, fontSize: 14 }}></i> 
-          {isSaved ? "บันทึกแล้ว" : "บันทึกไว้อ่าน"}
-        </button>
-      </div>
-
-      <div className="reader-tools" aria-label="ตัวเลือกการอ่าน">
-        <div className="reader-control" aria-label="ขนาดตัวอักษร">
-          {Object.entries(READER_SIZE_LABELS).map(([value, label]) => (
-            <button key={value} type="button" className={`reader-btn ${readerPrefs.size === value ? "on" : ""}`} onClick={() => setReaderPrefs(prev => ({ ...prev, size: value }))}>{label}</button>
-          ))}
-        </div>
-        <div className="reader-control" aria-label="ความเข้มตัวอักษร">
-          {Object.entries(READER_TONE_LABELS).map(([value, label]) => (
-            <button key={value} type="button" className={`reader-btn ${readerPrefs.tone === value ? "on" : ""}`} onClick={() => setReaderPrefs(prev => ({ ...prev, tone: value }))}>{label}</button>
-          ))}
-        </div>
-      </div>
-
-      {toc.length > 0 && (
-        <div className="card" style={{ padding: "20px 24px", marginBottom: 32, background: "var(--bg2)", border: ".5px solid var(--br2)" }}>
-          <h3 style={{ fontSize: 16, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-            <i className="ti ti-list" style={{ color: "var(--teal)" }}></i> สารบัญเนื้อหา (Table Of Contents)
-          </h3>
-          <ul style={{ margin: 0, paddingLeft: 24, display: "flex", flexDirection: "column", gap: 10 }}>
-            {toc.map(t => (
-              <li key={t.id} style={{ fontSize: t.level === 2 ? 14 : 13, color: "var(--text)" }}>
-                <a href={`#${t.id}`} onClick={(e) => { e.preventDefault(); document.getElementById(t.id)?.scrollIntoView({ behavior: 'smooth' }); }} style={{ color: "var(--teal)", textDecoration: "none", opacity: t.level === 3 ? 0.8 : 1 }}>
-                  {t.title}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="article-excerpt"><p>{displayItem.excerpt}</p></div>
-      <div className={readerClass} style={{ scrollBehavior: "smooth" }}>{parsedBody}</div>
-
-      {displayItem.tags && displayItem.tags.length > 0 && (
-        <div style={{ marginTop: 32, display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {displayItem.tags.map(t => (
-            <span key={t} className="tag tag-acc" style={{ fontSize: 11 }}>#{t}</span>
-          ))}
-        </div>
-      )}
-    </div>
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, item]) => item !== undefined)
+      .map(([key, item]) => [key, cleanForFirestore(item)])
   )
 }
 
-function getSavedReaderPrefs() {
-  try {
-    const saved = JSON.parse(window.localStorage.getItem(READER_STORAGE_KEY) || "{}")
-    return { size: READER_SIZE_LABELS[saved.size] ? saved.size : READER_DEFAULTS.size, tone: READER_TONE_LABELS[saved.tone] ? saved.tone : READER_DEFAULTS.tone }
-  } catch { return READER_DEFAULTS }
+function byNewestDate(a, b) {
+  const dateA = String(a.date || "")
+  const dateB = String(b.date || "")
+  if (dateA !== dateB) return dateB.localeCompare(dateA)
+  return String(b.id || "").localeCompare(String(a.id || ""))
+}
+
+function mergeWithFallback(fallbackItems, remoteItems) {
+  if (!remoteItems) return fallbackItems
+
+  const byId = new Map(fallbackItems.map(item => [String(item.id), item]))
+  remoteItems.forEach(item => {
+    const id = String(item.id)
+    if (item.deleted) {
+      byId.delete(id)
+      return
+    }
+    byId.set(id, { ...(byId.get(id) || {}), ...item })
+  })
+  return [...byId.values()]
+}
+
+export function useContentCollection(name, fallbackItems = []) {
+  const [remoteItems, setRemoteItems] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const collectionName = CONTENT_COLLECTIONS[name]
+
+  useEffect(() => {
+    if (!collectionName) {
+      setError(new Error(`Unknown content collection: ${name}`))
+      setLoading(false)
+      return undefined
+    }
+
+    const unsubscribe = onSnapshot(
+      collection(db, collectionName),
+      snapshot => {
+        const next = snapshot.docs.map(item => {
+          const data = item.data()
+          return { ...data, id: data.id ?? item.id }
+        })
+        setRemoteItems(next)
+        setError(null)
+        setLoading(false)
+      },
+      err => {
+        console.error(`Cannot load ${collectionName}`, err)
+        setError(err)
+        setRemoteItems(null)
+        setLoading(false)
+      }
+    )
+
+    return unsubscribe
+  }, [collectionName, name])
+
+  const items = useMemo(() => {
+    const source = loading && remoteItems === null ? [] : mergeWithFallback(fallbackItems, remoteItems)
+    return [...source].sort(byNewestDate)
+  }, [fallbackItems, loading, remoteItems])
+
+  async function saveItem(item) {
+    const id = String(item.id || crypto.randomUUID())
+    await setDoc(doc(db, collectionName, id), {
+      ...cleanForFirestore(item),
+      id,
+      deleted: false,
+      updatedAt: serverTimestamp(),
+    }, { merge: true })
+  }
+
+  async function deleteItem(id) {
+    await setDoc(doc(db, collectionName, String(id)), {
+      id: String(id),
+      deleted: true,
+      updatedAt: serverTimestamp(),
+    }, { merge: true })
+  }
+
+  return {
+    items,
+    loading,
+    error,
+    isUsingFallback: !loading && (!remoteItems || remoteItems.length === 0),
+    saveItem,
+    deleteItem,
+  }
+}
+
+export function useSiteSettings(fallbackSite) {
+  const [site, setSite] = useState(fallbackSite)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      doc(db, SITE_DOC.collection, SITE_DOC.id),
+      snapshot => {
+        setSite(snapshot.exists() ? { ...fallbackSite, ...snapshot.data() } : fallbackSite)
+        setError(null)
+        setLoading(false)
+      },
+      err => {
+        console.error("Cannot load site settings", err)
+        setSite(fallbackSite)
+        setError(err)
+        setLoading(false)
+      }
+    )
+
+    return unsubscribe
+  }, [fallbackSite])
+
+  async function saveSiteSettings(nextSite) {
+    await setDoc(doc(db, SITE_DOC.collection, SITE_DOC.id), {
+      ...cleanForFirestore(nextSite),
+      updatedAt: serverTimestamp(),
+    }, { merge: true })
+  }
+
+  return { site, loading, error, saveSiteSettings }
+}
+
+export function useTaxonomySettings(fallbackTaxonomy) {
+  const [taxonomy, setTaxonomy] = useState(fallbackTaxonomy)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      doc(db, TAXONOMY_DOC.collection, TAXONOMY_DOC.id),
+      snapshot => {
+        setTaxonomy(snapshot.exists() ? { ...fallbackTaxonomy, ...snapshot.data() } : fallbackTaxonomy)
+        setError(null)
+        setLoading(false)
+      },
+      err => {
+        console.error("Cannot load taxonomy settings", err)
+        setTaxonomy(fallbackTaxonomy)
+        setError(err)
+        setLoading(false)
+      }
+    )
+
+    return unsubscribe
+  }, [fallbackTaxonomy])
+
+  async function saveTaxonomySettings(nextTaxonomy) {
+    await setDoc(doc(db, TAXONOMY_DOC.collection, TAXONOMY_DOC.id), {
+      ...cleanForFirestore(nextTaxonomy),
+      updatedAt: serverTimestamp(),
+    }, { merge: true })
+  }
+
+  return { taxonomy, loading, error, saveTaxonomySettings }
 }
