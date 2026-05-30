@@ -29,19 +29,19 @@ const db = getFirestore(app);
 // --- จบ: โค้ดตั้งค่า Firebase ---
 
 // ━━━ CONFIGURATION ━━━
-const ADMIN_TEAM = ["อุสมาน", "ฟาดิล", "อนันดา"] 
+const ADMIN_TEAM = ["Usman Manu", "ฟาดิล", "อนันดา"] 
 const SUBMISSION_TYPES = ["บทความ", "เอกสาร", "รูปภาพ", "คลิป", "เสียง", "อื่นๆ"]
 const STATUS_OPTIONS = { PENDING: "รอตรวจ", REJECTED: "ตีกลับ", APPROVED: "อนุมัติแล้ว", POSTED: "ลงงานแล้ว" }
 const PLATFORMS = ["Facebook", "Instagram", "YouTube", "TikTok", "Spotify"]
 
 const DEFAULT_STAFF = ["ชาฟิน", "ชามิล", "ดาวูด", "ติรมีซี", "นิซอม", "แบยัง", "แบอัซมาวีย์", "ฟาดิล", "มะห์ดี", "ยะฮฺ", "อนันดา", "อับดุสสลาม", "อับบาส", "อุสมาน", "ฮาฟิซ"]
 const DEFAULT_MAGAZINE = [
-  { month: "มกราคม", user: "แบยัง" }, { month: "กุมภาพันธ์", user: "แบอัซมาวีย์" },
+  { month: "มกราคม", user: "แบยัง" }, { month: "กุมภาพันธ์", user: "ฟาดิล" },
   { month: "มีนาคม", user: "อุสมาน" }, { month: "เมษายน", user: "ชามิล" },
   { month: "พฤษภาคม", user: "อนันดา" }, { month: "มิถุนายน", user: "แบยัง" },
   { month: "กรกฎาคม", user: "ฟาดิล" }, { month: "สิงหาคม", user: "ชาฟิน" },
   { month: "กันยายน", user: "อุสมาน" }, { month: "ตุลาคม", user: "ดาวูด" },
-  { month: "พฤศจิกายน", user: "ฮาฟิซ" }, { month: "ธันวาคม", user: "มะห์ดี" }
+  { month: "พฤศจิกายน", user: "มะห์ดี" }, { month: "ธันวาคม", user: "ชาฟิน" }
 ]
 
 // ━━━ TELEGRAM CONFIG ━━━
