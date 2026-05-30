@@ -10,7 +10,7 @@ export default function Donation() {
       accountName: "นายสอบรีย์ บิลังโหลด",
       accountNumber: "704-287501-5",
       tag: "สมทบทุน",
-      logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Siam_Commercial_Bank_Logo.svg/256px-Siam_Commercial_Bank_Logo.svg.png",
+      logo: "/scb-logo.png",
       qrImage: "/scb-qr.png" // ใส่รูปภาพ QR Code ไว้ในโฟลเดอร์ public
     }
   ]
