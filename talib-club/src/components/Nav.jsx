@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { SITE } from "../data/index.js"
+import toast from "react-hot-toast"
 
 const NAV_LINKS = [
   { id: "home", label: "หน้าหลัก", icon: "ti-home" },
@@ -47,9 +48,22 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
     setAccountOpen(false)
   }
 
+  // แก้ไขระบบออกจากระบบให้สมูทขึ้น
   async function logout() {
-    await authState.logout()
-    nav("home")
+    const isConfirm = window.confirm("คุณแน่ใจหรือไม่ว่าต้องการออกจากระบบ?");
+    if (!isConfirm) return;
+
+    const toastId = toast.loading("กำลังออกจากระบบ...");
+
+    setTimeout(async () => {
+      try {
+        if (authState?.logout) await authState.logout();
+        toast.success("ออกจากระบบสำเร็จ", { id: toastId });
+        window.location.href = "/"; // รีโหลดหน้าเพื่อเคลียร์ state ทั้งหมด
+      } catch (error) {
+        toast.error("เกิดข้อผิดพลาดในการออกจากระบบ", { id: toastId });
+      }
+    }, 600);
   }
 
   const userName = authState?.profile?.displayName || authState?.user?.displayName || authState?.user?.email || "บัญชีของฉัน"
@@ -90,10 +104,11 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
                 background: authState?.user ? "var(--teal-bg)" : "var(--bg2)",
                 border: "none", cursor: "pointer",
                 color: authState?.user ? "var(--teal)" : "var(--t3)",
-                padding: authState?.user ? 0 : "6px 10px",
+                padding: authState?.user ? 0 : "6px 14px", // ปรับ padding
                 borderRadius: 20, width: authState?.user ? 34 : "auto",
                 height: authState?.user ? 34 : "auto",
                 display: "flex", alignItems: "center", justifyContent: "center",
+                gap: "6px", // เพิ่มช่องไฟระหว่างไอคอนและข้อความ
                 fontFamily: "'Prompt',sans-serif", fontWeight: 600,
               }}
               title={authState?.user ? "บัญชีของฉัน" : "เข้าสู่ระบบ"}
@@ -104,7 +119,12 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
                 photoURL
                   ? <img src={photoURL} alt="" onError={() => setAvatarBroken(true)} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
                   : userInitial
-              ) : <i className="ti ti-login"></i>}
+              ) : (
+                <>
+                  <i className="ti ti-login" style={{ fontSize: 16 }}></i>
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>เข้าสู่ระบบ</span>
+                </>
+              )}
             </button>
 
             {authState?.user && accountOpen && (

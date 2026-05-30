@@ -29,6 +29,24 @@ export default function MemberDashboard({ authState, go, initialView = "overview
     }
   }
 
+  // เพิ่มฟังก์ชันสำหรับออกจากระบบ
+  const handleLogout = async () => {
+    const isConfirm = window.confirm("คุณแน่ใจหรือไม่ว่าต้องการออกจากระบบ?");
+    if (!isConfirm) return;
+
+    const toastId = toast.loading("กำลังออกจากระบบ...");
+
+    setTimeout(async () => {
+      try {
+        if (authState?.logout) await authState.logout();
+        toast.success("ออกจากระบบสำเร็จ", { id: toastId });
+        window.location.href = "/";
+      } catch (error) {
+        toast.error("เกิดข้อผิดพลาดในการออกจากระบบ", { id: toastId });
+      }
+    }, 600);
+  };
+
   return (
     <div className="member-page">
       <div className="member-hero">
@@ -38,7 +56,8 @@ export default function MemberDashboard({ authState, go, initialView = "overview
           <p>พื้นที่สมาชิกสำหรับติดตามการอ่าน บันทึกหนังสือ และจัดการข้อมูลบัญชี Talib Club</p>
         </div>
         <div className="member-actions">
-          <button className="btn btn-outline" onClick={authState?.logout}>
+          {/* เปลี่ยนมาใช้ handleLogout แทนที่อันเดิม */}
+          <button className="btn btn-outline" onClick={handleLogout}>
             <i className="ti ti-logout" style={{ marginRight: 6 }}></i>ออกจากระบบ
           </button>
         </div>
