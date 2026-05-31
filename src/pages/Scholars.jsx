@@ -11,14 +11,39 @@ export default function Scholars() {
   const [search, setSearch] = useState("")
   const [era, setEra] = useState("0")
   const [field, setField] = useState("all")
+  const [manhajFilter, setManhajFilter] = useState("all")
 
   const fields = ["all", ...new Set([...(taxonomy.scholarFields || []), ...scholars.map(s=>s.field?.split("/")[0]).filter(Boolean)])]
 
   const filtered = scholars.filter(s=>{
     const matchEra = era==="0"||String(s.era)===String(era)
     const matchField = field==="all"||s.field.includes(field)
-    const matchSearch = !search||s.name.includes(search)||s.note.includes(search)
-    return matchEra && matchField && matchSearch
+    
+    let matchManhaj = true
+    if (manhajFilter !== "all") {
+      if (manhajFilter === "สะลาฟีย์") {
+        matchManhaj = s.manhaj && s.manhaj.includes("สะลาฟีย์")
+      } else if (manhajFilter === "อาชาอิเราะฮ์") {
+        matchManhaj = s.manhaj && (s.manhaj.includes("อาชาอิเราะฮ์") || s.manhaj.includes("มาตุรีดียะฮ์"))
+      } else if (manhajFilter === "คอวาริจญ์") {
+        matchManhaj = s.manhaj && (s.manhaj.includes("คอวาริจญ์") || s.manhaj.includes("อิบาดิยะฮ์"))
+      } else if (manhajFilter === "มุรญีอะฮ์") {
+        matchManhaj = s.manhaj && (s.manhaj.includes("มุรญีอะฮ์") || s.manhaj.includes("ญะฮ์มียะฮ์"))
+      } else if (manhajFilter === "การเมือง") {
+        matchManhaj = s.manhaj && (s.manhaj.includes("การเมือง") || s.manhaj.includes("อิควาน") || s.manhaj.includes("ซูรูรียะฮ์"))
+      } else if (manhajFilter === "โมเดิร์นนิสต์") {
+        matchManhaj = s.manhaj && (s.manhaj.includes("โมเดิร์นนิสต์") || s.manhaj.includes("ปฏิรูป"))
+      } else {
+        matchManhaj = s.manhaj && s.manhaj.includes(manhajFilter)
+      }
+    }
+
+    const term = search.toLowerCase()
+    const matchSearch = !search||
+      s.name.toLowerCase().includes(term)||
+      s.note.toLowerCase().includes(term)||
+      (s.manhaj && s.manhaj.toLowerCase().includes(term))
+    return matchEra && matchField && matchManhaj && matchSearch
   })
 
   const eras = ["0", ...(taxonomy.scholarEras || []).map(item => item.id)]
@@ -37,9 +62,21 @@ export default function Scholars() {
         <div style={{position:"relative",flex:1,minWidth:200}}>
           <i className="ti ti-search" style={{position:"absolute",left:10,top:"50%",
             transform:"translateY(-50%)",color:"var(--t3)",fontSize:14}}></i>
-          <input placeholder="ค้นหาชื่ออุลามาอฺ..." value={search}
+          <input placeholder="ค้นหาชื่ออุลามาอฺ หรือ มันฮัจญ์..." value={search}
             onChange={e=>setSearch(e.target.value)} style={{paddingLeft:32}}/>
         </div>
+        <select value={manhajFilter} onChange={e=>setManhajFilter(e.target.value)} style={{width:"auto",flex:"0 0 auto"}}>
+          <option value="all">ทุกมันฮัจญ์/อากีดะฮ์</option>
+          <option value="สะลาฟีย์">สะลาฟีย์ (มันฮัจญ์สะลัฟ / อะษารีย์)</option>
+          <option value="อาชาอิเราะฮ์">อาชาอิเราะฮ์ / มาตุรีดีย์</option>
+          <option value="ซูฟีย์">ซูฟีย์</option>
+          <option value="มุอ์ตาซิละฮ์">มุอ์ตาซิละฮ์</option>
+          <option value="ชีอะฮ์">ชีอะฮ์</option>
+          <option value="คอวาริจญ์">คอวาริจญ์ / อิบาดีย์</option>
+          <option value="มุรญีอะฮ์">มุรญีอะฮ์ / ญะฮ์มีย์</option>
+          <option value="การเมือง">การเมืองอิสลาม / อิควาน / ซูรูรีย์</option>
+          <option value="โมเดิร์นนิสต์">โมเดิร์นนิสต์ / ปฏิรูป</option>
+        </select>
         <select value={field} onChange={e=>setField(e.target.value)} style={{width:"auto",flex:"0 0 auto"}}>
           {fields.map(f=><option key={f} value={f}>{f==="all"?"ทุกสาขา":f}</option>)}
         </select>
@@ -81,8 +118,11 @@ export default function Scholars() {
                 <div key={s.id} className="card" style={{padding:16,borderLeft:`2px solid ${color}`}}>
                   <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:8}}>
                     <div style={{fontSize:13,fontWeight:500,color:"var(--text)",lineHeight:1.4}}>{s.name}</div>
-                    <span className="tag" style={{background:"var(--acc2)",color:"var(--t2)",
-                      fontSize:9,flexShrink:0,fontWeight:400}}>{s.field}</span>
+                    <div style={{display:"flex", gap:4, flexShrink:0, flexWrap:"wrap", justifyContent:"flex-end"}}>
+                      {s.manhaj && <span className="tag tag-teal" style={{fontSize:9,fontWeight:400}}>{s.manhaj}</span>}
+                      <span className="tag" style={{background:"var(--acc2)",color:"var(--t2)",
+                        fontSize:9,fontWeight:400}}>{s.field}</span>
+                    </div>
                   </div>
                   <div style={{display:"flex",gap:12,marginBottom:8}}>
                     <div style={{fontSize:11,fontWeight:300}}>
