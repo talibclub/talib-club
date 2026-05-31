@@ -63,6 +63,9 @@ main {
   margin: 0 auto;
   padding: 36px 24px 100px;
 }
+main.wide {
+  max-width: 1450px;
+}
 
 /* Typography */
 h1, h2, h3, p, span, div { overflow-wrap: break-word; word-wrap: break-word; }

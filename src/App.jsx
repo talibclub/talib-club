@@ -96,7 +96,7 @@ export default function App() {
       <Toaster position="top-right" toastOptions={{ style: { fontFamily: "'Prompt', sans-serif", fontSize: 14 } }} />
       
       <Nav page={page} go={go} theme={theme} setTheme={setTheme} authState={authState} />
-      <main>
+      <main className={page === "quran" || page === "member" ? "wide" : ""}>
         {page === "home" && <Home go={go} />}
         {page === "articles" && <Articles go={go} authState={authState} ctx={ctx} />}      
         {page === "article" && <ArticleDetail item={ctx} go={go} authState={authState} />}

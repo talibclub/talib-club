@@ -73,9 +73,9 @@ export default function MemberDashboard({ authState, go, initialView = "overview
           authState={authState} 
           go={go} 
           setView={setView} 
-          onOpenQuran={() => {
-            setQuranSura(1)
-            setQuranAyah(null)
+          onOpenQuran={(sura, ayah) => {
+            setQuranSura(sura || 1)
+            setQuranAyah(ayah || null)
             setView("quran")
           }}
           onOpenSavedVerses={() => setView("saved-verses")}
@@ -84,7 +84,7 @@ export default function MemberDashboard({ authState, go, initialView = "overview
       {view === "saved-articles" && <SavedArticlesPanel authState={authState} go={go} setView={setView} />}
       {view === "profile" && <ProfilePanel authState={authState} copied={copied} copyText={copyText} go={go} setView={setView} />}
       {view === "quran" && (
-        <div className="profile-layout" style={{ maxWidth: "100%", margin: "0 auto" }}>
+        <div style={{ width: "100%", maxWidth: "1400px", margin: "0 auto" }}>
           <button 
             onClick={() => setView("overview")} 
             className="sec-link" 
@@ -113,11 +113,56 @@ export default function MemberDashboard({ authState, go, initialView = "overview
 }
 
 function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
+  const [lastRead, setLastRead] = useState(null)
+
+  useEffect(() => {
+    try {
+      const local = localStorage.getItem("quran-last-read")
+      if (local) {
+        setLastRead(JSON.parse(local))
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }, [])
+
   return (
     <div>
+      {lastRead && (
+        <div className="card" style={{ 
+          padding: "16px 20px", 
+          marginBottom: 20, 
+          background: "var(--teal-bg)", 
+          borderColor: "rgba(45, 190, 160, 0.2)",
+          display: "flex", 
+          justifyContent: "space-between", 
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 12,
+          textAlign: "left"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 38, height: 38, borderRadius: "50%", background: "var(--card)", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--br)", flexShrink: 0 }}>
+              <i className="ti ti-flag-2" style={{ color: "var(--teal)", fontSize: 16 }}></i>
+            </div>
+            <div>
+              <span style={{ fontSize: 11, color: "var(--t2)", display: "block" }}>อ่านอัลกุรอานค้างไว้ล่าสุด</span>
+              <strong style={{ fontSize: 13, color: "var(--text)" }}>ซูเราะฮ์ {lastRead.suraName} ({lastRead.suraThaiName}) อายะฮ์ที่ {lastRead.aya}</strong>
+            </div>
+          </div>
+          <button 
+            className="btn btn-teal" 
+            style={{ padding: "6px 16px", fontSize: 12 }}
+            onClick={() => onOpenQuran(lastRead.sura, lastRead.aya)}
+          >
+            อ่านต่อล่าสุด <i className="ti ti-arrow-right" style={{ marginLeft: 4 }}></i>
+          </button>
+        </div>
+      )}
+
       <div className="grid3">
         <DashboardCard icon="ti-user-circle" title="โปรไฟล์ของฉัน" text="จัดการข้อมูลบัญชี" onClick={() => setView("profile")} />
-        <DashboardCard icon="ti-book" title="อัลกุรอานของฉัน" text="เปิดอ่าน แปลไทย ตัฟซีรย่อ และค้นหาคำสำคัญ" onClick={onOpenQuran} />
+        <DashboardCard icon="ti-book" title="อัลกุรอานของฉัน" text="เปิดอ่าน แปลไทย ตัฟซีรย่อ และค้นหาคำสำคัญ" onClick={() => onOpenQuran(1, null)} />
         <DashboardCard icon="ti-notebook" title="อายะฮ์ที่บันทึกไว้" text="ข้อคิดและประโยชน์ที่ได้รับจากอัลกุรอาน" onClick={onOpenSavedVerses} />
         <DashboardCard icon="ti-book-2" title="ชั้นหนังสือของฉัน" text="บันทึกหนังสือที่กำลังอ่านและอ่านจบ" />
         <DashboardCard icon="ti-flame" title="Reading Streak" text="ติดตามวันที่อ่านต่อเนื่อง" />
