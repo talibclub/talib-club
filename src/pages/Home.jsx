@@ -76,21 +76,23 @@ export default function Home({ go }) {
           <button className="sec-link" onClick={() => go("articles")}>ดูทั้งหมด →</button>
         </div>
         <div className="grid-art">
-          {recent.map((a, i) => (
-            <div key={a.id} className="card" style={{ cursor:"pointer", overflow:"hidden" }}
+          {recent.map(a => (
+            <div key={a.id} className="card" style={{ cursor: "pointer" }}
               onClick={() => go("article", a)}>
-              <div style={{
-                height:80, display:"flex", alignItems:"center", justifyContent:"center",
-                fontSize:28, opacity:.5,
-                background: i===0 ? "var(--teal-bg)" : i===1 ? "var(--acc2)" : "rgba(80,100,200,.07)"
-              }}>{a.coverEmoji}</div>
-              <div style={{ padding:12 }}>
-                <span className="tag tag-teal" style={{ marginBottom:6 }}>{a.category}</span>
-                <div style={{ fontSize:13, fontWeight:500, color:"var(--text)", lineHeight:1.4, marginBottom:6 }}>
+              <div style={{ padding: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                  <span className="tag tag-teal">{a.category}</span>
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", lineHeight: 1.45, marginBottom: 8 }}>
                   {a.title}
                 </div>
-                <div style={{ fontSize:11, color:"var(--t3)", fontWeight:300 }}>
-                  {a.author} · {a.readTime} นาที
+                <p style={{ fontSize: 12, marginBottom: 10, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                  {a.excerpt}
+                </p>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>
+                    {a.author} · {a.date}
+                  </div>
                 </div>
               </div>
             </div>

@@ -461,12 +461,12 @@ export default function Tracking() {
       {/* --------------------------------------------------------- */}
       {view === "admin-login" && (
         <div style={{ maxWidth: "400px", margin: "80px auto" }}>
-          <div className="card" style={{ padding: "32px", textAlign: "center", borderTop: "4px solid #1a3a5c" }}>
+          <div className="card" style={{ padding: "32px", textAlign: "center", borderTop: "4px solid var(--teal)" }}>
             <div style={{ fontSize: "40px", marginBottom: "16px" }}>🔐</div>
-            <h1 style={{ fontSize: "24px", marginBottom: "8px", fontWeight: "600", color: "#1a3a5c" }}>Admin Dashboard</h1>
+            <h1 style={{ fontSize: "24px", marginBottom: "8px", fontWeight: "600", color: "var(--teal)" }}>Admin Dashboard</h1>
             <p style={{ color: "var(--t2)", fontSize: "13px", marginBottom: "24px" }}>จัดการข้อมูลแบบครบวงจร</p>
             <input type="password" className="inp" placeholder="Password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} style={{ marginBottom: "16px", textAlign: "center" }} />
-            <button className="btn btn-main style-full" style={{ width: "100%", background: "#1a3a5c", color: "white" }} onClick={async () => {
+            <button className="btn btn-main style-full" style={{ width: "100%", background: "var(--teal)", color: "white" }} onClick={async () => {
               if (adminPassword === "admin1234") { setIsAdminAuthenticated(true); localStorage.setItem("talib_admin_auth", "true"); setView("admin-dashboard"); } else { await myAlert("รหัสผ่านไม่ถูกต้อง"); }
             }}>เข้าสู่ระบบ</button>
             <button className="btn btn-outline btn-sm" style={{ width: "100%", marginTop: "12px", border: "none" }} onClick={() => setView("home")}>← กลับหน้าหลัก</button>
@@ -480,7 +480,7 @@ export default function Tracking() {
       {view === "admin-dashboard" && isAdminAuthenticated && (
         <div style={{ maxWidth: "1200px", margin: "0 auto", background: "var(--bg)" }}>
           {/* Header Admin */}
-          <div style={{ background: "#1a3a5c", color: "white", padding: "16px 24px", borderRadius: "12px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }}>
+          <div style={{ background: "var(--teal)", color: "white", padding: "16px 24px", borderRadius: "12px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                <button onClick={() => setView("home")} style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "white", padding: "6px 12px", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>← หน้าหลักผู้ใช้</button>
                <div>
@@ -503,9 +503,9 @@ export default function Tracking() {
                 style={{ 
                   borderRadius: "8px 8px 0 0", 
                   background: adminTab === t.id ? "var(--card)" : "transparent", 
-                  color: adminTab === t.id ? "#1a3a5c" : "var(--t2)",
+                  color: adminTab === t.id ? "var(--teal)" : "var(--t2)",
                   border: adminTab === t.id ? "1px solid var(--br)" : "none",
-                  borderBottom: adminTab === t.id ? "2px solid #1a3a5c" : "none",
+                  borderBottom: adminTab === t.id ? "2px solid var(--teal)" : "none",
                   fontWeight: adminTab === t.id ? "700" : "500",
                   padding: "12px 20px"
                 }}>
@@ -517,14 +517,14 @@ export default function Tracking() {
           {/* --- TAB 1: UPLOAD RECIPIENTS --- */}
           {adminTab === 1 && (
             <div className="card" style={{ padding: "40px 32px" }}>
-               <h3 style={{ fontSize: "18px", marginBottom: "8px", color: "#1a3a5c" }}>📥 ลงรายชื่อเตรียมจัดส่ง</h3>
+               <h3 style={{ fontSize: "18px", marginBottom: "8px", color: "var(--teal)" }}>📥 ลงรายชื่อเตรียมจัดส่ง</h3>
                <p style={{ fontSize: "13px", color: "var(--teal)", background: "var(--teal-bg)", padding: "10px 16px", borderRadius: "6px", marginBottom: "24px" }}>
                  💡 <strong>ขั้นตอนนี้:</strong> อัปโหลดไฟล์ CSV ที่มีคอลัมน์ (ชื่อ, เบอร์โทร, ที่อยู่, รหัสไปรษณีย์) เพื่อประกาศให้ผู้รับตรวจสอบสิทธิ์ก่อนจัดส่ง
                </p>
                
                <div style={{ border: "2px dashed var(--br)", borderRadius: "12px", padding: "60px 24px", textAlign: "center", background: "var(--bg2)", cursor: "pointer", transition: "all 0.2s" }} onClick={() => document.getElementById('csv-prep').click()}>
                  <div style={{ fontSize: "48px", marginBottom: "16px" }}>📋</div>
-                 <div style={{ fontWeight: "700", color: "#1a3a5c", fontSize: "16px", marginBottom: "8px" }}>คลิกเพื่อเลือกไฟล์ Google Sheet (CSV)</div>
+                 <div style={{ fontWeight: "700", color: "var(--teal)", fontSize: "16px", marginBottom: "8px" }}>คลิกเพื่อเลือกไฟล์ Google Sheet (CSV)</div>
                  <div style={{ fontSize: "13px", color: "var(--t2)" }}>Google Sheet → File → Download → CSV</div>
                  <input id="csv-prep" type="file" accept=".csv" className="hidden" style={{ display: 'none' }} onChange={(e) => handleCSVUpload(e, "recipients")} />
                </div>
@@ -540,7 +540,7 @@ export default function Tracking() {
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                     <div style={{ fontSize: "20px" }}>📝</div>
                     <div>
-                      <h3 style={{ fontSize: "16px", margin: 0, color: "#1a3a5c", fontWeight: "700" }}>รายชื่อผู้ได้รับวารสารในระบบ</h3>
+                      <h3 style={{ fontSize: "16px", margin: 0, color: "var(--teal)", fontWeight: "700" }}>รายชื่อผู้ได้รับวารสารในระบบ</h3>
                     </div>
                   </div>
                </div>
@@ -548,10 +548,10 @@ export default function Tracking() {
                {/* Toolbar */}
                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "16px", background: "var(--bg)", padding: "12px", borderRadius: "8px", border: "1px solid var(--br2)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1, minWidth: "250px" }}>
-                    <input type="text" className="inp" placeholder="🔍 ค้นหาชื่อ / เบอร์..." value={searchQ} onChange={(e) => setSearchQ(e.target.value)} style={{ background: "white" }} />
+                    <input type="text" className="inp" placeholder="🔍 ค้นหาชื่อ / เบอร์..." value={searchQ} onChange={(e) => setSearchQ(e.target.value)} />
                   </div>
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                    <button className="btn" style={{ background: "#1a3a5c", color: "white" }} onClick={() => setActiveModal('label')}>🏷️ สร้าง/พิมพ์ลาเบล</button>
+                    <button className="btn" style={{ background: "var(--teal)", color: "white" }} onClick={() => setActiveModal('label')}>🏷️ สร้าง/พิมพ์ลาเบล</button>
                     <button className="btn btn-outline" onClick={() => exportCSV(recipients, false)}>📥 Export CSV</button>
                     <button className="btn btn-outline" style={{ color: "#d97706", borderColor: "#fcd34d", background: "#fffbeb" }} onClick={() => handleBulkBonus("recipients", selectedRecipients)}>🎁 โบนัสที่เลือก</button>
                     <button className="btn btn-outline" style={{ color: "#dc2626", borderColor: "#fecaca", background: "#fef2f2" }} onClick={() => handleBulkDelete("recipients", selectedRecipients)}>🗑️ ลบที่เลือก</button>
@@ -563,7 +563,7 @@ export default function Tracking() {
 
                <div style={{ overflowX: "auto", border: "1px solid var(--br)", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
                  <table style={{ width: "100%", fontSize: "13px", textAlign: "left", borderCollapse: "collapse" }}>
-                   <thead style={{ background: "#1a3a5c", color: "white", borderBottom: "2px solid #0f233a" }}>
+                   <thead style={{ background: "var(--teal)", color: "white", borderBottom: "2px solid rgba(0,0,0,0.15)" }}>
                      <tr>
                        <th style={{ padding: "12px", width: "40px", textAlign: "center" }}>
                          <input type="checkbox" checked={selectedRecipients.length === filteredRecipients.length && filteredRecipients.length > 0} onChange={(e) => setSelectedRecipients(e.target.checked ? filteredRecipients.map(r => r.id) : [])} style={{ accentColor: "var(--teal)", cursor: "pointer", width: "16px", height: "16px" }} />
@@ -580,12 +580,12 @@ export default function Tracking() {
                      {isLoading ? <tr><td colSpan="7" style={{ textAlign: "center", padding: "32px", color: "var(--t3)" }}>⏳ กำลังโหลดข้อมูล...</td></tr> : 
                       filteredRecipients.length === 0 ? <tr><td colSpan="7" style={{ textAlign: "center", padding: "32px", color: "var(--t3)" }}>📭 ไม่มีข้อมูล</td></tr> :
                       filteredRecipients.map((r, i) => (
-                       <tr key={r.id} style={{ borderBottom: "1px solid var(--br2)", background: i % 2 === 0 ? "white" : "var(--bg)" }}>
+                       <tr key={r.id} style={{ borderBottom: "1px solid var(--br2)", background: i % 2 === 0 ? "var(--card)" : "var(--bg2)" }}>
                          <td style={{ padding: "12px", textAlign: "center" }}>
                            <input type="checkbox" checked={selectedRecipients.includes(r.id)} onChange={(e) => setSelectedRecipients(prev => e.target.checked ? [...prev, r.id] : prev.filter(id => id !== r.id))} style={{ accentColor: "var(--teal)", cursor: "pointer", width: "16px", height: "16px" }} />
                          </td>
                          <td style={{ padding: "12px", color: "var(--t2)" }}>{i + 1}</td>
-                         <td style={{ padding: "12px", fontWeight: "600", color: "#1a3a5c" }}>{r.fullName}</td>
+                         <td style={{ padding: "12px", fontWeight: "600", color: "var(--teal)" }}>{r.fullName}</td>
                          <td style={{ padding: "12px", color: "var(--t2)" }}>{r.phone || "-"}</td>
                          <td style={{ padding: "12px", color: "var(--t2)", maxWidth: "250px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={`${r.address} ${r.postalCode}`}>{r.address} {r.postalCode}</td>
                          <td style={{ padding: "12px", color: "#d97706", fontWeight: "600", fontSize: "12px" }}>{r.bonusNote || ""}</td>
@@ -604,14 +604,14 @@ export default function Tracking() {
           {/* --- TAB 3: UPLOAD TRACKING --- */}
           {adminTab === 3 && (
             <div className="card" style={{ padding: "40px 32px" }}>
-               <h3 style={{ fontSize: "18px", marginBottom: "8px", color: "#1a3a5c" }}>📦 ลงเลขพัสดุ Tracking ที่จัดส่งแล้ว</h3>
+               <h3 style={{ fontSize: "18px", marginBottom: "8px", color: "var(--teal)" }}>📦 ลงเลขพัสดุ Tracking ที่จัดส่งแล้ว</h3>
                <p style={{ fontSize: "13px", color: "var(--teal)", background: "var(--teal-bg)", padding: "10px 16px", borderRadius: "6px", marginBottom: "24px" }}>
                  💡 <strong>ขั้นตอนนี้:</strong> อัปโหลดไฟล์ CSV ที่มีคอลัมน์ (ชื่อ, เบอร์โทร, เลข Tracking, รหัสไปรษณีย์, เมือง) ผู้ใช้จะสามารถนำเลขพัสดุไปติดตามในเว็บไปรษณีย์ได้
                </p>
                
                <div style={{ border: "2px dashed var(--br)", borderRadius: "12px", padding: "60px 24px", textAlign: "center", background: "var(--bg2)", cursor: "pointer", transition: "all 0.2s" }} onClick={() => document.getElementById('csv-records').click()}>
                  <div style={{ fontSize: "48px", marginBottom: "16px" }}>📄</div>
-                 <div style={{ fontWeight: "700", color: "#1a3a5c", fontSize: "16px", marginBottom: "8px" }}>คลิกเพื่อเลือกไฟล์ Google Sheet (CSV)</div>
+                 <div style={{ fontWeight: "700", color: "var(--teal)", fontSize: "16px", marginBottom: "8px" }}>คลิกเพื่อเลือกไฟล์ Google Sheet (CSV)</div>
                  <div style={{ fontSize: "13px", color: "var(--t2)" }}>ให้แน่ใจว่าในไฟล์มีคอลัมน์ "เลข Tracking" หรือ "Tracking"</div>
                  <input id="csv-records" type="file" accept=".csv" className="hidden" style={{ display: 'none' }} onChange={(e) => handleCSVUpload(e, "records")} />
                </div>
@@ -627,7 +627,7 @@ export default function Tracking() {
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                     <div style={{ fontSize: "20px" }}>🗂️</div>
                     <div>
-                      <h3 style={{ fontSize: "16px", margin: 0, color: "#1a3a5c", fontWeight: "700" }}>ข้อมูล Tracking ในระบบ</h3>
+                      <h3 style={{ fontSize: "16px", margin: 0, color: "var(--teal)", fontWeight: "700" }}>ข้อมูล Tracking ในระบบ</h3>
                     </div>
                   </div>
                </div>
@@ -635,7 +635,7 @@ export default function Tracking() {
                {/* Toolbar */}
                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "16px", background: "var(--bg)", padding: "12px", borderRadius: "8px", border: "1px solid var(--br2)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1, minWidth: "250px" }}>
-                    <input type="text" className="inp" placeholder="🔍 ค้นหาชื่อ / เบอร์ / Track..." value={searchQ} onChange={(e) => setSearchQ(e.target.value)} style={{ background: "white" }} />
+                    <input type="text" className="inp" placeholder="🔍 ค้นหาชื่อ / เบอร์ / Track..." value={searchQ} onChange={(e) => setSearchQ(e.target.value)} />
                   </div>
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                     <button className="btn btn-outline" onClick={() => exportCSV(records, true)}>📥 Export CSV</button>
@@ -645,53 +645,53 @@ export default function Tracking() {
                   </div>
                </div>
 
-               <div style={{ fontSize: "14px", fontWeight: "700", color: "#1a3a5c", marginBottom: "12px" }}>{filteredRecords.length} รายการในระบบ</div>
+               <div style={{ fontSize: "14px", fontWeight: "700", color: "var(--teal)", marginBottom: "12px" }}>{filteredRecords.length} รายการในระบบ</div>
 
                <div style={{ overflowX: "auto", border: "1px solid var(--br)", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-                 <table style={{ width: "100%", fontSize: "13px", textAlign: "left", borderCollapse: "collapse" }}>
-                   <thead style={{ background: "#1a3a5c", color: "white", borderBottom: "2px solid #0f233a", whiteSpace: "nowrap" }}>
-                     <tr>
-                       <th style={{ padding: "12px", width: "40px", textAlign: "center" }}>
-                         <input type="checkbox" checked={selectedRecords.length === filteredRecords.length && filteredRecords.length > 0} onChange={(e) => setSelectedRecords(e.target.checked ? filteredRecords.map(r => r.id) : [])} style={{ accentColor: "var(--teal)", cursor: "pointer", width: "16px", height: "16px" }} />
-                       </th>
-                       <th style={{ padding: "12px", width: "40px" }}>#</th>
-                       <th style={{ padding: "12px" }}>ชื่อ-นามสกุล</th>
-                       <th style={{ padding: "12px" }}>เบอร์โทร</th>
-                       <th style={{ padding: "12px" }}>เลข Tracking</th>
-                       <th style={{ padding: "12px" }}>รหัสไปรษณีย์</th>
-                       <th style={{ padding: "12px" }}>เมือง</th>
-                       <th style={{ padding: "12px" }}>บันทึก</th>
-                       <th style={{ padding: "12px", textAlign: "center" }}>จัดการ</th>
-                     </tr>
-                   </thead>
-                   <tbody>
-                     {isLoading ? <tr><td colSpan="9" style={{ textAlign: "center", padding: "32px", color: "var(--t3)" }}>⏳ กำลังโหลดข้อมูล...</td></tr> : 
-                      filteredRecords.length === 0 ? <tr><td colSpan="9" style={{ textAlign: "center", padding: "32px", color: "var(--t3)" }}>📭 ไม่มีข้อมูล</td></tr> :
-                      filteredRecords.map((r, i) => (
-                       <tr key={r.id} style={{ borderBottom: "1px solid var(--br2)", background: i % 2 === 0 ? "white" : "var(--bg)" }}>
-                         <td style={{ padding: "12px", textAlign: "center" }}>
-                           <input type="checkbox" checked={selectedRecords.includes(r.id)} onChange={(e) => setSelectedRecords(prev => e.target.checked ? [...prev, r.id] : prev.filter(id => id !== r.id))} style={{ accentColor: "var(--teal)", cursor: "pointer", width: "16px", height: "16px" }} />
-                         </td>
-                         <td style={{ padding: "12px", color: "var(--t2)" }}>{i + 1}</td>
-                         <td style={{ padding: "12px", fontWeight: "600", color: "#1a3a5c" }}>
-                           {r.fullName}
-                           {r.bonusNote && <div style={{ fontSize: "11px", color: "#d97706", marginTop: "2px" }}>🎁 {r.bonusNote}</div>}
-                         </td>
-                         <td style={{ padding: "12px", color: "var(--t2)" }}>{r.phone || "-"}</td>
-                         <td style={{ padding: "12px", fontFamily: "monospace", fontWeight: "700", color: "var(--teal)", letterSpacing: "0.5px" }}>{r.trackingNumber || "-"}</td>
-                         <td style={{ padding: "12px", color: "var(--t2)" }}>{r.postalCode || "-"}</td>
-                         <td style={{ padding: "12px", color: "var(--t2)" }}>{r.city || "-"}</td>
-                         <td style={{ padding: "12px", color: "var(--t2)", fontSize: "12px" }}>{formatDateTime(r.createdAt)}</td>
-                         <td style={{ padding: "12px", textAlign: "center", display: "flex", gap: "8px", justifyContent: "center" }}>
-                           <button className="btn btn-outline btn-sm" style={{ padding: "4px 8px", borderColor: "var(--br)", color: "var(--t2)" }} onClick={() => { setEditData(r); setActiveModal('edit-record'); }}>✏️</button>
-                           <button className="btn btn-outline btn-sm" style={{ padding: "4px 8px", borderColor: "#fecaca", color: "#dc2626", background: "#fef2f2" }} onClick={() => handleBulkDelete("records", [r.id])}>🗑️</button>
-                         </td>
-                       </tr>
-                     ))}
-                   </tbody>
-                 </table>
-               </div>
-            </div>
+                  <table style={{ width: "100%", fontSize: "13px", textAlign: "left", borderCollapse: "collapse" }}>
+                    <thead style={{ background: "var(--teal)", color: "white", borderBottom: "2px solid rgba(0,0,0,0.15)", whiteSpace: "nowrap" }}>
+                      <tr>
+                        <th style={{ padding: "12px", width: "40px", textAlign: "center" }}>
+                          <input type="checkbox" checked={selectedRecords.length === filteredRecords.length && filteredRecords.length > 0} onChange={(e) => setSelectedRecords(e.target.checked ? filteredRecords.map(r => r.id) : [])} style={{ accentColor: "var(--teal)", cursor: "pointer", width: "16px", height: "16px" }} />
+                        </th>
+                        <th style={{ padding: "12px", width: "40px" }}>#</th>
+                        <th style={{ padding: "12px" }}>ชื่อ-นามสกุล</th>
+                        <th style={{ padding: "12px" }}>เบอร์โทร</th>
+                        <th style={{ padding: "12px" }}>เลข Tracking</th>
+                        <th style={{ padding: "12px" }}>รหัสไปรษณีย์</th>
+                        <th style={{ padding: "12px" }}>เมือง</th>
+                        <th style={{ padding: "12px" }}>บันทึก</th>
+                        <th style={{ padding: "12px", textAlign: "center" }}>จัดการ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {isLoading ? <tr><td colSpan="9" style={{ textAlign: "center", padding: "32px", color: "var(--t3)" }}>⏳ กำลังโหลดข้อมูล...</td></tr> : 
+                       filteredRecords.length === 0 ? <tr><td colSpan="9" style={{ textAlign: "center", padding: "32px", color: "var(--t3)" }}>📭 ไม่มีข้อมูล</td></tr> :
+                       filteredRecords.map((r, i) => (
+                        <tr key={r.id} style={{ borderBottom: "1px solid var(--br2)", background: i % 2 === 0 ? "var(--card)" : "var(--bg2)" }}>
+                          <td style={{ padding: "12px", textAlign: "center" }}>
+                            <input type="checkbox" checked={selectedRecords.includes(r.id)} onChange={(e) => setSelectedRecords(prev => e.target.checked ? [...prev, r.id] : prev.filter(id => id !== r.id))} style={{ accentColor: "var(--teal)", cursor: "pointer", width: "16px", height: "16px" }} />
+                          </td>
+                          <td style={{ padding: "12px", color: "var(--t2)" }}>{i + 1}</td>
+                          <td style={{ padding: "12px", fontWeight: "600", color: "var(--teal)" }}>
+                            {r.fullName}
+                            {r.bonusNote && <div style={{ fontSize: "11px", color: "#d97706", marginTop: "2px" }}>🎁 {r.bonusNote}</div>}
+                          </td>
+                          <td style={{ padding: "12px", color: "var(--t2)" }}>{r.phone || "-"}</td>
+                          <td style={{ padding: "12px", fontFamily: "monospace", fontWeight: "700", color: "var(--teal)", letterSpacing: "0.5px" }}>{r.trackingNumber || "-"}</td>
+                          <td style={{ padding: "12px", color: "var(--t2)" }}>{r.postalCode || "-"}</td>
+                          <td style={{ padding: "12px", color: "var(--t2)" }}>{r.city || "-"}</td>
+                          <td style={{ padding: "12px", color: "var(--t2)", fontSize: "12px" }}>{formatDateTime(r.createdAt)}</td>
+                          <td style={{ padding: "12px", textAlign: "center", display: "flex", gap: "8px", justifyContent: "center" }}>
+                            <button className="btn btn-outline btn-sm" style={{ padding: "4px 8px", borderColor: "var(--br)", color: "var(--t2)" }} onClick={() => { setEditData(r); setActiveModal('edit-record'); }}>✏️</button>
+                            <button className="btn btn-outline btn-sm" style={{ padding: "4px 8px", borderColor: "#fecaca", color: "#dc2626", background: "#fef2f2" }} onClick={() => handleBulkDelete("records", [r.id])}>🗑️</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+             </div>
           )}
 
         </div>
@@ -703,11 +703,11 @@ export default function Tracking() {
       {(activeModal === 'edit-recipient' || activeModal === 'edit-record') && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
           <div className="card animate-fade-in" style={{ width: "100%", maxWidth: "500px", padding: 0, borderRadius: "12px", overflow: "hidden" }}>
-             <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--br)", background: "#1a3a5c", color: "white", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+             <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--br)", background: "var(--teal)", color: "white", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                <h3 style={{ fontSize: "16px", margin: 0, fontWeight: "600" }}>✏️ แก้ไขข้อมูล{activeModal === 'edit-record' ? " Tracking" : "รายชื่อ"}</h3>
                <button onClick={() => setActiveModal(null)} style={{ background: "none", border: "none", fontSize: "18px", color: "white", cursor: "pointer", opacity: 0.7 }}>✕</button>
              </div>
-             <div style={{ padding: "24px", display: "grid", gap: "16px", background: "white" }}>
+             <div style={{ padding: "24px", display: "grid", gap: "16px", background: "var(--card)" }}>
                <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>ชื่อ-นามสกุล</label><input type="text" className="inp" value={editData.fullName} onChange={e => setEditData({...editData, fullName: e.target.value})} /></div>
                <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>เบอร์โทร</label><input type="text" className="inp" value={editData.phone} onChange={e => setEditData({...editData, phone: e.target.value})} /></div>
                
@@ -726,11 +726,11 @@ export default function Tracking() {
                  <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>เลข Tracking</label><input type="text" className="inp" style={{ fontFamily: "monospace", fontWeight: "700", color: "var(--teal)" }} value={editData.trackingNumber} onChange={e => setEditData({...editData, trackingNumber: e.target.value})} /></div>
                )}
 
-               <div><label style={{ fontSize: "12px", fontWeight: "600", color: "#d97706" }}>🎁 โบนัสพิเศษ</label><input type="text" className="inp" style={{ borderColor: "#fcd34d", background: "#fffbeb" }} value={editData.bonusNote || ""} onChange={e => setEditData({...editData, bonusNote: e.target.value})} /></div>
+               <div><label style={{ fontSize: "12px", fontWeight: "600", color: "#d97706" }}>🎁 โบนัสพิเศษ</label><input type="text" className="inp" style={{ borderColor: "#fcd34d", background: "var(--teal-bg)" }} value={editData.bonusNote || ""} onChange={e => setEditData({...editData, bonusNote: e.target.value})} /></div>
              </div>
              <div style={{ padding: "16px 24px", background: "var(--bg)", borderTop: "1px solid var(--br)", display: "flex", justifyContent: "flex-end", gap: "12px" }}>
                <button className="btn btn-outline" onClick={() => setActiveModal(null)}>ยกเลิก</button>
-               <button className="btn" style={{ background: "#1a3a5c", color: "white" }} onClick={saveEdit}>{isLoading ? "⏳ กำลังบันทึก..." : "💾 บันทึกการแก้ไข"}</button>
+               <button className="btn" style={{ background: "var(--teal)", color: "white" }} onClick={saveEdit}>{isLoading ? "⏳ กำลังบันทึก..." : "💾 บันทึกการแก้ไข"}</button>
              </div>
           </div>
         </div>
@@ -742,37 +742,37 @@ export default function Tracking() {
       {activeModal === "label" && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
           <div className="card animate-fade-in" style={{ width: "100%", maxWidth: "700px", maxHeight: "90vh", display: "flex", flexDirection: "column", padding: 0, borderRadius: "12px", overflow: "hidden" }}>
-             <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--br)", background: "#1a3a5c", color: "white", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+             <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--br)", background: "var(--teal)", color: "white", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                <h3 style={{ fontSize: "16px", margin: 0, fontWeight: "600" }}>🏷️ สร้างและพิมพ์ลาเบลจ่าหน้าซอง</h3>
                <button onClick={() => setActiveModal(null)} style={{ background: "none", border: "none", fontSize: "18px", color: "white", cursor: "pointer", opacity: 0.7 }}>✕</button>
              </div>
-             <div style={{ padding: "24px", overflowY: "auto", flex: 1, background: "white" }}>
+             <div style={{ padding: "24px", overflowY: "auto", flex: 1, background: "var(--card)" }}>
                <div style={{ marginBottom: "24px", background: "var(--bg)", padding: "16px", borderRadius: "8px", border: "1px solid var(--br2)" }}>
-                 <div style={{ fontSize: "13px", fontWeight: "700", marginBottom: "12px", color: "#1a3a5c" }}>📮 ข้อมูลผู้ส่ง (Sender)</div>
+                 <div style={{ fontSize: "13px", fontWeight: "700", marginBottom: "12px", color: "var(--teal)" }}>📮 ข้อมูลผู้ส่ง (Sender)</div>
                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
-                   <input type="text" className="inp" placeholder="ชื่อผู้ส่ง..." value={labelSettings.name} onChange={e => setLabelSettings({...labelSettings, name: e.target.value})} style={{ background: "white" }} />
-                   <input type="text" className="inp" placeholder="เบอร์โทรผู้ส่ง..." value={labelSettings.phone} onChange={e => setLabelSettings({...labelSettings, phone: e.target.value})} style={{ background: "white" }} />
+                   <input type="text" className="inp" placeholder="ชื่อผู้ส่ง..." value={labelSettings.name} onChange={e => setLabelSettings({...labelSettings, name: e.target.value})} />
+                   <input type="text" className="inp" placeholder="เบอร์โทรผู้ส่ง..." value={labelSettings.phone} onChange={e => setLabelSettings({...labelSettings, phone: e.target.value})} />
                  </div>
-                 <textarea className="inp" placeholder="ที่อยู่ผู้ส่ง..." rows="2" value={labelSettings.addr} onChange={e => setLabelSettings({...labelSettings, addr: e.target.value})} style={{ background: "white" }}></textarea>
+                 <textarea className="inp" placeholder="ที่อยู่ผู้ส่ง..." rows="2" value={labelSettings.addr} onChange={e => setLabelSettings({...labelSettings, addr: e.target.value})}></textarea>
                </div>
                
                <div style={{ background: "var(--bg)", padding: "16px", borderRadius: "8px", border: "1px solid var(--br2)" }}>
-                 <div style={{ fontSize: "13px", fontWeight: "700", marginBottom: "12px", color: "#1a3a5c" }}>📐 ขนาดลาเบล (Printer Size)</div>
+                 <div style={{ fontSize: "13px", fontWeight: "700", marginBottom: "12px", color: "var(--teal)" }}>📐 ขนาดลาเบล (Printer Size)</div>
                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                   <label style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", border: "1px solid var(--br)", borderRadius: "8px", cursor: "pointer", background: "white" }}>
-                     <input type="radio" name="size" value="therm-150x100" checked={labelSettings.size === 'therm-150x100'} onChange={e => setLabelSettings({...labelSettings, size: e.target.value})} style={{ width: "auto", accentColor: "#1a3a5c" }} />
-                     <div><div style={{ fontWeight: "700", color: "#1a3a5c" }}>150×100 มม. (แนวนอน)</div><div style={{ fontSize: "12px", color: "var(--t2)" }}>เครื่องพิมพ์ความร้อนแบบแนวนอน</div></div>
+                   <label style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", border: "1px solid var(--br)", borderRadius: "8px", cursor: "pointer", background: "var(--bg2)" }}>
+                     <input type="radio" name="size" value="therm-150x100" checked={labelSettings.size === 'therm-150x100'} onChange={e => setLabelSettings({...labelSettings, size: e.target.value})} style={{ width: "auto", accentColor: "var(--teal)" }} />
+                     <div><div style={{ fontWeight: "700", color: "var(--teal)" }}>150×100 มม. (แนวนอน)</div><div style={{ fontSize: "12px", color: "var(--t2)" }}>เครื่องพิมพ์ความร้อนแบบแนวนอน</div></div>
                    </label>
-                   <label style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", border: "1px solid var(--br)", borderRadius: "8px", cursor: "pointer", background: "white" }}>
-                     <input type="radio" name="size" value="therm-100x150" checked={labelSettings.size === 'therm-100x150'} onChange={e => setLabelSettings({...labelSettings, size: e.target.value})} style={{ width: "auto", accentColor: "#1a3a5c" }} />
-                     <div><div style={{ fontWeight: "700", color: "#1a3a5c" }}>100×150 มม. (แนวตั้ง)</div><div style={{ fontSize: "12px", color: "var(--t2)" }}>มาตรฐานเครื่องพิมพ์ความร้อน</div></div>
+                   <label style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", border: "1px solid var(--br)", borderRadius: "8px", cursor: "pointer", background: "var(--bg2)" }}>
+                     <input type="radio" name="size" value="therm-100x150" checked={labelSettings.size === 'therm-100x150'} onChange={e => setLabelSettings({...labelSettings, size: e.target.value})} style={{ width: "auto", accentColor: "var(--teal)" }} />
+                     <div><div style={{ fontWeight: "700", color: "var(--teal)" }}>100×150 มม. (แนวตั้ง)</div><div style={{ fontSize: "12px", color: "var(--t2)" }}>มาตรฐานเครื่องพิมพ์ความร้อน</div></div>
                    </label>
                  </div>
                </div>
              </div>
              <div style={{ padding: "16px 24px", borderTop: "1px solid var(--br)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg)" }}>
-               <span style={{ fontSize: "13px", color: "var(--t2)" }}>จำนวนที่จะพิมพ์: <strong style={{ color: "#1a3a5c", fontSize: "16px" }}>{selectedRecipients.length > 0 ? selectedRecipients.length : recipients.length}</strong> ใบ</span>
-               <button className="btn" style={{ background: "#1a3a5c", color: "white" }} onClick={printLabels}>🖨️ พิมพ์ลาเบลที่เลือก</button>
+               <span style={{ fontSize: "13px", color: "var(--t2)" }}>จำนวนที่จะพิมพ์: <strong style={{ color: "var(--teal)", fontSize: "16px" }}>{selectedRecipients.length > 0 ? selectedRecipients.length : recipients.length}</strong> ใบ</span>
+               <button className="btn" style={{ background: "var(--teal)", color: "white" }} onClick={printLabels}>🖨️ พิมพ์ลาเบลที่เลือก</button>
              </div>
           </div>
         </div>
@@ -783,11 +783,11 @@ export default function Tracking() {
       {/* ========================================================= */}
       {dialogConfig && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-           <div className="card animate-fade-in" style={{ width: "100%", maxWidth: "400px", padding: "24px", background: "white", borderRadius: "12px", textAlign: "center", boxShadow: "0 10px 25px rgba(0,0,0,0.2)" }}>
+           <div className="card animate-fade-in" style={{ width: "100%", maxWidth: "400px", padding: "24px", background: "var(--card)", borderRadius: "12px", textAlign: "center", boxShadow: "0 10px 25px rgba(0,0,0,0.2)" }}>
               <div style={{ fontSize: "48px", marginBottom: "16px" }}>
                  {dialogConfig.type === 'alert' ? (dialogConfig.title === "ข้อผิดพลาด" ? '❌' : '✅') : dialogConfig.type === 'confirm' ? '❓' : '📝'}
               </div>
-              <h3 style={{ fontSize: "18px", fontWeight: "700", color: "#1a3a5c", marginBottom: "8px" }}>{dialogConfig.title}</h3>
+              <h3 style={{ fontSize: "18px", fontWeight: "700", color: "var(--teal)", marginBottom: "8px" }}>{dialogConfig.title}</h3>
               <p style={{ fontSize: "14px", color: "var(--t2)", marginBottom: "20px", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{dialogConfig.message}</p>
               
               {dialogConfig.type === 'prompt' && (
@@ -803,7 +803,7 @@ export default function Tracking() {
                  {dialogConfig.type !== 'alert' && (
                     <button className="btn btn-outline" style={{ flex: 1, padding: "10px" }} onClick={dialogConfig.onCancel}>ยกเลิก</button>
                  )}
-                 <button className="btn" style={{ background: "#1a3a5c", color: "white", flex: dialogConfig.type === 'alert' ? 0 : 1, minWidth: "120px", padding: "10px" }} onClick={() => dialogConfig.onConfirm(dialogConfig.inputValue)}>
+                 <button className="btn" style={{ background: "var(--teal)", color: "white", flex: dialogConfig.type === 'alert' ? 0 : 1, minWidth: "120px", padding: "10px" }} onClick={() => dialogConfig.onConfirm(dialogConfig.inputValue)}>
                     ตกลง
                  </button>
               </div>
