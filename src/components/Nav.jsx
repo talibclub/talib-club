@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { SITE } from "../data/index.js"
 import toast from "react-hot-toast"
+import { confirmAction } from "../utils/feedback.jsx"
 
 const NAV_LINKS = [
   { id: "home", label: "หน้าหลัก", icon: "ti-home" },
@@ -50,8 +51,13 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
 
   // แก้ไขระบบออกจากระบบให้สมูทขึ้น
   async function logout() {
-    const isConfirm = window.confirm("คุณแน่ใจหรือไม่ว่าต้องการออกจากระบบ?");
-    if (!isConfirm) return;
+    const ok = await confirmAction({
+      title: "ออกจากระบบ?",
+      message: "คุณต้องการออกจากระบบหรือไม่?",
+      confirmText: "ออกจากระบบ",
+      danger: true
+    });
+    if (!ok) return;
 
     const toastId = toast.loading("กำลังออกจากระบบ...");
 

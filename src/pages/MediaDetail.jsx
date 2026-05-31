@@ -1,12 +1,36 @@
 import { useEffect } from "react"
 
-export default function MediaDetail({ item, go }) {
+export default function MediaDetail({ item, go, authState }) {
   // ถ้ารีเฟรชแล้วไม่มีข้อมูล ให้กลับไปหน้ามีเดีย
   useEffect(() => {
     if (!item) {
       go("media")
     }
   }, [item, go])
+
+  // บันทึกประวัติการดูสื่อ
+  useEffect(() => {
+    if (item && authState?.user?.uid) {
+      try {
+        const historyKey = `talib_history_${authState.user.uid}`;
+        const history = JSON.parse(localStorage.getItem(historyKey) || "[]");
+        const filtered = history.filter(h => h.id !== item.id || h.type !== "media");
+        const next = [
+          { 
+            id: item.id, 
+            type: "media", 
+            mediaType: item.type, // youtube หรือ spotify
+            title: item.title, 
+            timestamp: Date.now() 
+          },
+          ...filtered
+        ].slice(0, 100);
+        localStorage.setItem(historyKey, JSON.stringify(next));
+      } catch (err) {
+        console.error("Failed to save media history", err);
+      }
+    }
+  }, [item, authState?.user?.uid])
 
   if (!item) return null
 

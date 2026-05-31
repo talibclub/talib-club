@@ -34,6 +34,29 @@ export default function ArticleDetail({ item, go, authState }) {
     }
   }, [displayItem, loadingArticles, saveItem])
 
+  // บันทึกประวัติการอ่านบทความ
+  useEffect(() => {
+    if (displayItem && authState?.user?.uid) {
+      try {
+        const historyKey = `talib_history_${authState.user.uid}`;
+        const history = JSON.parse(localStorage.getItem(historyKey) || "[]");
+        const filtered = history.filter(h => h.id !== displayItem.id || h.type !== "article");
+        const next = [
+          { 
+            id: displayItem.id, 
+            type: "article", 
+            title: displayItem.title, 
+            timestamp: Date.now() 
+          },
+          ...filtered
+        ].slice(0, 100);
+        localStorage.setItem(historyKey, JSON.stringify(next));
+      } catch (err) {
+        console.error("Failed to save read history", err);
+      }
+    }
+  }, [displayItem, authState?.user?.uid])
+
   useEffect(() => {
     if (!loadingArticles && !displayItem) go("articles")
   }, [displayItem, loadingArticles, go])

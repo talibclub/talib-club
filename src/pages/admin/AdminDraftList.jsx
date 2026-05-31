@@ -33,6 +33,7 @@ export default function AdminDraftList({ title, collectionName, initialItems = [
   }
 
   async function remove(item) {
+    if (busy) return
     const ok = await confirmAction({
       title: "ลบรายการนี้?",
       message: `รายการ "${item.title || item.name || item.channel || item.id}" จะถูกซ่อนจากหน้าเว็บไซต์`,
@@ -41,12 +42,15 @@ export default function AdminDraftList({ title, collectionName, initialItems = [
     })
     if (!ok) return
 
+    setBusy(true)
     try {
       await deleteItem(item.id)
       notifySuccess("ลบรายการเรียบร้อยแล้ว")
     } catch (err) {
       console.error(err)
       notifyError("ลบไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -94,23 +98,23 @@ export default function AdminDraftList({ title, collectionName, initialItems = [
         <h2 style={{ flex: 1 }}>{title} <span style={{ fontSize: 12, color: "var(--t3)" }}>({items.length})</span></h2>
         {loading && <span style={{ fontSize: 12, color: "var(--t3)" }}>กำลังโหลดข้อมูล...</span>}
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="ค้นหา..." style={{ maxWidth: 200 }} />
-        <button className="btn btn-teal" onClick={openNew}>
+        <button className="btn btn-teal" onClick={openNew} disabled={busy} style={{ opacity: busy ? 0.6 : 1 }}>
           <i className="ti ti-plus" style={{ marginRight: 6 }}></i>เพิ่มใหม่
         </button>
       </div>
 
       <div className="flex-col">
         {filtered.map(item => (
-          <div key={item.id} className="card" style={{ padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <div key={item.id} className="card" style={{ padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, opacity: busy ? 0.6 : 1 }}>
             <div style={{ minWidth: 0 }}>
               <h3 style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title || item.name || item.channel || "Untitled"}</h3>
               <p style={{ marginTop: 4 }}>{fields.slice(1, 4).map(f => item[f.key]).filter(Boolean).join(" · ") || "ยังไม่มีรายละเอียด"}</p>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
-              <button className="btn btn-outline" onClick={() => setEditing(item)}>
+              <button className="btn btn-outline" onClick={() => setEditing(item)} disabled={busy} style={{ opacity: busy ? 0.5 : 1, pointerEvents: busy ? 'none' : 'auto' }}>
                 <i className="ti ti-pencil" style={{ marginRight: 5 }}></i>แก้ไข
               </button>
-              <button className="btn btn-outline" style={{ color: "#e05555", borderColor: "rgba(224,85,85,.3)" }} onClick={() => remove(item)}>
+              <button className="btn btn-outline" style={{ color: "#e05555", borderColor: "rgba(224,85,85,.3)", opacity: busy ? 0.5 : 1, pointerEvents: busy ? 'none' : 'auto' }} onClick={() => remove(item)} disabled={busy}>
                 <i className="ti ti-trash" style={{ marginRight: 5 }}></i>ลบ
               </button>
             </div>

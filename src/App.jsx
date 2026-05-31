@@ -101,11 +101,11 @@ export default function App() {
         {page === "library" && <Library go={go} authState={authState} />}
         {page === "library-detail" && (
           <RequireLogin authState={authState} go={go}>
-            <LibraryDetail item={ctx} go={go} />
+            <LibraryDetail item={ctx} go={go} authState={authState} />
           </RequireLogin>
         )}
         {page === "media" && <Media go={go} />}
-        {page === "media-detail" && <MediaDetail item={ctx} go={go} />}
+        {page === "media-detail" && <MediaDetail item={ctx} go={go} authState={authState} />}
         {page === "scholars" && <Scholars />}
         {page === "tracking" && <Tracking />}
         {page === "auth" && <Auth authState={authState} go={go} />}

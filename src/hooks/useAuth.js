@@ -16,6 +16,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
+  updatePassword,
   verifyBeforeUpdateEmail,
 } from "firebase/auth"
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore"
@@ -75,10 +76,14 @@ export function useAuth() {
         const ref = doc(db, "users", currentUser.uid)
         const snap = await getDoc(ref)
         if (snap.exists()) {
+          const snapData = snap.data()
+          if (snapData.email !== currentUser.email) {
+            await setDoc(ref, { email: currentUser.email }, { merge: true }).catch(e => console.error("Sync email to firestore failed", e))
+          }
           setProfile({
             ...DEFAULT_PROFILE,
-            ...snap.data(),
-            displayName: snap.data().displayName || currentUser.displayName || "",
+            ...snapData,
+            displayName: snapData.displayName || currentUser.displayName || "",
             email: currentUser.email,
             photoURL: currentUser.photoURL || "",
           })
@@ -144,6 +149,12 @@ export function useAuth() {
       }
       await setDoc(doc(db, "users", auth.currentUser.uid), nextProfile, { merge: true })
       setProfile(prev => ({ ...DEFAULT_PROFILE, ...(prev || {}), ...nextProfile }))
+    },
+    async updateUserPassword(newPassword) {
+      if (!auth.currentUser) throw new Error("Missing current user")
+      const cleanPassword = newPassword.trim()
+      if (!cleanPassword) throw new Error("Missing password")
+      await updatePassword(auth.currentUser, cleanPassword)
     },
     async requestEmailChange(nextEmail) {
       if (!auth.currentUser) throw new Error("Missing current user")

@@ -88,14 +88,18 @@ export default function AdminArticles() {
   }
 
   async function remove(article) {
+    if (busy) return
     const ok = await confirmAction({ title: "ลบบทความนี้?", message: `บทความ "${article.title}" จะถูกซ่อนจากหน้าเว็บไซต์`, confirmText: "ลบบทความ", danger: true })
     if (!ok) return
+    setBusy(true)
     try {
       await deleteItem(article.id)
       setSelected(prev => prev.filter(id => id !== article.id))
       notifySuccess("ลบบทความเรียบร้อยแล้ว")
     } catch (err) {
       notifyError("ลบไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -127,7 +131,7 @@ export default function AdminArticles() {
             บทความวิชาการอิสลามทั้งหมดของ Talib Club {totalPages > 0 && `(หน้า ${page}/${totalPages})`}
           </p>
         </div>
-        <button className="btn btn-teal" onClick={openNew}>
+        <button className="btn btn-teal" onClick={openNew} disabled={busy} style={{ opacity: busy ? 0.6 : 1 }}>
           <i className="ti ti-plus" style={{ marginRight: 6 }}></i>เพิ่มใหม่
         </button>
       </div>
@@ -185,9 +189,9 @@ export default function AdminArticles() {
       )}
 
       {filtered.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", padding: "0 16px", marginBottom: 10 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, color: "var(--t2)" }}>
-            <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0} onChange={toggleAll} style={{ width: 16, height: 16, cursor: "pointer" }} />
+        <div style={{ display: "flex", alignItems: "center", padding: "0 16px", marginBottom: 10, opacity: busy ? 0.6 : 1 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: busy ? "not-allowed" : "pointer", fontSize: 12, color: "var(--t2)" }}>
+            <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0} onChange={toggleAll} disabled={busy} style={{ width: 16, height: 16, cursor: busy ? "not-allowed" : "pointer" }} />
             เลือกทั้งหมด {filtered.length} รายการที่ค้นเจอ
           </label>
         </div>
@@ -195,9 +199,9 @@ export default function AdminArticles() {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {currentItems.map(article => (
-          <div key={article.id} className="card" style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <div key={article.id} className="card" style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, opacity: busy ? 0.6 : 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
-              <input type="checkbox" checked={selected.includes(article.id)} onChange={() => toggleSelect(article.id)} style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }} />
+              <input type="checkbox" checked={selected.includes(article.id)} onChange={() => toggleSelect(article.id)} disabled={busy} style={{ width: 18, height: 18, cursor: busy ? "not-allowed" : "pointer", flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
                   <span className="tag tag-teal">{article.category}</span>
@@ -208,8 +212,8 @@ export default function AdminArticles() {
               </div>
             </div>
             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-              <button className="btn btn-outline" onClick={() => openEdit(article)} style={{ padding: "6px 12px", fontSize: 12 }}><i className="ti ti-pencil"></i></button>
-              <button className="btn btn-outline" style={{ color: "#e05555", borderColor: "rgba(224,85,85,.3)", padding: "6px 12px", fontSize: 12 }} onClick={() => remove(article)}><i className="ti ti-trash"></i></button>
+              <button className="btn btn-outline" onClick={() => openEdit(article)} disabled={busy} style={{ padding: "6px 12px", fontSize: 12, opacity: busy ? 0.5 : 1, pointerEvents: busy ? 'none' : 'auto' }}><i className="ti ti-pencil"></i></button>
+              <button className="btn btn-outline" style={{ color: "#e05555", borderColor: "rgba(224,85,85,.3)", padding: "6px 12px", fontSize: 12, opacity: busy ? 0.5 : 1, pointerEvents: busy ? 'none' : 'auto' }} onClick={() => remove(article)} disabled={busy}><i className="ti ti-trash"></i></button>
             </div>
           </div>
         ))}

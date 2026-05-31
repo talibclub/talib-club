@@ -24,7 +24,7 @@ function getPreviewUrl(url) {
   return url
 }
 
-export default function LibraryDetail({ item, go }) {
+export default function LibraryDetail({ item, go, authState }) {
   // ดึง saveItem ออกมาจากคอลเล็กชันเพื่อใช้อัปเดตข้อมูลขึ้น Firebase
   const { items: books, loading, saveItem } = useContentCollection("books", BOOKS)
   
@@ -36,6 +36,29 @@ export default function LibraryDetail({ item, go }) {
     if (urlId && books.length > 0) return books.find(b => String(b.id) === String(urlId));
     return null;
   }, [item, urlId, books])
+
+  // บันทึกประวัติการดูหนังสือ
+  useEffect(() => {
+    if (displayItem && authState?.user?.uid) {
+      try {
+        const historyKey = `talib_history_${authState.user.uid}`;
+        const history = JSON.parse(localStorage.getItem(historyKey) || "[]");
+        const filtered = history.filter(h => h.id !== displayItem.id || h.type !== "book");
+        const next = [
+          { 
+            id: displayItem.id, 
+            type: "book", 
+            title: displayItem.title, 
+            timestamp: Date.now() 
+          },
+          ...filtered
+        ].slice(0, 100);
+        localStorage.setItem(historyKey, JSON.stringify(next));
+      } catch (err) {
+        console.error("Failed to save book history", err);
+      }
+    }
+  }, [displayItem, authState?.user?.uid])
 
   // --- ระบบนับยอดเข้าชมของจริง (ยิงขึ้น Firebase) ---
   useEffect(() => {
