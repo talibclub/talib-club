@@ -13,7 +13,7 @@ export const ERAS = {
 export const SCHOLARS = [
   {
     id: "fallback_1",
-    name: "อิมาม อะบู ฮะนีฟะฮ์ (النعمان بن ثابت)",
+    name: "อิมาม อะบู ฮะนีฟะฮฺ (النعمان بن ثابت)",
     hijri: "80–150 AH",
     ad: "699–767 CE",
     era: 1,
@@ -24,7 +24,7 @@ export const SCHOLARS = [
   },
   {
     id: "fallback_2",
-    name: "อิมาม มาลิก อิบน์ อะนัส",
+    name: "อิมาม มาลิก บิน อะนัส",
     hijri: "93–179 AH",
     ad: "711–795 CE",
     era: 1,
@@ -46,7 +46,7 @@ export const SCHOLARS = [
   },
   {
     id: "fallback_4",
-    name: "อิมาม อะฮ์มัด อิบน์ ฮัมบัล",
+    name: "อิมาม อะหฺมัด บิน หัมบัล",
     hijri: "164–241 AH",
     ad: "780–855 CE",
     era: 1,

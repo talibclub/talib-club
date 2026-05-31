@@ -12,12 +12,17 @@ export default function Scholars() {
   const [era, setEra] = useState("0")
   const [field, setField] = useState("all")
   const [manhajFilter, setManhajFilter] = useState("all")
+  const [visibleCounts, setVisibleCounts] = useState({ 1: 12, 2: 12, 3: 12, 4: 12 })
+
+  const resetVisible = () => {
+    setVisibleCounts({ 1: 12, 2: 12, 3: 12, 4: 12 })
+  }
 
   const fields = ["all", ...new Set([...(taxonomy.scholarFields || []), ...scholars.map(s=>s.field?.split("/")[0]).filter(Boolean)])]
 
   const filtered = scholars.filter(s=>{
     const matchEra = era==="0"||String(s.era)===String(era)
-    const matchField = field==="all"||s.field.includes(field)
+    const matchField = field==="all"||(s.field && s.field.includes(field))
     
     let matchManhaj = true
     if (manhajFilter !== "all") {
@@ -40,8 +45,8 @@ export default function Scholars() {
 
     const term = search.toLowerCase()
     const matchSearch = !search||
-      s.name.toLowerCase().includes(term)||
-      s.note.toLowerCase().includes(term)||
+      (s.name && s.name.toLowerCase().includes(term))||
+      (s.note && s.note.toLowerCase().includes(term))||
       (s.manhaj && s.manhaj.toLowerCase().includes(term))
     return matchEra && matchField && matchManhaj && matchSearch
   })
@@ -49,11 +54,14 @@ export default function Scholars() {
   const eras = ["0", ...(taxonomy.scholarEras || []).map(item => item.id)]
   const eraLabelMap = Object.fromEntries((taxonomy.scholarEras || []).map(item => [String(item.id), item.label]))
 
+  const formatHijri = (val) => val ? val.replace(/\s*AH/gi, '').replace(/d\.\s*/gi, 'เสียชีวิต ').replace(/b\.\s*/gi, 'เกิด ') : 'ไม่ระบุ';
+  const formatAd = (val) => val ? val.replace(/\s*CE/gi, '').replace(/d\.\s*/gi, 'เสียชีวิต ').replace(/b\.\s*/gi, 'เกิด ') : 'ไม่ระบุ';
+
   return (
     <div>
       <div style={{marginBottom:28}}>
-        <h1 style={{marginBottom:8}}>รายนามอุลามาอฺ</h1>
-        <p>รวบรวมนักวิชาการอิสลามตั้งแต่ยุคฮิจเราะฮ์แรกจนถึงปัจจุบัน พร้อมปีฮิจเราะฮ์ (AH) และคริสต์ศักราช (CE)</p>
+        <h1 style={{marginBottom:8}}>รายนามอุลามาอ์</h1>
+        <p>รวบรวมนักวิชาการอิสลามตั้งแต่ยุคฮิจเราะฮ์แรกจนถึงปัจจุบัน พร้อมปีฮิจเราะฮ์ (ฮ.ศ.) และคริสต์ศักราช (ค.ศ.)</p>
         {loading && <p style={{ marginTop: 8, fontSize: 12 }}>กำลังโหลดรายชื่อใหม่ล่าสุด...</p>}
       </div>
 
@@ -62,10 +70,10 @@ export default function Scholars() {
         <div style={{position:"relative",flex:1,minWidth:200}}>
           <i className="ti ti-search" style={{position:"absolute",left:10,top:"50%",
             transform:"translateY(-50%)",color:"var(--t3)",fontSize:14}}></i>
-          <input placeholder="ค้นหาชื่ออุลามาอฺ หรือ มันฮัจญ์..." value={search}
-            onChange={e=>setSearch(e.target.value)} style={{paddingLeft:32}}/>
+          <input placeholder="ค้นหาชื่ออุลามาอ์ หรือ มันฮัจญ์..." value={search}
+            onChange={e=>{setSearch(e.target.value); resetVisible();}} style={{paddingLeft:32}}/>
         </div>
-        <select value={manhajFilter} onChange={e=>setManhajFilter(e.target.value)} style={{width:"auto",flex:"0 0 auto"}}>
+        <select value={manhajFilter} onChange={e=>{setManhajFilter(e.target.value); resetVisible();}} style={{width:"auto",flex:"0 0 auto"}}>
           <option value="all">ทุกมันฮัจญ์/อากีดะฮ์</option>
           <option value="สะลาฟีย์">สะลาฟีย์ (มันฮัจญ์สะลัฟ / อะษารีย์)</option>
           <option value="อาชาอิเราะฮ์">อาชาอิเราะฮ์ / มาตุรีดีย์</option>
@@ -77,7 +85,7 @@ export default function Scholars() {
           <option value="การเมือง">การเมืองอิสลาม / อิควาน / ซูรูรีย์</option>
           <option value="โมเดิร์นนิสต์">โมเดิร์นนิสต์ / ปฏิรูป</option>
         </select>
-        <select value={field} onChange={e=>setField(e.target.value)} style={{width:"auto",flex:"0 0 auto"}}>
+        <select value={field} onChange={e=>{setField(e.target.value); resetVisible();}} style={{width:"auto",flex:"0 0 auto"}}>
           {fields.map(f=><option key={f} value={f}>{f==="all"?"ทุกสาขา":f}</option>)}
         </select>
       </div>
@@ -85,7 +93,7 @@ export default function Scholars() {
       {/* ERA TABS */}
       <div style={{display:"flex",gap:6,marginBottom:28,flexWrap:"wrap"}}>
         {eras.map(e=>(
-          <button key={e} onClick={()=>setEra(e)} style={{
+          <button key={e} onClick={()=>{setEra(e); resetVisible();}} style={{
             fontFamily:"'Prompt',sans-serif",fontSize:11,fontWeight:300,
             padding:"5px 12px",borderRadius:20,border:".5px solid var(--br)",
             cursor:"pointer",transition:"all .15s",
@@ -101,6 +109,8 @@ export default function Scholars() {
         const eraScholars = filtered.filter(s=>String(s.era)===String(eraNum))
         if(eraScholars.length===0) return null
         const color = ERA_COLORS[eraNum] || "var(--teal)"
+        const visibleScholars = eraScholars.slice(0, visibleCounts[eraNum] || 12)
+        
         return (
           <div key={eraNum} style={{marginBottom:36}}>
             {/* Era Header */}
@@ -114,7 +124,7 @@ export default function Scholars() {
 
             {/* Scholars Cards */}
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:10}}>
-              {eraScholars.map(s=>(
+              {visibleScholars.map(s=>(
                 <div key={s.id} className="card" style={{padding:16,borderLeft:`2px solid ${color}`}}>
                   <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:8}}>
                     <div style={{fontSize:13,fontWeight:500,color:"var(--text)",lineHeight:1.4}}>{s.name}</div>
@@ -127,17 +137,35 @@ export default function Scholars() {
                   <div style={{display:"flex",gap:12,marginBottom:8}}>
                     <div style={{fontSize:11,fontWeight:300}}>
                       <span style={{color:"var(--t3)"}}>ฮ.ศ. </span>
-                      <span style={{color:color,fontWeight:500}}>{s.hijri}</span>
+                      <span style={{color:color,fontWeight:500}}>{formatHijri(s.hijri)}</span>
                     </div>
                     <div style={{fontSize:11,fontWeight:300}}>
                       <span style={{color:"var(--t3)"}}>ค.ศ. </span>
-                      <span style={{color:"var(--text)"}}>{s.ad}</span>
+                      <span style={{color:"var(--text)"}}>{formatAd(s.ad)}</span>
                     </div>
                   </div>
                   <p style={{fontSize:12,lineHeight:1.5,color:"var(--t2)"}}>{s.note}</p>
                 </div>
               ))}
             </div>
+
+            {/* SHOW MORE BUTTON */}
+            {eraScholars.length > visibleScholars.length && (
+              <div style={{textAlign:"center",marginTop:20}}>
+                <button onClick={() => setVisibleCounts(prev => ({...prev, [eraNum]: prev[eraNum] + 12}))}
+                  style={{
+                    fontFamily:"'Prompt',sans-serif",fontSize:11,fontWeight:300,
+                    padding:"5px 16px",borderRadius:20,border:".5px solid var(--br)",
+                    cursor:"pointer",transition:"all .15s",
+                    background:"var(--card)",color:"var(--t2)"
+                  }}
+                  onMouseOver={e => { e.target.style.background = 'var(--acc)'; e.target.style.color = 'var(--bg)' }}
+                  onMouseOut={e => { e.target.style.background = 'var(--card)'; e.target.style.color = 'var(--t2)' }}
+                >
+                  แสดงเพิ่มเติม ({eraScholars.length - visibleScholars.length} ท่าน)
+                </button>
+              </div>
+            )}
           </div>
         )
       })}
@@ -148,7 +176,7 @@ export default function Scholars() {
       <div style={{marginTop:32,padding:"20px 24px",background:"var(--acc2)",
         border:".5px solid var(--acc-br)",borderRadius:14,textAlign:"center"}}>
         <div style={{fontSize:14,fontWeight:500,color:"var(--text)",marginBottom:6}}>
-          ต้องการเพิ่มรายชื่ออุลามาอฺ?
+          ต้องการเพิ่มรายชื่ออุลามาอ์?
         </div>
         <p style={{fontSize:12,marginBottom:14}}>ติดต่อทีม Talib Club เพื่อเสนอรายชื่อนักวิชาการเพิ่มเติม</p>
         <a 
