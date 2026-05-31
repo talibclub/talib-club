@@ -1,5 +1,57 @@
+import { useState, useEffect } from "react"
 import { ARTICLES, BOOKS, MEDIA, SITE } from "../data/index.js"
 import { useContentCollection, useSiteSettings } from "../lib/contentStore.js"
+
+const QURAN_DUAS = [
+  { sura: 1, aya: 6 },
+  { sura: 2, aya: 127 },
+  { sura: 2, aya: 128 },
+  { sura: 2, aya: 201 },
+  { sura: 2, aya: 250 },
+  { sura: 2, aya: 286 },
+  { sura: 3, aya: 8 },
+  { sura: 3, aya: 9 },
+  { sura: 3, aya: 16 },
+  { sura: 3, aya: 147 },
+  { sura: 3, aya: 191 },
+  { sura: 3, aya: 193 },
+  { sura: 3, aya: 194 },
+  { sura: 7, aya: 23 },
+  { sura: 7, aya: 47 },
+  { sura: 7, aya: 126 },
+  { sura: 10, aya: 85 },
+  { sura: 14, aya: 38 },
+  { sura: 14, aya: 40 },
+  { sura: 14, aya: 41 },
+  { sura: 18, aya: 10 },
+  { sura: 20, aya: 25 },
+  { sura: 20, aya: 114 },
+  { sura: 21, aya: 87 },
+  { sura: 23, aya: 109 },
+  { sura: 23, aya: 118 },
+  { sura: 25, aya: 65 },
+  { sura: 25, aya: 74 },
+  { sura: 27, aya: 19 },
+  { sura: 28, aya: 24 },
+  { sura: 60, aya: 4 }
+]
+
+const SURAH_NAMES = {
+  1: "อัล-ฟาติฮะฮ์",
+  2: "อัล-บะเกาะเราะฮ์",
+  3: "อาลิ อิมรอน",
+  7: "อัล-อะอ์รอฟ",
+  10: "ยูนุส",
+  14: "อิบรอฮีม",
+  18: "อัล-กะฮ์ฟ",
+  20: "ฏอฮา",
+  21: "อัล-อันบิยาอ์",
+  23: "อัล-มุอ์มินูน",
+  25: "อัล-ฟุรกอน",
+  27: "อัน-นัมลฺ",
+  28: "อัล-เกาะศ็อศ",
+  60: "อัล-มุมตะหะนะฮ์"
+}
 
 export default function Home({ go }) {
   const { items: articles } = useContentCollection("articles", ARTICLES)
@@ -9,6 +61,74 @@ export default function Home({ go }) {
   const recent     = articles.slice(0, 3)
   const newBooks   = books.slice(0, 4)
   const recentMedia= media.slice(0, 3)
+
+  const [dailyDua, setDailyDua] = useState(null)
+
+  useEffect(() => {
+    if (!site) return
+
+    const todayStr = new Date().toDateString()
+    const cached = localStorage.getItem("talib_club_daily_dua")
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached)
+        if (parsed.dateString === todayStr) {
+          setDailyDua({
+            ar: parsed.ar,
+            th: parsed.th,
+            ref: parsed.ref
+          })
+          return
+        }
+      } catch (e) {
+        console.error("Error parsing cached dua:", e)
+      }
+    }
+
+    const today = new Date().getDate()
+    const index = (today - 1) % QURAN_DUAS.length
+    const dua = QURAN_DUAS[index]
+
+    fetch(`https://quranenc.com/api/v1/translation/aya/thai_rwwad/${dua.sura}/${dua.aya}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.result) {
+          const fetchedDua = {
+            dateString: todayStr,
+            ar: data.result.arabic_text,
+            th: data.result.translation,
+            ref: `${SURAH_NAMES[dua.sura] || `ซูเราะฮ์ที่ ${dua.sura}`} ${dua.sura}:${dua.aya}`
+          }
+          localStorage.setItem("talib_club_daily_dua", JSON.stringify(fetchedDua))
+          setDailyDua({
+            ar: fetchedDua.ar,
+            th: fetchedDua.th,
+            ref: fetchedDua.ref
+          })
+        } else {
+          setDailyDua({
+            ar: site.ayah?.ar,
+            th: site.ayah?.th,
+            ref: site.ayah?.ref
+          })
+        }
+      })
+      .catch(err => {
+        console.error("Failed to fetch daily dua:", err)
+        setDailyDua({
+          ar: site.ayah?.ar,
+          th: site.ayah?.th,
+          ref: site.ayah?.ref
+        })
+      })
+  }, [site])
+
+  const displayDua = dailyDua || {
+    ar: site?.ayah?.ar || "",
+    th: site?.ayah?.th || "",
+    ref: site?.ayah?.ref || ""
+  }
+
 
   return (
     <div>
@@ -46,9 +166,9 @@ export default function Home({ go }) {
           <div className="ayah-ar" style={{
             fontSize:18, color:"var(--text)", direction:"rtl", textAlign:"right",
             lineHeight:1.7, marginBottom:6, fontFamily:"serif"
-          }}>{site.ayah.ar}</div>
+          }}>{displayDua.ar}</div>
           <div style={{ fontSize:12, color:"var(--t2)", fontWeight:300, lineHeight:1.5 }}>
-            {site.ayah.th} — {site.ayah.ref}
+            {displayDua.th} — {displayDua.ref}
           </div>
         </div>
       </div>

@@ -27,7 +27,7 @@ export default function Scholars() {
   return (
     <div>
       <div style={{marginBottom:28}}>
-        <h1 style={{marginBottom:8}}>รายนามอุลามาอ์</h1>
+        <h1 style={{marginBottom:8}}>รายนามอุลามาอฺ</h1>
         <p>รวบรวมนักวิชาการอิสลามตั้งแต่ยุคฮิจเราะฮ์แรกจนถึงปัจจุบัน พร้อมปีฮิจเราะฮ์ (AH) และคริสต์ศักราช (CE)</p>
         {loading && <p style={{ marginTop: 8, fontSize: 12 }}>กำลังโหลดรายชื่อใหม่ล่าสุด...</p>}
       </div>
@@ -37,7 +37,7 @@ export default function Scholars() {
         <div style={{position:"relative",flex:1,minWidth:200}}>
           <i className="ti ti-search" style={{position:"absolute",left:10,top:"50%",
             transform:"translateY(-50%)",color:"var(--t3)",fontSize:14}}></i>
-          <input placeholder="ค้นหาชื่ออุลามาอ์..." value={search}
+          <input placeholder="ค้นหาชื่ออุลามาอฺ..." value={search}
             onChange={e=>setSearch(e.target.value)} style={{paddingLeft:32}}/>
         </div>
         <select value={field} onChange={e=>setField(e.target.value)} style={{width:"auto",flex:"0 0 auto"}}>
@@ -108,7 +108,7 @@ export default function Scholars() {
       <div style={{marginTop:32,padding:"20px 24px",background:"var(--acc2)",
         border:".5px solid var(--acc-br)",borderRadius:14,textAlign:"center"}}>
         <div style={{fontSize:14,fontWeight:500,color:"var(--text)",marginBottom:6}}>
-          ต้องการเพิ่มรายชื่ออุลามาอ์?
+          ต้องการเพิ่มรายชื่ออุลามาอฺ?
         </div>
         <p style={{fontSize:12,marginBottom:14}}>ติดต่อทีม Talib Club เพื่อเสนอรายชื่อนักวิชาการเพิ่มเติม</p>
         <a 
