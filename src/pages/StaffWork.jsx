@@ -1,32 +1,16 @@
 import React, { useEffect, useMemo, useState, useRef } from "react"
-import { initializeApp, getApps } from "firebase/app"
 import { 
   collection, onSnapshot, query, updateDoc, doc, 
-  serverTimestamp, addDoc, deleteDoc, setDoc, orderBy, getFirestore 
+  serverTimestamp, addDoc, deleteDoc, setDoc, orderBy 
 } from "firebase/firestore"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { toast } from "react-hot-toast"
+import { db } from "../lib/firebase.js"
 
 // ฟังก์ชันแจ้งเตือนด้วย Toast
 const notifySuccess = (msg) => toast.success(msg)
 const notifyError = (msg) => toast.error(msg)
 
-// --- เริ่ม: โค้ดตั้งค่า Firebase สำหรับระบบ Preview ด้านขวามือ ---
-const firebaseConfig = {
-  apiKey: "AIzaSyC8HoWaAu0XWy3he_pMxqUIWwREDPdeUpg",
-  authDomain: "talib-club-web.firebaseapp.com",
-  projectId: "talib-club-web",
-  storageBucket: "talib-club-web.firebasestorage.app",
-  messagingSenderId: "300903382422",
-  appId: "1:300903382422:web:887e6f03a6c4f0092db1b7"
-};
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const db = getFirestore(app);
-
-// ⚠️ หมายเหตุ: เมื่อนำโค้ดไปใช้ใน VS Code ของโปรเจกต์คุณ
-// 1. ให้ลบ Block โค้ดตั้งค่า Firebase นี้ออกทั้งหมด (ลบบรรทัดที่ 14 ถึง 26 ทิ้ง)
-// 2. พิมพ์เรียกใช้งานบรรทัดนี้แทน -> import { db } from "../lib/firebase.js"
-// --- จบ: โค้ดตั้งค่า Firebase ---
 
 // ━━━ CONFIGURATION ━━━
 const ADMIN_TEAM = ["Usman Manu", "ฟาดิล", "อนันดา"] 
@@ -370,6 +354,9 @@ export default function StaffWork({ authState, go }) {
       <div className="card" style={{ padding: "24px", marginBottom: "24px", borderLeft: "4px solid var(--teal)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
           <div>
+            <button className="btn btn-outline" onClick={() => go("staff")} style={{ marginBottom: "12px", padding: "5px 12px", fontSize: "12px", display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <i className="ti ti-arrow-left"></i> กลับ
+            </button>
             <h1>ศูนย์ปฏิบัติงาน Talib Club</h1>
             <p style={{ marginTop: "4px" }}>ทีมงาน: <strong style={{ color: "var(--teal)" }}>{currentUser}</strong> ({isAdmin ? "แอดมิน" : "ผู้จัดทำ"})</p>
           </div>
