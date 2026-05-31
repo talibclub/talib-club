@@ -27,10 +27,10 @@ export default function Scholars() {
   const [mhFilter, setMhFilter] = useState("")
   const [mzFilter, setMzFilter] = useState("")
 
-  const [visibleCounts, setVisibleCounts] = useState({ 1: 12, 2: 12, 3: 12, 4: 12 })
+  const [visibleCounts, setVisibleCounts] = useState({ 1: 6, 2: 6, 3: 6, 4: 6 })
 
   const resetVisible = () => {
-    setVisibleCounts({ 1: 12, 2: 12, 3: 12, 4: 12 })
+    setVisibleCounts({ 1: 6, 2: 6, 3: 6, 4: 6 })
   }
 
   const fields = ["all", ...new Set([...(taxonomy.scholarFields || []), ...scholars.map(s => s.field).filter(Boolean)])]
@@ -92,10 +92,30 @@ export default function Scholars() {
 
   return (
     <div>
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ marginBottom: 8 }}>รายนามอุลามาอ์</h1>
-        <p>รวบรวมนักวิชาการอิสลามแบ่งตามยุคสมัย พร้อมตัวกรองวิชาการและระบบสืบค้นอย่างละเอียด</p>
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ marginBottom: 8 }}>ทำเนียบบุคคลในอิสลาม</h1>
+        <p style={{ color: "var(--t2)" }}>รวบรวมบุคคลและปราชญ์ในประวัติศาสตร์อิสลามแบ่งตามยุคสมัย พร้อมข้อมูลวิชาการ</p>
         {loading && <p style={{ marginTop: 8, fontSize: 12 }}>กำลังโหลดรายชื่อใหม่ล่าสุด...</p>}
+      </div>
+
+      {/* DISCLAIMER BANNER */}
+      <div style={{
+        background: "rgba(245, 158, 11, 0.08)",
+        border: "0.5px solid rgba(245, 158, 11, 0.25)",
+        padding: "12px 16px",
+        borderRadius: "8px",
+        marginBottom: "24px",
+        fontSize: "12px",
+        color: "var(--amber)",
+        lineHeight: "1.5",
+        display: "flex",
+        alignItems: "center",
+        gap: "10px"
+      }}>
+        <i className="ti ti-info-circle" style={{ fontSize: "16px", flexShrink: 0 }}></i>
+        <span>
+          <strong>ชี้แจง:</strong> รายชื่อและฐานข้อมูลบุคคลด้านล่างนี้ยังอยู่ในขั้นตอนการปรับปรุงและอัปเดตข้อมูลให้สมบูรณ์ ทีมงานกำลังทยอยตรวจสอบรายละเอียดวิชาการทีละท่านอย่างรอบคอบ
+        </span>
       </div>
 
       {/* SEARCH + FILTER */}
@@ -277,7 +297,7 @@ export default function Scholars() {
             {eraScholars.length > visibleScholars.length && (
               <div style={{ textAlign: "center", marginTop: 20 }}>
                 <button 
-                  onClick={() => setVisibleCounts(prev => ({ ...prev, [eraNum]: prev[eraNum] + 12 }))}
+                  onClick={() => setVisibleCounts(prev => ({ ...prev, [eraNum]: prev[eraNum] + 6 }))}
                   style={{
                     fontFamily: "'Prompt', sans-serif", fontSize: 11, fontWeight: 300,
                     padding: "5px 16px", borderRadius: 20, border: ".5px solid var(--br)",
@@ -295,7 +315,7 @@ export default function Scholars() {
         )
       })}
 
-      {filtered.length === 0 && <div className="empty">ไม่พบอุลามาอ์ที่ตรงกับการค้นหา</div>}
+      {filtered.length === 0 && <div className="empty">ไม่พบรายชื่อบุคคลที่ตรงกับการค้นหา</div>}
 
       {/* CONTACT */}
       <div style={{
@@ -303,9 +323,9 @@ export default function Scholars() {
         border: ".5px solid var(--acc-br)", borderRadius: 14, textAlign: "center"
       }}>
         <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", marginBottom: 6 }}>
-          ต้องการเพิ่มรายชื่ออุลามาอ์?
+          ต้องการเสนอรายชื่อบุคคลเพิ่มเติม?
         </div>
-        <p style={{ fontSize: 12, marginBottom: 14 }}>ติดต่อทีม Talib Club เพื่อเสนอรายชื่อนักวิชาการเพิ่มเติม</p>
+        <p style={{ fontSize: 12, marginBottom: 14 }}>ติดต่อทีม Talib Club เพื่อเสนอรายชื่อบุคคลและผู้รู้เพิ่มเติม</p>
         <a 
           href="https://www.facebook.com/TalibClub" 
           target="_blank" 

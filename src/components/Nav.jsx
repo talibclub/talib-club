@@ -8,7 +8,7 @@ const NAV_LINKS = [
   { id: "articles", label: "บทความ", icon: "ti-file-text" },
   { id: "library", label: "ห้องสมุด", icon: "ti-books" },
   { id: "media", label: "มีเดีย", icon: "ti-player-play" },
-  { id: "scholars", label: "อุลามาอฺ", icon: "ti-users" },
+  { id: "scholars", label: "ทำเนียบบุคคล", icon: "ti-users" },
   { id: "tracking", label: "ตรวจพัสดุ", icon: "ti-package" },
 ]
 
