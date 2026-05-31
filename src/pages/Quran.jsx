@@ -4,9 +4,31 @@ import { getSurahTheme } from "../data/quranThemes.js"
 import { useContentCollection } from "../lib/contentStore.js"
 import toast from "react-hot-toast"
 import { confirmAction } from "../utils/feedback.jsx"
+import QURAN_BENEFITS from "../data/quranBenefits.json"
 
 export default function Quran({ initialSura, initialAyah, authState }) {
   const [selectedSura, setSelectedSura] = useState(initialSura || 1)
+  const [readingTheme, setReadingTheme] = useState(() => {
+    return localStorage.getItem("quran-reading-theme") || "sepia"
+  })
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    return localStorage.getItem("quran-sidebar-collapsed") === "true"
+  })
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
+  const [benefitsExpanded, setBenefitsExpanded] = useState(true)
+
+  useEffect(() => {
+    localStorage.setItem("quran-reading-theme", readingTheme)
+  }, [readingTheme])
+
+  useEffect(() => {
+    localStorage.setItem("quran-sidebar-collapsed", sidebarCollapsed)
+  }, [sidebarCollapsed])
+
+  useEffect(() => {
+    setBenefitsExpanded(true)
+  }, [selectedSura])
+
   const [search, setSearch] = useState("")
   const [mode, setMode] = useState("translation") // "mushaf" | "translation" | "tafsir"
   const [translationKey, setTranslationKey] = useState("thai_complex") // "thai_complex" | "thai_rwwad"
@@ -256,27 +278,113 @@ export default function Quran({ initialSura, initialAyah, authState }) {
   const hasBismillah = selectedSura !== 1 && selectedSura !== 9
 
   return (
-    <div>
+    <div className={`quran-container quran-theme-${readingTheme}`}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap');
         
+        .quran-container {
+          padding: 24px;
+          border-radius: 20px;
+          background: var(--quran-bg);
+          color: var(--quran-text);
+          transition: background 0.3s, color 0.3s;
+        }
+        
+        .quran-theme-light {
+          --quran-bg: var(--bg);
+          --quran-card-bg: var(--card);
+          --quran-text: var(--text);
+          --quran-t2: var(--t2);
+          --quran-t3: var(--t3);
+          --quran-br: var(--br);
+          --quran-br2: var(--br2);
+          --quran-acc2: var(--acc2);
+          --quran-teal: var(--teal);
+          --quran-teal-bg: var(--teal-bg);
+        }
+        
+        .quran-theme-sepia {
+          --quran-bg: #f6f0e2;
+          --quran-card-bg: #faf5eb;
+          --quran-text: #2d241e;
+          --quran-t2: #5d5045;
+          --quran-t3: #8d7d6f;
+          --quran-br: #e5dbc1;
+          --quran-br2: #efe6cc;
+          --quran-acc2: #eedfb8;
+          --quran-teal: #1b7a63;
+          --quran-teal-bg: #ecf4f1;
+        }
+        
+        .quran-theme-dark {
+          --quran-bg: #121214;
+          --quran-card-bg: #1e1e22;
+          --quran-text: #e3ded7;
+          --quran-t2: #9b968f;
+          --quran-t3: #6b6660;
+          --quran-br: #28282c;
+          --quran-br2: #202023;
+          --quran-acc2: #27272b;
+          --quran-teal: #2dbea0;
+          --quran-teal-bg: rgba(45, 190, 160, 0.08);
+        }
+
+        .quran-container .card {
+          background: var(--quran-card-bg) !important;
+          border-color: var(--quran-br) !important;
+          color: var(--quran-text) !important;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.02) !important;
+        }
+
+        .quran-container h1, 
+        .quran-container h2, 
+        .quran-container h3 {
+          color: var(--quran-text) !important;
+        }
+
+        .quran-container p,
+        .quran-container span {
+          color: var(--quran-t2);
+        }
+
+        .quran-container input,
+        .quran-container select {
+          background: var(--quran-card-bg) !important;
+          color: var(--quran-text) !important;
+          border-color: var(--quran-br) !important;
+        }
+        
+        .quran-container input::placeholder {
+          color: var(--quran-t3) !important;
+        }
+
         .surah-item {
           transition: all 0.2s ease;
           cursor: pointer;
+          color: var(--quran-text) !important;
+          border-bottom: 0.5px solid var(--quran-br) !important;
         }
+        
+        .surah-item span,
+        .surah-item div {
+          color: inherit;
+        }
+        
         .surah-item:hover {
-          background: var(--bg2);
+          background: var(--quran-bg) !important;
         }
+        
         .surah-item.active {
-          background: var(--teal-bg);
-          border-left: 3px solid var(--teal);
-          color: var(--teal);
+          background: var(--quran-teal-bg) !important;
+          border-left: 3.5px solid var(--quran-teal) !important;
+          color: var(--quran-teal) !important;
+          font-weight: 500;
         }
+        
         .quran-sidebar {
           overflow-y: auto;
           flex: 1;
         }
-        /* Scrollbar styles for sidebar */
         .quran-sidebar::-webkit-scrollbar {
           width: 5px;
         }
@@ -284,19 +392,21 @@ export default function Quran({ initialSura, initialAyah, authState }) {
           background: transparent;
         }
         .quran-sidebar::-webkit-scrollbar-thumb {
-          background: var(--br);
+          background: var(--quran-br);
           border-radius: 4px;
         }
         .arabic-font {
           font-family: 'Amiri', 'Noto Naskh Arabic', 'Traditional Arabic', serif;
           direction: rtl;
           text-align: right;
-          line-height: 2.2;
+          line-height: 2.6;
+          color: var(--quran-text);
         }
         .mushaf-flow {
           text-align: justify;
           direction: rtl;
-          line-height: 2.5;
+          line-height: 2.6;
+          color: var(--quran-text);
         }
         .mode-btn {
           font-family: 'Prompt', sans-serif;
@@ -304,24 +414,24 @@ export default function Quran({ initialSura, initialAyah, authState }) {
           font-weight: 400;
           padding: 5px 12px;
           border-radius: 20px;
-          border: 0.5px solid var(--br);
-          background: var(--card);
-          color: var(--t2);
+          border: 0.5px solid var(--quran-br);
+          background: var(--quran-card-bg);
+          color: var(--quran-t2);
           cursor: pointer;
           transition: all 0.15s;
         }
         .mode-btn.active {
-          background: var(--teal);
+          background: var(--quran-teal);
           color: #fff;
-          border-color: var(--teal);
+          border-color: var(--quran-teal);
         }
         .size-btn {
           width: 28px;
           height: 28px;
           border-radius: 50%;
-          border: 0.5px solid var(--br);
-          background: var(--card);
-          color: var(--text);
+          border: 0.5px solid var(--quran-br);
+          background: var(--quran-card-bg);
+          color: var(--quran-text);
           cursor: pointer;
           display: inline-flex;
           align-items: center;
@@ -330,17 +440,20 @@ export default function Quran({ initialSura, initialAyah, authState }) {
           transition: all 0.15s;
         }
         .size-btn:hover {
-          background: var(--bg2);
+          background: var(--quran-bg);
         }
         .tafsir-box {
-          background: var(--acc2);
-          border-left: 2px solid var(--teal);
-          padding: 12px 16px;
-          border-radius: 0 8px 8px 0;
+          background: var(--quran-acc2);
+          border-left: 3px solid var(--quran-teal);
+          padding: 14px 18px;
+          border-radius: 0 10px 10px 0;
           margin-top: 8px;
         }
+        .tafsir-box div {
+          color: var(--quran-text);
+        }
         @keyframes pulse-highlight {
-          0% { background-color: var(--teal-bg); box-shadow: 0 0 12px rgba(45, 190, 160, 0.4); }
+          0% { background-color: var(--quran-teal-bg); box-shadow: 0 0 12px rgba(45, 190, 160, 0.4); }
           50% { background-color: rgba(45, 190, 160, 0.25); box-shadow: 0 0 15px rgba(45, 190, 160, 0.5); }
           100% { background-color: transparent; box-shadow: none; }
         }
@@ -357,28 +470,33 @@ export default function Quran({ initialSura, initialAyah, authState }) {
           border: none;
           background: transparent;
           cursor: pointer;
-          color: var(--t3);
+          color: var(--quran-t3);
           border-bottom: 2px solid transparent;
           transition: all 0.2s;
         }
         .sidebar-tab-btn.active {
-          color: var(--teal);
-          border-bottom-color: var(--teal);
+          color: var(--quran-teal);
+          border-bottom-color: var(--quran-teal);
         }
         .search-result-item {
           padding: 12px;
-          border-bottom: 0.5px solid var(--br2);
+          border-bottom: 0.5px solid var(--quran-br);
           cursor: pointer;
           transition: all 0.2s;
+          color: var(--quran-text);
         }
         .search-result-item:hover {
-          background: var(--bg2);
+          background: var(--quran-bg);
         }
         .search-highlight {
-          background-color: rgba(255, 179, 0, 0.2);
+          background-color: rgba(255, 179, 0, 0.25);
           padding: 0 2px;
           border-radius: 2px;
           font-weight: 500;
+        }
+        @keyframes slideUp {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
         }
       `}</style>
 
@@ -391,172 +509,224 @@ export default function Quran({ initialSura, initialAyah, authState }) {
       </div>
 
       {/* CONTENT LAYOUT */}
-      <div style={{ display: "flex", gap: 24, flexDirection: isMobile ? "column" : "row" }}>
-        
-        {/* SIDEBAR FOR DESKTOP OR DROPDOWN FOR MOBILE */}
+      <div style={{ display: "flex", gap: sidebarCollapsed && !isMobile ? 0 : 24, flexDirection: isMobile ? "column" : "row", position: "relative" }}>
         {!isMobile ? (
           <div style={{ 
-            width: 280, 
-            display: "flex", 
-            flexDirection: "column", 
-            gap: 12, 
+            width: sidebarCollapsed ? 0 : 280, 
+            transition: "width 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
             flexShrink: 0,
+            height: "calc(100vh - 120px)",
             position: "sticky",
             top: 20,
-            height: "calc(100vh - 120px)"
+            zIndex: 10
           }}>
-            {/* Sidebar Tabs */}
-            <div style={{ display: "flex", borderBottom: "0.5px solid var(--br2)" }}>
-              <button 
-                className={`sidebar-tab-btn ${sidebarTab === "surah" ? "active" : ""}`}
-                onClick={() => setSidebarTab("surah")}
-              >
-                รายชื่อซูเราะฮ์
-              </button>
-              <button 
-                className={`sidebar-tab-btn ${sidebarTab === "search" ? "active" : ""}`}
-                onClick={() => setSidebarTab("search")}
-              >
-                ค้นหาในอายะฮ์
-              </button>
-            </div>
+            {/* Floating Toggle Button */}
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              style={{
+                position: "absolute",
+                right: sidebarCollapsed ? "-16px" : "-16px",
+                top: "40px",
+                width: "32px",
+                height: "32px",
+                borderRadius: "50%",
+                background: "var(--quran-teal)",
+                color: "#fff",
+                border: "2.5px solid var(--quran-card-bg)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                zIndex: 20,
+                boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
+                transition: "transform 0.2s ease"
+              }}
+              title={sidebarCollapsed ? "เปิดแถบรายชื่อซูเราะฮ์" : "ปิดแถบรายชื่อซูเราะฮ์"}
+            >
+              <i className={`ti ${sidebarCollapsed ? "ti-chevron-right" : "ti-chevron-left"}`} style={{ fontSize: 12, fontWeight: "bold" }}></i>
+            </button>
 
-            {/* Sidebar Tab Content */}
-            {sidebarTab === "surah" ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 0 }}>
-                <div style={{ position: "relative" }}>
-                  <i className="ti ti-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 13 }}></i>
-                  <input 
-                    placeholder="ค้นหาชื่อซูเราะห์..."
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    style={{ width: "100%", paddingLeft: 30, paddingRight: 10, height: 36, fontSize: 12, borderRadius: 8, border: "0.5px solid var(--br)", background: "var(--card)", color: "var(--text)" }}
-                  />
-                </div>
-                
-                <div className="quran-sidebar card" style={{ padding: 0, display: "flex", flexDirection: "column", overflowY: "auto", minHeight: 0 }}>
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    {filteredSurahs.map(s => (
-                      <div 
-                        key={s.number} 
-                        className={`surah-item ${selectedSura === s.number ? "active" : ""}`}
-                        onClick={() => setSelectedSura(s.number)}
-                        style={{ 
-                          padding: "10px 14px", 
-                          display: "flex", 
-                          justifyContent: "space-between", 
-                          alignItems: "center", 
-                          borderBottom: "0.5px solid var(--br2)"
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: "10px", color: "var(--t3)", width: 18, textAlign: "center" }}>{s.number}</span>
-                          <div>
-                            <div style={{ fontSize: "12px", fontWeight: 500 }}>{s.englishName}</div>
-                            <div style={{ fontSize: "9px", color: "var(--t2)" }}>{s.englishNameTranslation}</div>
-                          </div>
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: "14px", fontFamily: "'Amiri', serif", color: "var(--text)" }}>{s.name}</div>
-                          <div style={{ fontSize: "9px", color: "var(--t3)" }}>{s.numberOfAyahs} อายะฮ์</div>
-                        </div>
-                      </div>
-                    ))}
-                    {filteredSurahs.length === 0 && (
-                      <div style={{ padding: 20, textAlign: "center", fontSize: 12, color: "var(--t3)" }}>ไม่พบผลลัพธ์</div>
-                    )}
-                  </div>
-                </div>
+            {/* Inner Wrapper (to hide content during collapse) */}
+            <div style={{
+              width: 280,
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              opacity: sidebarCollapsed ? 0 : 1,
+              transition: "opacity 0.25s ease",
+              pointerEvents: sidebarCollapsed ? "none" : "auto",
+              overflow: "hidden"
+            }}>
+              {/* Sidebar Tabs */}
+              <div style={{ display: "flex", borderBottom: "0.5px solid var(--quran-br)" }}>
+                <button 
+                  className={`sidebar-tab-btn ${sidebarTab === "surah" ? "active" : ""}`}
+                  onClick={() => setSidebarTab("surah")}
+                >
+                  รายชื่อซูเราะฮ์
+                </button>
+                <button 
+                  className={`sidebar-tab-btn ${sidebarTab === "search" ? "active" : ""}`}
+                  onClick={() => setSidebarTab("search")}
+                >
+                  ค้นหาในอายะฮ์
+                </button>
               </div>
-            ) : (
-              // KEYWORD SEARCH TAB
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 0 }}>
-                <form onSubmit={handleKeywordSearch} style={{ display: "flex", gap: 6 }}>
-                  <div style={{ position: "relative", flex: 1 }}>
-                    <i className="ti ti-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 13 }}></i>
+
+              {/* Sidebar Tab Content */}
+              {sidebarTab === "surah" ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 0 }}>
+                  <div style={{ position: "relative" }}>
+                    <i className="ti ti-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--quran-t3)", fontSize: 13 }}></i>
                     <input 
-                      placeholder="เช่น สวรรค์, ความเมตตา, นบี..."
-                      value={keywordQuery}
-                      onChange={e => setKeywordQuery(e.target.value)}
-                      style={{ width: "100%", paddingLeft: 30, paddingRight: 10, height: 36, fontSize: 12, borderRadius: 8, border: "0.5px solid var(--br)", background: "var(--card)", color: "var(--text)" }}
+                      placeholder="ค้นหาชื่อซูเราะห์..."
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      style={{ width: "100%", paddingLeft: 30, paddingRight: 10, height: 36, fontSize: 12, borderRadius: 8, border: "0.5px solid var(--quran-br)" }}
                     />
                   </div>
-                  <button className="btn btn-teal" style={{ height: 36, padding: "0 12px", fontSize: 12 }} type="submit">ค้นหา</button>
-                </form>
-
-                {searchLoading && (
-                  <div style={{ textAlign: "center", padding: 24 }}>
-                    <i className="ti ti-loader-2 spin" style={{ fontSize: 20, color: "var(--teal)" }}></i>
-                    <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 6 }}>กำลังวิเคราะห์คีย์เวิร์ด...</div>
-                  </div>
-                )}
-
-                {searchError && (
-                  <div style={{ color: "var(--red)", fontSize: 11, padding: 8, textAlign: "center" }}>
-                    {searchError}
-                  </div>
-                )}
-
-                {!searchLoading && !searchError && (
+                  
                   <div className="quran-sidebar card" style={{ padding: 0, display: "flex", flexDirection: "column", overflowY: "auto", minHeight: 0 }}>
                     <div style={{ display: "flex", flexDirection: "column" }}>
-                      {searchResults.length > 0 ? (
-                        searchResults.map((match, i) => {
-                          const highlightText = (text, query) => {
-                            if (!query) return text
-                            const parts = text.split(new RegExp(`(${query})`, "gi"))
-                            return parts.map((part, idx) => 
-                              part.toLowerCase() === query.toLowerCase() 
-                                ? <span key={idx} className="search-highlight">{part}</span> 
-                                : part
-                            )
-                          }
-
-                          return (
-                            <div 
-                              key={`${match.surah.number}_${match.numberInSurah}_${i}`} 
-                              className="search-result-item"
-                              onClick={() => handleSelectSearchResult(match)}
-                            >
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                                <span style={{ fontSize: 10, fontWeight: 600, color: "var(--teal)" }}>
-                                  ซูเราะฮ์ {match.surah.englishName} ({match.numberInSurah})
-                                </span>
-                                <span style={{ fontSize: 9, color: "var(--t3)" }}>
-                                  [{match.surah.number}:{match.numberInSurah}]
-                                </span>
-                              </div>
-                              <div style={{ fontSize: 11, color: "var(--text)", lineHeight: 1.45 }}>
-                                {highlightText(match.text, keywordQuery)}
-                              </div>
+                      {filteredSurahs.map(s => (
+                        <div 
+                          key={s.number} 
+                          className={`surah-item ${selectedSura === s.number ? "active" : ""}`}
+                          onClick={() => setSelectedSura(s.number)}
+                          style={{ 
+                            padding: "10px 14px", 
+                            display: "flex", 
+                            justifyContent: "space-between", 
+                            alignItems: "center", 
+                            borderBottom: "0.5px solid var(--quran-br)"
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontSize: "10px", color: "var(--quran-t3)", width: 18, textAlign: "center" }}>{s.number}</span>
+                            <div>
+                              <div style={{ fontSize: "12px", fontWeight: 500 }}>{s.englishName}</div>
+                              <div style={{ fontSize: "9px", color: "var(--quran-t2)" }}>{s.englishNameTranslation}</div>
                             </div>
-                          )
-                        })
-                      ) : (
-                        <div style={{ padding: 24, textAlign: "center", fontSize: 11, color: "var(--t3)" }}>
-                          {keywordQuery ? "ไม่พบคำสำคัญนี้ในพระคัมภีร์" : "พิมพ์คำค้นหาและกดปุ่มเพื่อเริ่มค้นหาความหมาย"}
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontSize: "14px", fontFamily: "'Amiri', serif" }}>{s.name}</div>
+                            <div style={{ fontSize: "9px", color: "var(--quran-t3)" }}>{s.numberOfAyahs} อายะฮ์</div>
+                          </div>
                         </div>
+                      ))}
+                      {filteredSurahs.length === 0 && (
+                        <div style={{ padding: 20, textAlign: "center", fontSize: 12, color: "var(--quran-t3)" }}>ไม่พบผลลัพธ์</div>
                       )}
                     </div>
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              ) : (
+                // KEYWORD SEARCH TAB
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 0 }}>
+                  <form onSubmit={handleKeywordSearch} style={{ display: "flex", gap: 6 }}>
+                    <div style={{ position: "relative", flex: 1 }}>
+                      <i className="ti ti-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--quran-t3)", fontSize: 13 }}></i>
+                      <input 
+                        placeholder="เช่น สวรรค์, ความเมตตา, นบี..."
+                        value={keywordQuery}
+                        onChange={e => setKeywordQuery(e.target.value)}
+                        style={{ width: "100%", paddingLeft: 30, paddingRight: 10, height: 36, fontSize: 12, borderRadius: 8, border: "0.5px solid var(--quran-br)" }}
+                      />
+                    </div>
+                    <button className="btn btn-teal" style={{ height: 36, padding: "0 12px", fontSize: 12 }} type="submit">ค้นหา</button>
+                  </form>
+
+                  {searchLoading && (
+                    <div style={{ textAlign: "center", padding: 24 }}>
+                      <i className="ti ti-loader-2 spin" style={{ fontSize: 20, color: "var(--quran-teal)" }}></i>
+                      <div style={{ fontSize: 11, color: "var(--quran-t3)", marginTop: 6 }}>กำลังค้นหา...</div>
+                    </div>
+                  )}
+
+                  {searchError && (
+                    <div style={{ color: "var(--red)", fontSize: 11, padding: 8, textAlign: "center" }}>
+                      {searchError}
+                    </div>
+                  )}
+
+                  {!searchLoading && !searchError && (
+                    <div className="quran-sidebar card" style={{ padding: 0, display: "flex", flexDirection: "column", overflowY: "auto", minHeight: 0 }}>
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        {searchResults.length > 0 ? (
+                          searchResults.map((match, i) => {
+                            const highlightText = (text, query) => {
+                              if (!query) return text
+                              const parts = text.split(new RegExp(`(${query})`, "gi"))
+                              return parts.map((part, idx) => 
+                                part.toLowerCase() === query.toLowerCase() 
+                                  ? <span key={idx} className="search-highlight">{part}</span> 
+                                  : part
+                              )
+                            }
+
+                            return (
+                              <div 
+                                key={`${match.surah.number}_${match.numberInSurah}_${i}`} 
+                                className="search-result-item"
+                                onClick={() => handleSelectSearchResult(match)}
+                                style={{ padding: "12px", borderBottom: "0.5px solid var(--quran-br)" }}
+                              >
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                                  <span style={{ fontSize: 10, fontWeight: 600, color: "var(--quran-teal)" }}>
+                                    ซูเราะฮ์ {match.surah.englishName} ({match.numberInSurah})
+                                  </span>
+                                  <span style={{ fontSize: 9, color: "var(--quran-t3)" }}>
+                                    [{match.surah.number}:{match.numberInSurah}]
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: 11, color: "var(--quran-text)", lineHeight: 1.45 }}>
+                                  {highlightText(match.text, keywordQuery)}
+                                </div>
+                              </div>
+                            )
+                          })
+                        ) : (
+                          <div style={{ padding: 24, textAlign: "center", fontSize: 11, color: "var(--quran-t3)" }}>
+                            {keywordQuery ? "ไม่พบคำสำคัญนี้ในพระคัมภีร์" : "พิมพ์คำค้นหาและกดปุ่มเพื่อเริ่มค้นหาความหมาย"}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 500, color: "var(--t2)" }}>เลือกซูเราะห์:</div>
-            <select 
-              value={selectedSura}
-              onChange={e => setSelectedSura(Number(e.target.value))}
-              style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "0.5px solid var(--br)", fontSize: 12, fontFamily: "'Prompt', sans-serif" }}
-            >
-              {SURA_LIST.map(s => (
-                <option key={s.number} value={s.number}>
-                  {s.number}. {s.englishName} ({s.englishNameTranslation}) — {s.numberOfAyahs} อายะฮ์
-                </option>
-              ))}
-            </select>
+          /* MOBILE SELECT TRIGGER BAR */
+          <div 
+            onClick={() => setIsMobileNavOpen(true)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "12px 16px",
+              background: "var(--quran-card-bg)",
+              border: "1px solid var(--quran-br)",
+              borderRadius: "12px",
+              cursor: "pointer",
+              marginBottom: "4px",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.02)"
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <i className="ti ti-book" style={{ color: "var(--quran-teal)", fontSize: 16 }}></i>
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--quran-text)" }}>
+                  ซูเราะฮ์ {currentSuraInfo.number}: {currentSuraInfo.englishName}
+                </div>
+                <div style={{ fontSize: "10px", color: "var(--quran-t2)" }}>
+                  {currentSuraInfo.englishNameTranslation} • {currentSuraInfo.numberOfAyahs} อายะฮ์ (แตะเพื่อเลือก/ค้นหา)
+                </div>
+              </div>
+            </div>
+            <i className="ti ti-chevron-down" style={{ color: "var(--quran-t3)", fontSize: 14 }}></i>
           </div>
         )}
 
@@ -646,17 +816,64 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                 </button>
               </div>
 
-              {/* Font Resizing Controls */}
-              <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+              {/* Font Resizing & Theme Controls */}
+              <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+                
+                {/* Theme Selector */}
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 11, color: "var(--t2)" }}>อาหรับ:</span>
+                  <span style={{ fontSize: 11, color: "var(--quran-t2)" }}>โทนสี:</span>
+                  <div style={{ display: "flex", gap: 6, background: "var(--quran-bg)", padding: "3px 6px", borderRadius: 20, border: "0.5px solid var(--quran-br)" }}>
+                    <button 
+                      onClick={() => setReadingTheme("light")}
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        background: "#ffffff",
+                        border: readingTheme === "light" ? "2px solid var(--quran-teal)" : "0.5px solid #ccc",
+                        cursor: "pointer",
+                        padding: 0
+                      }}
+                      title="โทนสีสว่าง"
+                    />
+                    <button 
+                      onClick={() => setReadingTheme("sepia")}
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        background: "#faf5eb",
+                        border: readingTheme === "sepia" ? "2px solid var(--quran-teal)" : "0.5px solid #e2d6bc",
+                        cursor: "pointer",
+                        padding: 0
+                      }}
+                      title="โทนสีถนอมสายตา (Sepia)"
+                    />
+                    <button 
+                      onClick={() => setReadingTheme("dark")}
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        background: "#1d1d20",
+                        border: readingTheme === "dark" ? "2px solid var(--quran-teal)" : "0.5px solid #555",
+                        cursor: "pointer",
+                        padding: 0
+                      }}
+                      title="โทนสีมืด"
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 11, color: "var(--quran-t2)" }}>อาหรับ:</span>
                   <button className="size-btn" onClick={() => setArabicSize(prev => Math.max(prev - 2, 20))} title="ย่อขนาดอักษรอาหรับ"><i className="ti ti-minus"></i></button>
                   <span style={{ fontSize: 11, width: 22, textAlign: "center", fontWeight: 500 }}>{arabicSize}</span>
                   <button className="size-btn" onClick={() => setArabicSize(prev => Math.min(prev + 2, 52))} title="ขยายขนาดอักษรอาหรับ"><i className="ti ti-plus"></i></button>
                 </div>
                 {mode !== "mushaf" && (
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 11, color: "var(--t2)" }}>ภาษาไทย:</span>
+                    <span style={{ fontSize: 11, color: "var(--quran-t2)" }}>ภาษาไทย:</span>
                     <button className="size-btn" onClick={() => setThaiSize(prev => Math.max(prev - 1, 12))} title="ย่อขนาดอักษรไทย"><i className="ti ti-minus"></i></button>
                     <span style={{ fontSize: 11, width: 22, textAlign: "center", fontWeight: 500 }}>{thaiSize}</span>
                     <button className="size-btn" onClick={() => setThaiSize(prev => Math.min(prev + 1, 26))} title="ขยายขนาดอักษรไทย"><i className="ti ti-plus"></i></button>
@@ -877,25 +1094,96 @@ export default function Quran({ initialSura, initialAyah, authState }) {
             </div>
           )}
 
+          {/* VERSE BENEFITS (فوائد الآيات) */}
+          {!loading && !error && verses.length > 0 && (() => {
+            const suraBenefits = QURAN_BENEFITS[selectedSura] || [];
+            if (suraBenefits.length === 0) return null;
+            return (
+              <div 
+                className="card" 
+                style={{ 
+                  marginTop: 20, 
+                  padding: "20px 24px", 
+                  borderLeft: "4px solid var(--quran-teal)", 
+                  background: "var(--quran-teal-bg)" 
+                }}
+              >
+                <div 
+                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+                  onClick={() => setBenefitsExpanded(!benefitsExpanded)}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <i className="ti ti-bulb" style={{ color: "var(--quran-teal)", fontSize: 18 }}></i>
+                    <div style={{ textAlign: "left" }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--quran-text)", display: "block" }}>
+                        ประโยชน์และข้อคิดที่ได้รับจากโองการต่างๆ ในซูเราะฮ์นี้
+                      </span>
+                      <span style={{ fontSize: 10, color: "var(--quran-t2)" }}>
+                        فوائد الآيات وهداياتها (ตัฟซีรอัลมุคตะศ็อร)
+                      </span>
+                    </div>
+                  </div>
+                  <i className={`ti ${benefitsExpanded ? "ti-chevron-up" : "ti-chevron-down"}`} style={{ color: "var(--quran-t2)", fontSize: 16 }}></i>
+                </div>
+
+                {benefitsExpanded && (
+                  <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+                    {suraBenefits.map((b, idx) => (
+                      <div 
+                        key={idx} 
+                        style={{ 
+                          borderBottom: idx === suraBenefits.length - 1 ? "none" : "0.5px solid var(--quran-br)", 
+                          paddingBottom: idx === suraBenefits.length - 1 ? 0 : 12,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 6
+                        }}
+                      >
+                        {/* Arabic Benefit */}
+                        <div 
+                          style={{ 
+                            fontFamily: "'Amiri', serif", 
+                            fontSize: 20, 
+                            direction: "rtl", 
+                            textAlign: "right",
+                            lineHeight: 1.5,
+                            color: "var(--quran-teal)" 
+                          }}
+                        >
+                          {b.arabic}
+                        </div>
+                        
+                        {/* Thai Benefit */}
+                        <div style={{ fontSize: "12.5px", lineHeight: 1.6, color: "var(--quran-text)", fontWeight: 400, textAlign: "left" }}>
+                          • {b.thai}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* LICENCE AND CREDIT BANNER */}
           <div 
             style={{ 
               marginTop: 24, 
               padding: "16px 20px", 
               borderRadius: 12, 
-              border: "0.5px solid var(--br)", 
-              background: "var(--card)", 
+              border: "0.5px solid var(--quran-br)", 
+              background: "var(--quran-card-bg)", 
               fontSize: "11px", 
-              color: "var(--t2)", 
+              color: "var(--quran-t2)", 
               lineHeight: "1.6" 
             }}
           >
-            <div style={{ fontWeight: 600, color: "var(--text)", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
-              <i className="ti ti-license" style={{ fontSize: 14, color: "var(--teal)" }}></i>
+            <div style={{ fontWeight: 600, color: "var(--quran-text)", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+              <i className="ti ti-license" style={{ fontSize: 14, color: "var(--quran-teal)" }}></i>
               แหล่งข้อมูลและลิขสิทธิ์ข้อมูลเผยแพร่
             </div>
             ข้อมูลแปลความหมายพระมหาคัมภีร์อัลกุรอานและตัฟซีรย่อภาษาไทยได้รับการสนับสนุนจาก <strong>โครงการสารานุกรมอัลกุรอาน (QuranEnc.com)</strong>
-            <ul style={{ paddingLeft: 16, marginTop: 4, display: "flex", flexDirection: "column", gap: 2, listStyleType: "none" }}>
+            <ul style={{ paddingLeft: 16, marginTop: 4, display: "flex", flexDirection: "column", gap: 2, listStyleType: "none", textAlign: "left" }}>
               <li>• สำนวนคำแปลภาษาไทย: ศูนย์แปล Rowwad Translation Center และ คณะผู้ทรงคุณวุฒิ (สมาคมศิษย์เก่ามหาวิทยาลัยในต่างประเทศ)</li>
               <li>• บทอธิบายคำแปลย่อ (ตัฟซีรย่อ): หนังสือตัฟซีรอัลมุคตะศ็อร (Al-Mukhtasar fi Tafsir al-Qur'an) แปลภาษาไทย</li>
               <li>• พัฒนาโดยอ้างอิงข้อมูลเวอร์ชันล่าสุดของโครงการ ซึ่งไม่อนุญาตให้ดัดแปลงหรือตัดต่อเนื้อหาคัดลอกใดๆ เพื่อความถูกต้องของพระดำรัส</li>
@@ -925,23 +1213,24 @@ export default function Quran({ initialSura, initialAyah, authState }) {
             display: "flex",
             flexDirection: "column",
             gap: 16,
-            background: "var(--card)",
+            background: "var(--quran-card-bg)",
+            border: "0.5px solid var(--quran-br)",
             boxShadow: "0 20px 50px rgba(0, 0, 0, 0.3)"
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", margin: 0 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--quran-text)", margin: 0 }}>
                 {activeBookmarkModal.bookmarkId ? "แก้ไขบันทึกข้อคิดอายะฮ์" : "บันทึกข้อคิดและประโยชน์จากอายะฮ์"}
               </h3>
               <button 
                 onClick={() => setActiveBookmarkModal(null)} 
-                style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "var(--t3)" }}
+                style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "var(--quran-t3)" }}
               >
                 <i className="ti ti-x"></i>
               </button>
             </div>
 
-            <div style={{ padding: 12, background: "var(--bg3)", borderRadius: 8, border: "0.5px solid var(--br2)" }}>
-              <span style={{ fontSize: 10, color: "var(--t3)", fontWeight: 500 }}>
+            <div style={{ padding: 12, background: "var(--quran-bg)", borderRadius: 8, border: "0.5px solid var(--quran-br2)" }}>
+              <span style={{ fontSize: 10, color: "var(--quran-t3)", fontWeight: 500 }}>
                 ซูเราะฮ์ {activeBookmarkModal.suraName} อายะฮ์ที่ {activeBookmarkModal.aya}
               </span>
               <div style={{ 
@@ -951,17 +1240,17 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                 textAlign: "right", 
                 margin: "8px 0",
                 lineHeight: 1.6,
-                color: "var(--text)"
+                color: "var(--quran-text)"
               }}>
                 {activeBookmarkModal.arabicText}
               </div>
-              <div style={{ fontSize: 12, color: "var(--t2)", lineHeight: 1.45 }}>
+              <div style={{ fontSize: 12, color: "var(--quran-t2)", lineHeight: 1.45, textAlign: "left" }}>
                 {activeBookmarkModal.translation}
               </div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 12, fontWeight: 500, color: "var(--teal)" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, textAlign: "left" }}>
+              <label style={{ fontSize: 12, fontWeight: 500, color: "var(--quran-teal)" }}>
                 บันทึกข้อคิด/ประโยชน์ที่ได้รับ (จดบันทึกส่วนตัวเพื่อเตือนตนเอง):
               </label>
               <textarea 
@@ -973,9 +1262,9 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                   minHeight: 100,
                   padding: 12,
                   borderRadius: 8,
-                  border: "0.5px solid var(--br)",
-                  background: "var(--card)",
-                  color: "var(--text)",
+                  border: "0.5px solid var(--quran-br)",
+                  background: "var(--quran-card-bg)",
+                  color: "var(--quran-text)",
                   fontSize: 13,
                   fontFamily: "'Prompt', sans-serif"
                 }}
@@ -1011,6 +1300,203 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                   บันทึก
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MOBILE BOTTOM SHEET NAVIGATION DRAWER */}
+      {isMobile && isMobileNavOpen && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0, 0, 0, 0.4)",
+          backdropFilter: "blur(4px)",
+          zIndex: 1000,
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "center"
+        }}
+        onClick={() => setIsMobileNavOpen(false)}
+        >
+          <div 
+            style={{
+              width: "100%",
+              maxHeight: "85vh",
+              background: "var(--quran-card-bg)",
+              borderRadius: "20px 20px 0 0",
+              display: "flex",
+              flexDirection: "column",
+              padding: "16px 20px 24px",
+              gap: 12,
+              animation: "slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+              boxShadow: "0 -10px 40px rgba(0,0,0,0.15)",
+              border: "1px solid var(--quran-br)",
+              borderBottom: "none"
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Drawer Drag bar & Close */}
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
+              <div style={{ width: 40, height: 4, borderRadius: 2, background: "var(--quran-br)" }}></div>
+            </div>
+            
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ fontSize: "14px", fontWeight: 600, color: "var(--quran-text)", margin: 0 }}>เลือกซูเราะฮ์ / ค้นหา</h3>
+              <button 
+                onClick={() => setIsMobileNavOpen(false)}
+                style={{ background: "none", border: "none", fontSize: "16px", cursor: "pointer", color: "var(--quran-t2)" }}
+              >
+                <i className="ti ti-x"></i>
+              </button>
+            </div>
+
+            {/* Sidebar Tabs inside Mobile Drawer */}
+            <div style={{ display: "flex", borderBottom: "0.5px solid var(--quran-br)" }}>
+              <button 
+                className={`sidebar-tab-btn ${sidebarTab === "surah" ? "active" : ""}`}
+                onClick={() => setSidebarTab("surah")}
+              >
+                รายชื่อซูเราะฮ์
+              </button>
+              <button 
+                className={`sidebar-tab-btn ${sidebarTab === "search" ? "active" : ""}`}
+                onClick={() => setSidebarTab("search")}
+              >
+                ค้นหาในอายะฮ์
+              </button>
+            </div>
+
+            {/* Content inside drawer */}
+            <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflowY: "hidden" }}>
+              {sidebarTab === "surah" ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 0 }}>
+                  <div style={{ position: "relative" }}>
+                    <i className="ti ti-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--quran-t3)", fontSize: 13 }}></i>
+                    <input 
+                      placeholder="ค้นหาชื่อซูเราะห์..."
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      style={{ width: "100%", paddingLeft: 30, paddingRight: 10, height: 36, fontSize: 12, borderRadius: 8, border: "0.5px solid var(--quran-br)" }}
+                    />
+                  </div>
+                  
+                  <div className="quran-sidebar" style={{ overflowY: "auto", flex: 1 }}>
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      {filteredSurahs.map(s => (
+                        <div 
+                          key={s.number} 
+                          className={`surah-item ${selectedSura === s.number ? "active" : ""}`}
+                          onClick={() => {
+                            setSelectedSura(s.number);
+                            setIsMobileNavOpen(false);
+                          }}
+                          style={{ 
+                            padding: "10px 14px", 
+                            display: "flex", 
+                            justifyContent: "space-between", 
+                            alignItems: "center", 
+                            borderBottom: "0.5px solid var(--quran-br)",
+                            borderRadius: 6
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontSize: "10px", color: "var(--quran-t3)", width: 18, textAlign: "center" }}>{s.number}</span>
+                            <div style={{ textAlign: "left" }}>
+                              <div style={{ fontSize: "12px", fontWeight: 500 }}>{s.englishName}</div>
+                              <div style={{ fontSize: "9px", color: "var(--quran-t2)" }}>{s.englishNameTranslation}</div>
+                            </div>
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontSize: "14px", fontFamily: "'Amiri', serif" }}>{s.name}</div>
+                            <div style={{ fontSize: "9px", color: "var(--quran-t3)" }}>{s.numberOfAyahs} อายะฮ์</div>
+                          </div>
+                        </div>
+                      ))}
+                      {filteredSurahs.length === 0 && (
+                        <div style={{ padding: 20, textAlign: "center", fontSize: 12, color: "var(--quran-t3)" }}>ไม่พบผลลัพธ์</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // KEYWORD SEARCH TAB
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 0 }}>
+                  <form onSubmit={handleKeywordSearch} style={{ display: "flex", gap: 6 }}>
+                    <div style={{ position: "relative", flex: 1 }}>
+                      <i className="ti ti-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--quran-t3)", fontSize: 13 }}></i>
+                      <input 
+                        placeholder="เช่น สวรรค์, ความเมตตา, นบี..."
+                        value={keywordQuery}
+                        onChange={e => setKeywordQuery(e.target.value)}
+                        style={{ width: "100%", paddingLeft: 30, paddingRight: 10, height: 36, fontSize: 12, borderRadius: 8, border: "0.5px solid var(--quran-br)" }}
+                      />
+                    </div>
+                    <button className="btn btn-teal" style={{ height: 36, padding: "0 12px", fontSize: 12 }} type="submit">ค้นหา</button>
+                  </form>
+
+                  {searchLoading && (
+                    <div style={{ textAlign: "center", padding: 24 }}>
+                      <i className="ti ti-loader-2 spin" style={{ fontSize: 20, color: "var(--quran-teal)" }}></i>
+                      <div style={{ fontSize: 11, color: "var(--quran-t3)", marginTop: 6 }}>กำลังค้นหา...</div>
+                    </div>
+                  )}
+
+                  {searchError && (
+                    <div style={{ color: "var(--red)", fontSize: 11, padding: 8, textAlign: "center" }}>
+                      {searchError}
+                    </div>
+                  )}
+
+                  {!searchLoading && !searchError && (
+                    <div className="quran-sidebar" style={{ overflowY: "auto", flex: 1 }}>
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        {searchResults.length > 0 ? (
+                          searchResults.map((match, i) => {
+                            const highlightText = (text, query) => {
+                              if (!query) return text
+                              const parts = text.split(new RegExp(`(${query})`, "gi"))
+                              return parts.map((part, idx) => 
+                                part.toLowerCase() === query.toLowerCase() 
+                                  ? <span key={idx} className="search-highlight">{part}</span> 
+                                  : part
+                              )
+                            }
+
+                            return (
+                              <div 
+                                key={`${match.surah.number}_${match.numberInSurah}_${i}`} 
+                                className="search-result-item"
+                                onClick={() => {
+                                  handleSelectSearchResult(match);
+                                  setIsMobileNavOpen(false);
+                                }}
+                                style={{ padding: "12px", borderBottom: "0.5px solid var(--quran-br)" }}
+                              >
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                                  <span style={{ fontSize: 10, fontWeight: 600, color: "var(--quran-teal)" }}>
+                                    ซูเราะฮ์ {match.surah.englishName} ({match.numberInSurah})
+                                  </span>
+                                  <span style={{ fontSize: 9, color: "var(--quran-t3)" }}>
+                                    [{match.surah.number}:{match.numberInSurah}]
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: 11, color: "var(--quran-text)", lineHeight: 1.45, textAlign: "left" }}>
+                                  {highlightText(match.text, keywordQuery)}
+                                </div>
+                              </div>
+                            )
+                          })
+                        ) : (
+                          <div style={{ padding: 24, textAlign: "center", fontSize: 11, color: "var(--quran-t3)" }}>
+                            {keywordQuery ? "ไม่พบคำสำคัญนี้" : "พิมพ์คำค้นหาเพื่อเริ่มค้นหาอายะฮ์"}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
