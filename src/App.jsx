@@ -109,7 +109,11 @@ export default function App() {
         {page === "media" && <Media go={go} />}
         {page === "media-detail" && <MediaDetail item={ctx} go={go} authState={authState} />}
         {page === "scholars" && <Scholars />}
-        {page === "quran" && <Quran />}
+        {page === "quran" && (
+          <RequireLogin authState={authState} go={go}>
+            <MemberDashboard authState={authState} go={go} initialView="quran" />
+          </RequireLogin>
+        )}
         {page === "tracking" && <Tracking />}
         {page === "auth" && <Auth authState={authState} go={go} />}
         
