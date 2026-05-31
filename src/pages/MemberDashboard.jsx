@@ -151,7 +151,7 @@ function SavedArticlesPanel({ authState, go, setView }) {
     const userBookmarks = bookmarks.filter(b => b.uid === uid);
     
     return userBookmarks.map(b => {
-      const art = articles.find(a => a.id === b.articleId);
+      const art = articles.find(a => String(a.id) === String(b.articleId));
       if (!art) return null;
       
       let savedAtDate = null;

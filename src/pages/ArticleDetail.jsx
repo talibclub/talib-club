@@ -71,41 +71,39 @@ export default function ArticleDetail({ item, go, authState }) {
   
   const savedList = useMemo(() => {
     if (!uid) return [];
-    return bookmarks.filter(b => b.uid === uid).map(b => b.articleId);
+    return bookmarks.filter(b => b.uid === uid).map(b => String(b.articleId));
   }, [bookmarks, uid])
 
-  const isSaved = displayItem ? savedList.includes(displayItem.id) : false;
+  const isSaved = displayItem ? savedList.includes(String(displayItem.id)) : false;
 
-  // ในหน้า ArticleDetail.jsx
-// แทนที่ฟังก์ชัน toggleSave ด้วยอันนี้ครับ
-const toggleSave = async () => {
-  if (!uid) {
-    toast.error("กรุณาเข้าสู่ระบบก่อนบันทึกบทความ");
-    go("auth");
-    return;
-  }
-  
-  // สร้าง ID เฉพาะ: uid + articleId
-  const bookmarkId = `${uid}_${displayItem.id}`; 
-  
-  try {
-    if (isSaved) {
-      await deleteBookmark(bookmarkId); // ใช้ฟังก์ชัน deleteBookmark จาก useContentCollection
-      toast.success("ยกเลิกการบันทึกแล้ว");
-    } else {
-      await saveBookmark({
-        id: bookmarkId,
-        uid: uid,
-        articleId: displayItem.id,
-        savedAt: serverTimestamp()
-      });
-      toast.success("บันทึกบทความแล้ว!");
+  const toggleSave = async () => {
+    if (!uid) {
+      toast.error("กรุณาเข้าสู่ระบบก่อนบันทึกบทความ");
+      go("auth");
+      return;
     }
-  } catch (err) {
-    console.error("Save bookmark failed:", err);
-    toast.error("บันทึกไม่สำเร็จ");
+    
+    // สร้าง ID เฉพาะ: uid + articleId
+    const bookmarkId = `${uid}_${displayItem.id}`; 
+    
+    try {
+      if (isSaved) {
+        await deleteBookmark(bookmarkId); // ใช้ฟังก์ชัน deleteBookmark จาก useContentCollection
+        toast.success("ยกเลิกการบันทึกแล้ว");
+      } else {
+        await saveBookmark({
+          id: bookmarkId,
+          uid: uid,
+          articleId: String(displayItem.id),
+          savedAt: serverTimestamp()
+        });
+        toast.success("บันทึกบทความแล้ว!");
+      }
+    } catch (err) {
+      console.error("Save bookmark failed:", err);
+      toast.error("บันทึกไม่สำเร็จ");
+    }
   }
-}
 
   const handleShare = async () => {
     navigator.clipboard.writeText(window.location.href);
