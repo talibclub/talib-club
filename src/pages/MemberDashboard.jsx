@@ -379,7 +379,7 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
         <DashboardCard icon="ti-user-circle" title="โปรไฟล์ของฉัน" text="จัดการข้อมูลบัญชี" onClick={() => setView("profile")} />
         <DashboardCard icon="ti-book" title="อัลกุรอานของฉัน" text="เปิดอ่าน แปลไทย ตัฟซีรย่อ และค้นหาคำสำคัญ" onClick={() => onOpenQuran(1, null)} />
         <DashboardCard icon="ti-notebook" title="อายะฮ์ที่บันทึกไว้" text="ข้อคิดและประโยชน์ที่ได้รับจากอัลกุรอาน" onClick={onOpenSavedVerses} />
-        <DashboardCard icon="ti-book-2" title="ชั้นหนังสือของฉัน" text="เพิ่มหนังสือจากเว็บหรือไฟล์นอก แล้วบันทึกเซสชันอ่านจริง" onClick={() => setView("bookshelf")} />
+        <DashboardCard icon="ti-device-desktop" title="ห้องอ่านหนังสือส่วนตัว" text="โหมดแอปจับเวลาอ่านหนังสือ สะสมไอเทม และทำภารกิจรายวัน" onClick={() => go("reader")} />
         <DashboardCard icon="ti-flame" title={`${streak.current} วันต่อเนื่อง`} text={`ดีที่สุด ${streak.best} วัน · อ่านจริง ${streak.totalDays} วัน · คุ้มครอง ${streak.protectedTotal} วัน`} onClick={() => setView("bookshelf")} />
         <DashboardCard 
           icon="ti-bookmark" 

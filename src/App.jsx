@@ -5,6 +5,7 @@ import Nav from "./components/Nav.jsx"
 
 const Home = lazy(() => import("./pages/Home.jsx"))
 const Articles = lazy(() => import("./pages/Articles.jsx"))
+const ReadingApp = lazy(() => import("./pages/ReadingApp.jsx"))
 const ArticleDetail = lazy(() => import("./pages/ArticleDetail.jsx"))
 const Library = lazy(() => import("./pages/Library.jsx"))
 const LibraryDetail = lazy(() => import("./pages/LibraryDetail.jsx"))
@@ -48,6 +49,7 @@ export default function App() {
     "staff-translation": "staff-translation",
     "admin": "admin",
     "donate": "donate",
+    "reader": "reader",
   }
 
   useEffect(() => {
@@ -172,6 +174,11 @@ export default function App() {
             </RequireStaff>
           )}
           {page === "donate" && <Donation />}
+          {page === "reader" && (
+            <RequireLogin authState={authState} go={go}>
+              <ReadingApp authState={authState} go={go} />
+            </RequireLogin>
+          )}
         </Suspense>
       </main>
       <PWAInstallBanner />

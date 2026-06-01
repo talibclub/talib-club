@@ -436,6 +436,7 @@ function AccountDropdown({ name, email, photoURL, isStaff, nav, logout, isInstal
       </div>
 
       <DropdownItem icon="ti-layout-dashboard" label="แดชบอร์ดสมาชิก" onClick={() => nav("member", { view: "overview" })} />
+      <DropdownItem icon="ti-device-desktop" label="ห้องอ่านหนังสือ (จับเวลา)" onClick={() => nav("reader")} />
       <DropdownItem icon="ti-user-circle" label="โปรไฟล์ของฉัน" onClick={() => nav("member", { view: "profile" })} />
       {isStaff && <DropdownItem icon="ti-briefcase" label="Staff Workspace" onClick={() => nav("staff")} />}
       {isStaff && <DropdownItem icon="ti-shield-check" label="Admin Panel" onClick={() => nav("admin")} />}
@@ -577,6 +578,7 @@ function AccountDrawer({ name, email, photoURL, isStaff, nav, logout, onClose, p
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <DrawerItem icon="ti-layout-dashboard" label="แดชบอร์ดสมาชิก" onClick={() => { nav("member", { view: "overview" }); onClose(); }} />
+          <DrawerItem icon="ti-device-desktop" label="ห้องอ่านหนังสือ (จับเวลา)" onClick={() => { nav("reader"); onClose(); }} />
           <DrawerItem icon="ti-user-circle" label="โปรไฟล์ของฉัน" onClick={() => { nav("member", { view: "profile" }); onClose(); }} />
           {isStaff && <DrawerItem icon="ti-briefcase" label="Staff Workspace" onClick={() => { nav("staff"); onClose(); }} />}
           {isStaff && <DrawerItem icon="ti-shield-check" label="Admin Panel" onClick={() => { nav("admin"); onClose(); }} />}
