@@ -79,6 +79,34 @@ export default function Articles({ go, authState, ctx }) {
     }).filter(s => s.articles.length > 0)
   }, [taxonomy.articleSeries, articles])
 
+  const filteredSeries = useMemo(() => {
+    const seriesIds = new Set(
+      filtered
+        .filter(a => String(a.type).toLowerCase() === "series" && a.seriesId)
+        .map(a => String(a.seriesId).toLowerCase())
+    );
+    
+    return (taxonomy.articleSeries || []).map(s => {
+      const seriesArticles = articles.filter(a => String(a.type).toLowerCase() === "series" && String(a.seriesId).toLowerCase() === String(s.id).toLowerCase());
+      const sorted = [...seriesArticles].sort((a, b) => (a.part || 0) - (b.part || 0));
+      return {
+        ...s,
+        articles: sorted
+      };
+    }).filter(s => seriesIds.has(String(s.id).toLowerCase()));
+  }, [taxonomy.articleSeries, filtered, articles]);
+
+  const filteredGeneral = useMemo(() => {
+    return filtered.filter(a => String(a.type).toLowerCase() !== "series");
+  }, [filtered]);
+
+  const paginatedGeneral = useMemo(() => {
+    const startIndex = (page - 1) * ITEMS_PER_PAGE;
+    return filteredGeneral.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredGeneral, page]);
+
+  const totalGeneralPages = Math.ceil(filteredGeneral.length / ITEMS_PER_PAGE);
+
   const isDefaultView = !search && cat === "all" && type === "all" && !showAllBrowse
   const recentArticles = filtered.slice(0, 6)
 
@@ -271,49 +299,144 @@ export default function Articles({ go, authState, ctx }) {
                 <div className="empty">ไม่พบบทความที่ตรงกับการค้นหา</div>
               ) : (
                 <>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>
-                    {paginatedFiltered.map(a => (
-                      <div key={a.id} className="card" style={{ cursor: "pointer", overflow: "hidden", display: "flex", flexDirection: "column" }} onClick={() => viewArticle(a)}>
-                        {a.coverUrl ? (
-                          <div style={{ width: "100%", height: 160, overflow: "hidden", borderBottom: ".5px solid var(--br2)" }}>
-                            <img src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          </div>
-                        ) : (
-                          <div style={{ width: "100%", height: 160, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: ".5px solid var(--br2)" }}>
-                            <span style={{ fontSize: 40 }}>{a.coverEmoji || "📖"}</span>
-                          </div>
-                        )}
-                        <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                          <div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                              <span className="tag tag-teal">{a.category}</span>
-                              {a.type === "series" && <span className="tag tag-acc">ซีรีส์ ตอน {a.part}</span>}
-                              {a.type === "specific" && a.seriesName && <span className="tag tag-acc">{a.seriesName}</span>}
-                            </div>
-                            <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", lineHeight: 1.45, marginBottom: 8, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{a.title}</div>
-                            <p style={{ fontSize: 12, marginBottom: 10, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", color: "var(--t2)" }}>{a.excerpt}</p>
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" }}>
-                            <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>{a.author} · {a.date}</div>
+                  {!search ? (
+                    <div>
+                      {filteredSeries.length > 0 && (
+                        <div style={{ marginBottom: 28 }}>
+                          <div style={{ fontSize: 13, color: "var(--teal)", fontWeight: 600, marginBottom: 12 }}>ซีรีส์ในหมวดหมู่นี้</div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>
+                            {filteredSeries.map(s => (
+                              <div key={s.id} className="card" style={{ padding: 16, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                                <div>
+                                  <div 
+                                    style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, cursor: "pointer" }}
+                                    onClick={() => setSelectedSeries(s)}
+                                  >
+                                    <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                      <i className="ti ti-list" style={{ color: "var(--teal)", fontSize: 14 }}></i>
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>{s.name}</div>
+                                      <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>{s.articles.length} ตอน</div>
+                                    </div>
+                                  </div>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                    {s.articles.slice(0, 3).map(a => (
+                                      <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, background: "var(--bg2)", cursor: "pointer" }} onClick={() => viewArticle(a)}>
+                                        <span style={{ fontSize: 10, color: "var(--teal)", fontWeight: 500, background: "var(--teal-bg)", padding: "1px 6px", borderRadius: 4, flexShrink: 0 }}>ตอน {a.part}</span>
+                                        <span style={{ fontSize: 12, color: "var(--text)", lineHeight: 1.4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.title}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                                <button 
+                                  onClick={() => setSelectedSeries(s)}
+                                  className="btn btn-outline" 
+                                  style={{ width: "100%", marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 11, padding: "6px 0", borderColor: "rgba(15,110,86,0.2)", color: "var(--teal)" }}
+                                >
+                                  ดูทุกตอน ({s.articles.length} ตอน) <i className="ti ti-arrow-right" style={{ fontSize: 11 }}></i>
+                                </button>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      )}
 
-                  {totalPages > 1 && (
-                    <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 32, flexWrap: "wrap" }}>
-                      {Array.from({ length: totalPages }).map((_, i) => (
-                        <button 
-                          key={i} 
-                          onClick={() => { setPage(i + 1); window.scrollTo(0, 0); }}
-                          className={page === i + 1 ? "btn btn-teal" : "btn btn-outline"} 
-                          style={{ padding: "6px 14px", fontSize: 12 }}
-                        >
-                          {i + 1}
-                        </button>
-                      ))}
+                      {paginatedGeneral.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: 13, color: "var(--teal)", fontWeight: 600, marginBottom: 12, marginTop: filteredSeries.length > 0 ? 28 : 0 }}>บทความทั่วไป / บทความเฉพาะเรื่อง</div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>
+                            {paginatedGeneral.map(a => (
+                              <div key={a.id} className="card" style={{ cursor: "pointer", overflow: "hidden", display: "flex", flexDirection: "column" }} onClick={() => viewArticle(a)}>
+                                {a.coverUrl ? (
+                                  <div style={{ width: "100%", height: 160, overflow: "hidden", borderBottom: ".5px solid var(--br2)" }}>
+                                    <img src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                  </div>
+                                ) : (
+                                  <div style={{ width: "100%", height: 160, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: ".5px solid var(--br2)" }}>
+                                    <span style={{ fontSize: 40 }}>{a.coverEmoji || "📖"}</span>
+                                  </div>
+                                )}
+                                <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                                  <div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                                      <span className="tag tag-teal">{a.category}</span>
+                                    </div>
+                                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", lineHeight: 1.45, marginBottom: 8, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{a.title}</div>
+                                    <p style={{ fontSize: 12, marginBottom: 10, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", color: "var(--t2)" }}>{a.excerpt}</p>
+                                  </div>
+                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" }}>
+                                    <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>{a.author} · {a.date}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {totalGeneralPages > 1 && (
+                            <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 32, flexWrap: "wrap" }}>
+                              {Array.from({ length: totalGeneralPages }).map((_, i) => (
+                                <button 
+                                  key={i} 
+                                  onClick={() => { setPage(i + 1); window.scrollTo(0, 0); }}
+                                  className={page === i + 1 ? "btn btn-teal" : "btn btn-outline"} 
+                                  style={{ padding: "6px 14px", fontSize: 12 }}
+                                >
+                                  {i + 1}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
+                  ) : (
+                    <>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>
+                        {paginatedFiltered.map(a => (
+                          <div key={a.id} className="card" style={{ cursor: "pointer", overflow: "hidden", display: "flex", flexDirection: "column" }} onClick={() => viewArticle(a)}>
+                            {a.coverUrl ? (
+                              <div style={{ width: "100%", height: 160, overflow: "hidden", borderBottom: ".5px solid var(--br2)" }}>
+                                <img src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                              </div>
+                            ) : (
+                              <div style={{ width: "100%", height: 160, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: ".5px solid var(--br2)" }}>
+                                <span style={{ fontSize: 40 }}>{a.coverEmoji || "📖"}</span>
+                              </div>
+                            )}
+                            <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                              <div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                                  <span className="tag tag-teal">{a.category}</span>
+                                  {a.type === "series" && <span className="tag tag-acc">ซีรีส์ ตอน {a.part}</span>}
+                                  {a.type === "specific" && a.seriesName && <span className="tag tag-acc">{a.seriesName}</span>}
+                                </div>
+                                <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", lineHeight: 1.45, marginBottom: 8, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{a.title}</div>
+                                <p style={{ fontSize: 12, marginBottom: 10, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", color: "var(--t2)" }}>{a.excerpt}</p>
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" }}>
+                                <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>{a.author} · {a.date}</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {totalPages > 1 && (
+                        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 32, flexWrap: "wrap" }}>
+                          {Array.from({ length: totalPages }).map((_, i) => (
+                            <button 
+                              key={i} 
+                              onClick={() => { setPage(i + 1); window.scrollTo(0, 0); }}
+                              className={page === i + 1 ? "btn btn-teal" : "btn btn-outline"} 
+                              style={{ padding: "6px 14px", fontSize: 12 }}
+                            >
+                              {i + 1}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               )}

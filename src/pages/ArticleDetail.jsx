@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from "react"
 import toast from "react-hot-toast"
-import { ARTICLES } from "../data/index.js"
+import { ARTICLES, SERIES } from "../data/index.js"
 import { useContentCollection } from "../lib/contentStore.js"
 import { serverTimestamp } from "firebase/firestore"
 
@@ -27,6 +27,27 @@ export default function ArticleDetail({ item, go, authState }) {
     if (item && item.id && articles.length > 0) return articles.find(a => String(a.id) === String(item.id));
     return null;
   }, [item, urlId, articles])
+
+  const seriesArticles = useMemo(() => {
+    if (displayItem?.type === "series" && displayItem?.seriesId) {
+      return articles
+        .filter(a => String(a.type).toLowerCase() === "series" && String(a.seriesId).toLowerCase() === String(displayItem.seriesId).toLowerCase())
+        .sort((a, b) => (a.part || 0) - (b.part || 0));
+    }
+    return [];
+  }, [displayItem, articles]);
+
+  const seriesName = useMemo(() => {
+    if (displayItem?.seriesId) {
+      const s = SERIES.find(x => String(x.id).toLowerCase() === String(displayItem.seriesId).toLowerCase());
+      return s ? s.name : displayItem.seriesId;
+    }
+    return "";
+  }, [displayItem]);
+
+  const currentIdx = seriesArticles.findIndex(a => String(a.id) === String(displayItem?.id));
+  const prevEpisode = currentIdx > 0 ? seriesArticles[currentIdx - 1] : null;
+  const nextEpisode = currentIdx >= 0 && currentIdx < seriesArticles.length - 1 ? seriesArticles[currentIdx + 1] : null;
 
   // อัปเดตยอดวิวขึ้น Firestore
   useEffect(() => {
@@ -230,6 +251,77 @@ export default function ArticleDetail({ item, go, authState }) {
           {displayItem.tags.map(t => (
             <span key={t} className="tag tag-acc" style={{ fontSize: 11 }}>#{t}</span>
           ))}
+        </div>
+      )}
+
+      {/* ตอนก่อนหน้า / ตอนถัดไป */}
+      {(prevEpisode || nextEpisode) && (
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginTop: 40, flexWrap: "wrap" }}>
+          {prevEpisode ? (
+            <button 
+              onClick={() => go("article", { ...prevEpisode, fromFilters: item?.fromFilters })} 
+              className="btn btn-outline" 
+              style={{ flex: 1, minWidth: 200, display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", textDecoration: "none", color: "var(--text)", textAlign: "left", justifyContent: "flex-start" }}
+            >
+              <i className="ti ti-arrow-left" style={{ color: "var(--teal)" }}></i>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 10, color: "var(--teal)", fontWeight: 500 }}>ตอนก่อนหน้า</div>
+                <div style={{ fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>ตอนที่ {prevEpisode.part}: {prevEpisode.title}</div>
+              </div>
+            </button>
+          ) : <div style={{ flex: 1 }} />}
+
+          {nextEpisode ? (
+            <button 
+              onClick={() => go("article", { ...nextEpisode, fromFilters: item?.fromFilters })} 
+              className="btn btn-outline" 
+              style={{ flex: 1, minWidth: 200, display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", textDecoration: "none", color: "var(--text)", textAlign: "right", justifyContent: "flex-end" }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 10, color: "var(--teal)", fontWeight: 500 }}>ตอนถัดไป</div>
+                <div style={{ fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>ตอนที่ {nextEpisode.part}: {nextEpisode.title}</div>
+              </div>
+              <i className="ti ti-arrow-right" style={{ color: "var(--teal)" }}></i>
+            </button>
+          ) : <div style={{ flex: 1 }} />}
+        </div>
+      )}
+
+      {/* สารบัญตอนทั้งหมดในซีรีส์ */}
+      {seriesArticles.length > 0 && (
+        <div className="card" style={{ padding: "20px 24px", marginTop: 32, background: "var(--teal-bg)", border: ".5px solid rgba(15,110,86,0.2)" }}>
+          <h3 style={{ fontSize: 14, marginBottom: 14, display: "flex", alignItems: "center", gap: 8, color: "var(--teal)", fontWeight: 600 }}>
+            <i className="ti ti-list-numbers" style={{ fontSize: 18 }}></i> ตอนทั้งหมดในซีรีส์ "{seriesName}" ({seriesArticles.length} ตอน)
+          </h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
+            {seriesArticles.map(a => {
+              const isCurrent = String(a.id) === String(displayItem.id);
+              return (
+                <button
+                  key={a.id}
+                  onClick={() => go("article", { ...a, fromFilters: item?.fromFilters })}
+                  className={`btn ${isCurrent ? 'btn-teal' : 'btn-outline'}`}
+                  style={{ 
+                    justifyContent: "flex-start", 
+                    fontSize: 12, 
+                    padding: "8px 12px", 
+                    textAlign: "left",
+                    fontWeight: isCurrent ? 600 : 300,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    display: "block",
+                    width: "100%",
+                    borderColor: isCurrent ? "var(--teal)" : "var(--br)"
+                  }}
+                  title={a.title}
+                >
+                  <span style={{ fontWeight: 600, marginRight: 6 }}>ตอน {a.part}:</span>
+                  {a.title}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
