@@ -28,37 +28,34 @@ export default function LibraryDetail({ item, go, authState }) {
   // ดึง saveItem ออกมาจากคอลเล็กชันเพื่อใช้อัปเดตข้อมูลขึ้น Firebase
   const { items: books, loading, saveItem } = useContentCollection("books", BOOKS)
   
+  // 💡 เชื่อมต่อกับคอลเลกชัน history ใน Firestore
+  const { saveItem: saveHistory } = useContentCollection("history", [])
+  
   const urlId = new URLSearchParams(window.location.search).get("id")
   const hasIncrementedView = useRef(null) // ตัวรั้งสำหรับป้องกันการบวกยอดวิวซ้ำตอนเรนเดอร์
 
   const displayItem = useMemo(() => {
-    if (item) return item;
+    if (item && item.title) return item;
     if (urlId && books.length > 0) return books.find(b => String(b.id) === String(urlId));
+    if (item && item.id && books.length > 0) return books.find(b => String(b.id) === String(item.id));
     return null;
   }, [item, urlId, books])
 
   // บันทึกประวัติการดูหนังสือ
   useEffect(() => {
-    if (displayItem && authState?.user?.uid) {
-      try {
-        const historyKey = `talib_history_${authState.user.uid}`;
-        const history = JSON.parse(localStorage.getItem(historyKey) || "[]");
-        const filtered = history.filter(h => h.id !== displayItem.id || h.type !== "book");
-        const next = [
-          { 
-            id: displayItem.id, 
-            type: "book", 
-            title: displayItem.title, 
-            timestamp: Date.now() 
-          },
-          ...filtered
-        ].slice(0, 100);
-        localStorage.setItem(historyKey, JSON.stringify(next));
-      } catch (err) {
-        console.error("Failed to save book history", err);
-      }
+    if (displayItem && authState?.user?.uid && saveHistory) {
+      const uid = authState.user.uid;
+      const historyId = `${uid}_book_${displayItem.id}`;
+      saveHistory({
+        id: historyId,
+        uid,
+        itemId: displayItem.id,
+        type: "book",
+        title: displayItem.title,
+        timestamp: Date.now()
+      }).catch(err => console.error("Failed to save book history to Firebase", err));
     }
-  }, [displayItem, authState?.user?.uid])
+  }, [displayItem, authState?.user?.uid, saveHistory])
 
   // --- ระบบนับยอดเข้าชมของจริง (ยิงขึ้น Firebase) ---
   useEffect(() => {

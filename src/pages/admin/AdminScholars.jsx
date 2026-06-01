@@ -46,17 +46,38 @@ export default function AdminScholars() {
     return matchSearch && matchField && matchEra
   })
 
+  const sorted = [...filtered].sort((a, b) => {
+    const getMs = (val) => {
+      if (!val) return 0
+      if (typeof val.toDate === "function") return val.toDate().getTime()
+      if (val.seconds) return val.seconds * 1000
+      if (typeof val === "number") return val
+      const parsed = Date.parse(val)
+      return isNaN(parsed) ? 0 : parsed
+    }
+    const timeA = getMs(a.createdAt || a.updatedAt)
+    const timeB = getMs(b.createdAt || b.updatedAt)
+    if (timeA || timeB) {
+      if (timeA && timeB) return timeB - timeA
+      return timeA ? -1 : 1
+    }
+    const yearA = parseInt(String(a.hijri || a.ad || "").replace(/\D/g, "")) || 0
+    const yearB = parseInt(String(b.hijri || b.ad || "").replace(/\D/g, "")) || 0
+    if (yearA !== yearB) return yearB - yearA
+    return String(b.id || "").localeCompare(String(a.id || ""))
+  })
+
   // คำนวณข้อมูลสำหรับหน้าปัจจุบัน
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
-  const currentItems = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(sorted.length / ITEMS_PER_PAGE)
+  const currentItems = sorted.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
 
   const toggleSelect = (id) => {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
   
   const toggleAll = () => {
-    if (selected.length === filtered.length) setSelected([])
-    else setSelected(filtered.map(s => s.id))
+    if (selected.length === sorted.length) setSelected([])
+    else setSelected(sorted.map(s => s.id))
   }
 
   function openNew() {
@@ -123,7 +144,7 @@ export default function AdminScholars() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
         <div style={{ flex: 1 }}>
-          <h2 style={{ minWidth: 150 }}>รายชื่ออุลามาอฺ <span style={{ fontSize: 12, color: "var(--t3)" }}>({filtered.length} รายการ)</span></h2>
+          <h2 style={{ minWidth: 150 }}>รายชื่ออุลามาอฺ <span style={{ fontSize: 12, color: "var(--t3)" }}>({sorted.length} รายการ)</span></h2>
           <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>
             จัดการฐานข้อมูลประวัติและรายชื่อบรรดาอุลามาอฺ {totalPages > 0 && `(หน้า ${page}/${totalPages})`}
           </p>
@@ -189,11 +210,11 @@ export default function AdminScholars() {
       )}
 
       {/* เลือกทั้งหมด */}
-      {filtered.length > 0 && (
+      {sorted.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", padding: "0 16px", marginBottom: 10, opacity: busy ? 0.6 : 1 }}>
           <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: busy ? "not-allowed" : "pointer", fontSize: 12, color: "var(--t2)" }}>
-            <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0} onChange={toggleAll} disabled={busy} style={{ width: 16, height: 16, cursor: busy ? "not-allowed" : "pointer" }} />
-            เลือกทั้งหมด {filtered.length} รายการที่ค้นเจอ
+            <input type="checkbox" checked={selected.length === sorted.length && sorted.length > 0} onChange={toggleAll} disabled={busy} style={{ width: 16, height: 16, cursor: busy ? "not-allowed" : "pointer" }} />
+            เลือกทั้งหมด {sorted.length} รายการที่ค้นเจอ
           </label>
         </div>
       )}
@@ -233,20 +254,20 @@ export default function AdminScholars() {
             </div>
           )
         })}
-        {filtered.length === 0 && <div className="empty">ไม่พบข้อมูลที่ตรงกับเงื่อนไข</div>}
+        {sorted.length === 0 && <div className="empty">ไม่พบข้อมูลที่ตรงกับเงื่อนไข</div>}
       </div>
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 32, flexWrap: "wrap" }}>
-          <button className="btn btn-outline" disabled={page === 1} onClick={() => { setPage(page - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ padding: "6px 12px", fontSize: 12 }}>ก่อนหน้า</button>
+          <button className="btn btn-outline" disabled={page === 1} onClick={() => { setPage(page - 1); window.scrollTo(0, 0); }} style={{ padding: "6px 12px", fontSize: 12 }}>ก่อนหน้า</button>
           
           {Array.from({ length: totalPages }).map((_, i) => {
             const p = i + 1;
             // แสดงเฉพาะหน้าแรก หน้าสุดท้าย และหน้าใกล้เคียง
             if (p === 1 || p === totalPages || (p >= page - 1 && p <= page + 1)) {
               return (
-                <button key={p} onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className={page === p ? "btn btn-teal" : "btn btn-outline"} style={{ padding: "6px 14px", fontSize: 12 }}>{p}</button>
+                <button key={p} onClick={() => { setPage(p); window.scrollTo(0, 0); }} className={page === p ? "btn btn-teal" : "btn btn-outline"} style={{ padding: "6px 14px", fontSize: 12 }}>{p}</button>
               )
             }
             if (p === page - 2 || p === page + 2) {
@@ -255,7 +276,7 @@ export default function AdminScholars() {
             return null;
           })}
           
-          <button className="btn btn-outline" disabled={page === totalPages} onClick={() => { setPage(page + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ padding: "6px 12px", fontSize: 12 }}>ถัดไป</button>
+          <button className="btn btn-outline" disabled={page === totalPages} onClick={() => { setPage(page + 1); window.scrollTo(0, 0); }} style={{ padding: "6px 12px", fontSize: 12 }}>ถัดไป</button>
         </div>
       )}
     </div>

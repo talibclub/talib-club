@@ -225,7 +225,7 @@ export default function Media({ go }) {
               {Array.from({ length: totalPages }).map((_, i) => (
                 <button 
                   key={i} 
-                  onClick={() => { setPage(i + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  onClick={() => { setPage(i + 1); window.scrollTo(0, 0); }}
                   className={page === i + 1 ? "btn btn-teal" : "btn btn-outline"} 
                   style={{ padding: "6px 14px", fontSize: 12 }}
                 >

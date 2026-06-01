@@ -1,6 +1,12 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 export default function Auth({ authState, go }) {
+  useEffect(() => {
+    if (authState?.user) {
+      go("member")
+    }
+  }, [authState?.user, go])
+
   const [mode, setMode] = useState("login")
   const [displayName, setDisplayName] = useState("")
   const [email, setEmail] = useState("")
@@ -82,6 +88,8 @@ export default function Auth({ authState, go }) {
     }
     setBusy(false)
   }
+
+  if (authState?.user) return null
 
   return (
     <div className="auth-page">

@@ -15,13 +15,16 @@ export default function ArticleDetail({ item, go, authState }) {
   // 💡 เชื่อมต่อกับคอลเลกชัน bookmarks ใน Firestore
   const { items: bookmarks, saveItem: saveBookmark, deleteItem: deleteBookmark } = useContentCollection("bookmarks", [])
   
+  // 💡 เชื่อมต่อกับคอลเลกชัน history ใน Firestore
+  const { saveItem: saveHistory } = useContentCollection("history", [])
+  
   const urlId = new URLSearchParams(window.location.search).get("id")
   const hasIncrementedView = useRef(null)
 
   const displayItem = useMemo(() => {
-    if (item && !item.viewMode) return item;
+    if (item && item.title && !item.viewMode) return item;
     if (urlId && articles.length > 0) return articles.find(a => String(a.id) === String(urlId));
-    if (item && item.id) return item;
+    if (item && item.id && articles.length > 0) return articles.find(a => String(a.id) === String(item.id));
     return null;
   }, [item, urlId, articles])
 
@@ -36,26 +39,19 @@ export default function ArticleDetail({ item, go, authState }) {
 
   // บันทึกประวัติการอ่านบทความ
   useEffect(() => {
-    if (displayItem && authState?.user?.uid) {
-      try {
-        const historyKey = `talib_history_${authState.user.uid}`;
-        const history = JSON.parse(localStorage.getItem(historyKey) || "[]");
-        const filtered = history.filter(h => h.id !== displayItem.id || h.type !== "article");
-        const next = [
-          { 
-            id: displayItem.id, 
-            type: "article", 
-            title: displayItem.title, 
-            timestamp: Date.now() 
-          },
-          ...filtered
-        ].slice(0, 100);
-        localStorage.setItem(historyKey, JSON.stringify(next));
-      } catch (err) {
-        console.error("Failed to save read history", err);
-      }
+    if (displayItem && authState?.user?.uid && saveHistory) {
+      const uid = authState.user.uid;
+      const historyId = `${uid}_article_${displayItem.id}`;
+      saveHistory({
+        id: historyId,
+        uid,
+        itemId: displayItem.id,
+        type: "article",
+        title: displayItem.title,
+        timestamp: Date.now()
+      }).catch(err => console.error("Failed to save read history to Firebase", err));
     }
-  }, [displayItem, authState?.user?.uid])
+  }, [displayItem, authState?.user?.uid, saveHistory])
 
   useEffect(() => {
     if (!loadingArticles && !displayItem) go("articles")
@@ -142,7 +138,7 @@ export default function ArticleDetail({ item, go, authState }) {
   const readerClass = `article-body reader-size-${readerPrefs.size} reader-tone-${readerPrefs.tone}`
 
   return (
-    <div className="article-page" style={{ maxWidth: 800, margin: "0 auto" }}>
+    <div className="article-page" style={{ maxWidth: 720, margin: "0 auto" }}>
       <button className="btn btn-outline" onClick={() => go("articles")} style={{ marginBottom: 24, padding: "6px 14px", fontSize: 12 }}>
         <i className="ti ti-arrow-left" style={{ marginRight: 6, fontSize: 12 }}></i>กลับหน้าบทความ
       </button>

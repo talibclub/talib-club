@@ -157,6 +157,10 @@ export default function Home({ go }) {
       </div>
 
       {/* AYAH */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
+        <i className="ti ti-bookmark" style={{ color: "var(--teal)", fontSize: 15 }}></i>
+        <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>อายะฮ์และบทดุอาอ์ประจำวัน</span>
+      </div>
       <div className="ayah-block" style={{
         background:"var(--acc2)", border:".5px solid var(--acc-br)", borderRadius:14,
         padding:"18px 22px", marginBottom:32, display:"flex", gap:14, alignItems:"center"

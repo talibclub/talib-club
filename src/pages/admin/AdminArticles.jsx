@@ -47,16 +47,24 @@ export default function AdminArticles() {
     return matchSearch && matchType && matchCat
   })
 
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
-  const currentItems = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+  // เรียงข้อมูลจากใหม่ไปเก่า (เรียงตามวันที่ หรือ ID ถ้าวันที่เหมือนกัน)
+  const sorted = [...filtered].sort((a, b) => {
+    const dateA = a.date || ""
+    const dateB = b.date || ""
+    if (dateA !== dateB) return dateB.localeCompare(dateA)
+    return String(b.id || "").localeCompare(String(a.id || ""))
+  })
+
+  const totalPages = Math.ceil(sorted.length / ITEMS_PER_PAGE)
+  const currentItems = sorted.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
 
   const toggleSelect = (id) => {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
   
   const toggleAll = () => {
-    if (selected.length === filtered.length) setSelected([])
-    else setSelected(filtered.map(a => a.id))
+    if (selected.length === sorted.length) setSelected([])
+    else setSelected(sorted.map(a => a.id))
   }
 
   function openNew() {
@@ -126,7 +134,7 @@ export default function AdminArticles() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
         <div style={{ flex: 1 }}>
-          <h2 style={{ minWidth: 150 }}>บทความ <span style={{ fontSize: 12, color: "var(--t3)" }}>({filtered.length} รายการ)</span></h2>
+          <h2 style={{ minWidth: 150 }}>บทความ <span style={{ fontSize: 12, color: "var(--t3)" }}>({sorted.length} รายการ)</span></h2>
           <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>
             บทความวิชาการอิสลามทั้งหมดของ Talib Club {totalPages > 0 && `(หน้า ${page}/${totalPages})`}
           </p>
@@ -188,11 +196,11 @@ export default function AdminArticles() {
         </div>
       )}
 
-      {filtered.length > 0 && (
+      {sorted.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", padding: "0 16px", marginBottom: 10, opacity: busy ? 0.6 : 1 }}>
           <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: busy ? "not-allowed" : "pointer", fontSize: 12, color: "var(--t2)" }}>
-            <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0} onChange={toggleAll} disabled={busy} style={{ width: 16, height: 16, cursor: busy ? "not-allowed" : "pointer" }} />
-            เลือกทั้งหมด {filtered.length} รายการที่ค้นเจอ
+            <input type="checkbox" checked={selected.length === sorted.length && sorted.length > 0} onChange={toggleAll} disabled={busy} style={{ width: 16, height: 16, cursor: busy ? "not-allowed" : "pointer" }} />
+            เลือกทั้งหมด {sorted.length} รายการที่ค้นเจอ
           </label>
         </div>
       )}
@@ -222,16 +230,16 @@ export default function AdminArticles() {
 
       {totalPages > 1 && (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 32, flexWrap: "wrap" }}>
-          <button className="btn btn-outline" disabled={page === 1} onClick={() => { setPage(page - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ padding: "6px 12px", fontSize: 12 }}>ก่อนหน้า</button>
+          <button className="btn btn-outline" disabled={page === 1} onClick={() => { setPage(page - 1); window.scrollTo(0, 0); }} style={{ padding: "6px 12px", fontSize: 12 }}>ก่อนหน้า</button>
           {Array.from({ length: totalPages }).map((_, i) => {
             const p = i + 1;
             if (p === 1 || p === totalPages || (p >= page - 1 && p <= page + 1)) {
-              return <button key={p} onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className={page === p ? "btn btn-teal" : "btn btn-outline"} style={{ padding: "6px 14px", fontSize: 12 }}>{p}</button>
+              return <button key={p} onClick={() => { setPage(p); window.scrollTo(0, 0); }} className={page === p ? "btn btn-teal" : "btn btn-outline"} style={{ padding: "6px 14px", fontSize: 12 }}>{p}</button>
             }
             if (p === page - 2 || p === page + 2) return <span key={p} style={{ color: "var(--t3)", padding: "0 4px" }}>...</span>
             return null;
           })}
-          <button className="btn btn-outline" disabled={page === totalPages} onClick={() => { setPage(page + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ padding: "6px 12px", fontSize: 12 }}>ถัดไป</button>
+          <button className="btn btn-outline" disabled={page === totalPages} onClick={() => { setPage(page + 1); window.scrollTo(0, 0); }} style={{ padding: "6px 12px", fontSize: 12 }}>ถัดไป</button>
         </div>
       )}
     </div>

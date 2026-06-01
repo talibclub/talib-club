@@ -14,7 +14,11 @@ export const CONTENT_COLLECTIONS = {
   media: "content_media",
   scholars: "content_scholars",
   bookmarks: "content_bookmarks",
+  bookshelf: "content_bookshelf",
+  reading_sessions: "content_reading_sessions",
+  reading_streaks: "content_reading_streaks",
   quran_bookmarks: "content_quran_bookmarks",
+  history: "content_history",
 }
 
 export const SITE_DOC = { collection: "content_settings", id: "site" }
@@ -31,10 +35,29 @@ function cleanForFirestore(value) {
   )
 }
 
-function byNewestDate(a, b) {
+function getMs(val) {
+  if (!val) return 0
+  if (typeof val.toDate === "function") return val.toDate().getTime()
+  if (val.seconds) return val.seconds * 1000
+  if (typeof val === "number") return val
+  const parsed = Date.parse(val)
+  return isNaN(parsed) ? 0 : parsed
+}
+
+function byNewest(a, b) {
+  // Sort by createdAt or updatedAt (Firestore timestamp)
+  const timeA = getMs(a.createdAt || a.updatedAt)
+  const timeB = getMs(b.createdAt || b.updatedAt)
+  if (timeA || timeB) {
+    if (timeA && timeB) return timeB - timeA // Newer first
+    return timeA ? -1 : 1 // Items with Firestore timestamps go to the top
+  }
+
+  // Fall back to date field if available
   const dateA = String(a.date || "")
   const dateB = String(b.date || "")
   if (dateA !== dateB) return dateB.localeCompare(dateA)
+
   return String(b.id || "").localeCompare(String(a.id || ""))
 }
 
@@ -89,18 +112,22 @@ export function useContentCollection(name, fallbackItems = []) {
   }, [collectionName, name])
 
   const items = useMemo(() => {
-    const source = loading && remoteItems === null ? [] : mergeWithFallback(fallbackItems, remoteItems)
-    return [...source].sort(byNewestDate)
+    const source = loading && remoteItems === null ? fallbackItems : mergeWithFallback(fallbackItems, remoteItems)
+    return [...source].sort(byNewest)
   }, [fallbackItems, loading, remoteItems])
 
   async function saveItem(item) {
     const id = String(item.id || crypto.randomUUID())
-    await setDoc(doc(db, collectionName, id), {
+    const payload = {
       ...cleanForFirestore(item),
       id,
       deleted: false,
       updatedAt: serverTimestamp(),
-    }, { merge: true })
+    }
+    if (!payload.createdAt && !item.createdAt) {
+      payload.createdAt = serverTimestamp()
+    }
+    await setDoc(doc(db, collectionName, id), payload, { merge: true })
   }
 
   async function deleteItem(id) {

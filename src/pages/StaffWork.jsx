@@ -6,6 +6,8 @@ import {
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { toast } from "react-hot-toast"
 import { db } from "../lib/firebase.js"
+import { triggerPushNotification } from "../utils/pushNotifications.js"
+
 
 // ฟังก์ชันแจ้งเตือนด้วย Toast
 const notifySuccess = (msg) => toast.success(msg)
@@ -74,7 +76,7 @@ export default function StaffWork({ authState, go }) {
 
   // Dynamic Data States
   const [staffTeam, setStaffTeam] = useState(DEFAULT_STAFF)
-  const [magazineQueue, setMagazineQueue] = useState(DEFAULT_MAGAZINE)
+  const [magazineQueue, setMagazineQueue] = useState([])
   const [newStaffName, setNewStaffName] = useState("")
 
   // Form State (แยกหน้าที่ชัดเจน)
@@ -112,7 +114,11 @@ export default function StaffWork({ authState, go }) {
     })
 
     const unsubMag = onSnapshot(doc(db, "settings", "magazine"), (docSnap) => {
-      if (docSnap.exists() && docSnap.data().queue) setMagazineQueue(docSnap.data().queue)
+      if (docSnap.exists() && docSnap.data().queue) {
+        setMagazineQueue(docSnap.data().queue)
+      } else {
+        setMagazineQueue(DEFAULT_MAGAZINE)
+      }
     })
 
     return () => { unsubSubs(); unsubStaff(); unsubMag(); }
@@ -132,6 +138,12 @@ export default function StaffWork({ authState, go }) {
         const currentQueue = magazineQueue[currentMonthIndex];
         if (currentQueue && currentQueue.user) {
           await sendBotNotification(`📚 [แจ้งเตือนคิววารสาร]\nเข้าสู่เดือน ${currentQueue.month} แล้ว!\n\nรับผิดชอบวารสารหลักเดือนนี้คือ: 🌟 ${currentQueue.user} 🌟\n\nเตรียมตัววางแผนงานได้เลยครับ 🚀`);
+          await triggerPushNotification(
+            "📚 แจ้งเตือนคิววารสารประจำเดือน",
+            `เข้าสู่เดือน ${currentQueue.month} แล้ว! ผู้รับผิดชอบหลักคือ ${currentQueue.user}`,
+            "/staff-work",
+            { isStaffOnly: true }
+          );
           localStorage.setItem(yearMonthKey, "true");
         }
       }
@@ -252,6 +264,12 @@ export default function StaffWork({ authState, go }) {
         `📬 [งานใหม่] ส่งโดย: ${currentUser}\nหัวข้อ: "${form.title}"\nประเภท: ${form.type}\n` +
         `✍️ เขียน/แปล: ${form.writer || "-"}\n🎨 กราฟิก: ${form.graphic || "-"}\n📢 คนลงโพสต์: ${form.poster || "-"}\n\nรอแอดมินตรวจสอบครับ 🚀`
       )
+      await triggerPushNotification(
+        "📬 มีงานส่งใหม่รอการตรวจสอบ",
+        `หัวข้อ: "${form.title}" ส่งโดย: ${currentUser}`,
+        "/staff-work",
+        { isStaffOnly: true }
+      )
       
       setForm({ title: "", type: "", description: "", writer: "", graphic: "", poster: "", files: [] })
       setTab("dashboard")
@@ -276,8 +294,20 @@ export default function StaffWork({ authState, go }) {
       const targetSub = subs.find(s => s.id === id)
       if (nextStatus === STATUS_OPTIONS.APPROVED) {
         await sendBotNotification(`✅ [อนุมัติแล้ว] งาน "${targetSub.title}"\nตรวจผ่านแล้ว 🎉 เตรียมจัดคิวลงแพลตฟอร์มได้เลย!`)
+        await triggerPushNotification(
+          "✅ งานผ่านการอนุมัติแล้ว",
+          `งาน "${targetSub.title}" ได้รับการอนุมัติโดยแอดมิน`,
+          "/staff-work",
+          { isStaffOnly: true }
+        )
       } else if (nextStatus === STATUS_OPTIONS.REJECTED) {
         await sendBotNotification(`⚠️ [ถูกตีกลับ] งาน "${targetSub.title}"\nของถูกตีกลับให้แก้ไข!\n\n💬 ฟีดแบ็กจากแอดมิน:\n"${feedbackText}"\n\nรีบเข้าไปแก้ไขด้วยนะครับ 🛠️`)
+        await triggerPushNotification(
+          "⚠️ งานถูกตีกลับให้แก้ไข",
+          `งาน "${targetSub.title}" ถูกส่งกลับ: "${feedbackText}"`,
+          "/staff-work",
+          { isStaffOnly: true }
+        )
       }
     } catch (e) {
       notifyError("อัปเดตสถานะล้มเหลว")
@@ -296,9 +326,17 @@ export default function StaffWork({ authState, go }) {
       notifySuccess("บันทึกการลงงานเรียบร้อย!")
       setPostingId(null)
       const targetSub = subs.find(s => s.id === id)
+      const platformsStr = postingForm.platforms.join(", ")
+      const postUrl = postingForm.postLink
       setPostingForm({ scheduleDate: "", platforms: [], postLink: "" })
 
-      await sendBotNotification(`📢 [ลงโพสต์เรียบร้อย]\nงาน: "${targetSub.title}"\n\n📱 แพลตฟอร์ม: ${postingForm.platforms.join(", ")}\n🔗 ลิงก์: ${postingForm.postLink || "ไม่ได้ระบุ"}`)
+      await sendBotNotification(`📢 [ลงโพสต์เรียบร้อย]\nงาน: "${targetSub.title}"\n\n📱 แพลตฟอร์ม: ${platformsStr}\n🔗 ลิงก์: ${postUrl || "ไม่ได้ระบุ"}`)
+      await triggerPushNotification(
+        "📢 ลงงานจริงเรียบร้อย",
+        `งาน "${targetSub.title}" เผยแพร่ลง ${platformsStr} แล้ว`,
+        "/staff-work",
+        { isStaffOnly: true }
+      )
     } catch (e) {
       notifyError("บันทึกการโพสต์ล้มเหลว")
     }
