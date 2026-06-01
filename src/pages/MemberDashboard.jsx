@@ -483,7 +483,20 @@ function ProfilePanel({ authState, copied, copyText, go, setView }) {
     newPassword: "",
   })
   const [busy, setBusy] = useState("")
-  const [history, setHistory] = useState([])
+  
+  // 💡 เชื่อมต่อกับคอลเลกชัน history ใน Firestore
+  const { items: rawHistory, loading: loadingHistory } = useContentCollection("history", [])
+  
+  const history = useMemo(() => {
+    if (!user?.uid) return [];
+    return rawHistory
+      .filter(h => h.uid === user.uid)
+      .sort((a, b) => {
+        const timeA = a.timestamp || 0;
+        const timeB = b.timestamp || 0;
+        return timeB - timeA;
+      });
+  }, [rawHistory, user?.uid])
 
   const isGoogleUser = user?.providerData?.some(p => p.providerId === "google.com") || false;
 
@@ -496,17 +509,7 @@ function ProfilePanel({ authState, copied, copyText, go, setView }) {
     })
   }, [displayName, email])
 
-  useEffect(() => {
-    if (user?.uid) {
-      try {
-        const historyKey = `talib_history_${user.uid}`;
-        const items = JSON.parse(localStorage.getItem(historyKey) || "[]");
-        setHistory(items);
-      } catch (err) {
-        console.error("Error reading history", err);
-      }
-    }
-  }, [user?.uid])
+  // ลบโค้ด useEffect ดั้งเดิมที่ดึงประวัติจาก localStorage ออกแล้ว เพราะเปลี่ยนไปดึงจาก Firestore ด้านบนแล้ว
 
   const set = (key, value) => setForm(prev => ({ ...prev, [key]: value }))
 
@@ -518,9 +521,10 @@ function ProfilePanel({ authState, copied, copyText, go, setView }) {
   }, [history])
 
   const handleHistoryClick = (h) => {
-    if (h.type === "article") go("article", { id: h.id });
-    else if (h.type === "book") go("library-detail", { id: h.id });
-    else if (h.type === "media") go("media-detail", { id: h.id });
+    const targetId = h.itemId || h.id;
+    if (h.type === "article") go("article", { id: targetId });
+    else if (h.type === "book") go("library-detail", { id: targetId });
+    else if (h.type === "media") go("media-detail", { id: targetId });
   }
 
   async function saveAccount(e) {
