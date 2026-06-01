@@ -21,8 +21,8 @@ export default function Media({ go }) {
     { id: "all", label: "ทั้งหมด", icon: "ti-layout-grid" },
     ...(taxonomy.mediaTypes || []).map(item => ({
       id: item,
-      label: item === "youtube" ? "YouTube" : item === "spotify" ? "Spotify" : item,
-      icon: item === "youtube" ? "ti-brand-youtube" : item === "spotify" ? "ti-brand-spotify" : "ti-player-play",
+      label: item === "youtube" ? "YouTube" : item === "spotify" ? "Spotify" : item === "video" ? "คลิปสั้น" : item,
+      icon: item === "youtube" ? "ti-brand-youtube" : item === "spotify" ? "ti-brand-spotify" : item === "video" ? "ti-video" : "ti-player-play",
     })),
   ]
 
@@ -124,8 +124,8 @@ export default function Media({ go }) {
               {filteredPlaylists.map((pl, idx) => (
                 <div key={idx} className="card" style={{ display: "flex", flexDirection: "column", overflow: "hidden", padding: 0 }}>
                   <div style={{ display: "flex", height: 130, borderBottom: ".5px solid var(--br2)" }}>
-                    <div style={{ flex: 1, background: pl.type === "youtube" ? "rgba(255,50,50,.05)" : "rgba(30,215,96,.05)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <i className={`ti ${pl.type === "youtube" ? "ti-brand-youtube" : "ti-brand-spotify"}`} style={{ fontSize: 44, color: pl.type === "youtube" ? "#ff4444" : "#1ed760", opacity: .7 }}></i>
+                    <div style={{ flex: 1, background: pl.type === "youtube" ? "rgba(255,50,50,.05)" : pl.type === "spotify" ? "rgba(30,215,96,.05)" : "rgba(15,110,86,.05)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <i className={`ti ${pl.type === "youtube" ? "ti-brand-youtube" : pl.type === "spotify" ? "ti-brand-spotify" : "ti-video"}`} style={{ fontSize: 44, color: pl.type === "youtube" ? "#ff4444" : pl.type === "spotify" ? "#1ed760" : "var(--teal)", opacity: .7 }}></i>
                     </div>
                     <div style={{ width: 85, backgroundColor: "#111a22", color: "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
                       <i className="ti ti-menu-2" style={{ fontSize: 16, opacity: 0.8 }}></i>
@@ -198,7 +198,7 @@ export default function Media({ go }) {
                         <img src={thumbUrl} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       ) : (
                         <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          <i className={`ti ${item.type === "youtube" ? "ti-brand-youtube" : "ti-brand-spotify"}`} style={{ fontSize: 40, color: "var(--t3)" }}></i>
+                          <i className={`ti ${item.type === "youtube" ? "ti-brand-youtube" : item.type === "spotify" ? "ti-brand-spotify" : "ti-video"}`} style={{ fontSize: 40, color: "var(--t3)" }}></i>
                         </div>
                       )}
                       {item.duration && (

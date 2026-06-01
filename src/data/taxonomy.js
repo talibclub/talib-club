@@ -7,7 +7,7 @@ export const DEFAULT_TAXONOMY = {
   articleSeries: SERIES,
   bookTypes: BOOK_TYPES,
   bookSources: ["Talib Club", "สำนักพิมพ์อื่น"],
-  mediaTypes: ["youtube", "spotify"],
+  mediaTypes: ["youtube", "spotify", "video"],
   scholarEras: [
     { id: "1", label: "ยุคแรก (Salaf)" },
     { id: "2", label: "ยุคกลาง" },

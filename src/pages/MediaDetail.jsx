@@ -82,15 +82,31 @@ export default function MediaDetail({ item, go, authState }) {
         </div>
       )}
 
+      {item.type === "video" && (
+        <div style={{
+          marginBottom: 24, borderRadius: 16, overflow: "hidden",
+          border: ".5px solid var(--br2)", background: "#000",
+          boxShadow: "0 10px 30px -10px rgba(0,0,0,0.2)",
+          width: "100%", position: "relative", paddingBottom: "56.25%", height: 0
+        }}>
+          <video 
+            src={item.videoUrl} 
+            controls 
+            autoPlay 
+            style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "contain" }}
+          />
+        </div>
+      )}
+
       {/* ข้อมูลรายละเอียด (ปรับปรุงให้อยู่ในการ์ดมินิมอล และเปลี่ยนเป็นคำว่า จากช่อง :) */}
       <div className="card" style={{ padding: 24, minWidth: 0, width: "100%" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
           <span className="tag" style={{
-            background: item.type === "youtube" ? "rgba(255,50,50,.08)" : "rgba(30,215,96,.08)",
-            color: item.type === "youtube" ? "#ff4444" : "#1ed760", fontSize: 11, padding: "4px 10px", borderRadius: 20
+            background: item.type === "youtube" ? "rgba(255,50,50,.08)" : item.type === "spotify" ? "rgba(30,215,96,.08)" : "rgba(15,110,86,.08)",
+            color: item.type === "youtube" ? "#ff4444" : item.type === "spotify" ? "#1ed760" : "var(--teal)", fontSize: 11, padding: "4px 10px", borderRadius: 20
           }}>
-            <i className={`ti ${item.type === "youtube" ? "ti-brand-youtube" : "ti-brand-spotify"}`} style={{ marginRight: 4 }}></i>
-            {item.type === "youtube" ? "YouTube" : "Spotify"}
+            <i className={`ti ${item.type === "youtube" ? "ti-brand-youtube" : item.type === "spotify" ? "ti-brand-spotify" : "ti-video"}`} style={{ marginRight: 4 }}></i>
+            {item.type === "youtube" ? "YouTube" : item.type === "spotify" ? "Spotify" : "คลิปสั้น"}
           </span>
           <span style={{ fontSize: 13, color: "var(--t3)", fontWeight: 300 }}>{item.series}</span>
         </div>
