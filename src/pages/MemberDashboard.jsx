@@ -174,7 +174,6 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
           text="เก็บบทความที่อยากกลับมาอ่านภายหลัง" 
           onClick={() => setView("saved-articles")} 
         />
-        <DashboardCard icon="ti-bell" title="การแจ้งเตือน" text="ข่าวสาร กิจกรรม และหนังสือใหม่" />
       </div>
     </div>
   )

@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useMemo } from "react"
 import { SITE } from "../data/index.js"
 import toast from "react-hot-toast"
 import { confirmAction } from "../utils/feedback.jsx"
+import { useContentCollection } from "../lib/contentStore.js"
+import { ARTICLES, BOOKS } from "../data/index.js"
 
 const NAV_LINKS = [
   { id: "home", label: "หน้าหลัก", icon: "ti-home" },
@@ -15,8 +17,99 @@ const NAV_LINKS = [
 export default function Nav({ page, go, theme, setTheme, authState }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
+  const [notificationOpen, setNotificationOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const accountRef = useRef(null)
+  const notificationRef = useRef(null)
+
+  const { items: articles } = useContentCollection("articles", ARTICLES)
+  const { items: books } = useContentCollection("books", BOOKS)
+
+  const notifications = useMemo(() => {
+    const list = []
+    
+    // 1. Welcome Notification
+    list.push({
+      id: "welcome",
+      title: "ยินดีต้อนรับสู่ Talib Club!",
+      desc: `ขอให้อัลลอฮฺทรงเพิ่มพูนความรู้ที่เป็นประโยชน์แก่ท่านในการศึกษาอิสลาม`,
+      time: "ระบบ",
+      icon: "ti-gift",
+      color: "var(--teal)",
+      onClick: () => nav("member", { view: "profile" })
+    })
+
+    // 2. Latest Article Notification
+    if (articles && articles.length > 0) {
+      const latestArt = articles[0]
+      list.push({
+        id: `art-${latestArt.id}`,
+        title: "บทความวิชาการใหม่",
+        desc: `อ่านบทความล่าสุด: "${latestArt.title}" โดย ${latestArt.author}`,
+        time: latestArt.date || "เมื่อเร็วๆ นี้",
+        icon: "ti-file-text",
+        color: "var(--teal)",
+        onClick: () => nav("article", latestArt)
+      })
+    }
+
+    // 3. Latest Book Notification
+    if (books && books.length > 0) {
+      const latestBook = books[0]
+      list.push({
+        id: `book-${latestBook.id}`,
+        title: "หนังสือและตำราใหม่",
+        desc: `ดาวน์โหลดผลงานล่าสุด: "${latestBook.title}" หมวดหมู่ ${latestBook.category}`,
+        time: "เมื่อเร็วๆ นี้",
+        icon: "ti-book",
+        color: "rgb(255, 179, 0)",
+        onClick: () => nav("library-detail", latestBook)
+      })
+    }
+
+    // 4. Feature Announcement
+    list.push({
+      id: "sync-feature",
+      title: "ระบบคลาวด์ซิงก์ข้อมูล",
+      desc: "ประวัติการอ่านและอายะฮ์ที่ท่านบันทึกไว้ถูกซิงก์กับฐานข้อมูล Firestore อัตโนมัติ",
+      time: "ระบบ",
+      icon: "ti-cloud-upload",
+      color: "#3b73c4",
+      onClick: () => nav("member", { view: "profile" })
+    })
+
+    return list
+  }, [articles, books, authState?.user, authState?.profile])
+
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    try {
+      const seenIds = JSON.parse(localStorage.getItem("talib_seen_notifications") || "[]")
+      const unseen = notifications.filter(n => !seenIds.includes(n.id))
+      setUnreadCount(unseen.length)
+    } catch (e) {
+      setUnreadCount(notifications.length)
+    }
+  }, [notifications])
+
+  const markAllAsRead = () => {
+    try {
+      const ids = notifications.map(n => n.id)
+      localStorage.setItem("talib_seen_notifications", JSON.stringify(ids))
+      setUnreadCount(0)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const toggleNotifications = () => {
+    setNotificationOpen(!notificationOpen)
+    setAccountOpen(false)
+    if (!notificationOpen) {
+      markAllAsRead()
+    }
+  }
 
   useEffect(() => {
     const fn = () => {
@@ -29,16 +122,20 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
   }, [])
 
   useEffect(() => {
-    function closeAccount(e) {
+    function closeDropdowns(e) {
       if (accountRef.current && !accountRef.current.contains(e.target)) setAccountOpen(false)
+      if (notificationRef.current && !notificationRef.current.contains(e.target)) setNotificationOpen(false)
     }
     function closeOnEsc(e) {
-      if (e.key === "Escape") setAccountOpen(false)
+      if (e.key === "Escape") {
+        setAccountOpen(false)
+        setNotificationOpen(false)
+      }
     }
-    document.addEventListener("mousedown", closeAccount)
+    document.addEventListener("mousedown", closeDropdowns)
     document.addEventListener("keydown", closeOnEsc)
     return () => {
-      document.removeEventListener("mousedown", closeAccount)
+      document.removeEventListener("mousedown", closeDropdowns)
       document.removeEventListener("keydown", closeOnEsc)
     }
   }, [])
@@ -47,6 +144,7 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
     go(id, data)
     setMenuOpen(false)
     setAccountOpen(false)
+    setNotificationOpen(false)
   }
 
   // แก้ไขระบบออกจากระบบให้สมูทขึ้น
@@ -112,6 +210,47 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
         )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {authState?.user && (
+            <div ref={notificationRef} style={{ position: "relative" }}>
+              <button
+                onClick={toggleNotifications}
+                style={{
+                  background: notificationOpen ? "var(--teal-bg)" : "var(--bg2)",
+                  border: "none", cursor: "pointer",
+                  color: notificationOpen ? "var(--teal)" : "var(--t3)",
+                  padding: 0,
+                  borderRadius: 20, width: 34, height: 34,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  position: "relative"
+                }}
+                title="การแจ้งเตือน"
+                aria-label="เมนูการแจ้งเตือน"
+                aria-expanded={notificationOpen}
+              >
+                <i className="ti ti-bell" style={{ fontSize: 18 }}></i>
+                {unreadCount > 0 && (
+                  <span style={{
+                    position: "absolute",
+                    top: 2,
+                    right: 2,
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: "#e05555",
+                    border: "1.5px solid var(--nav-bg)"
+                  }} />
+                )}
+              </button>
+
+              {notificationOpen && !isMobile && (
+                <NotificationDropdown
+                  notifications={notifications}
+                  onClose={() => setNotificationOpen(false)}
+                />
+              )}
+            </div>
+          )}
+
           <div ref={accountRef} style={{ position: "relative" }}>
             <button
               onClick={() => authState?.user ? setAccountOpen(open => !open) : nav("auth")}
@@ -172,6 +311,13 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
           logout={logout}
           onClose={() => setAccountOpen(false)}
           page={page}
+        />
+      )}
+
+      {authState?.user && notificationOpen && isMobile && (
+        <NotificationDrawer
+          notifications={notifications}
+          onClose={() => setNotificationOpen(false)}
         />
       )}
 
@@ -403,4 +549,153 @@ function drawerItemStyle(active, danger) {
     fontFamily: "'Prompt',sans-serif",
     fontWeight: active ? 600 : 400
   }
+}
+
+function NotificationDropdown({ notifications, onClose }) {
+  return (
+    <div style={{
+      position: "absolute", right: 0, top: 42, width: 320,
+      background: "var(--card)", border: ".5px solid var(--br2)",
+      borderRadius: 12, boxShadow: "0 18px 45px rgba(0,0,0,.18)",
+      padding: 12, zIndex: 200, color: "var(--text)",
+      display: "flex", flexDirection: "column"
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 10, borderBottom: ".5px solid var(--br2)", marginBottom: 8 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+          <i className="ti ti-bell" style={{ color: "var(--teal)" }}></i> การแจ้งเตือน
+        </span>
+        <button onClick={onClose} style={{
+          background: "transparent", border: "none", cursor: "pointer", color: "var(--t3)", fontSize: 11,
+          fontFamily: "'Prompt',sans-serif"
+        }}>ปิด</button>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 320, overflowY: "auto", paddingRight: 2 }}>
+        {notifications.map(n => (
+          <div
+            key={n.id}
+            onClick={() => { n.onClick(); onClose(); }}
+            style={{
+              padding: 10,
+              borderRadius: 8,
+              background: "var(--bg2)",
+              cursor: "pointer",
+              display: "flex",
+              gap: 10,
+              alignItems: "flex-start",
+              transition: "transform 0.15s ease, background 0.15s ease",
+              textAlign: "left"
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateX(2px)"
+              e.currentTarget.style.background = "var(--bg3)"
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "none"
+              e.currentTarget.style.background = "var(--bg2)"
+            }}
+          >
+            <div style={{
+              width: 28, height: 28, borderRadius: 6,
+              background: "var(--card)", color: n.color || "var(--teal)",
+              display: "grid", placeItems: "center", flexShrink: 0, fontSize: 14,
+              border: "0.5px solid var(--br2)"
+            }}>
+              <i className={`ti ${n.icon}`}></i>
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: 500, color: "var(--text)" }}>{n.title}</div>
+              <div style={{ fontSize: 11, color: "var(--t2)", marginTop: 2, lineHeight: 1.4 }}>{n.desc}</div>
+              <span style={{ fontSize: 9, color: "var(--t3)", display: "block", marginTop: 4 }}>{n.time}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function NotificationDrawer({ notifications, onClose }) {
+  return (
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
+      <div 
+        onClick={onClose} 
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "rgba(0, 0, 0, 0.5)",
+          backdropFilter: "blur(2px)",
+          animation: "fadeIn 0.2s ease-out"
+        }} 
+      />
+      <div style={{
+        position: "absolute",
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: "280px",
+        background: "var(--bg)",
+        padding: "60px 20px",
+        borderLeft: "1px solid var(--br2)",
+        boxShadow: "-5px 0 15px rgba(0,0,0,0.1)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        animation: "slideLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+        zIndex: 1001
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 15, borderBottom: "1px solid var(--br2)" }}>
+          <h3 style={{ fontSize: 15, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+            <i className="ti ti-bell" style={{ color: "var(--teal)" }}></i> การแจ้งเตือน
+          </h3>
+          <button onClick={onClose} style={{
+            background: "var(--bg2)",
+            border: "none",
+            borderRadius: "50%",
+            width: 28,
+            height: 28,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--t2)",
+            cursor: "pointer"
+          }}>
+            <i className="ti ti-x" style={{ fontSize: 14 }}></i>
+          </button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, overflowY: "auto" }}>
+          {notifications.map(n => (
+            <div
+              key={n.id}
+              onClick={() => { n.onClick(); onClose(); }}
+              style={{
+                padding: 12,
+                borderRadius: 10,
+                background: "var(--card)",
+                border: "0.5px solid var(--br2)",
+                cursor: "pointer",
+                display: "flex",
+                gap: 10,
+                alignItems: "flex-start",
+                textAlign: "left"
+              }}
+            >
+              <div style={{
+                width: 28, height: 28, borderRadius: 6,
+                background: "var(--bg2)", color: n.color || "var(--teal)",
+                display: "grid", placeItems: "center", flexShrink: 0, fontSize: 14
+              }}>
+                <i className={`ti ${n.icon}`}></i>
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 500, color: "var(--text)" }}>{n.title}</div>
+                <div style={{ fontSize: 11, color: "var(--t2)", marginTop: 2, lineHeight: 1.4 }}>{n.desc}</div>
+                <span style={{ fontSize: 9, color: "var(--t3)", display: "block", marginTop: 4 }}>{n.time}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
 }

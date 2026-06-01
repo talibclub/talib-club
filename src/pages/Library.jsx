@@ -210,15 +210,15 @@ export default function Library({ go, authState }) {
       {/* PAGINATION CONTROLS */}
       {totalPages > 1 && (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, marginTop: 32 }}>
-          <button onClick={() => { setCurrentPage(prev => Math.max(prev - 1, 1)); window.scrollTo({ top: 0, behavior: "smooth" }) }} disabled={currentPage === 1} className="btn btn-outline" style={{ padding: "6px 12px", opacity: currentPage === 1 ? 0.4 : 1, cursor: currentPage === 1 ? "not-allowed" : "pointer" }}>
+          <button onClick={() => { setCurrentPage(prev => Math.max(prev - 1, 1)); window.scrollTo(0, 0) }} disabled={currentPage === 1} className="btn btn-outline" style={{ padding: "6px 12px", opacity: currentPage === 1 ? 0.4 : 1, cursor: currentPage === 1 ? "not-allowed" : "pointer" }}>
             <i className="ti ti-chevron-left" style={{ fontSize: 14 }}></i>
           </button>
           {Array.from({ length: totalPages }).map((_, i) => (
-            <button key={i} onClick={() => { setCurrentPage(i + 1); window.scrollTo({ top: 0, behavior: "smooth" }) }} className={currentPage === i + 1 ? "btn btn-teal" : "btn btn-outline"} style={{ padding: "6px 14px", fontSize: 12, minWidth: 32 }}>
+            <button key={i} onClick={() => { setCurrentPage(i + 1); window.scrollTo(0, 0) }} className={currentPage === i + 1 ? "btn btn-teal" : "btn btn-outline"} style={{ padding: "6px 14px", fontSize: 12, minWidth: 32 }}>
               {i + 1}
             </button>
           ))}
-          <button onClick={() => { setCurrentPage(prev => Math.min(prev + 1, totalPages)); window.scrollTo({ top: 0, behavior: "smooth" }) }} disabled={currentPage === totalPages} className="btn btn-outline" style={{ padding: "6px 12px", opacity: currentPage === totalPages ? 0.4 : 1, cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}>
+          <button onClick={() => { setCurrentPage(prev => Math.min(prev + 1, totalPages)); window.scrollTo(0, 0) }} disabled={currentPage === totalPages} className="btn btn-outline" style={{ padding: "6px 12px", opacity: currentPage === totalPages ? 0.4 : 1, cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}>
             <i className="ti ti-chevron-right" style={{ fontSize: 14 }}></i>
           </button>
         </div>

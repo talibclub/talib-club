@@ -74,7 +74,7 @@ export default function App() {
   const go = (p, data = null) => {
     setPage(p)
     setCtx(data)
-    window.scrollTo({ top: 0, behavior: "smooth" })
+    window.scrollTo(0, 0)
     
     let urlPath = "/";
     if (p === "tracking") {
@@ -96,7 +96,7 @@ export default function App() {
       <Toaster position="top-right" toastOptions={{ style: { fontFamily: "'Prompt', sans-serif", fontSize: 14 } }} />
       
       <Nav page={page} go={go} theme={theme} setTheme={setTheme} authState={authState} />
-      <main className={page === "quran" || page === "member" ? "wide" : ""}>
+      <main className={`${page === "quran" || page === "member" ? "wide" : ""} fade-in-active`} key={page}>
         {page === "home" && <Home go={go} />}
         {page === "articles" && <Articles go={go} authState={authState} ctx={ctx} />}      
         {page === "article" && <ArticleDetail item={ctx} go={go} authState={authState} />}
