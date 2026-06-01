@@ -203,7 +203,25 @@ export default function Scholars() {
       </div>
 
       {/* TIMELINE */}
-      {eras.filter(item => item !== "0").map(eraNum => {
+      {loading ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="card" style={{ padding: 16, borderLeft: "2px solid var(--br2)", display: "flex", flexDirection: "column", gap: 8, opacity: 0.6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ height: 14, background: "var(--bg3)", width: "50%", borderRadius: 4 }}></div>
+                <div style={{ height: 12, background: "var(--bg3)", width: "20%", borderRadius: 4 }}></div>
+              </div>
+              <div style={{ height: 11, background: "var(--bg3)", width: "35%", borderRadius: 4 }}></div>
+              <div style={{ display: "flex", gap: 12 }}>
+                <div style={{ height: 11, background: "var(--bg3)", width: "25%", borderRadius: 4 }}></div>
+                <div style={{ height: 11, background: "var(--bg3)", width: "25%", borderRadius: 4 }}></div>
+              </div>
+              <div style={{ height: 12, background: "var(--bg3)", width: "80%", borderRadius: 4, marginTop: 4 }}></div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        eras.filter(item => item !== "0").map(eraNum => {
         const eraScholars = filtered.filter(s => String(s.era) === String(eraNum))
         if (eraScholars.length === 0) return null
         const color = ERA_COLORS[eraNum] || "var(--teal)"
@@ -313,9 +331,9 @@ export default function Scholars() {
             )}
           </div>
         )
-      })}
+      }))}
 
-      {filtered.length === 0 && <div className="empty">ไม่พบรายชื่อบุคคลที่ตรงกับการค้นหา</div>}
+      {!loading && filtered.length === 0 && <div className="empty">ไม่พบรายชื่อบุคคลที่ตรงกับการค้นหา</div>}
 
       {/* CONTACT */}
       <div style={{

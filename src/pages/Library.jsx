@@ -131,7 +131,23 @@ export default function Library({ go, authState, ctx }) {
       )}
 
       {/* BOOKS GRID */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(340px,1fr))", gap: 16 }}>
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="card" style={{ padding: 16, display: "flex", gap: 16, opacity: 0.6 }}>
+              <div style={{ width: 90, height: 120, background: "var(--bg3)", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <i className="ti ti-loader-2 spin" style={{ fontSize: 20, color: "var(--teal)" }}></i>
+              </div>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ height: 12, background: "var(--bg3)", width: "30%", borderRadius: 4 }}></div>
+                <div style={{ height: 16, background: "var(--bg3)", width: "90%", borderRadius: 4 }}></div>
+                <div style={{ height: 12, background: "var(--bg3)", width: "60%", borderRadius: 4 }}></div>
+                <div style={{ height: 12, background: "var(--bg3)", width: "80%", borderRadius: 4, marginTop: 4 }}></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="empty">ไม่พบรายการที่ตรงกับการค้นหา หรือตัวกรองที่เลือก</div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(340px,1fr))", gap: 16 }}>

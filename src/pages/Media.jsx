@@ -140,7 +140,22 @@ export default function Media({ go, ctx }) {
             </div>
           </div>
 
-          {filteredPlaylists.length === 0 ? (
+          {loading ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))", gap: 14 }}>
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} className="card" style={{ padding: 16, height: 260, display: "flex", flexDirection: "column", gap: 12, opacity: 0.6 }}>
+                  <div style={{ width: "100%", height: 130, background: "var(--bg3)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <i className="ti ti-loader-2 spin" style={{ fontSize: 24, color: "var(--teal)" }}></i>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ height: 14, background: "var(--bg3)", width: "40%", borderRadius: 4 }}></div>
+                    <div style={{ height: 16, background: "var(--bg3)", width: "90%", borderRadius: 4 }}></div>
+                    <div style={{ height: 12, background: "var(--bg3)", width: "60%", borderRadius: 4 }}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredPlaylists.length === 0 ? (
             <div className="empty">ไม่พบเพลย์ลิสต์ที่ตรงกับการค้นหา</div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))", gap: 14 }}>
@@ -201,7 +216,21 @@ export default function Media({ go, ctx }) {
             />
           </div>
 
-          {filteredClips.length === 0 ? (
+          {loading ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} className="card" style={{ padding: 16, height: 220, display: "flex", flexDirection: "column", gap: 12, opacity: 0.6 }}>
+                  <div style={{ width: "100%", height: 120, background: "var(--bg3)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <i className="ti ti-loader-2 spin" style={{ fontSize: 24, color: "var(--teal)" }}></i>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ height: 14, background: "var(--bg3)", width: "90%", borderRadius: 4 }}></div>
+                    <div style={{ height: 12, background: "var(--bg3)", width: "50%", borderRadius: 4 }}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredClips.length === 0 ? (
             <div className="empty">ไม่พบคลิปที่ตรงกับการค้นหาในเพลย์ลิสต์นี้</div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
