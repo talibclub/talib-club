@@ -608,7 +608,7 @@ function ProfilePanel({ authState, copied, copyText, go, setView }) {
         </div>
 
         {/* Sub Navigation pills */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 24, borderBottom: "0.5px solid var(--br2)", paddingBottom: 12 }}>
+        <div className="profile-tabs">
           <button className={`pill ${subView === "stats" ? "on" : ""}`} onClick={() => setSubView("stats")}>
             <i className="ti ti-chart-bar" style={{ marginRight: 6 }}></i>สถิติและการเรียนรู้
           </button>
