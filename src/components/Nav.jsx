@@ -152,6 +152,7 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
                   nav={nav}
                   logout={logout}
                   onClose={() => setAccountOpen(false)}
+                  page={page}
                 />
               ) : (
                 <AccountDropdown
@@ -280,56 +281,49 @@ const iconButtonStyle = {
   color: "var(--text)",
 }
 
-function AccountDrawer({ name, email, photoURL, isStaff, nav, logout, onClose }) {
+function AccountDrawer({ name, email, photoURL, isStaff, nav, logout, onClose, page }) {
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
       <div 
         onClick={onClose} 
         style={{
           position: "absolute",
           inset: 0,
-          background: "rgba(0, 0, 0, 0.4)",
-          backdropFilter: "blur(6px)",
-          animation: "fadeIn 0.25s ease-out"
+          background: "rgba(0, 0, 0, 0.5)",
+          backdropFilter: "blur(2px)",
+          animation: "fadeIn 0.2s ease-out"
         }} 
       />
       <div style={{
-        position: "relative",
-        background: "var(--card)",
-        borderTop: ".5px solid var(--br2)",
-        borderRadius: "24px 24px 0 0",
-        padding: "16px 20px calc(24px + env(safe-area-inset-bottom, 0px))",
-        boxShadow: "0 -8px 30px rgba(0,0,0,0.15)",
-        zIndex: 1001,
-        maxHeight: "85vh",
-        overflowY: "auto",
-        animation: "slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+        position: "absolute",
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: "280px",
+        background: "var(--bg)",
+        padding: "60px 20px",
+        borderLeft: "1px solid var(--br2)",
+        boxShadow: "-5px 0 15px rgba(0,0,0,0.1)",
         display: "flex",
         flexDirection: "column",
-        gap: 16
+        gap: 16,
+        animation: "slideLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+        zIndex: 1001
       }}>
         <style dangerouslySetInnerHTML={{__html: `
           @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
           }
-          @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
+          @keyframes slideLeft {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
           }
         `}} />
-        <div style={{
-          width: 40,
-          height: 4,
-          background: "var(--br2)",
-          borderRadius: 2,
-          margin: "0 auto 8px",
-          opacity: 0.8
-        }} />
-        <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "8px 4px 16px", borderBottom: ".5px solid var(--br2)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, paddingBottom: 15, borderBottom: "1px solid var(--br2)" }}>
           <div style={{
-            width: 48,
-            height: 48,
+            width: 44,
+            height: 44,
             borderRadius: "50%",
             background: "var(--teal-bg)",
             color: "var(--teal)",
@@ -337,67 +331,76 @@ function AccountDrawer({ name, email, photoURL, isStaff, nav, logout, onClose })
             alignItems: "center",
             justifyContent: "center",
             fontWeight: 600,
-            fontSize: 18,
             overflow: "hidden",
             flexShrink: 0
           }}>
             {photoURL ? <img src={photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (name.trim()[0] || "U").toUpperCase()}
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
-            {email && <div style={{ fontSize: 13, color: "var(--t2)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</div>}
+            <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+            {email && <div style={{ fontSize: 11, color: "var(--t2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</div>}
           </div>
           <button onClick={onClose} style={{
             background: "var(--bg2)",
             border: "none",
             borderRadius: "50%",
-            width: 32,
-            height: 32,
+            width: 28,
+            height: 28,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             color: "var(--t2)",
             cursor: "pointer"
           }}>
-            <i className="ti ti-x" style={{ fontSize: 16 }}></i>
+            <i className="ti ti-x" style={{ fontSize: 14 }}></i>
           </button>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <DrawerItem icon="ti-layout-dashboard" label="แดชบอร์ดสมาชิก" onClick={() => { nav("member", { view: "overview" }); onClose(); }} />
-          <DrawerItem icon="ti-user-circle" label="โปรไฟล์ของฉัน" onClick={() => { nav("member", { view: "profile" }); onClose(); }} />
-          {isStaff && <DrawerItem icon="ti-briefcase" label="Staff Workspace" onClick={() => { nav("staff"); onClose(); }} />}
-          {isStaff && <DrawerItem icon="ti-shield-check" label="Admin Panel" onClick={() => { nav("admin"); onClose(); }} />}
-        </div>
-        <div style={{ borderTop: ".5px solid var(--br2)", paddingTop: 12 }}>
-          <DrawerItem icon="ti-logout" label="ออกจากระบบ" danger onClick={() => { logout(); onClose(); }} />
+        <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+          <button onClick={() => { nav("member", { view: "overview" }); onClose(); }} style={drawerItemStyle(page === "member" && !window.location.search.includes("view=profile"))}>
+            <i className="ti ti-layout-dashboard" style={{ marginRight: 15, fontSize: 18, color: "var(--teal)" }}></i>
+            แดชบอร์ดสมาชิก
+          </button>
+          <button onClick={() => { nav("member", { view: "profile" }); onClose(); }} style={drawerItemStyle(page === "member" && window.location.search.includes("view=profile"))}>
+            <i className="ti ti-user-circle" style={{ marginRight: 15, fontSize: 18, color: "var(--teal)" }}></i>
+            โปรไฟล์ของฉัน
+          </button>
+          {isStaff && (
+            <button onClick={() => { nav("staff"); onClose(); }} style={drawerItemStyle(page === "staff")}>
+              <i className="ti ti-briefcase" style={{ marginRight: 15, fontSize: 18, color: "var(--teal)" }}></i>
+              Staff Workspace
+            </button>
+          )}
+          {isStaff && (
+            <button onClick={() => { nav("admin"); onClose(); }} style={drawerItemStyle(page === "admin")}>
+              <i className="ti ti-shield-check" style={{ marginRight: 15, fontSize: 18, color: "var(--teal)" }}></i>
+              Admin Panel
+            </button>
+          )}
+          <div style={{ borderTop: "1px solid var(--br2)", marginTop: 15, paddingTop: 15 }}>
+            <button onClick={() => { logout(); onClose(); }} style={drawerItemStyle(false, true)}>
+              <i className="ti ti-logout" style={{ marginRight: 15, fontSize: 18, color: "#e05555" }}></i>
+              ออกจากระบบ
+            </button>
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-function DrawerItem({ icon, label, onClick, danger }) {
-  return (
-    <button onClick={onClick} style={{
-      width: "100%",
-      border: "none",
-      background: danger ? "rgba(224, 85, 85, 0.08)" : "var(--bg2)",
-      cursor: "pointer",
-      color: danger ? "#e05555" : "var(--text)",
-      display: "flex",
-      alignItems: "center",
-      gap: 14,
-      padding: "14px 16px",
-      borderRadius: 12,
-      textAlign: "left",
-      fontFamily: "'Prompt',sans-serif",
-      fontSize: 14,
-      fontWeight: 500,
-      transition: "background 0.2s"
-    }}>
-      <i className={`ti ${icon}`} style={{ fontSize: 18, color: danger ? "#e05555" : "var(--teal)" }}></i>
-      <span style={{ flex: 1 }}>{label}</span>
-      <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.4 }}></i>
-    </button>
-  )
+function drawerItemStyle(active, danger) {
+  return {
+    display: "flex",
+    alignItems: "center",
+    width: "100%",
+    textAlign: "left",
+    padding: "16px 10px",
+    fontSize: 15,
+    background: "transparent",
+    border: "none",
+    color: danger ? "#e05555" : active ? "var(--teal)" : "var(--text)",
+    cursor: "pointer",
+    fontFamily: "'Prompt',sans-serif",
+    fontWeight: active ? 600 : 400
+  }
 }
