@@ -142,28 +142,15 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
               )}
             </button>
 
-            {authState?.user && accountOpen && (
-              isMobile ? (
-                <AccountDrawer
-                  name={userName}
-                  email={authState.user?.email}
-                  photoURL={photoURL}
-                  isStaff={authState.isStaff}
-                  nav={nav}
-                  logout={logout}
-                  onClose={() => setAccountOpen(false)}
-                  page={page}
-                />
-              ) : (
-                <AccountDropdown
-                  name={userName}
-                  email={authState.user?.email}
-                  photoURL={photoURL}
-                  isStaff={authState.isStaff}
-                  nav={nav}
-                  logout={logout}
-                />
-              )
+            {authState?.user && accountOpen && !isMobile && (
+              <AccountDropdown
+                name={userName}
+                email={authState.user?.email}
+                photoURL={photoURL}
+                isStaff={authState.isStaff}
+                nav={nav}
+                logout={logout}
+              />
             )}
           </div>
           <button onClick={() => setTheme(theme === "light" ? "dark" : "light")} style={{
@@ -174,6 +161,19 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
           </button>
         </div>
       </nav>
+
+      {authState?.user && accountOpen && isMobile && (
+        <AccountDrawer
+          name={userName}
+          email={authState.user?.email}
+          photoURL={photoURL}
+          isStaff={authState.isStaff}
+          nav={nav}
+          logout={logout}
+          onClose={() => setAccountOpen(false)}
+          page={page}
+        />
+      )}
 
       {isMobile && menuOpen && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}>
