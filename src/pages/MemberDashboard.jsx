@@ -5,8 +5,8 @@ import { useContentCollection } from "../lib/contentStore.js"
 import { confirmAction } from "../utils/feedback.jsx"
 import Quran from "./Quran.jsx"
 
-export default function MemberDashboard({ authState, go, initialView = "overview" }) {
-  const [view, setView] = useState("overview")
+export default function MemberDashboard({ authState, go, initialView = "overview", ctx }) {
+  const [view, setCurrentView] = useState("overview")
   const [copied, setCopied] = useState("")
   const [quranSura, setQuranSura] = useState(1)
   const [quranAyah, setQuranAyah] = useState(null)
@@ -17,8 +17,23 @@ export default function MemberDashboard({ authState, go, initialView = "overview
   const role = profile.role || "member"
 
   useEffect(() => {
-    if (initialView) setView(initialView)
-  }, [initialView])
+    if (initialView) setCurrentView(initialView)
+    
+    const searchParams = new URLSearchParams(window.location.search)
+    const sura = searchParams.get("sura") || ctx?.sura
+    const ayah = searchParams.get("ayah") || ctx?.ayah
+    if (sura) setQuranSura(Number(sura))
+    if (ayah) setQuranAyah(Number(ayah))
+    else if (initialView !== "quran" && view !== "quran") setQuranAyah(null)
+  }, [initialView, ctx])
+
+  const setView = (newView) => {
+    if (newView === "quran") {
+      go("quran", { sura: quranSura, ayah: quranAyah })
+    } else {
+      go("member", { view: newView })
+    }
+  }
 
   async function copyText(label, value) {
     if (!value) return
@@ -76,9 +91,7 @@ export default function MemberDashboard({ authState, go, initialView = "overview
           go={go} 
           setView={setView} 
           onOpenQuran={(sura, ayah) => {
-            setQuranSura(sura || 1)
-            setQuranAyah(ayah || null)
-            setView("quran")
+            go("quran", { sura: sura || 1, ayah: ayah || null })
           }}
           onOpenSavedVerses={() => setView("saved-verses")}
         />
@@ -1217,9 +1230,7 @@ function SavedVersesPanel({ authState, go, setView, setQuranSura, setQuranAyah }
   }, [userSaved, search]);
 
   const handleOpenVerse = (sura, aya) => {
-    setQuranSura(sura);
-    setQuranAyah(aya);
-    setView("quran");
+    go("quran", { sura, ayah: aya })
   };
 
   const handleEdit = (item) => {

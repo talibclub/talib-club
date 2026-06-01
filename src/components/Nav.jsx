@@ -92,34 +92,66 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
     return list
   }, [articles, books, authState?.user, authState?.profile])
 
+  const [seenIds, setSeenIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("talib_seen_notifications") || "[]")
+    } catch {
+      return []
+    }
+  })
+
+  const [dismissedIds, setDismissedIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("talib_dismissed_notifications") || "[]")
+    } catch {
+      return []
+    }
+  })
+
   const [unreadCount, setUnreadCount] = useState(0)
 
+  // Filter visible (non-dismissed) notifications
+  const visibleNotifications = useMemo(() => {
+    return notifications.filter(n => !dismissedIds.includes(n.id))
+  }, [notifications, dismissedIds])
+
   useEffect(() => {
-    try {
-      const seenIds = JSON.parse(localStorage.getItem("talib_seen_notifications") || "[]")
-      const unseen = notifications.filter(n => !seenIds.includes(n.id))
-      setUnreadCount(unseen.length)
-    } catch (e) {
-      setUnreadCount(notifications.length)
-    }
-  }, [notifications])
+    const unseen = visibleNotifications.filter(n => !seenIds.includes(n.id))
+    setUnreadCount(unseen.length)
+  }, [visibleNotifications, seenIds])
 
   const markAllAsRead = () => {
     try {
-      const ids = notifications.map(n => n.id)
-      localStorage.setItem("talib_seen_notifications", JSON.stringify(ids))
+      const ids = visibleNotifications.map(n => n.id)
+      const merged = Array.from(new Set([...seenIds, ...ids]))
+      localStorage.setItem("talib_seen_notifications", JSON.stringify(merged))
+      setSeenIds(merged)
       setUnreadCount(0)
     } catch (e) {
       console.error(e)
     }
   }
 
+  const markAsRead = (id) => {
+    try {
+      const merged = Array.from(new Set([...seenIds, id]))
+      localStorage.setItem("talib_seen_notifications", JSON.stringify(merged))
+      setSeenIds(merged)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const handleDismissNotification = (id, e) => {
+    e.stopPropagation()
+    const next = [...dismissedIds, id]
+    setDismissedIds(next)
+    localStorage.setItem("talib_dismissed_notifications", JSON.stringify(next))
+  }
+
   const toggleNotifications = () => {
     setNotificationOpen(!notificationOpen)
     setAccountOpen(false)
-    if (!notificationOpen) {
-      markAllAsRead()
-    }
   }
 
   useEffect(() => {
@@ -258,10 +290,15 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
 
               {notificationOpen && !isMobile && (
                 <NotificationDropdown
-                  notifications={notifications}
+                  notifications={visibleNotifications}
+                  seenIds={seenIds}
+                  markAsRead={markAsRead}
+                  onDismiss={handleDismissNotification}
                   onClose={() => setNotificationOpen(false)}
                   pushState={pushState}
                   togglePushSubscription={togglePushSubscription}
+                  unreadCount={unreadCount}
+                  markAllAsRead={markAllAsRead}
                 />
               )}
             </div>
@@ -336,10 +373,15 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
 
       {authState?.user && notificationOpen && isMobile && (
         <NotificationDrawer
-          notifications={notifications}
+          notifications={visibleNotifications}
+          seenIds={seenIds}
+          markAsRead={markAsRead}
+          onDismiss={handleDismissNotification}
           onClose={() => setNotificationOpen(false)}
           pushState={pushState}
           togglePushSubscription={togglePushSubscription}
+          unreadCount={unreadCount}
+          markAllAsRead={markAllAsRead}
         />
       )}
 
@@ -452,47 +494,54 @@ const iconButtonStyle = {
 
 function AccountDrawer({ name, email, photoURL, isStaff, nav, logout, onClose, page, isInstallable, installApp }) {
   return (
-    <div className="account-drawer" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
       <div 
         onClick={onClose} 
         style={{
           position: "absolute",
           inset: 0,
-          background: "rgba(0, 0, 0, 0.5)",
-          backdropFilter: "blur(2px)",
-          animation: "fadeIn 0.2s ease-out"
+          background: "rgba(0, 0, 0, 0.4)",
+          backdropFilter: "blur(6px)",
+          animation: "fadeIn 0.25s ease-out"
         }} 
       />
       <div style={{
-        position: "absolute",
-        top: 0,
-        right: 0,
-        bottom: 0,
-        width: "280px",
-        background: "var(--bg)",
-        padding: "60px 20px",
-        borderLeft: "1px solid var(--br2)",
-        boxShadow: "-5px 0 15px rgba(0,0,0,0.1)",
+        position: "relative",
+        background: "var(--card)",
+        borderTop: ".5px solid var(--br2)",
+        borderRadius: "24px 24px 0 0",
+        padding: "16px 20px calc(24px + env(safe-area-inset-bottom, 0px))",
+        boxShadow: "0 -8px 30px rgba(0,0,0,0.15)",
+        zIndex: 1001,
+        maxHeight: "85vh",
+        overflowY: "auto",
+        animation: "slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
         display: "flex",
         flexDirection: "column",
-        gap: 16,
-        animation: "slideLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
-        zIndex: 1001
+        gap: 16
       }}>
         <style dangerouslySetInnerHTML={{__html: `
           @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
           }
-          @keyframes slideLeft {
-            from { transform: translateX(100%); }
-            to { transform: translateX(0); }
+          @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
           }
         `}} />
-        <div style={{ display: "flex", alignItems: "center", gap: 12, paddingBottom: 15, borderBottom: "1px solid var(--br2)" }}>
+        <div style={{
+          width: 40,
+          height: 4,
+          background: "var(--br2)",
+          borderRadius: 2,
+          margin: "0 auto 8px",
+          opacity: 0.8
+        }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "8px 4px 16px", borderBottom: ".5px solid var(--br2)" }}>
           <div style={{
-            width: 44,
-            height: 44,
+            width: 48,
+            height: 48,
             borderRadius: "50%",
             background: "var(--teal-bg)",
             color: "var(--teal)",
@@ -500,90 +549,76 @@ function AccountDrawer({ name, email, photoURL, isStaff, nav, logout, onClose, p
             alignItems: "center",
             justifyContent: "center",
             fontWeight: 600,
+            fontSize: 18,
             overflow: "hidden",
             flexShrink: 0
           }}>
             {photoURL ? <img src={photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (name.trim()[0] || "U").toUpperCase()}
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
-            {email && <div style={{ fontSize: 11, color: "var(--t2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</div>}
+            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+            {email && <div style={{ fontSize: 13, color: "var(--t2)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</div>}
           </div>
           <button onClick={onClose} style={{
             background: "var(--bg2)",
             border: "none",
             borderRadius: "50%",
-            width: 28,
-            height: 28,
+            width: 32,
+            height: 32,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             color: "var(--t2)",
             cursor: "pointer"
           }}>
-            <i className="ti ti-x" style={{ fontSize: 14 }}></i>
+            <i className="ti ti-x" style={{ fontSize: 16 }}></i>
           </button>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-          <button onClick={() => { nav("member", { view: "overview" }); onClose(); }} style={drawerItemStyle(page === "member" && !window.location.search.includes("view=profile"))}>
-            <i className="ti ti-layout-dashboard" style={{ marginRight: 15, fontSize: 18, color: "var(--teal)" }}></i>
-            แดชบอร์ดสมาชิก
-          </button>
-          <button onClick={() => { nav("member", { view: "profile" }); onClose(); }} style={drawerItemStyle(page === "member" && window.location.search.includes("view=profile"))}>
-            <i className="ti ti-user-circle" style={{ marginRight: 15, fontSize: 18, color: "var(--teal)" }}></i>
-            โปรไฟล์ของฉัน
-          </button>
-          {isStaff && (
-            <button onClick={() => { nav("staff"); onClose(); }} style={drawerItemStyle(page === "staff")}>
-              <i className="ti ti-briefcase" style={{ marginRight: 15, fontSize: 18, color: "var(--teal)" }}></i>
-              Staff Workspace
-            </button>
-          )}
-          {isStaff && (
-            <button onClick={() => { nav("admin"); onClose(); }} style={drawerItemStyle(page === "admin")}>
-              <i className="ti ti-shield-check" style={{ marginRight: 15, fontSize: 18, color: "var(--teal)" }}></i>
-              Admin Panel
-            </button>
-          )}
-          {isInstallable && (
-            <button onClick={() => { installApp(); onClose(); }} style={drawerItemStyle(false)}>
-              <i className="ti ti-download" style={{ marginRight: 15, fontSize: 18, color: "var(--teal)" }}></i>
-              ติดตั้งแอปพลิเคชัน
-            </button>
-          )}
-          <div style={{ borderTop: "1px solid var(--br2)", marginTop: 15, paddingTop: 15 }}>
-            <button onClick={() => { logout(); onClose(); }} style={drawerItemStyle(false, true)}>
-              <i className="ti ti-logout" style={{ marginRight: 15, fontSize: 18, color: "#e05555" }}></i>
-              ออกจากระบบ
-            </button>
-          </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <DrawerItem icon="ti-layout-dashboard" label="แดชบอร์ดสมาชิก" onClick={() => { nav("member", { view: "overview" }); onClose(); }} />
+          <DrawerItem icon="ti-user-circle" label="โปรไฟล์ของฉัน" onClick={() => { nav("member", { view: "profile" }); onClose(); }} />
+          {isStaff && <DrawerItem icon="ti-briefcase" label="Staff Workspace" onClick={() => { nav("staff"); onClose(); }} />}
+          {isStaff && <DrawerItem icon="ti-shield-check" label="Admin Panel" onClick={() => { nav("admin"); onClose(); }} />}
+          {isInstallable && <DrawerItem icon="ti-download" label="ติดตั้งแอป Talib" onClick={() => { installApp(); onClose(); }} />}
+        </div>
+        <div style={{ borderTop: ".5px solid var(--br2)", paddingTop: 12 }}>
+          <DrawerItem icon="ti-logout" label="ออกจากระบบ" danger onClick={() => { logout(); onClose(); }} />
         </div>
       </div>
     </div>
   )
 }
 
-function drawerItemStyle(active, danger) {
-  return {
-    display: "flex",
-    alignItems: "center",
-    width: "100%",
-    textAlign: "left",
-    padding: "16px 10px",
-    fontSize: 15,
-    background: "transparent",
-    border: "none",
-    color: danger ? "#e05555" : active ? "var(--teal)" : "var(--text)",
-    cursor: "pointer",
-    fontFamily: "'Prompt',sans-serif",
-    fontWeight: active ? 600 : 400
-  }
+function DrawerItem({ icon, label, onClick, danger }) {
+  return (
+    <button onClick={onClick} style={{
+      width: "100%",
+      border: "none",
+      background: danger ? "rgba(224, 85, 85, 0.08)" : "var(--bg2)",
+      cursor: "pointer",
+      color: danger ? "#e05555" : "var(--text)",
+      display: "flex",
+      alignItems: "center",
+      gap: 14,
+      padding: "14px 16px",
+      borderRadius: 12,
+      textAlign: "left",
+      fontFamily: "'Prompt',sans-serif",
+      fontSize: 14,
+      fontWeight: 500,
+      transition: "background 0.2s"
+    }}>
+      <i className={`ti ${icon}`} style={{ fontSize: 18, color: danger ? "#e05555" : "var(--teal)" }}></i>
+      <span style={{ flex: 1 }}>{label}</span>
+      <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.4 }}></i>
+    </button>
+  )
 }
 
-function NotificationDropdown({ notifications, onClose, pushState, togglePushSubscription }) {
+function NotificationDropdown({ notifications, seenIds, markAsRead, onDismiss, onClose, pushState, togglePushSubscription, unreadCount, markAllAsRead }) {
   return (
     <div style={{
-      position: "absolute", right: 0, top: 42, width: 320,
+      position: "absolute", right: 0, top: 42, width: 330,
       background: "var(--card)", border: ".5px solid var(--br2)",
       borderRadius: 12, boxShadow: "0 18px 45px rgba(0,0,0,.18)",
       padding: 12, zIndex: 200, color: "var(--text)",
@@ -593,10 +628,18 @@ function NotificationDropdown({ notifications, onClose, pushState, togglePushSub
         <span style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
           <i className="ti ti-bell" style={{ color: "var(--teal)" }}></i> การแจ้งเตือน
         </span>
-        <button onClick={onClose} style={{
-          background: "transparent", border: "none", cursor: "pointer", color: "var(--t3)", fontSize: 11,
-          fontFamily: "'Prompt',sans-serif"
-        }}>ปิด</button>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          {unreadCount > 0 && (
+            <button onClick={markAllAsRead} style={{
+              background: "transparent", border: "none", cursor: "pointer", color: "var(--teal)", fontSize: 11,
+              fontFamily: "'Prompt',sans-serif", fontWeight: 500
+            }}>อ่านทั้งหมด</button>
+          )}
+          <button onClick={onClose} style={{
+            background: "transparent", border: "none", cursor: "pointer", color: "var(--t3)", fontSize: 11,
+            fontFamily: "'Prompt',sans-serif"
+          }}>ปิด</button>
+        </div>
       </div>
 
       {pushState && pushState.supported && (
@@ -632,51 +675,109 @@ function NotificationDropdown({ notifications, onClose, pushState, togglePushSub
       <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 320, overflowY: "auto", paddingRight: 2 }}>
         {notifications.length === 0 ? (
           <div style={{ padding: "20px 10px", textAlign: "center", color: "var(--t3)", fontSize: 12 }}>ไม่มีการแจ้งเตือนในขณะนี้</div>
-        ) : notifications.map(n => (
-          <div
-            key={n.id}
-            onClick={() => { n.onClick(); onClose(); }}
-            style={{
-              padding: 10,
-              borderRadius: 8,
-              background: "var(--bg2)",
-              cursor: "pointer",
-              display: "flex",
-              gap: 10,
-              alignItems: "flex-start",
-              transition: "transform 0.15s ease, background 0.15s ease",
-              textAlign: "left"
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateX(2px)"
-              e.currentTarget.style.background = "var(--bg3)"
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "none"
-              e.currentTarget.style.background = "var(--bg2)"
-            }}
-          >
-            <div style={{
-              width: 28, height: 28, borderRadius: 6,
-              background: "var(--card)", color: n.color || "var(--teal)",
-              display: "grid", placeItems: "center", flexShrink: 0, fontSize: 14,
-              border: "0.5px solid var(--br2)"
-            }}>
-              <i className={`ti ${n.icon}`}></i>
+        ) : notifications.map(n => {
+          const isUnread = !seenIds.includes(n.id)
+          return (
+            <div
+              key={n.id}
+              onClick={() => { markAsRead(n.id); n.onClick(); onClose(); }}
+              style={{
+                padding: "10px 8px 10px 10px",
+                borderRadius: 8,
+                background: isUnread ? "rgba(45, 190, 160, 0.08)" : "var(--bg2)",
+                border: isUnread ? "0.5px solid rgba(45, 190, 160, 0.2)" : "0.5px solid transparent",
+                cursor: "pointer",
+                display: "flex",
+                gap: 8,
+                alignItems: "flex-start",
+                transition: "transform 0.15s ease, background 0.15s ease",
+                textAlign: "left",
+                position: "relative"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateX(2px)"
+                e.currentTarget.style.background = isUnread ? "rgba(45, 190, 160, 0.13)" : "var(--bg3)"
+                const dismissBtn = e.currentTarget.querySelector(".dismiss-btn")
+                if (dismissBtn) dismissBtn.style.opacity = "1"
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "none"
+                e.currentTarget.style.background = isUnread ? "rgba(45, 190, 160, 0.08)" : "var(--bg2)"
+                const dismissBtn = e.currentTarget.querySelector(".dismiss-btn")
+                if (dismissBtn) dismissBtn.style.opacity = "0"
+              }}
+            >
+              {/* Unread dot indicator */}
+              {isUnread && (
+                <span style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: "var(--teal)",
+                  alignSelf: "center",
+                  marginRight: 2,
+                  flexShrink: 0
+                }} />
+              )}
+              
+              <div style={{
+                width: 28, height: 28, borderRadius: 6,
+                background: "var(--card)", color: n.color || "var(--teal)",
+                display: "grid", placeItems: "center", flexShrink: 0, fontSize: 14,
+                border: "0.5px solid var(--br2)"
+              }}>
+                <i className={`ti ${n.icon}`}></i>
+              </div>
+              
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 500, color: "var(--text)" }}>{n.title}</div>
+                <div style={{ fontSize: 11, color: "var(--t2)", marginTop: 2, lineHeight: 1.4 }}>{n.desc}</div>
+                <span style={{ fontSize: 9, color: "var(--t3)", display: "block", marginTop: 4 }}>{n.time}</span>
+              </div>
+
+              {/* Dismiss X button */}
+              <button 
+                className="dismiss-btn"
+                onClick={(e) => onDismiss(n.id, e)}
+                style={{ 
+                  background: "transparent", 
+                  border: "none", 
+                  color: "var(--t3)", 
+                  cursor: "pointer", 
+                  padding: "4px",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 20,
+                  height: 20,
+                  alignSelf: "center",
+                  opacity: 0,
+                  transition: "opacity 0.2s, background-color 0.15s, color 0.15s"
+                }}
+                onMouseEnter={(e) => {
+                  e.stopPropagation();
+                  e.currentTarget.style.background = "var(--bg2)";
+                  e.currentTarget.style.color = "#e05555";
+                }}
+                onMouseLeave={(e) => {
+                  e.stopPropagation();
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.color = "var(--t3)";
+                }}
+                title="ลบการแจ้งเตือน"
+              >
+                <i className="ti ti-x" style={{ fontSize: 10 }}></i>
+              </button>
             </div>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: 12, fontWeight: 500, color: "var(--text)" }}>{n.title}</div>
-              <div style={{ fontSize: 11, color: "var(--t2)", marginTop: 2, lineHeight: 1.4 }}>{n.desc}</div>
-              <span style={{ fontSize: 9, color: "var(--t3)", display: "block", marginTop: 4 }}>{n.time}</span>
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
 }
 
-function NotificationDrawer({ notifications, onClose, pushState, togglePushSubscription }) {
+function NotificationDrawer({ notifications, seenIds, markAsRead, onDismiss, onClose, pushState, togglePushSubscription, unreadCount, markAllAsRead }) {
   return (
     <div className="notification-drawer" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
       <div 
@@ -709,20 +810,28 @@ function NotificationDrawer({ notifications, onClose, pushState, togglePushSubsc
           <h3 style={{ fontSize: 15, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
             <i className="ti ti-bell" style={{ color: "var(--teal)" }}></i> การแจ้งเตือน
           </h3>
-          <button onClick={onClose} style={{
-            background: "var(--bg2)",
-            border: "none",
-            borderRadius: "50%",
-            width: 28,
-            height: 28,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "var(--t2)",
-            cursor: "pointer"
-          }}>
-            <i className="ti ti-x" style={{ fontSize: 14 }}></i>
-          </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {unreadCount > 0 && (
+              <button onClick={markAllAsRead} style={{
+                background: "transparent", border: "none", cursor: "pointer", color: "var(--teal)", fontSize: 12,
+                fontFamily: "'Prompt',sans-serif", fontWeight: 500
+              }}>อ่านทั้งหมด</button>
+            )}
+            <button onClick={onClose} style={{
+              background: "var(--bg2)",
+              border: "none",
+              borderRadius: "50%",
+              width: 28,
+              height: 28,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--t2)",
+              cursor: "pointer"
+            }}>
+              <i className="ti ti-x" style={{ fontSize: 14 }}></i>
+            </button>
+          </div>
         </div>
 
         {pushState && pushState.supported && (
@@ -758,36 +867,89 @@ function NotificationDrawer({ notifications, onClose, pushState, togglePushSubsc
         <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, overflowY: "auto" }}>
           {notifications.length === 0 ? (
             <div style={{ padding: "20px 10px", textAlign: "center", color: "var(--t3)", fontSize: 12 }}>ไม่มีการแจ้งเตือนในขณะนี้</div>
-          ) : notifications.map(n => (
-            <div
-              key={n.id}
-              onClick={() => { n.onClick(); onClose(); }}
-              style={{
-                padding: 12,
-                borderRadius: 10,
-                background: "var(--card)",
-                border: "0.5px solid var(--br2)",
-                cursor: "pointer",
-                display: "flex",
-                gap: 10,
-                alignItems: "flex-start",
-                textAlign: "left"
-              }}
-            >
-              <div style={{
-                width: 28, height: 28, borderRadius: 6,
-                background: "var(--bg2)", color: n.color || "var(--teal)",
-                display: "grid", placeItems: "center", flexShrink: 0, fontSize: 14
-              }}>
-                <i className={`ti ${n.icon}`}></i>
+          ) : notifications.map(n => {
+            const isUnread = !seenIds.includes(n.id)
+            return (
+              <div
+                key={n.id}
+                onClick={() => { markAsRead(n.id); n.onClick(); onClose(); }}
+                style={{
+                  padding: 12,
+                  borderRadius: 10,
+                  background: isUnread ? "rgba(45, 190, 160, 0.08)" : "var(--card)",
+                  border: isUnread ? "0.5px solid rgba(45, 190, 160, 0.2)" : "0.5px solid var(--br2)",
+                  cursor: "pointer",
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "flex-start",
+                  textAlign: "left",
+                  position: "relative"
+                }}
+              >
+                {/* Unread dot indicator */}
+                {isUnread && (
+                  <span style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: "var(--teal)",
+                    alignSelf: "center",
+                    marginRight: 2,
+                    flexShrink: 0
+                  }} />
+                )}
+                
+                <div style={{
+                  width: 28, height: 28, borderRadius: 6,
+                  background: "var(--bg2)", color: n.color || "var(--teal)",
+                  display: "grid", placeItems: "center", flexShrink: 0, fontSize: 14
+                }}>
+                  <i className={`ti ${n.icon}`}></i>
+                </div>
+                
+                <div style={{ minWidth: 0, flex: 1, paddingRight: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: "var(--text)" }}>{n.title}</div>
+                  <div style={{ fontSize: 11, color: "var(--t2)", marginTop: 2, lineHeight: 1.4 }}>{n.desc}</div>
+                  <span style={{ fontSize: 9, color: "var(--t3)", display: "block", marginTop: 4 }}>{n.time}</span>
+                </div>
+
+                {/* Dismiss X button */}
+                <button 
+                  onClick={(e) => onDismiss(n.id, e)}
+                  style={{ 
+                    background: "transparent", 
+                    border: "none", 
+                    color: "var(--t3)", 
+                    cursor: "pointer", 
+                    padding: "4px",
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 22,
+                    height: 22,
+                    position: "absolute",
+                    right: 8,
+                    top: "50%",
+                    transform: "translateY(-50%)"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.stopPropagation();
+                    e.currentTarget.style.background = "var(--bg2)";
+                    e.currentTarget.style.color = "#e05555";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.stopPropagation();
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.color = "var(--t3)";
+                  }}
+                  title="ลบการแจ้งเตือน"
+                >
+                  <i className="ti ti-x" style={{ fontSize: 10 }}></i>
+                </button>
               </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 500, color: "var(--text)" }}>{n.title}</div>
-                <div style={{ fontSize: 11, color: "var(--t2)", marginTop: 2, lineHeight: 1.4 }}>{n.desc}</div>
-                <span style={{ fontSize: 9, color: "var(--t3)", display: "block", marginTop: 4 }}>{n.time}</span>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>

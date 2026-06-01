@@ -75,6 +75,34 @@ export default function Quran({ initialSura, initialAyah, authState }) {
     setBenefitsExpanded(true)
   }, [selectedSura])
 
+  // Synchronize Quran selection (selectedSura and targetScrollAyah) with the browser URL query parameters
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    const isQuranPage = url.pathname === "/quran"
+    const isMemberQuran = url.pathname === "/member" && url.searchParams.get("view") === "quran"
+    
+    if (isQuranPage || isMemberQuran) {
+      const prevSura = url.searchParams.get("sura")
+      const prevAyah = url.searchParams.get("ayah")
+      
+      let changed = false
+      if (prevSura !== String(selectedSura)) {
+        url.searchParams.set("sura", selectedSura)
+        url.searchParams.delete("ayah") // Clear ayah on surah change
+        changed = true
+      }
+      
+      if (targetScrollAyah && prevAyah !== String(targetScrollAyah)) {
+        url.searchParams.set("ayah", targetScrollAyah)
+        changed = true
+      }
+      
+      if (changed) {
+        window.history.replaceState(window.history.state, "", url.pathname + url.search)
+      }
+    }
+  }, [selectedSura, targetScrollAyah])
+
   // Track window scroll for progress bar and scroll-to-top button
   useEffect(() => {
     const handleScroll = () => {

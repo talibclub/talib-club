@@ -29,7 +29,7 @@ function getSubscriptionId(endpoint) {
  * Gets the current notification permission and active subscription status
  */
 export async function getPushSubscriptionState() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || typeof Notification === 'undefined') {
     return { supported: false, permission: 'denied', subscribed: false };
   }
 
@@ -57,7 +57,7 @@ export async function getPushSubscriptionState() {
  * Requests notification permissions and registers the push subscription in Firestore
  */
 export async function subscribeToPushNotifications(userId = null, isStaff = false) {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || typeof Notification === 'undefined') {
     throw new Error('เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือนแบบพุช');
   }
 

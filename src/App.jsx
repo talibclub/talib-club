@@ -59,14 +59,31 @@ export default function App() {
         const path = window.location.pathname.replace(/^\//, "")
         const mapped = urlToPage[path] || "home"
         setPage(mapped)
-        setCtx(null)
+        
+        // Restore context from query parameters on browser history navigation
+        const params = new URLSearchParams(window.location.search)
+        const parsedCtx = {}
+        for (const [key, val] of params.entries()) {
+          parsedCtx[key] = val
+        }
+        setCtx(Object.keys(parsedCtx).length > 0 ? parsedCtx : null)
       }
     }
 
     const initialPath = window.location.pathname.replace(/^\//, "")
     const initialPage = urlToPage[initialPath] || "home"
-    window.history.replaceState({ page: initialPage, ctx: null }, "", window.location.pathname + window.location.search)
+    
+    // Restore context from query parameters on initial page load
+    const params = new URLSearchParams(window.location.search)
+    const initialCtx = {}
+    for (const [key, val] of params.entries()) {
+      initialCtx[key] = val
+    }
+    const finalCtx = Object.keys(initialCtx).length > 0 ? initialCtx : null
+
+    window.history.replaceState({ page: initialPage, ctx: finalCtx }, "", window.location.pathname + window.location.search)
     setPage(initialPage)
+    setCtx(finalCtx)
 
     window.addEventListener("popstate", handlePopstate)
     return () => window.removeEventListener("popstate", handlePopstate)
@@ -85,9 +102,18 @@ export default function App() {
       urlPath = "/" + p;
     }
     
-    // ฝัง ID ลงในลิงก์ URL อัตโนมัติ เพื่อให้แชร์ได้ 
-    if (data && data.id) {
-      urlPath += `?id=${data.id}`
+    // Embed context parameters automatically into the URL query string
+    if (data) {
+      const qParams = new URLSearchParams()
+      Object.entries(data).forEach(([key, val]) => {
+        if (val !== null && val !== undefined) {
+          qParams.set(key, val)
+        }
+      })
+      const queryString = qParams.toString()
+      if (queryString) {
+        urlPath += `?${queryString}`
+      }
     }
     
     window.history.pushState({ page: p, ctx: data }, "", urlPath);
@@ -114,7 +140,7 @@ export default function App() {
           {page === "scholars" && <Scholars />}
           {page === "quran" && (
             <RequireLogin authState={authState} go={go}>
-              <MemberDashboard authState={authState} go={go} initialView="quran" />
+              <MemberDashboard authState={authState} go={go} initialView="quran" ctx={ctx} />
             </RequireLogin>
           )}
           {page === "tracking" && <Tracking />}
@@ -122,7 +148,7 @@ export default function App() {
           
           {page === "member" && (
             <RequireLogin authState={authState} go={go}>
-              <MemberDashboard authState={authState} go={go} initialView={ctx?.view} />
+              <MemberDashboard authState={authState} go={go} initialView={ctx?.view} ctx={ctx} />
             </RequireLogin>
           )}
           {page === "staff" && (
