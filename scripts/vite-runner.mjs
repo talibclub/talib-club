@@ -1,12 +1,34 @@
 import react from "@vitejs/plugin-react"
 import { build, createServer, preview } from "vite"
+import path from "path"
 
 const command = process.argv[2] || "dev"
 
 const viteConfig = {
   root: process.cwd(),
-  configFile: false,
   plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(process.cwd(), "./src"),
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("firebase")) {
+              return "vendor-firebase"
+            }
+            if (id.includes("react") || id.includes("react-dom") || id.includes("scheduler")) {
+              return "vendor-react"
+            }
+            return "vendor-others"
+          }
+        }
+      }
+    }
+  }
 }
 
 if (command === "build") {
