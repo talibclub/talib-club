@@ -4,7 +4,7 @@ import { getFirestore } from "firebase/firestore"
 
 const defaultWebFirebaseConfig = {
   apiKey: "AIzaSyC8HoWaAu0XWy3he_pMxqUIWwREDPdeUpg",
-  authDomain: "talib-club-web.firebaseapp.com",
+  authDomain: "talibclub.org",
   projectId: "talib-club-web",
   storageBucket: "talib-club-web.firebasestorage.app",
   messagingSenderId: "300903382422",

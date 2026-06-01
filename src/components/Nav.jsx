@@ -305,6 +305,8 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
                 isStaff={authState.isStaff}
                 nav={nav}
                 logout={logout}
+                isInstallable={isInstallable}
+                installApp={installApp}
               />
             )}
           </div>
@@ -327,6 +329,8 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
           logout={logout}
           onClose={() => setAccountOpen(false)}
           page={page}
+          isInstallable={isInstallable}
+          installApp={installApp}
         />
       )}
 
@@ -366,7 +370,7 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
   )
 }
 
-function AccountDropdown({ name, email, photoURL, isStaff, nav, logout }) {
+function AccountDropdown({ name, email, photoURL, isStaff, nav, logout, isInstallable, installApp }) {
   return (
     <div style={{
       position: "absolute", right: 0, top: 42, width: 260,
@@ -392,6 +396,7 @@ function AccountDropdown({ name, email, photoURL, isStaff, nav, logout }) {
       <DropdownItem icon="ti-user-circle" label="โปรไฟล์ของฉัน" onClick={() => nav("member", { view: "profile" })} />
       {isStaff && <DropdownItem icon="ti-briefcase" label="Staff Workspace" onClick={() => nav("staff")} />}
       {isStaff && <DropdownItem icon="ti-shield-check" label="Admin Panel" onClick={() => nav("admin")} />}
+      {isInstallable && <DropdownItem icon="ti-download" label="ติดตั้งแอป Talib" onClick={installApp} />}
 
       <div style={{ borderTop: ".5px solid var(--br2)", marginTop: 6, paddingTop: 6 }}>
         <DropdownItem icon="ti-logout" label="ออกจากระบบ" danger onClick={logout} />
@@ -445,7 +450,7 @@ const iconButtonStyle = {
   color: "var(--text)",
 }
 
-function AccountDrawer({ name, email, photoURL, isStaff, nav, logout, onClose, page }) {
+function AccountDrawer({ name, email, photoURL, isStaff, nav, logout, onClose, page, isInstallable, installApp }) {
   return (
     <div className="account-drawer" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
       <div 
@@ -538,6 +543,12 @@ function AccountDrawer({ name, email, photoURL, isStaff, nav, logout, onClose, p
             <button onClick={() => { nav("admin"); onClose(); }} style={drawerItemStyle(page === "admin")}>
               <i className="ti ti-shield-check" style={{ marginRight: 15, fontSize: 18, color: "var(--teal)" }}></i>
               Admin Panel
+            </button>
+          )}
+          {isInstallable && (
+            <button onClick={() => { installApp(); onClose(); }} style={drawerItemStyle(false)}>
+              <i className="ti ti-download" style={{ marginRight: 15, fontSize: 18, color: "var(--teal)" }}></i>
+              ติดตั้งแอปพลิเคชัน
             </button>
           )}
           <div style={{ borderTop: "1px solid var(--br2)", marginTop: 15, paddingTop: 15 }}>

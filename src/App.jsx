@@ -1,25 +1,27 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, lazy, Suspense } from "react"
 import { useTheme } from "./hooks/useTheme.js"
 import { useAuth } from "./hooks/useAuth.js"
 import Nav from "./components/Nav.jsx"
-import Home from "./pages/Home.jsx"
-import Articles from "./pages/Articles.jsx"
-import ArticleDetail from "./pages/ArticleDetail.jsx"
-import Library from "./pages/Library.jsx"
-import LibraryDetail from "./pages/LibraryDetail.jsx"
-import Media from "./pages/Media.jsx"
-import MediaDetail from "./pages/MediaDetail.jsx"
-import Scholars from "./pages/Scholars.jsx"
-import Quran from "./pages/Quran.jsx"
-import Tracking from "./pages/Tracking.jsx"
-import Auth from "./pages/Auth.jsx"
-import MemberDashboard from "./pages/MemberDashboard.jsx"
-import StaffDashboard from "./pages/StaffDashboard.jsx"
-import StaffWork from "./pages/StaffWork.jsx"
-import StaffTranslation from "./pages/StaffTranslation.jsx"
-import Admin from "./pages/Admin.jsx"
-import Donation from "./pages/Donation.jsx"
+
+const Home = lazy(() => import("./pages/Home.jsx"))
+const Articles = lazy(() => import("./pages/Articles.jsx"))
+const ArticleDetail = lazy(() => import("./pages/ArticleDetail.jsx"))
+const Library = lazy(() => import("./pages/Library.jsx"))
+const LibraryDetail = lazy(() => import("./pages/LibraryDetail.jsx"))
+const Media = lazy(() => import("./pages/Media.jsx"))
+const MediaDetail = lazy(() => import("./pages/MediaDetail.jsx"))
+const Scholars = lazy(() => import("./pages/Scholars.jsx"))
+const Quran = lazy(() => import("./pages/Quran.jsx"))
+const Tracking = lazy(() => import("./pages/Tracking.jsx"))
+const Auth = lazy(() => import("./pages/Auth.jsx"))
+const MemberDashboard = lazy(() => import("./pages/MemberDashboard.jsx"))
+const StaffDashboard = lazy(() => import("./pages/StaffDashboard.jsx"))
+const StaffWork = lazy(() => import("./pages/StaffWork.jsx"))
+const StaffTranslation = lazy(() => import("./pages/StaffTranslation.jsx"))
+const Admin = lazy(() => import("./pages/Admin.jsx"))
+const Donation = lazy(() => import("./pages/Donation.jsx"))
 import { Toaster } from "react-hot-toast"
+import PWAInstallBanner from "./components/PWAInstallBanner.jsx"
 import "./styles/global.css"
 
 export default function App() {
@@ -97,53 +99,56 @@ export default function App() {
       
       <Nav page={page} go={go} theme={theme} setTheme={setTheme} authState={authState} />
       <main className={`${page === "quran" || page === "member" ? "wide" : ""} fade-in-active`} key={page}>
-        {page === "home" && <Home go={go} />}
-        {page === "articles" && <Articles go={go} authState={authState} ctx={ctx} />}      
-        {page === "article" && <ArticleDetail item={ctx} go={go} authState={authState} />}
-        {page === "library" && <Library go={go} authState={authState} />}
-        {page === "library-detail" && (
-          <RequireLogin authState={authState} go={go}>
-            <LibraryDetail item={ctx} go={go} authState={authState} />
-          </RequireLogin>
-        )}
-        {page === "media" && <Media go={go} />}
-        {page === "media-detail" && <MediaDetail item={ctx} go={go} authState={authState} />}
-        {page === "scholars" && <Scholars />}
-        {page === "quran" && (
-          <RequireLogin authState={authState} go={go}>
-            <MemberDashboard authState={authState} go={go} initialView="quran" />
-          </RequireLogin>
-        )}
-        {page === "tracking" && <Tracking />}
-        {page === "auth" && <Auth authState={authState} go={go} />}
-        
-        {page === "member" && (
-          <RequireLogin authState={authState} go={go}>
-            <MemberDashboard authState={authState} go={go} initialView={ctx?.view} />
-          </RequireLogin>
-        )}
-        {page === "staff" && (
-          <RequireLogin authState={authState} go={go}>
-            <StaffDashboard authState={authState} go={go} />
-          </RequireLogin>
-        )}
-        {page === "staff-work" && (
-          <RequireStaff authState={authState} go={go}>
-            <StaffWork authState={authState} go={go} />
-          </RequireStaff>
-        )}
-        {page === "staff-translation" && (
-          <RequireStaff authState={authState} go={go}>
-            <StaffTranslation authState={authState} go={go} />
-          </RequireStaff>
-        )}
-        {page === "admin" && (
-          <RequireStaff authState={authState} go={go}>
-            <Admin go={go} authState={authState} initialTab={ctx?.tab} />
-          </RequireStaff>
-        )}
-       {page === "donate" && <Donation />}
+        <Suspense fallback={<LoadingState />}>
+          {page === "home" && <Home go={go} />}
+          {page === "articles" && <Articles go={go} authState={authState} ctx={ctx} />}      
+          {page === "article" && <ArticleDetail item={ctx} go={go} authState={authState} />}
+          {page === "library" && <Library go={go} authState={authState} />}
+          {page === "library-detail" && (
+            <RequireLogin authState={authState} go={go}>
+              <LibraryDetail item={ctx} go={go} authState={authState} />
+            </RequireLogin>
+          )}
+          {page === "media" && <Media go={go} />}
+          {page === "media-detail" && <MediaDetail item={ctx} go={go} authState={authState} />}
+          {page === "scholars" && <Scholars />}
+          {page === "quran" && (
+            <RequireLogin authState={authState} go={go}>
+              <MemberDashboard authState={authState} go={go} initialView="quran" />
+            </RequireLogin>
+          )}
+          {page === "tracking" && <Tracking />}
+          {page === "auth" && <Auth authState={authState} go={go} />}
+          
+          {page === "member" && (
+            <RequireLogin authState={authState} go={go}>
+              <MemberDashboard authState={authState} go={go} initialView={ctx?.view} />
+            </RequireLogin>
+          )}
+          {page === "staff" && (
+            <RequireLogin authState={authState} go={go}>
+              <StaffDashboard authState={authState} go={go} />
+            </RequireLogin>
+          )}
+          {page === "staff-work" && (
+            <RequireStaff authState={authState} go={go}>
+              <StaffWork authState={authState} go={go} />
+            </RequireStaff>
+          )}
+          {page === "staff-translation" && (
+            <RequireStaff authState={authState} go={go}>
+              <StaffTranslation authState={authState} go={go} />
+            </RequireStaff>
+          )}
+          {page === "admin" && (
+            <RequireStaff authState={authState} go={go}>
+              <Admin go={go} authState={authState} initialTab={ctx?.tab} />
+            </RequireStaff>
+          )}
+          {page === "donate" && <Donation />}
+        </Suspense>
       </main>
+      <PWAInstallBanner />
     </div>
   )
 }
