@@ -139,7 +139,15 @@ export default function ArticleDetail({ item, go, authState }) {
 
   return (
     <div className="article-page" style={{ maxWidth: 720, margin: "0 auto" }}>
-      <button className="btn btn-outline" onClick={() => go("articles")} style={{ marginBottom: 24, padding: "6px 14px", fontSize: 12 }}>
+      <button className="btn btn-outline" onClick={() => {
+        if (displayItem?.fromFilters) {
+          go("articles", displayItem.fromFilters)
+        } else if (item?.fromFilters) {
+          go("articles", item.fromFilters)
+        } else {
+          go("articles")
+        }
+      }} style={{ marginBottom: 24, padding: "6px 14px", fontSize: 12 }}>
         <i className="ti ti-arrow-left" style={{ marginRight: 6, fontSize: 12 }}></i>กลับหน้าบทความ
       </button>
 
@@ -173,6 +181,16 @@ export default function ArticleDetail({ item, go, authState }) {
           {isSaved ? "บันทึกแล้ว" : "บันทึกไว้อ่าน"}
         </button>
       </div>
+
+      {displayItem.coverUrl && (
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 28, width: "100%" }}>
+          <img 
+            src={displayItem.coverUrl} 
+            alt={displayItem.title} 
+            style={{ maxWidth: "100%", maxHeight: 420, borderRadius: 12, boxShadow: "0 10px 25px rgba(0,0,0,0.1)", objectFit: "contain", border: ".5px solid var(--br2)" }} 
+          />
+        </div>
+      )}
 
       <div className="reader-tools" aria-label="ตัวเลือกการอ่าน">
         <div className="reader-control" aria-label="ขนาดตัวอักษร">

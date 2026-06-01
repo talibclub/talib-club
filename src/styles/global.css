@@ -129,7 +129,7 @@ input[type="range"]{accent-color:var(--teal);padding:0;box-shadow:none}
 .reader-btn.on{background:var(--teal);color:#fff}
 .article-excerpt{background:var(--teal-bg);border:.5px solid rgba(15,110,86,.22);border-radius:12px;padding:15px 18px;margin-bottom:30px; min-width: 0; width: 100%;}
 .article-excerpt p{color:var(--teal);font-weight:500;font-size:13px;line-height:1.75}
-.article-body{font-size:16px;line-height:2;color:var(--text);font-weight:400}
+.article-body{font-size:16px;line-height:2;color:var(--text);font-weight:400;white-space:pre-line}
 .article-body p{margin-bottom:22px;color:inherit;font-size:inherit;font-weight:inherit;line-height:inherit}
 .reader-size-sm{font-size:14.5px}
 .reader-size-md{font-size:16px}
