@@ -47,16 +47,37 @@ export default function AdminLibrary() {
     return matchSearch && matchType && matchCat && matchSource
   })
 
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
-  const currentItems = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+  const sorted = [...filtered].sort((a, b) => {
+    const getMs = (val) => {
+      if (!val) return 0
+      if (typeof val.toDate === "function") return val.toDate().getTime()
+      if (val.seconds) return val.seconds * 1000
+      if (typeof val === "number") return val
+      const parsed = Date.parse(val)
+      return isNaN(parsed) ? 0 : parsed
+    }
+    const timeA = getMs(a.createdAt || a.updatedAt)
+    const timeB = getMs(b.createdAt || b.updatedAt)
+    if (timeA || timeB) {
+      if (timeA && timeB) return timeB - timeA
+      return timeA ? -1 : 1
+    }
+    const yearA = Number(a.year) || 0
+    const yearB = Number(b.year) || 0
+    if (yearA !== yearB) return yearB - yearA
+    return String(b.id || "").localeCompare(String(a.id || ""))
+  })
+
+  const totalPages = Math.ceil(sorted.length / ITEMS_PER_PAGE)
+  const currentItems = sorted.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
 
   const toggleSelect = (id) => {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
   
   const toggleAll = () => {
-    if (selected.length === filtered.length) setSelected([])
-    else setSelected(filtered.map(b => b.id))
+    if (selected.length === sorted.length) setSelected([])
+    else setSelected(sorted.map(b => b.id))
   }
 
   function openNew() {
@@ -124,7 +145,7 @@ export default function AdminLibrary() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
         <div style={{ flex: 1 }}>
-          <h2 style={{ minWidth: 150 }}>หนังสือและ PDF <span style={{ fontSize: 12, color: "var(--t3)" }}>({filtered.length} รายการ)</span></h2>
+          <h2 style={{ minWidth: 150 }}>หนังสือและ PDF <span style={{ fontSize: 12, color: "var(--t3)" }}>({sorted.length} รายการ)</span></h2>
           <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>
             หนังสือ วารสาร และสื่อดาวน์โหลดทั้งหมดของ Talib Club {totalPages > 0 && `(หน้า ${page}/${totalPages})`}
           </p>
@@ -195,11 +216,11 @@ export default function AdminLibrary() {
         </div>
       )}
 
-      {filtered.length > 0 && (
+      {sorted.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", padding: "0 16px", marginBottom: 10, opacity: busy ? 0.6 : 1 }}>
           <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: busy ? "not-allowed" : "pointer", fontSize: 12, color: "var(--t2)" }}>
-            <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0} onChange={toggleAll} disabled={busy} style={{ width: 16, height: 16, cursor: busy ? "not-allowed" : "pointer" }} />
-            เลือกทั้งหมด {filtered.length} รายการที่ค้นเจอ
+            <input type="checkbox" checked={selected.length === sorted.length && sorted.length > 0} onChange={toggleAll} disabled={busy} style={{ width: 16, height: 16, cursor: busy ? "not-allowed" : "pointer" }} />
+            เลือกทั้งหมด {sorted.length} รายการที่ค้นเจอ
           </label>
         </div>
       )}

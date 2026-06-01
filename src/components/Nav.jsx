@@ -4,6 +4,8 @@ import toast from "react-hot-toast"
 import { confirmAction } from "../utils/feedback.jsx"
 import { useContentCollection } from "../lib/contentStore.js"
 import { ARTICLES, BOOKS } from "../data/index.js"
+import { usePWA } from "../hooks/usePWA.js"
+
 
 const NAV_LINKS = [
   { id: "home", label: "หน้าหลัก", icon: "ti-home" },
@@ -22,8 +24,17 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
   const accountRef = useRef(null)
   const notificationRef = useRef(null)
 
+  const {
+    isInstallable,
+    isInstalled,
+    installApp,
+    pushState,
+    togglePushSubscription
+  } = usePWA(authState?.user, authState?.isStaff)
+
   const { items: articles } = useContentCollection("articles", ARTICLES)
   const { items: books } = useContentCollection("books", BOOKS)
+
 
   const notifications = useMemo(() => {
     const list = []
@@ -249,6 +260,8 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
                 <NotificationDropdown
                   notifications={notifications}
                   onClose={() => setNotificationOpen(false)}
+                  pushState={pushState}
+                  togglePushSubscription={togglePushSubscription}
                 />
               )}
             </div>
@@ -295,6 +308,17 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
               />
             )}
           </div>
+          {isInstallable && (
+            <button onClick={installApp} style={{
+              background: "var(--teal)", border: "none", cursor: "pointer",
+              color: "#fff", padding: "6px 12px", borderRadius: 20,
+              display: "flex", alignItems: "center", gap: "6px",
+              fontFamily: "'Prompt', sans-serif", fontSize: "12px", fontWeight: 500,
+            }} title="ติดตั้งแอปบนอุปกรณ์นี้">
+              <i className="ti ti-download" style={{ fontSize: 14 }}></i>
+              <span>ติดตั้งแอป</span>
+            </button>
+          )}
           <button onClick={() => setTheme(theme === "light" ? "dark" : "light")} style={{
             background: "var(--bg2)", border: "none", cursor: "pointer",
             color: "var(--t3)", padding: "6px 10px", borderRadius: 20,
@@ -321,6 +345,8 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
         <NotificationDrawer
           notifications={notifications}
           onClose={() => setNotificationOpen(false)}
+          pushState={pushState}
+          togglePushSubscription={togglePushSubscription}
         />
       )}
 
@@ -340,10 +366,24 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
                 {l.label}
               </button>
             ))}
-            <button onClick={() => nav(authState?.user ? "member" : "auth")} style={mobileButtonStyle(page, authState?.user ? "member" : "auth")}>
+             <button onClick={() => nav(authState?.user ? "member" : "auth")} style={mobileButtonStyle(page, authState?.user ? "member" : "auth")}>
               <i className={`ti ${authState?.user ? "ti-user-circle" : "ti-login"}`} style={{ marginRight: 15 }}></i>
               {authState?.user ? "บัญชีของฉัน" : "เข้าสู่ระบบ"}
             </button>
+            {isInstallable && (
+              <div style={{ borderTop: "1px solid var(--br2)", marginTop: 15, paddingTop: 15 }}>
+                <button onClick={() => { installApp(); setMenuOpen(false); }} style={{
+                  ...mobileButtonStyle(page, ""),
+                  color: "var(--teal)",
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                }}>
+                  <i className="ti ti-download" style={{ marginRight: 15, fontSize: 18 }}></i>
+                  ติดตั้งแอปพลิเคชัน
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -554,7 +594,7 @@ function drawerItemStyle(active, danger) {
   }
 }
 
-function NotificationDropdown({ notifications, onClose }) {
+function NotificationDropdown({ notifications, onClose, pushState, togglePushSubscription }) {
   return (
     <div style={{
       position: "absolute", right: 0, top: 42, width: 320,
@@ -573,8 +613,40 @@ function NotificationDropdown({ notifications, onClose }) {
         }}>ปิด</button>
       </div>
 
+      {pushState && pushState.supported && (
+        <div style={{
+          background: "var(--bg2)", padding: "10px 12px", borderRadius: 10,
+          marginBottom: 10, border: "0.5px solid var(--br2)",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 8
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text)" }}>
+            <i className={`ti ${pushState.subscribed ? "ti-bell-ringing" : "ti-bell-off"}`} style={{ color: pushState.subscribed ? "var(--teal)" : "var(--t3)", fontSize: 16 }}></i>
+            <span style={{ fontSize: 11, fontWeight: 500 }}>รับการแจ้งเตือนบนเครื่องนี้</span>
+          </div>
+          <button 
+            onClick={togglePushSubscription}
+            style={{
+              padding: "4px 8px",
+              borderRadius: 6,
+              border: "none",
+              background: pushState.subscribed ? "var(--teal-bg)" : "var(--bg3)",
+              color: pushState.subscribed ? "var(--teal)" : "var(--t2)",
+              fontSize: 10,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "'Prompt', sans-serif"
+            }}
+          >
+            {pushState.subscribed ? 'เปิดอยู่' : 'ปิดอยู่'}
+          </button>
+        </div>
+      )}
+
       <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 320, overflowY: "auto", paddingRight: 2 }}>
-        {notifications.map(n => (
+        {notifications.length === 0 ? (
+          <div style={{ padding: "20px 10px", textAlign: "center", color: "var(--t3)", fontSize: 12 }}>ไม่มีการแจ้งเตือนในขณะนี้</div>
+        ) : notifications.map(n => (
           <div
             key={n.id}
             onClick={() => { n.onClick(); onClose(); }}
@@ -618,7 +690,7 @@ function NotificationDropdown({ notifications, onClose }) {
   )
 }
 
-function NotificationDrawer({ notifications, onClose }) {
+function NotificationDrawer({ notifications, onClose, pushState, togglePushSubscription }) {
   return (
     <div className="notification-drawer" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
       <div 
@@ -666,8 +738,41 @@ function NotificationDrawer({ notifications, onClose }) {
             <i className="ti ti-x" style={{ fontSize: 14 }}></i>
           </button>
         </div>
+
+        {pushState && pushState.supported && (
+          <div style={{
+            background: "var(--bg2)", padding: "10px 12px", borderRadius: 10,
+            border: "0.5px solid var(--br2)",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            gap: 8
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text)" }}>
+              <i className={`ti ${pushState.subscribed ? "ti-bell-ringing" : "ti-bell-off"}`} style={{ color: pushState.subscribed ? "var(--teal)" : "var(--t3)", fontSize: 16 }}></i>
+              <span style={{ fontSize: 11, fontWeight: 500 }}>รับการแจ้งเตือนบนเครื่องนี้</span>
+            </div>
+            <button 
+              onClick={togglePushSubscription}
+              style={{
+                padding: "4px 8px",
+                borderRadius: 6,
+                border: "none",
+                background: pushState.subscribed ? "var(--teal-bg)" : "var(--bg3)",
+                color: pushState.subscribed ? "var(--teal)" : "var(--t2)",
+                fontSize: 10,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "'Prompt', sans-serif"
+              }}
+            >
+              {pushState.subscribed ? 'เปิดอยู่' : 'ปิดอยู่'}
+            </button>
+          </div>
+        )}
+
         <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, overflowY: "auto" }}>
-          {notifications.map(n => (
+          {notifications.length === 0 ? (
+            <div style={{ padding: "20px 10px", textAlign: "center", color: "var(--t3)", fontSize: 12 }}>ไม่มีการแจ้งเตือนในขณะนี้</div>
+          ) : notifications.map(n => (
             <div
               key={n.id}
               onClick={() => { n.onClick(); onClose(); }}
