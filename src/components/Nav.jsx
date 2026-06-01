@@ -308,17 +308,6 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
               />
             )}
           </div>
-          {isInstallable && (
-            <button onClick={installApp} style={{
-              background: "var(--teal)", border: "none", cursor: "pointer",
-              color: "#fff", padding: "6px 12px", borderRadius: 20,
-              display: "flex", alignItems: "center", gap: "6px",
-              fontFamily: "'Prompt', sans-serif", fontSize: "12px", fontWeight: 500,
-            }} title="ติดตั้งแอปบนอุปกรณ์นี้">
-              <i className="ti ti-download" style={{ fontSize: 14 }}></i>
-              <span>ติดตั้งแอป</span>
-            </button>
-          )}
           <button onClick={() => setTheme(theme === "light" ? "dark" : "light")} style={{
             background: "var(--bg2)", border: "none", cursor: "pointer",
             color: "var(--t3)", padding: "6px 10px", borderRadius: 20,
@@ -370,20 +359,6 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
               <i className={`ti ${authState?.user ? "ti-user-circle" : "ti-login"}`} style={{ marginRight: 15 }}></i>
               {authState?.user ? "บัญชีของฉัน" : "เข้าสู่ระบบ"}
             </button>
-            {isInstallable && (
-              <div style={{ borderTop: "1px solid var(--br2)", marginTop: 15, paddingTop: 15 }}>
-                <button onClick={() => { installApp(); setMenuOpen(false); }} style={{
-                  ...mobileButtonStyle(page, ""),
-                  color: "var(--teal)",
-                  fontWeight: 600,
-                  display: "flex",
-                  alignItems: "center",
-                }}>
-                  <i className="ti ti-download" style={{ marginRight: 15, fontSize: 18 }}></i>
-                  ติดตั้งแอปพลิเคชัน
-                </button>
-              </div>
-            )}
           </div>
         </div>
       )}
