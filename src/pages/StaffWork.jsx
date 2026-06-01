@@ -74,7 +74,7 @@ export default function StaffWork({ authState, go }) {
 
   // Dynamic Data States
   const [staffTeam, setStaffTeam] = useState(DEFAULT_STAFF)
-  const [magazineQueue, setMagazineQueue] = useState(DEFAULT_MAGAZINE)
+  const [magazineQueue, setMagazineQueue] = useState([])
   const [newStaffName, setNewStaffName] = useState("")
 
   // Form State (แยกหน้าที่ชัดเจน)
@@ -112,7 +112,11 @@ export default function StaffWork({ authState, go }) {
     })
 
     const unsubMag = onSnapshot(doc(db, "settings", "magazine"), (docSnap) => {
-      if (docSnap.exists() && docSnap.data().queue) setMagazineQueue(docSnap.data().queue)
+      if (docSnap.exists() && docSnap.data().queue) {
+        setMagazineQueue(docSnap.data().queue)
+      } else {
+        setMagazineQueue(DEFAULT_MAGAZINE)
+      }
     })
 
     return () => { unsubSubs(); unsubStaff(); unsubMag(); }

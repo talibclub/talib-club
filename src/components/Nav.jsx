@@ -123,6 +123,9 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
 
   useEffect(() => {
     function closeDropdowns(e) {
+      if (e.target.closest(".account-drawer") || e.target.closest(".notification-drawer")) {
+        return
+      }
       if (accountRef.current && !accountRef.current.contains(e.target)) setAccountOpen(false)
       if (notificationRef.current && !notificationRef.current.contains(e.target)) setNotificationOpen(false)
     }
@@ -429,7 +432,7 @@ const iconButtonStyle = {
 
 function AccountDrawer({ name, email, photoURL, isStaff, nav, logout, onClose, page }) {
   return (
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
+    <div className="account-drawer" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
       <div 
         onClick={onClose} 
         style={{
@@ -617,7 +620,7 @@ function NotificationDropdown({ notifications, onClose }) {
 
 function NotificationDrawer({ notifications, onClose }) {
   return (
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
+    <div className="notification-drawer" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
       <div 
         onClick={onClose} 
         style={{
