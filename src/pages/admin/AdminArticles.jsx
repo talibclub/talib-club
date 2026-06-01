@@ -2,6 +2,8 @@ import { useState, useEffect } from "react"
 import { ARTICLES, DEFAULT_TAXONOMY } from "../../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage"
+import { storage } from "../../lib/firebase.js"
 
 const EMPTY = {
   type: "general",
@@ -15,6 +17,8 @@ const EMPTY = {
   date: new Date().toISOString().slice(0, 10),
   tags: [],
   body: "",
+  coverUrl: "",
+  coverEmoji: "📖",
 }
 
 export default function AdminArticles() {
@@ -87,7 +91,6 @@ export default function AdminArticles() {
 
     const payload = { ...editing, part: editing.type === "series" && editing.part ? Number(editing.part) : null }
     delete payload.readTime;
-    delete payload.coverEmoji;
 
     setBusy(true)
     try {
@@ -377,6 +380,27 @@ export default function AdminArticles() {
 
 function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
   const set = (key, value) => setItem(prev => ({ ...prev, [key]: value }))
+  const [uploadingImage, setUploadingImage] = useState(false)
+
+  const handleUploadImage = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadingImage(true)
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
+      const storageRef = ref(storage, `article_covers/${Date.now()}_${safeName}`)
+      await uploadBytes(storageRef, file)
+      const url = await getDownloadURL(storageRef)
+      set("coverUrl", url)
+      notifySuccess("อัปโหลดรูปภาพปกเรียบร้อยแล้ว")
+    } catch (err) {
+      console.error(err)
+      notifyError("อัปโหลดรูปภาพล้มเหลว")
+    } finally {
+      setUploadingImage(false)
+    }
+  }
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -409,6 +433,64 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
         {item.type === "specific" && <Field label="ชื่อหัวข้อย่อย" span><input value={item.seriesName || ""} onChange={e => set("seriesName", e.target.value)} /></Field>}
         <Field label="ผู้เขียน"><input value={item.author || ""} onChange={e => set("author", e.target.value)} /></Field>
         <Field label="วันที่เผยแพร่"><input type="date" value={item.date || ""} onChange={e => set("date", e.target.value)} /></Field>
+
+        <Field label="รูปภาพปกบทความ (URL)" span>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <input 
+              value={item.coverUrl || ""} 
+              onChange={e => set("coverUrl", e.target.value)} 
+              placeholder="https://example.com/image.jpg หรืออัปโหลดไฟล์..." 
+              style={{ flex: 1 }}
+            />
+            <label className="btn btn-outline" style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", flexShrink: 0, padding: "10px 16px" }}>
+              <i className={uploadingImage ? "ti ti-loader-2 spin" : "ti ti-upload"}></i>
+              {uploadingImage ? "กำลังอัปโหลด..." : "อัปโหลดรูปภาพ"}
+              <input type="file" accept="image/*" onChange={handleUploadImage} disabled={uploadingImage} style={{ display: "none" }} />
+            </label>
+          </div>
+          {item.coverUrl && (
+            <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ position: "relative", width: 120, height: 75, borderRadius: 8, overflow: "hidden", border: "1px solid var(--br2)", flexShrink: 0 }}>
+                <img src={item.coverUrl} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <button 
+                  type="button" 
+                  onClick={() => set("coverUrl", "")} 
+                  style={{ 
+                    position: "absolute", 
+                    top: 4, 
+                    right: 4, 
+                    background: "rgba(0,0,0,0.6)", 
+                    color: "#fff", 
+                    border: "none", 
+                    borderRadius: "50%", 
+                    width: 20, 
+                    height: 20, 
+                    display: "flex", 
+                    alignItems: "center", 
+                    justifyContent: "center", 
+                    cursor: "pointer", 
+                    fontSize: 10 
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+              <span style={{ fontSize: 12, color: "var(--t3)" }}>ตัวอย่างรูปภาพปก</span>
+            </div>
+          )}
+        </Field>
+
+        <Field label="อิโมจิประดับการ์ด (coverEmoji - แสดงผลเมื่อไม่มีรูปภาพปก)">
+          <input 
+            value={item.coverEmoji || ""} 
+            onChange={e => set("coverEmoji", e.target.value)} 
+            placeholder="📖" 
+            maxLength={4}
+          />
+        </Field>
+        
+        <div />
+
         <Field label="บทคัดย่อ (แสดงหน้าการ์ด)" span><textarea value={item.excerpt || ""} onChange={e => set("excerpt", e.target.value)} rows={2} placeholder="เนื้อหาสรุปสั้นๆ..." /></Field>
         <Field label="Tags (คั่นด้วยลูกน้ำ ,)" span><input value={(item.tags || []).join(", ")} onChange={e => set("tags", e.target.value.split(",").map(tag => tag.trim()).filter(Boolean))} placeholder="เช่น ฟิกฮ์, อะกีดะฮ์" /></Field>
         <Field label="เนื้อหาบทความแบบเต็ม" span><textarea value={item.body || ""} onChange={e => set("body", e.target.value)} rows={12} placeholder="พิมพ์เนื้อหาที่นี่..." style={{ lineHeight: 1.6 }} /></Field>
