@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react"
+import { createPortal } from "react-dom"
 import toast from "react-hot-toast"
 import { BOOKS, DEFAULT_TAXONOMY } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
@@ -586,7 +587,7 @@ export default function ReadingApp({ authState, go, ctx }) {
 
   if (activeBook) {
     // --- Focused Reading Room View (Full-Bleed Overlay App Interface) ---
-    return (
+    return createPortal(
       <div style={{
         position: "fixed",
         inset: 0,
@@ -751,7 +752,8 @@ export default function ReadingApp({ authState, go, ctx }) {
             </button>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     )
   }
 
