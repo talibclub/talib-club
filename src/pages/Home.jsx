@@ -54,9 +54,9 @@ const SURAH_NAMES = {
 }
 
 export default function Home({ go }) {
-  const { items: articles } = useContentCollection("articles", ARTICLES)
-  const { items: books } = useContentCollection("books", BOOKS)
-  const { items: media } = useContentCollection("media", MEDIA)
+  const { items: articles, loading: loadingArticles } = useContentCollection("articles", ARTICLES)
+  const { items: books, loading: loadingBooks } = useContentCollection("books", BOOKS)
+  const { items: media, loading: loadingMedia } = useContentCollection("media", MEDIA)
   const { site } = useSiteSettings(SITE)
   const recent     = articles.slice(0, 3)
   const newBooks   = books.slice(0, 4)
@@ -199,29 +199,57 @@ export default function Home({ go }) {
           <span className="sec-title">บทความล่าสุด</span>
           <button className="sec-link" onClick={() => go("articles")}>ดูทั้งหมด →</button>
         </div>
-        <div className="grid-art">
-          {recent.map(a => (
-            <div key={a.id} className="card" style={{ cursor: "pointer" }}
-              onClick={() => go("article", a)}>
-              <div style={{ padding: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                  <span className="tag tag-teal">{a.category}</span>
+        {loadingArticles ? (
+          <div className="grid-art">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="card" style={{ padding: 16, height: 280, display: "flex", flexDirection: "column", justifyContent: "space-between", opacity: 0.6 }}>
+                <div style={{ width: "100%", height: 140, background: "var(--bg3)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <i className="ti ti-loader-2 spin" style={{ fontSize: 24, color: "var(--teal)" }}></i>
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", lineHeight: 1.45, marginBottom: 8 }}>
-                  {a.title}
+                <div style={{ flex: 1, marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ height: 14, background: "var(--bg3)", width: "40%", borderRadius: 4 }}></div>
+                  <div style={{ height: 18, background: "var(--bg3)", width: "90%", borderRadius: 4 }}></div>
+                  <div style={{ height: 14, background: "var(--bg3)", width: "70%", borderRadius: 4 }}></div>
                 </div>
-                <p style={{ fontSize: 12, marginBottom: 10, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                  {a.excerpt}
-                </p>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>
-                    {a.author} · {a.date}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid-art">
+            {recent.map(a => (
+              <div key={a.id} className="card" style={{ cursor: "pointer", overflow: "hidden", display: "flex", flexDirection: "column" }}
+                onClick={() => go("article", a)}>
+                {a.coverUrl ? (
+                  <div style={{ width: "100%", height: 140, overflow: "hidden", borderBottom: ".5px solid var(--br2)" }}>
+                    <img src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </div>
+                ) : (
+                  <div style={{ width: "100%", height: 140, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: ".5px solid var(--br2)" }}>
+                    <span style={{ fontSize: 36 }}>{a.coverEmoji || "📖"}</span>
+                  </div>
+                )}
+                <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                      <span className="tag tag-teal" style={{ fontSize: 10 }}>{a.category}</span>
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", lineHeight: 1.45, marginBottom: 6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                      {a.title}
+                    </div>
+                    <p style={{ fontSize: 12, marginBottom: 8, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", color: "var(--t2)" }}>
+                      {a.excerpt}
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" }}>
+                    <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>
+                      {a.author} · {a.date}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* MEDIA + LIBRARY */}
@@ -232,28 +260,44 @@ export default function Home({ go }) {
             <span className="sec-title">มีเดียล่าสุด</span>
             <button className="sec-link" onClick={() => go("media")}>ดูทั้งหมด →</button>
           </div>
-          <div className="flex-col">
-            {recentMedia.map(m => (
-              <div key={m.id} className="card" style={{ padding:"11px 14px", display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}
-                onClick={() => go("media")}>
-                <div style={{
-                  width:32, height:32, borderRadius:"50%", background:"var(--acc2)",
-                  border:".5px solid var(--acc-br)", display:"flex", alignItems:"center",
-                  justifyContent:"center", flexShrink:0,
-                }}>
-                  <i className={`ti ${m.type==="youtube" ? "ti-brand-youtube" : "ti-brand-spotify"}`}
-                    style={{ fontSize:14, color: m.type==="youtube" ? "#ff4444" : "#1ed760" }}></i>
-                </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:12, fontWeight:500, color:"var(--text)",
-                    whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{m.title}</div>
-                  <div style={{ fontSize:10, color:"var(--t3)", fontWeight:300, marginTop:2 }}>
-                    {m.series} · {m.duration}
+          {loadingMedia ? (
+            <div className="flex-col">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="card" style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 10, opacity: 0.6 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--bg3)", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                    <i className="ti ti-loader-2 spin" style={{ fontSize: 14, color: "var(--teal)" }}></i>
+                  </div>
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ height: 12, background: "var(--bg3)", width: "70%", borderRadius: 4 }}></div>
+                    <div style={{ height: 10, background: "var(--bg3)", width: "40%", borderRadius: 4 }}></div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex-col">
+              {recentMedia.map(m => (
+                <div key={m.id} className="card" style={{ padding:"11px 14px", display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}
+                  onClick={() => go("media")}>
+                  <div style={{
+                    width:32, height:32, borderRadius:"50%", background:"var(--acc2)",
+                    border:".5px solid var(--acc-br)", display:"flex", alignItems:"center",
+                    justifyContent:"center", flexShrink:0,
+                  }}>
+                    <i className={`ti ${m.type==="youtube" ? "ti-brand-youtube" : "ti-brand-spotify"}`}
+                      style={{ fontSize:14, color: m.type==="youtube" ? "#ff4444" : "#1ed760" }}></i>
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:12, fontWeight:500, color:"var(--text)",
+                      whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{m.title}</div>
+                    <div style={{ fontSize:10, color:"var(--t3)", fontWeight:300, marginTop:2 }}>
+                      {m.series} · {m.duration}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Library */}
@@ -262,24 +306,42 @@ export default function Home({ go }) {
             <span className="sec-title">ห้องสมุด</span>
             <button className="sec-link" onClick={() => go("library")}>ดูทั้งหมด →</button>
           </div>
-          <div className="flex-col">
-            {newBooks.map(b => (
-              <div key={b.id} className="card" style={{
-                padding:"11px 14px", display:"flex", alignItems:"center",
-                justifyContent:"space-between", gap:10, cursor:"pointer"
-              }} onClick={() => go("library")}>
-                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                  <i className={`ti ${b.type==="วารสาร" ? "ti-news" : b.type==="PDF" ? "ti-file-text" : "ti-book"}`}
-                    style={{ fontSize:16, color:"var(--teal)", flexShrink:0 }}></i>
-                  <div>
-                    <div style={{ fontSize:12, fontWeight:500, color:"var(--text)" }}>{b.title}</div>
-                    <div style={{ fontSize:10, color:"var(--t3)", fontWeight:300 }}>{b.type} · {b.year}</div>
+          {loadingBooks ? (
+            <div className="flex-col">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="card" style={{ padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, opacity: 0.6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
+                    <div style={{ width: 24, height: 24, borderRadius: 4, background: "var(--bg3)", display: "grid", placeItems: "center" }}>
+                      <i className="ti ti-loader-2 spin" style={{ fontSize: 12, color: "var(--teal)" }}></i>
+                    </div>
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                      <div style={{ height: 12, background: "var(--bg3)", width: "60%", borderRadius: 4 }}></div>
+                      <div style={{ height: 10, background: "var(--bg3)", width: "30%", borderRadius: 4 }}></div>
+                    </div>
                   </div>
                 </div>
-                {b.isNew && <span className="tag tag-new" style={{ flexShrink:0 }}>ใหม่</span>}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex-col">
+              {newBooks.map(b => (
+                <div key={b.id} className="card" style={{
+                  padding:"11px 14px", display:"flex", alignItems:"center",
+                  justifyContent:"space-between", gap:10, cursor:"pointer"
+                }} onClick={() => go("library")}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <i className={`ti ${b.type==="วารสาร" ? "ti-news" : b.type==="PDF" ? "ti-file-text" : "ti-book"}`}
+                      style={{ fontSize:16, color:"var(--teal)", flexShrink:0 }}></i>
+                    <div>
+                      <div style={{ fontSize:12, fontWeight:500, color:"var(--text)" }}>{b.title}</div>
+                      <div style={{ fontSize:10, color:"var(--t3)", fontWeight:300 }}>{b.type} · {b.year}</div>
+                    </div>
+                  </div>
+                  {b.isNew && <span className="tag tag-new" style={{ flexShrink:0 }}>ใหม่</span>}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

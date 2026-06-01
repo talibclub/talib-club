@@ -23,17 +23,22 @@ function getDownloadUrl(url) {
   return url
 }
 
-export default function Library({ go, authState }) {
+export default function Library({ go, authState, ctx }) {
   const { items: books, loading } = useContentCollection("books", BOOKS)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
 
-  const [filter, setFilter] = useState("all")
-  const [search, setSearch] = useState("")
-  const [categoryFilter, setCategoryFilter] = useState("all")
-  const [sourceFilter, setSourceFilter] = useState("all")
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
-  const [currentPage, setCurrentPage] = useState(1)
+  const filter = ctx?.filter || "all"
+  const categoryFilter = ctx?.cat || "all"
+  const sourceFilter = ctx?.source || "all"
+  const showAdvancedFilters = ctx?.showAdv === "true"
+  const currentPage = parseInt(ctx?.page, 10) || 1
   const ITEMS_PER_PAGE = 12
+
+  const [search, setSearch] = useState(() => ctx?.search || "")
+
+  useEffect(() => {
+    setSearch(ctx?.search || "")
+  }, [ctx?.search])
 
   const types = ["all", ...(taxonomy.bookTypes || [])]
 
@@ -47,9 +52,21 @@ export default function Library({ go, authState }) {
     return ["all", ...Array.from(sources).sort()]
   }, [books])
 
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [search, filter, categoryFilter, sourceFilter])
+  const updateFilters = (newParams) => {
+    const updated = {
+      filter,
+      cat: categoryFilter,
+      source: sourceFilter,
+      search: newParams.search !== undefined ? newParams.search : search,
+      showAdv: showAdvancedFilters ? "true" : "false",
+      page: currentPage,
+      ...newParams
+    }
+    if (newParams.filter !== undefined || newParams.cat !== undefined || newParams.source !== undefined || newParams.search !== undefined || newParams.showAdv !== undefined) {
+      updated.page = 1
+    }
+    go("library", updated, { replace: true, noScroll: true })
+  }
 
   const filtered = useMemo(() => {
     return books.filter(b => {
@@ -79,15 +96,15 @@ export default function Library({ go, authState }) {
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, minWidth: 250 }}>
           <i className="ti ti-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 14 }}></i>
-          <input placeholder="ค้นหาชื่อหนังสือ, ผู้เขียน, หรือเนื้อหา..." value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 32 }} />
+          <input placeholder="ค้นหาชื่อหนังสือ, ผู้เขียน, หรือเนื้อหา..." value={search} onChange={e => { setSearch(e.target.value); updateFilters({ search: e.target.value }) }} style={{ paddingLeft: 32 }} />
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {types.map(t => (
-            <button key={t} onClick={() => setFilter(t)} style={{ fontFamily: "'Prompt',sans-serif", fontSize: 12, fontWeight: 300, padding: "5px 12px", borderRadius: 20, border: ".5px solid var(--br)", cursor: "pointer", transition: "all .15s", background: filter === t ? "var(--acc)" : "var(--card)", color: filter === t ? "var(--bg)" : "var(--t2)" }}>
+            <button key={t} onClick={() => updateFilters({ filter: t })} style={{ fontFamily: "'Prompt',sans-serif", fontSize: 12, fontWeight: 300, padding: "5px 12px", borderRadius: 20, border: ".5px solid var(--br)", cursor: "pointer", transition: "all .15s", background: filter === t ? "var(--acc)" : "var(--card)", color: filter === t ? "var(--bg)" : "var(--t2)" }}>
               {t === "all" ? "ทั้งหมด" : t}
             </button>
           ))}
-          <button onClick={() => setShowAdvancedFilters(!showAdvancedFilters)} className={showAdvancedFilters ? "btn btn-teal" : "btn btn-outline"} style={{ padding: "5px 12px", display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+          <button onClick={() => updateFilters({ showAdv: !showAdvancedFilters ? "true" : "false" })} className={showAdvancedFilters ? "btn btn-teal" : "btn btn-outline"} style={{ padding: "5px 12px", display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
             <i className="ti ti-filter"></i> ตัวกรองเพิ่มเติม
           </button>
         </div>
@@ -98,14 +115,14 @@ export default function Library({ go, authState }) {
         <div className="card" style={{ padding: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, background: "var(--acc2)" }}>
           <div>
             <label style={{ display: "block", fontSize: 11, color: "var(--t2)", marginBottom: 6, fontWeight: 500 }}>หมวดหมู่เนื้อหา</label>
-            <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={{ width: "100%", padding: "8px 12px", fontSize: 13, borderRadius: 8, border: "0.5px solid var(--br)", background: "var(--card)", color: "var(--text)" }}>
+            <select value={categoryFilter} onChange={e => updateFilters({ cat: e.target.value })} style={{ width: "100%", padding: "8px 12px", fontSize: 13, borderRadius: 8, border: "0.5px solid var(--br)", background: "var(--card)", color: "var(--text)" }}>
               <option value="all">-- ทุกหมวดหมู่ --</option>
               {availableCategories.filter(c => c !== "all").map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div>
             <label style={{ display: "block", fontSize: 11, color: "var(--t2)", marginBottom: 6, fontWeight: 500 }}>แหล่งที่มา / สำนักพิมพ์</label>
-            <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} style={{ width: "100%", padding: "8px 12px", fontSize: 13, borderRadius: 8, border: "0.5px solid var(--br)", background: "var(--card)", color: "var(--text)" }}>
+            <select value={sourceFilter} onChange={e => updateFilters({ source: e.target.value })} style={{ width: "100%", padding: "8px 12px", fontSize: 13, borderRadius: 8, border: "0.5px solid var(--br)", background: "var(--card)", color: "var(--text)" }}>
               <option value="all">-- ทุกสำนักพิมพ์ --</option>
               {availableSources.filter(s => s !== "all").map(s => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -210,15 +227,15 @@ export default function Library({ go, authState }) {
       {/* PAGINATION CONTROLS */}
       {totalPages > 1 && (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, marginTop: 32 }}>
-          <button onClick={() => { setCurrentPage(prev => Math.max(prev - 1, 1)); window.scrollTo(0, 0) }} disabled={currentPage === 1} className="btn btn-outline" style={{ padding: "6px 12px", opacity: currentPage === 1 ? 0.4 : 1, cursor: currentPage === 1 ? "not-allowed" : "pointer" }}>
+          <button onClick={() => { updateFilters({ page: Math.max(currentPage - 1, 1) }); window.scrollTo(0, 0) }} disabled={currentPage === 1} className="btn btn-outline" style={{ padding: "6px 12px", opacity: currentPage === 1 ? 0.4 : 1, cursor: currentPage === 1 ? "not-allowed" : "pointer" }}>
             <i className="ti ti-chevron-left" style={{ fontSize: 14 }}></i>
           </button>
           {Array.from({ length: totalPages }).map((_, i) => (
-            <button key={i} onClick={() => { setCurrentPage(i + 1); window.scrollTo(0, 0) }} className={currentPage === i + 1 ? "btn btn-teal" : "btn btn-outline"} style={{ padding: "6px 14px", fontSize: 12, minWidth: 32 }}>
+            <button key={i} onClick={() => { updateFilters({ page: i + 1 }); window.scrollTo(0, 0) }} className={currentPage === i + 1 ? "btn btn-teal" : "btn btn-outline"} style={{ padding: "6px 14px", fontSize: 12, minWidth: 32 }}>
               {i + 1}
             </button>
           ))}
-          <button onClick={() => { setCurrentPage(prev => Math.min(prev + 1, totalPages)); window.scrollTo(0, 0) }} disabled={currentPage === totalPages} className="btn btn-outline" style={{ padding: "6px 12px", opacity: currentPage === totalPages ? 0.4 : 1, cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}>
+          <button onClick={() => { updateFilters({ page: Math.min(currentPage + 1, totalPages) }); window.scrollTo(0, 0) }} disabled={currentPage === totalPages} className="btn btn-outline" style={{ padding: "6px 12px", opacity: currentPage === totalPages ? 0.4 : 1, cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}>
             <i className="ti ti-chevron-right" style={{ fontSize: 14 }}></i>
           </button>
         </div>

@@ -2,19 +2,25 @@ import { useState, useMemo, useEffect } from "react"
 import { MEDIA, DEFAULT_TAXONOMY, SITE } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings, useSiteSettings } from "../lib/contentStore.js"
 
-export default function Media({ go }) {
+export default function Media({ go, ctx }) {
   const { items: media, loading, error, isUsingFallback } = useContentCollection("media", MEDIA)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   const { site } = useSiteSettings(SITE)
   
-  // State สำหรับหน้าแรก (หน้ารวมเพลย์ลิสต์)
-  const [filter, setFilter] = useState("all")
-  const [searchPlaylist, setSearchPlaylist] = useState("")
-  
-  // State สำหรับด้านใน Playlist
-  const [selectedPlaylist, setSelectedPlaylist] = useState(null)
-  const [searchClip, setSearchClip] = useState("")
-  const [page, setPage] = useState(1)
+  const filter = ctx?.filter || "all"
+  const page = parseInt(ctx?.page, 10) || 1
+
+  const [searchPlaylist, setSearchPlaylist] = useState(() => ctx?.searchPlaylist || "")
+  const [searchClip, setSearchClip] = useState(() => ctx?.searchClip || "")
+
+  useEffect(() => {
+    setSearchPlaylist(ctx?.searchPlaylist || "")
+  }, [ctx?.searchPlaylist])
+
+  useEffect(() => {
+    setSearchClip(ctx?.searchClip || "")
+  }, [ctx?.searchClip])
+
   const ITEMS_PER_PAGE = 9
 
   const filters = [
@@ -30,21 +36,47 @@ export default function Media({ go }) {
   ]
 
   // 1. จัดกลุ่มเพลย์ลิสต์
-  const playlists = []
-  media.forEach(item => {
-    const playlistName = item.series || "วิดีโอทั่วไป"
-    let pl = playlists.find(p => p.name === playlistName)
-    if (!pl) {
-      pl = {
-        name: playlistName,
-        teacher: item.channel || item.series || "Talib Club",
-        type: String(item.type || "").toLowerCase(),
-        items: []
+  const playlists = useMemo(() => {
+    const list = []
+    media.forEach(item => {
+      const playlistName = item.series || "วิดีโอทั่วไป"
+      let pl = list.find(p => p.name === playlistName)
+      if (!pl) {
+        pl = {
+          name: playlistName,
+          teacher: item.channel || item.series || "Talib Club",
+          type: String(item.type || "").toLowerCase(),
+          items: []
+        }
+        list.push(pl)
       }
-      playlists.push(pl)
+      pl.items.push(item)
+    })
+    return list
+  }, [media])
+
+  const selectedPlaylist = useMemo(() => {
+    if (!ctx?.playlist) return null
+    return playlists.find(p => String(p.name).toLowerCase() === String(ctx.playlist).toLowerCase()) || null
+  }, [ctx?.playlist, playlists])
+
+  const updateFilters = (newParams) => {
+    const updated = {
+      filter,
+      searchPlaylist,
+      playlist: ctx?.playlist || "",
+      searchClip,
+      page,
+      ...newParams
     }
-    pl.items.push(item)
-  })
+    if (newParams.filter !== undefined || newParams.searchPlaylist !== undefined || newParams.playlist !== undefined) {
+      updated.page = 1
+      updated.searchClip = ""
+    } else if (newParams.searchClip !== undefined) {
+      updated.page = 1
+    }
+    go("media", updated, { replace: true, noScroll: true })
+  }
 
   // 2. กรองเพลย์ลิสต์หน้าแรก (ค้นหา + ประเภท)
   const filteredPlaylists = playlists.filter(pl => {
@@ -65,11 +97,6 @@ export default function Media({ go }) {
     )
   }, [selectedPlaylist, searchClip])
 
-  // รีเซ็ตหน้าเมื่อมีการค้นหาคลิปใหม่
-  useEffect(() => {
-    setPage(1)
-  }, [searchClip])
-
   // จัดการข้อมูลหน้า Pagination สำหรับคลิปที่กรองแล้ว
   const currentItems = useMemo(() => {
     const startIndex = (page - 1) * ITEMS_PER_PAGE
@@ -77,13 +104,6 @@ export default function Media({ go }) {
   }, [filteredClips, page])
 
   const totalPages = Math.ceil(filteredClips.length / ITEMS_PER_PAGE)
-
-  // ฟังก์ชันออกจากเพลย์ลิสต์ (เคลียร์ค่าการค้นหาและหน้า)
-  const handleBackToPlaylists = () => {
-    setSelectedPlaylist(null)
-    setSearchClip("")
-    setPage(1)
-  }
 
   return (
     <div>
@@ -101,7 +121,7 @@ export default function Media({ go }) {
               <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
               <input 
                 value={searchPlaylist} 
-                onChange={e => setSearchPlaylist(e.target.value)} 
+                onChange={e => { setSearchPlaylist(e.target.value); updateFilters({ searchPlaylist: e.target.value }) }} 
                 placeholder="ค้นหาเพลย์ลิสต์ หรือ ชื่อช่อง..." 
                 style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "10px 16px 10px 42px", background: "var(--bg2)", border: "none" }} 
               />
@@ -112,7 +132,7 @@ export default function Media({ go }) {
                 <button
                   key={item.id}
                   className={filter === item.id ? "btn btn-teal" : "btn btn-outline"}
-                  onClick={() => setFilter(item.id)}
+                  onClick={() => updateFilters({ filter: item.id })}
                 >
                   <i className={`ti ${item.icon}`} style={{ marginRight: 6 }}></i>{item.label}
                 </button>
@@ -144,7 +164,7 @@ export default function Media({ go }) {
                     </div>
                     <button 
                       className="btn btn-outline" 
-                      onClick={() => { setSelectedPlaylist(pl); setPage(1); setSearchClip(""); }}
+                      onClick={() => updateFilters({ playlist: pl.name, page: 1, searchClip: "" })}
                       style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12, padding: "8px 0", borderColor: "rgba(15,110,86,0.3)", color: "var(--teal)" }}
                     >
                       <i className="ti ti-play-circle" style={{ fontSize: 13 }}></i> ดูเพลย์ลิสต์
@@ -158,7 +178,7 @@ export default function Media({ go }) {
       ) : (
         /* INSIDE PLAYLIST (แบบบล็อกพร้อมปก Thumbnail และ Pagination) */
         <div>
-          <button className="btn btn-outline" style={{ marginBottom: 20, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, padding: "6px 12px" }} onClick={handleBackToPlaylists}>
+          <button className="btn btn-outline" style={{ marginBottom: 20, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, padding: "6px 12px" }} onClick={() => updateFilters({ playlist: "", page: 1, searchClip: "" })}>
             <i className="ti ti-arrow-left"></i> กลับหน้ารวมมีเดีย
           </button>
           
@@ -175,7 +195,7 @@ export default function Media({ go }) {
             <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
             <input 
               value={searchClip} 
-              onChange={e => setSearchClip(e.target.value)} 
+              onChange={e => { setSearchClip(e.target.value); updateFilters({ searchClip: e.target.value }) }} 
               placeholder={`ค้นหาคลิปใน ${selectedPlaylist.name}...`} 
               style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "10px 16px 10px 42px", background: "var(--bg2)", border: ".5px solid var(--br)" }} 
             />
@@ -228,7 +248,7 @@ export default function Media({ go }) {
               {Array.from({ length: totalPages }).map((_, i) => (
                 <button 
                   key={i} 
-                  onClick={() => { setPage(i + 1); window.scrollTo(0, 0); }}
+                  onClick={() => { updateFilters({ page: i + 1 }); window.scrollTo(0, 0); }}
                   className={page === i + 1 ? "btn btn-teal" : "btn btn-outline"} 
                   style={{ padding: "6px 14px", fontSize: 12 }}
                 >

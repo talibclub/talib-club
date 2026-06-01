@@ -100,7 +100,7 @@ export default function MemberDashboard({ authState, go, initialView = "overview
       )}
       {view === "saved-articles" && <SavedArticlesPanel authState={authState} go={go} setView={setView} />}
       {view === "bookshelf" && <BookshelfPanel authState={authState} go={go} setView={setView} />}
-      {view === "profile" && <ProfilePanel authState={authState} copied={copied} copyText={copyText} go={go} setView={setView} />}
+      {view === "profile" && <ProfilePanel authState={authState} copied={copied} copyText={copyText} go={go} setView={setView} ctx={ctx} />}
       {view === "quran" && (
         <div style={{ width: "100%", maxWidth: "1400px", margin: "0 auto" }}>
           <button 
@@ -1481,7 +1481,7 @@ function SavedArticlesPanel({ authState, go, setView }) {
   )
 }
 
-function ProfilePanel({ authState, copied, copyText, go, setView }) {
+function ProfilePanel({ authState, copied, copyText, go, setView, ctx }) {
   const user = authState?.user
   const profile = authState?.profile || {}
   const role = profile.role || "member"
@@ -1490,7 +1490,10 @@ function ProfilePanel({ authState, copied, copyText, go, setView }) {
   const photoURL = user?.photoURL || ""
   const isStaff = role === "staff"
 
-  const [subView, setSubView] = useState("stats") // "stats" or "account"
+  const subView = ctx?.sub || "stats"
+  const setSubView = (newSub) => {
+    go("member", { view: "profile", sub: newSub }, { replace: true, noScroll: true })
+  }
   
   const [form, setForm] = useState({
     displayName: displayName === "-" ? "" : displayName,

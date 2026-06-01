@@ -51,7 +51,7 @@ export default function Admin({ go, authState, initialTab = "articles" }) {
 
       <div style={{ display: "flex", gap: 6, marginBottom: 24, flexWrap: "wrap" }}>
         {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`pill ${tab === t.id ? "on" : ""}`}>
+          <button key={t.id} onClick={() => go("admin", { tab: t.id }, { replace: true, noScroll: true })} className={`pill ${tab === t.id ? "on" : ""}`}>
             <i className={`ti ${t.icon}`} style={{ marginRight: 6 }}></i>{t.label}
           </button>
         ))}

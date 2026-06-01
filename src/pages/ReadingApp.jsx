@@ -160,7 +160,7 @@ function getPreviewUrl(url) {
   return url
 }
 
-export default function ReadingApp({ authState, go, ctx }) {
+export default function ReadingApp({ authState, go, ctx, theme }) {
   const uid = authState?.user?.uid
   const { items: books } = useContentCollection("books", BOOKS)
   const { items: shelfItems, saveItem: saveShelfItem, deleteItem: deleteShelfItem } = useContentCollection("bookshelf", [])
@@ -170,7 +170,7 @@ export default function ReadingApp({ authState, go, ctx }) {
 
   // Reading Mode State
   const [activeBook, setActiveBook] = useState(null)
-  const [activeMobileTab, setActiveMobileTab] = useState("preview") // "preview" or "form" for mobile split layout
+  const [activeMobileTab, setActiveMobileTab] = useState("form") // "preview" or "form" for mobile split layout, default to form first
   
   // External Upload States
   const [addMode, setAddMode] = useState("library")
@@ -474,7 +474,7 @@ export default function ReadingApp({ authState, go, ctx }) {
     setStartPage(shelfItem.currentPage || 1)
     setEndPage("")
     setReflection("")
-    setActiveMobileTab("preview")
+    setActiveMobileTab("form")
     startTimestampRef.current = Date.now()
   }
 
@@ -590,7 +590,7 @@ export default function ReadingApp({ authState, go, ctx }) {
   if (activeBook) {
     // --- Focused Reading Room View (Full-Bleed Overlay App Interface) ---
     return createPortal(
-      <div style={{
+      <div className={`app ${theme || "light"}`} style={{
         position: "fixed",
         inset: 0,
         zIndex: 2000,
@@ -691,7 +691,7 @@ export default function ReadingApp({ authState, go, ctx }) {
         </div>
 
         {/* Workspace Split */}
-        <div style={{ display: "grid", gridTemplateColumns: "2.2fr 1fr", gap: 18, flex: 1, minHeight: 0 }} className="reader-split">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 2.2fr", gap: 18, flex: 1, minHeight: 0 }} className="reader-split">
           <style dangerouslySetInnerHTML={{__html: `
             @media (max-width: 900px) {
               .mobile-tabs-container {
@@ -713,25 +713,7 @@ export default function ReadingApp({ authState, go, ctx }) {
             }
           `}} />
 
-          {/* Left Panel: Embedded Google Preview Viewer */}
-          <div className="reader-preview" style={{ borderRadius: 16, overflow: "hidden", border: "1px solid var(--br2)", background: "var(--bg2)", height: "100%" }}>
-            {activeBook.book.fileUrl ? (
-              <iframe 
-                src={getPreviewUrl(activeBook.book.fileUrl)} 
-                style={{ width: "100%", height: "100%", border: "none" }} 
-                title="Book Preview"
-                allow="autoplay"
-              ></iframe>
-            ) : (
-              <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", color: "var(--t3)" }}>
-                <i className="ti ti-book-off" style={{ fontSize: 48, marginBottom: 12 }}></i>
-                <p>หนังสือเล่มนี้ไม่มีไฟล์ PDF พรีวิว</p>
-                <p style={{ fontSize: 11, marginTop: 4 }}>กรุณาเปิดอ่านผ่านเอกสารรูปเล่มจริงหรือไฟล์ภายนอกของท่าน ควบคู่กับการใช้ตัวจับเวลาด้านขวาครับ</p>
-              </div>
-            )}
-          </div>
-
-          {/* Right Panel: Reading Log Panel */}
+          {/* Left Panel: Reading Log Panel */}
           <div className="card reader-form-card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14, overflowY: "auto", height: "100%" }}>
             <h3 style={{ fontSize: 14, borderBottom: "1.5px solid var(--br2)", paddingBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
               <i className="ti ti-notebook" style={{ color: "var(--teal)" }}></i> บันทึกผลการอ่าน
@@ -812,6 +794,24 @@ export default function ReadingApp({ authState, go, ctx }) {
             >
               {saving ? "กำลังบันทึก..." : "บันทึกความคืบหน้า"}
             </button>
+          </div>
+
+          {/* Right Panel: Embedded Google Preview Viewer */}
+          <div className="reader-preview" style={{ borderRadius: 16, overflow: "hidden", border: "1px solid var(--br2)", background: "var(--bg2)", height: "100%" }}>
+            {activeBook.book.fileUrl ? (
+              <iframe 
+                src={getPreviewUrl(activeBook.book.fileUrl)} 
+                style={{ width: "100%", height: "100%", border: "none" }} 
+                title="Book Preview"
+                allow="autoplay"
+              ></iframe>
+            ) : (
+              <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", color: "var(--t3)" }}>
+                <i className="ti ti-book-off" style={{ fontSize: 48, marginBottom: 12 }}></i>
+                <p>หนังสือเล่มนี้ไม่มีไฟล์ PDF พรีวิว</p>
+                <p style={{ fontSize: 11, marginTop: 4 }}>กรุณาเปิดอ่านผ่านเอกสารรูปเล่มจริงหรือไฟล์ภายนอกของท่าน ควบคู่กับการใช้ตัวจับเวลาด้านขวาครับ</p>
+              </div>
+            )}
           </div>
         </div>
       </div>,

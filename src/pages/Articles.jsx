@@ -6,13 +6,17 @@ export default function Articles({ go, authState, ctx }) {
   const { items: articles, loading } = useContentCollection("articles", ARTICLES)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   
-  const [cat, setCat] = useState(() => ctx?.cat || "all")
+  const cat = ctx?.cat || "all"
+  const type = ctx?.type || "all"
+  const showAllBrowse = ctx?.showAllBrowse === "true" || ctx?.showAllBrowse === true || false
+  const page = parseInt(ctx?.page, 10) || 1
+
   const [search, setSearch] = useState(() => ctx?.search || "")
-  const [type, setType] = useState(() => ctx?.type || "all")
-  const [showAllBrowse, setShowAllBrowse] = useState(() => ctx?.showAllBrowse === "true" || ctx?.showAllBrowse === true || false)
-  const [selectedSeries, setSelectedSeries] = useState(null)
-  const [page, setPage] = useState(() => parseInt(ctx?.page, 10) || 1)
-  
+
+  useEffect(() => {
+    setSearch(ctx?.search || "")
+  }, [ctx?.search])
+
   const isLoggedIn = !!authState?.user;
 
   const types = [{ id: "all", label: "ทั้งหมด" }, ...(taxonomy.articleTypes || [])]
@@ -27,15 +31,21 @@ export default function Articles({ go, authState, ctx }) {
 
   const ITEMS_PER_PAGE = 12
 
-  const isFirstRender = useRef(true)
-  // Reset page when category, type, search, or browsing state changes
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false
-      return
+  const updateFilters = (newParams) => {
+    const updated = {
+      cat,
+      type,
+      search: newParams.search !== undefined ? newParams.search : search,
+      showAllBrowse,
+      selectedSeriesId: ctx?.selectedSeriesId || "",
+      page,
+      ...newParams
     }
-    setPage(1)
-  }, [cat, type, search, showAllBrowse])
+    if (newParams.cat !== undefined || newParams.type !== undefined || newParams.search !== undefined || newParams.showAllBrowse !== undefined || newParams.selectedSeriesId !== undefined) {
+      updated.page = 1
+    }
+    go("articles", updated, { replace: true, noScroll: true })
+  }
 
   const viewArticle = (article) => {
     go("article", {
@@ -69,15 +79,10 @@ export default function Articles({ go, authState, ctx }) {
     }).filter(s => s.articles.length > 0)
   }, [taxonomy.articleSeries, articles])
 
-  // Restore selectedSeries state when taxonomy / seriesGroups loads
-  useEffect(() => {
-    if (ctx?.selectedSeriesId && seriesGroups.length > 0) {
-      const found = seriesGroups.find(s => String(s.id).toLowerCase() === String(ctx.selectedSeriesId).toLowerCase())
-      if (found) {
-        setSelectedSeries(found)
-      }
-    }
-  }, [ctx, seriesGroups])
+  const selectedSeries = useMemo(() => {
+    if (!ctx?.selectedSeriesId) return null
+    return seriesGroups.find(s => String(s.id).toLowerCase() === String(ctx.selectedSeriesId).toLowerCase()) || null
+  }, [ctx?.selectedSeriesId, seriesGroups])
 
   const filteredSeries = useMemo(() => {
     const seriesIds = new Set(
@@ -137,7 +142,7 @@ export default function Articles({ go, authState, ctx }) {
           <button 
             className="btn btn-outline" 
             style={{ marginBottom: 20, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, padding: "6px 12px" }} 
-            onClick={() => setSelectedSeries(null)}
+            onClick={() => updateFilters({ selectedSeriesId: "" })}
           >
             <i className="ti ti-arrow-left"></i> กลับหน้ารวมบทความ
           </button>
@@ -185,17 +190,17 @@ export default function Articles({ go, authState, ctx }) {
             <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
               <i className="ti ti-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 14 }}></i>
               <input placeholder="ค้นหาบทความ..." value={search}
-                onChange={e => { setSearch(e.target.value); if (e.target.value) setShowAllBrowse(true) }}
+                onChange={e => { setSearch(e.target.value); updateFilters({ search: e.target.value, showAllBrowse: e.target.value ? true : showAllBrowse }) }}
                 style={{ paddingLeft: 32 }} />
             </div>
-            <select value={type} onChange={e => { setType(e.target.value); if (e.target.value !== "all") setShowAllBrowse(true) }} style={{ width: "auto", flex: "0 0 auto" }}>
+            <select value={type} onChange={e => updateFilters({ type: e.target.value, showAllBrowse: e.target.value !== "all" ? true : showAllBrowse })} style={{ width: "auto", flex: "0 0 auto" }}>
               {types.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
             </select>
           </div>
 
           <div style={{ display: "flex", gap: 6, marginBottom: 24, flexWrap: "wrap" }}>
             {categories.map(c => (
-              <button key={c.id} onClick={() => { setCat(c.id); if (c.id !== "all") setShowAllBrowse(true) }} style={{
+              <button key={c.id} onClick={() => updateFilters({ cat: c.id, showAllBrowse: c.id !== "all" ? true : showAllBrowse })} style={{
                 fontFamily: "'Prompt',sans-serif", fontSize: 12, fontWeight: 300,
                 padding: "5px 12px", borderRadius: 20, border: ".5px solid var(--br)",
                 cursor: "pointer", transition: "all .15s",
@@ -218,7 +223,7 @@ export default function Articles({ go, authState, ctx }) {
                         <div>
                           <div 
                             style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, cursor: "pointer" }}
-                            onClick={() => setSelectedSeries(s)}
+                            onClick={() => updateFilters({ selectedSeriesId: s.id })}
                           >
                             <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                               <i className="ti ti-list" style={{ color: "var(--teal)", fontSize: 14 }}></i>
@@ -239,7 +244,7 @@ export default function Articles({ go, authState, ctx }) {
                         </div>
                         
                         <button 
-                          onClick={() => setSelectedSeries(s)}
+                          onClick={() => updateFilters({ selectedSeriesId: s.id })}
                           className="btn btn-outline" 
                           style={{ width: "100%", marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 11, padding: "6px 0", borderColor: "rgba(15,110,86,0.2)", color: "var(--teal)" }}
                         >
@@ -281,7 +286,7 @@ export default function Articles({ go, authState, ctx }) {
                   ))}
                 </div>
                 {filtered.length > 6 && (
-                  <button className="btn btn-outline" onClick={() => setShowAllBrowse(true)} style={{ margin: "28px auto 0", display: "block", fontSize: 12 }}>
+                  <button className="btn btn-outline" onClick={() => updateFilters({ showAllBrowse: true })} style={{ margin: "28px auto 0", display: "block", fontSize: 12 }}>
                     ดูบทความทั้งหมด ({filtered.length} บทความ)
                   </button>
                 )}
@@ -292,7 +297,7 @@ export default function Articles({ go, authState, ctx }) {
               <div className="sec-hd" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span className="sec-title">{filtered.length} บทความที่พบ</span>
                 {!search && cat === "all" && type === "all" && (
-                  <button className="sec-link" onClick={() => { setShowAllBrowse(false) }} style={{ fontSize: 12 }}>กลับหน้าสารบัญซีรีส์</button>
+                  <button className="sec-link" onClick={() => updateFilters({ showAllBrowse: false })} style={{ fontSize: 12 }}>กลับหน้าสารบัญซีรีส์</button>
                 )}
               </div>
               {filtered.length === 0 ? (
@@ -310,7 +315,7 @@ export default function Articles({ go, authState, ctx }) {
                                 <div>
                                   <div 
                                     style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, cursor: "pointer" }}
-                                    onClick={() => setSelectedSeries(s)}
+                                    onClick={() => updateFilters({ selectedSeriesId: s.id })}
                                   >
                                     <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                       <i className="ti ti-list" style={{ color: "var(--teal)", fontSize: 14 }}></i>
@@ -330,7 +335,7 @@ export default function Articles({ go, authState, ctx }) {
                                   </div>
                                 </div>
                                 <button 
-                                  onClick={() => setSelectedSeries(s)}
+                                  onClick={() => updateFilters({ selectedSeriesId: s.id })}
                                   className="btn btn-outline" 
                                   style={{ width: "100%", marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 11, padding: "6px 0", borderColor: "rgba(15,110,86,0.2)", color: "var(--teal)" }}
                                 >
@@ -378,7 +383,7 @@ export default function Articles({ go, authState, ctx }) {
                               {Array.from({ length: totalGeneralPages }).map((_, i) => (
                                 <button 
                                   key={i} 
-                                  onClick={() => { setPage(i + 1); window.scrollTo(0, 0); }}
+                                  onClick={() => { updateFilters({ page: i + 1 }); window.scrollTo(0, 0); }}
                                   className={page === i + 1 ? "btn btn-teal" : "btn btn-outline"} 
                                   style={{ padding: "6px 14px", fontSize: 12 }}
                                 >
@@ -427,7 +432,7 @@ export default function Articles({ go, authState, ctx }) {
                           {Array.from({ length: totalPages }).map((_, i) => (
                             <button 
                               key={i} 
-                              onClick={() => { setPage(i + 1); window.scrollTo(0, 0); }}
+                              onClick={() => { updateFilters({ page: i + 1 }); window.scrollTo(0, 0); }}
                               className={page === i + 1 ? "btn btn-teal" : "btn btn-outline"} 
                               style={{ padding: "6px 14px", fontSize: 12 }}
                             >

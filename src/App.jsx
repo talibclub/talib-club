@@ -109,10 +109,12 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const go = (p, data = null) => {
+  const go = (p, data = null, options = {}) => {
     setPage(p)
     setCtx(data)
-    window.scrollTo(0, 0)
+    if (!options.noScroll) {
+      window.scrollTo(0, 0)
+    }
     
     let urlPath = "/";
     if (p === "tracking") {
@@ -135,7 +137,11 @@ export default function App() {
       }
     }
     
-    window.history.pushState({ page: p, ctx: data }, "", urlPath);
+    if (options.replace) {
+      window.history.replaceState({ page: p, ctx: data }, "", urlPath);
+    } else {
+      window.history.pushState({ page: p, ctx: data }, "", urlPath);
+    }
   }
 
   return (
@@ -148,13 +154,13 @@ export default function App() {
           {page === "home" && <Home go={go} />}
           {page === "articles" && <Articles go={go} authState={authState} ctx={ctx} />}      
           {page === "article" && <ArticleDetail item={ctx} go={go} authState={authState} />}
-          {page === "library" && <Library go={go} authState={authState} />}
+          {page === "library" && <Library go={go} authState={authState} ctx={ctx} />}
           {page === "library-detail" && (
             <RequireLogin authState={authState} go={go}>
               <LibraryDetail item={ctx} go={go} authState={authState} />
             </RequireLogin>
           )}
-          {page === "media" && <Media go={go} />}
+          {page === "media" && <Media go={go} ctx={ctx} />}
           {page === "media-detail" && <MediaDetail item={ctx} go={go} authState={authState} />}
           {page === "scholars" && <Scholars />}
           {page === "quran" && (
@@ -193,7 +199,7 @@ export default function App() {
           {page === "donate" && <Donation />}
           {page === "reader" && (
             <RequireLogin authState={authState} go={go}>
-              <ReadingApp authState={authState} go={go} ctx={ctx} />
+              <ReadingApp authState={authState} go={go} ctx={ctx} theme={theme} />
             </RequireLogin>
           )}
         </Suspense>
