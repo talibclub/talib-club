@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-01T11:02:00+07:00",
+  "title": "Design System: Talib Club",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Academic Sage Teal", "canonical": "oklch(48% 0.12 170)", "tonalRamp": ["#05241c", "#0a4939", "#0f6e56", "#1c9f7d", "#3dbea0", "#84dac6", "#c1ede2", "#f0faf8"] },
+      "neutral-bg": { "role": "neutral", "displayName": "Alabaster Paper", "canonical": "oklch(96% 0.005 80)", "tonalRamp": ["#111010", "#302f2d", "#504e4a", "#817f7b", "#aba8a3", "#edeae4", "#f7f5f1", "#faf9f7"] },
+      "text": { "role": "neutral-text", "displayName": "Charcoal Ink", "canonical": "oklch(15% 0.005 80)", "tonalRamp": ["#000000", "#111010", "#242321", "#3b3936", "#55524e", "#817f7b", "#b2b0a9", "#edeae4"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display Heading", "purpose": "Main section headers and hero text." },
+      "body": { "displayName": "Body Paragraph", "purpose": "Highly readable body text and articles." }
+    },
+    "shadows": [
+      { "name": "ambient-low", "value": "0 4px 16px rgba(0,0,0,0.03)", "purpose": "Gentle elevation for surface components." },
+      { "name": "active-elevation", "value": "0 6px 20px rgba(0,0,0,0.05)", "purpose": "Active state / hover feedback." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Standard state transition easing." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "767px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary action button for key submissions or main path clicks.",
+      "html": "<button class=\"ds-btn-primary\">บันทึกข้อมูล</button>",
+      "css": ".ds-btn-primary { background: #0f6e56; color: #fff; padding: 9px 20px; border-radius: 24px; border: none; font-family: 'Prompt', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: opacity 0.2s; } .ds-btn-primary:hover { opacity: 0.8; }"
+    },
+    {
+      "name": "Filter Pill",
+      "kind": "chip",
+      "refersTo": "pill",
+      "description": "Used to toggle categories or select tags in filters.",
+      "html": "<button class=\"ds-pill ds-pill-active\">บทความสั้น</button>",
+      "css": ".ds-pill { font-family: 'Prompt', sans-serif; font-size: 12px; font-weight: 300; padding: 5px 12px; border-radius: 20px; border: 0.5px solid rgba(0,0,0,0.07); cursor: pointer; transition: all 0.15s; background: #ffffff; color: rgba(0,0,0,0.45); } .ds-pill-active { background: #0f6e56; color: #ffffff; border-color: #0f6e56; }"
+    },
+    {
+      "name": "Standard Card",
+      "kind": "card",
+      "refersTo": "card-default",
+      "description": "Default container block for grid items (articles, books, scholars).",
+      "html": "<div class=\"ds-card\"><h3 class=\"ds-card-title\">ความรู้ด้านฟิกฮ์</h3><p class=\"ds-card-desc\">เนื้อหาเกณฑ์เกี่ยวกับแนวปฏิบัติในชีวิตประจำวันของมุสลิม</p></div>",
+      "css": ".ds-card { background: #ffffff; border: 0.5px solid rgba(0,0,0,0.05); border-radius: 12px; padding: 24px; box-shadow: 0 4px 16px rgba(0,0,0,0.03); transition: border-color 0.2s, box-shadow 0.2s; font-family: 'Prompt', sans-serif; } .ds-card:hover { border-color: rgba(26,25,22,0.15); box-shadow: 0 6px 20px rgba(0,0,0,0.05); } .ds-card-title { font-size: 15px; font-weight: 500; color: #111010; margin-bottom: 8px; margin-top: 0; } .ds-card-desc { font-size: 13px; color: #6b6760; line-height: 1.6; font-weight: 300; margin: 0; }"
+    },
+    {
+      "name": "Badge Tag",
+      "kind": "chip",
+      "refersTo": "tag-teal",
+      "description": "Small category badge or tag for items.",
+      "html": "<span class=\"ds-tag ds-tag-teal\">นิติศาสตร์อิสลาม</span>",
+      "css": ".ds-tag { font-family: 'Prompt', sans-serif; font-size: 10px; font-weight: 400; padding: 2px 8px; border-radius: 4px; display: inline-block; } .ds-tag-teal { background: rgba(15,110,86,0.07); color: #0f6e56; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Academic Sanctuary",
+    "overview": "การออกแบบเว็บไซต์ Talib Club มุ่งเน้นไปที่ความน่าเชื่อถือทางวิชาการ (Academic Trust) ควบคู่กับความสบายตาขณะอ่านข้อมูลหรือศึกษาค้นคว้า (Reading Comfort) ระบบการดีไซน์จึงปฏิเสธสีสันที่ฉูดฉาดเกินจำเป็น การจัดวางที่หนาแน่น และความซับซ้อนที่ไม่เอื้อต่อการอ่าน และเลือกใช้พื้นที่ว่าง (Whitespace) ที่เหมาะสม การจัดแบ่งสัดส่วนที่ชัดเจน และโทนสีธรรมชาติที่นุ่มนวล",
+    "keyCharacteristics": [
+      "Reading-centric Typography: ใช้ฟอนต์ Prompt ที่มีน้ำหนักบางเบา (Light 300) สำหรับข้อความยาว เพื่อให้อ่านง่าย สบายตา",
+      "Organic & Muted Palette: สีหลักนำโดยสีเขียวปราชญ์ (Sage Teal) และสีพื้นหลังโทนกระดาษถนอมสายตา (Alabaster Paper)",
+      "Restrained Elevation: ใช้ขอบเส้นบางเฉียบ (0.5px) และแสงเงาแบบกระจายตัวเบาบางแทนการยกกล่องแบบลอยตัวหนา"
+    ],
+    "rules": [
+      { "name": "The Restrained Teal Rule", "body": "สีเขียววิชาการ (Teal) จะถูกใช้อย่างประหยัดในแต่ละหน้าจอ (ไม่เกิน 10% ของพื้นที่หน้าทั้งหมด) เพื่อคงความเป็นป้ายบอกความสำคัญและรักษาความสงบสายตาของอินเทอร์เฟซ", "section": "colors" },
+      { "name": "The Line-Height Sanctuary Rule", "body": "ห้ามใช้ line-height น้อยกว่า 1.8 สำหรับข้อความส่วนที่เป็นบทความ (Body text) เพื่อป้องกันการซ้อนเบียดของตัวอักษรภาษาไทยที่มีสระบน-ล่าง", "section": "typography" },
+      { "name": "The Border Over Shadow Rule", "body": "การแบ่งองค์ประกอบจะเน้นการใช้ขอบเส้นขนาด 0.5px (var(--br)) เป็นหลัก ห้ามใช้แสงเงาเป็นองค์ประกอบหลักในการแบ่งแยกการ์ดหากไม่ได้รับการโต้ตอบจากผู้ใช้ (Hover)", "section": "elevation" }
+    ],
+    "dos": [
+      "Do รักษาความกว้างของข้อความเนื้อหาบทความให้อยู่ที่ความกว้างสูงสุดประมาณ 720px (max-width: 720px) และจัดให้อยู่กึ่งกลางหน้า",
+      "Do ใช้ฟอนต์น้ำหนัก 300 สำหรับการแสดงผลย่อยในภาษาไทย และใช้ line-height 1.8 เสมอสำหรับเนื้อหาบทความทั่วไป",
+      "Do ใช้ transition: background 0.3s, color 0.3s ในการสลับธีมมืดและสว่าง เพื่อลดความกระตุกสายตาของผู้ใช้"
+    ],
+    "donts": [
+      "Don't ใช้ gradient text กับหัวข้อวิชาการเด็ดขาด ให้ใช้สี Charcoal หรือสีขาวตรงตามธีมเพื่อความเรียบง่ายและเป็นผู้ใหญ่",
+      "Don't ตกแต่งการ์ดด้วยการระบายสีขอบฝั่งซ้ายหรือขวาเป็นแถบหนาสีเข้ม (Side-stripe borders) เพราะทำให้เว็บบดบังความเป็นทางการและดูรกสายตา",
+      "Don't ออกแบบการ์ดในแนวตารางที่เป็นแพทเทิร์นเดียวกันซ้ำๆ ทั้งหน้าโดยไม่มีการจัดอันดับหรือเน้นชิ้นงานแรก (Feature Card) ให้กับผู้ใช้"
+    ]
+  }
+}
