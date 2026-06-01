@@ -37,16 +37,6 @@ export default function Articles({ go, authState, ctx }) {
     setPage(1)
   }, [cat, type, search, showAllBrowse])
 
-  // Restore selectedSeries state when taxonomy / seriesGroups loads
-  useEffect(() => {
-    if (ctx?.selectedSeriesId && seriesGroups.length > 0) {
-      const found = seriesGroups.find(s => String(s.id).toLowerCase() === String(ctx.selectedSeriesId).toLowerCase())
-      if (found) {
-        setSelectedSeries(found)
-      }
-    }
-  }, [ctx, seriesGroups])
-
   const viewArticle = (article) => {
     go("article", {
       ...article,
@@ -78,6 +68,16 @@ export default function Articles({ go, authState, ctx }) {
       }
     }).filter(s => s.articles.length > 0)
   }, [taxonomy.articleSeries, articles])
+
+  // Restore selectedSeries state when taxonomy / seriesGroups loads
+  useEffect(() => {
+    if (ctx?.selectedSeriesId && seriesGroups.length > 0) {
+      const found = seriesGroups.find(s => String(s.id).toLowerCase() === String(ctx.selectedSeriesId).toLowerCase())
+      if (found) {
+        setSelectedSeries(found)
+      }
+    }
+  }, [ctx, seriesGroups])
 
   const filteredSeries = useMemo(() => {
     const seriesIds = new Set(
