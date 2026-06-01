@@ -4,3 +4,7 @@ dist/
 *.log
 .env
 .env.local
+
+# Ignore massive video files to avoid git push timeout
+public/this_profile's_activity_across_facebook/posts/media/videos/
+
