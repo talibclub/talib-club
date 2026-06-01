@@ -3,6 +3,16 @@ import toast from "react-hot-toast"
 import { BOOKS, DEFAULT_TAXONOMY } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 import { confirmAction } from "../utils/feedback.jsx"
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage"
+import { storage } from "../lib/firebase.js"
+
+// --- Helper Functions ---
+function sanitizeStorageName(name) {
+  return String(name || "book.pdf")
+    .replace(/[^\w.\-ก-๙]+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 90)
+}
 
 const DAILY_READING_GOAL_MINUTES = 10
 const MIN_VERIFIED_SECONDS = 180
@@ -149,7 +159,7 @@ function getPreviewUrl(url) {
   return url
 }
 
-export default function ReadingApp({ authState, go }) {
+export default function ReadingApp({ authState, go, ctx }) {
   const uid = authState?.user?.uid
   const { items: books } = useContentCollection("books", BOOKS)
   const { items: shelfItems, saveItem: saveShelfItem, deleteItem: deleteShelfItem } = useContentCollection("bookshelf", [])
@@ -159,6 +169,18 @@ export default function ReadingApp({ authState, go }) {
 
   // Reading Mode State
   const [activeBook, setActiveBook] = useState(null)
+  
+  // External Upload States
+  const [addMode, setAddMode] = useState("library")
+  const [externalBook, setExternalBook] = useState({
+    title: "",
+    author: "",
+    fileUrl: "",
+    desc: "",
+    totalPages: "",
+    file: null,
+  })
+  const [uploadingExternal, setUploadingExternal] = useState(false)
   
   // Stopwatch states
   const [seconds, setSeconds] = useState(0)
@@ -174,6 +196,7 @@ export default function ReadingApp({ authState, go }) {
 
   // Add Book Dropdown states
   const [selectedBookToAdd, setSelectedBookToAdd] = useState("")
+  const [showAddForm, setShowAddForm] = useState(false)
 
   // --- Normalized Streak & Sessions ---
   const streakSettings = useMemo(() => {
@@ -346,6 +369,75 @@ export default function ReadingApp({ authState, go }) {
     toast.success("เพิ่มเข้าชั้นหนังสือแล้ว! พร้อมเปิดห้องอ่านหนังสือ")
   }
 
+  async function addExternalBook() {
+    if (!uid) return
+    const title = externalBook.title.trim() || externalBook.file?.name || ""
+    const hasSource = externalBook.fileUrl.trim() || externalBook.file
+    if (!title) {
+      toast.error("กรุณาใส่ชื่อหนังสือหรือเลือกไฟล์")
+      return
+    }
+    if (!hasSource) {
+      toast.error("กรุณาใส่ลิงก์ไฟล์หรืออัปโหลดไฟล์")
+      return
+    }
+
+    setUploadingExternal(true)
+    try {
+      let fileUrl = externalBook.fileUrl.trim()
+      let fileMeta = {}
+
+      if (externalBook.file) {
+        const safeName = sanitizeStorageName(externalBook.file.name)
+        const fileRef = ref(storage, `members/${uid}/bookshelf/${Date.now()}-${safeName}`)
+        await uploadBytes(fileRef, externalBook.file, {
+          contentType: externalBook.file.type || "application/octet-stream",
+          customMetadata: { uid, title },
+        })
+        fileUrl = await getDownloadURL(fileRef)
+        fileMeta = {
+          fileName: externalBook.file.name,
+          fileSize: externalBook.file.size,
+          fileType: externalBook.file.type,
+        }
+      }
+
+      const externalId = `external-${crypto.randomUUID()}`
+      const customBook = {
+        id: externalId,
+        title,
+        author: externalBook.author.trim() || "ไฟล์ของสมาชิก",
+        type: "ไฟล์นอก",
+        source: "เพิ่มโดยสมาชิก",
+        category: "หนังสือส่วนตัว",
+        fileUrl,
+        desc: externalBook.desc.trim(),
+        totalPages: Number(externalBook.totalPages || 0),
+        ...fileMeta,
+      }
+
+      await saveShelfItem({
+        id: `${uid}_book_${externalId}`,
+        uid,
+        bookId: externalId,
+        sourceType: "external",
+        customBook,
+        totalPages: Number(externalBook.totalPages || 0),
+        status: "reading",
+        progress: 0,
+        note: "",
+        addedAt: Date.now(),
+      })
+      setExternalBook({ title: "", author: "", fileUrl: "", desc: "", totalPages: "", file: null })
+      toast.success("เพิ่มไฟล์นอกเข้าชั้นหนังสือแล้ว! พร้อมเปิดห้องอ่านหนังสือ")
+    } catch (error) {
+      console.error(error)
+      toast.error("เพิ่มไฟล์นอกไม่สำเร็จ กรุณาตรวจสอบสิทธิ์อัปโหลดหรือใช้ลิงก์ไฟล์แทน")
+    } finally {
+      setUploadingExternal(false)
+    }
+  }
+
   // --- Stopwatch logic ---
   useEffect(() => {
     if (isRunning) {
@@ -360,7 +452,20 @@ export default function ReadingApp({ authState, go }) {
     }
   }, [isRunning])
 
-  const startReading = (shelfItem) => {
+  // Auto-start reading session when shelfItemId is passed via context
+  useEffect(() => {
+    if (ctx?.shelfItemId && shelfItems.length > 0 && books.length > 0 && !activeBook) {
+      const item = shelfItems.find(s => s.id === ctx.shelfItemId)
+      if (item) {
+        const book = getShelfBook(item, books)
+        if (book) {
+          startReading({ ...item, book })
+        }
+      }
+    }
+  }, [ctx, shelfItems, books, activeBook])
+
+  function startReading(shelfItem) {
     setActiveBook(shelfItem)
     setSeconds(0)
     setIsRunning(true)
@@ -480,46 +585,73 @@ export default function ReadingApp({ authState, go }) {
   }, [seconds])
 
   if (activeBook) {
-    // --- Focused Reading Room View ---
+    // --- Focused Reading Room View (Full-Bleed Overlay App Interface) ---
     return (
-      <div style={{ display: "flex", flexDirection: "column", minHeight: "90vh", background: "var(--bg)", width: "100%", maxWidth: "1400px", margin: "0 auto", padding: 12 }}>
+      <div style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 2000,
+        background: "var(--bg)",
+        display: "flex",
+        flexDirection: "column",
+        width: "100vw",
+        height: "100vh",
+        padding: "16px 20px",
+        overflow: "hidden",
+        boxSizing: "border-box",
+        animation: "pageFadeIn 0.25s ease-out forwards"
+      }}>
         {/* Header HUD */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, paddingBottom: 12, borderBottom: "1px solid var(--br2)", marginBottom: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, paddingBottom: 14, borderBottom: "1px solid var(--br2)", marginBottom: 14, flexWrap: "wrap" }}>
           <div>
-            <span style={{ fontSize: 11, color: "var(--teal)", fontWeight: 600 }}>โหมดแอปอ่านหนังสือโฟกัส</span>
-            <h2 style={{ fontSize: 16, marginTop: 2, display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{activeBook.book.title}</h2>
+            <span style={{ fontSize: 10, color: "var(--teal)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>โหมดแอปอ่านหนังสือโฟกัส (Distraction-Free)</span>
+            <h2 style={{ fontSize: 16, marginTop: 2, fontWeight: 600, display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{activeBook.book.title}</h2>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {/* Digital Timer HUD */}
-            <div style={{ background: seconds >= MIN_VERIFIED_SECONDS ? "var(--teal-bg)" : "var(--bg2)", border: seconds >= MIN_VERIFIED_SECONDS ? "1.5px solid var(--teal)" : "1px solid var(--br)", padding: "4px 14px", borderRadius: 20, display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{
+              background: seconds >= MIN_VERIFIED_SECONDS ? "var(--teal-bg)" : "var(--bg2)",
+              border: seconds >= MIN_VERIFIED_SECONDS ? "1.5px solid var(--teal)" : "1.5px solid var(--br)",
+              boxShadow: (isRunning && seconds >= MIN_VERIFIED_SECONDS) ? "0 0 12px rgba(69, 214, 182, 0.25)" : "none",
+              padding: "6px 16px",
+              borderRadius: 20,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              transition: "all 0.3s ease"
+            }}>
               <i className={`ti ${isRunning ? "ti-clock spin" : "ti-player-pause"}`} style={{ color: seconds >= MIN_VERIFIED_SECONDS ? "var(--teal)" : "var(--t3)", fontSize: 14 }}></i>
               <strong style={{ fontFamily: "monospace", fontSize: 16, color: seconds >= MIN_VERIFIED_SECONDS ? "var(--teal)" : "var(--text)" }}>{displayTimer}</strong>
             </div>
 
-            <button onClick={toggleStopwatch} className={`btn ${isRunning ? "btn-outline" : "btn-teal"}`} style={{ padding: "6px 12px", fontSize: 12 }}>
+            <button onClick={toggleStopwatch} className={`btn ${isRunning ? "btn-outline" : "btn-teal"}`} style={{ padding: "8px 14px", fontSize: 12 }}>
               <i className={`ti ${isRunning ? "ti-player-pause" : "ti-player-play"}`}></i> {isRunning ? "หยุดจับเวลา" : "เริ่มจับเวลา"}
             </button>
-            <button onClick={exitReadingRoom} className="btn" style={{ background: "#e05555", color: "#fff", padding: "6px 12px", fontSize: 12 }}>
+            <button onClick={exitReadingRoom} className="btn" style={{ background: "#e05555", color: "#fff", padding: "8px 14px", fontSize: 12 }}>
               <i className="ti ti-logout"></i> ออก
             </button>
           </div>
         </div>
 
         {/* Workspace Split */}
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, flex: 1, minHeight: 0 }} className="reader-split">
+        <div style={{ display: "grid", gridTemplateColumns: "2.2fr 1fr", gap: 18, flex: 1, minHeight: 0 }} className="reader-split">
           <style dangerouslySetInnerHTML={{__html: `
             @media (max-width: 900px) {
               .reader-split {
                 grid-template-columns: 1fr !important;
               }
               .reader-preview {
-                height: 50vh !important;
+                height: 40vh !important;
+              }
+              .reader-form-card {
+                height: auto !important;
+                max-height: 48vh !important;
               }
             }
           `}} />
 
           {/* Left Panel: Embedded Google Preview Viewer */}
-          <div className="reader-preview" style={{ borderRadius: 16, overflow: "hidden", border: "1px solid var(--br2)", background: "var(--bg2)", height: "70vh" }}>
+          <div className="reader-preview" style={{ borderRadius: 16, overflow: "hidden", border: "1px solid var(--br2)", background: "var(--bg2)", height: "100%" }}>
             {activeBook.book.fileUrl ? (
               <iframe 
                 src={getPreviewUrl(activeBook.book.fileUrl)} 
@@ -537,24 +669,39 @@ export default function ReadingApp({ authState, go }) {
           </div>
 
           {/* Right Panel: Reading Log Panel */}
-          <div className="card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14, overflowY: "auto", height: "70vh" }}>
+          <div className="card reader-form-card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14, overflowY: "auto", height: "100%" }}>
             <h3 style={{ fontSize: 14, borderBottom: "1.5px solid var(--br2)", paddingBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
               <i className="ti ti-notebook" style={{ color: "var(--teal)" }}></i> บันทึกผลการอ่าน
             </h3>
 
-            {seconds < MIN_VERIFIED_SECONDS && (
-              <div style={{ background: "rgba(255, 179, 0, 0.08)", border: "1px solid rgba(255, 179, 0, 0.2)", padding: 10, borderRadius: 8, fontSize: 11, color: "rgb(255, 160, 0)", lineHeight: 1.4 }}>
-                <i className="ti ti-alert-circle" style={{ marginRight: 6 }}></i>
-                ระบบต้องการเวลาการอ่านสะสมขั้นต่ำ **3 นาที (180 วินาที)** เพื่อนำไปคำนวณและยืนยัน Streak ของคุณ กรุณาเปิดหนังสืออ่านต่อและปล่อยตัวจับเวลาทำงาน
+            {/* Dynamic Checklist HUD */}
+            <div style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              background: "var(--bg2)",
+              padding: 12,
+              borderRadius: 12,
+              border: "1px solid var(--br2)",
+              fontSize: 12
+            }}>
+              <span style={{ fontSize: 10, fontWeight: 600, color: "var(--t3)", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 2 }}>เกณฑ์การยืนยันเซสชัน</span>
+              
+              <div style={{ display: "flex", alignItems: "center", gap: 8, color: seconds >= MIN_VERIFIED_SECONDS ? "var(--teal)" : "var(--t3)", transition: "color 0.2s" }}>
+                <i className={`ti ${seconds >= MIN_VERIFIED_SECONDS ? "ti-circle-check" : "ti-circle"}`} style={{ fontSize: 14, color: seconds >= MIN_VERIFIED_SECONDS ? "var(--teal)" : "var(--t3)" }}></i>
+                <span>เวลาอ่านอย่างน้อย 3 นาที (ขณะนี้: {displayTimer})</span>
               </div>
-            )}
-
-            {seconds >= MIN_VERIFIED_SECONDS && (
-              <div style={{ background: "var(--teal-bg)", border: "1px solid rgba(45, 190, 160, 0.2)", padding: 10, borderRadius: 8, fontSize: 11, color: "var(--teal)", lineHeight: 1.4 }}>
-                <i className="ti ti-circle-check" style={{ marginRight: 6 }}></i>
-                คุณผ่านเกณฑ์เวลาขั้นต่ำแล้ว! สามารถกรอกหน้าหนังสือที่จบ เขียนข้อคิดสะท้อนธรรม และกดปุ่มบันทึกได้เลยครับ
+              
+              <div style={{ display: "flex", alignItems: "center", gap: 8, color: (endPage && Number(endPage) >= Number(startPage)) ? "var(--teal)" : "var(--t3)", transition: "color 0.2s" }}>
+                <i className={`ti ${(endPage && Number(endPage) >= Number(startPage)) ? "ti-circle-check" : "ti-circle"}`} style={{ fontSize: 14, color: (endPage && Number(endPage) >= Number(startPage)) ? "var(--teal)" : "var(--t3)" }}></i>
+                <span>ระบุหน้าที่อ่านถึง (หน้า {startPage} ถึง {endPage || "?"})</span>
               </div>
-            )}
+              
+              <div style={{ display: "flex", alignItems: "center", gap: 8, color: reflection.trim().length >= MIN_REFLECTION_CHARS ? "var(--teal)" : "var(--t3)", transition: "color 0.2s" }}>
+                <i className={`ti ${reflection.trim().length >= MIN_REFLECTION_CHARS ? "ti-circle-check" : "ti-circle"}`} style={{ fontSize: 14, color: reflection.trim().length >= MIN_REFLECTION_CHARS ? "var(--teal)" : "var(--t3)" }}></i>
+                <span>บันทึกข้อคิด {MIN_REFLECTION_CHARS} ตัวอักษรขึ้นไป ({reflection.trim().length}/{MIN_REFLECTION_CHARS})</span>
+              </div>
+            </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <label style={{ display: "grid", gap: 4 }}>
@@ -589,14 +736,14 @@ export default function ReadingApp({ authState, go }) {
                 value={reflection} 
                 onChange={e => setReflection(e.target.value)} 
                 rows={5} 
-                placeholder="วันนี้ได้ข้อคิดสะกิดใจเรื่องอะไรบ้างจากการอ่านหัวข้อนี้? พิมพ์ข้อเขียนสั้นๆ (แนะนำอย่างน้อย 20 ตัวอักษรเพื่อรับสถิติยืนยัน)" 
+                placeholder="วันนี้ได้ข้อคิดสะกิดใจเรื่องอะไรบ้างจากการอ่านหัวข้อนี้? พิมพ์ข้อเขียนสั้นๆ (อย่างน้อย 20 ตัวอักษรเพื่อรับสถิติยืนยัน)" 
                 style={{ fontSize: 12, padding: 10, lineHeight: 1.5 }}
               />
             </label>
 
             <button 
               onClick={saveReadingProgress} 
-              disabled={saving || seconds < MIN_VERIFIED_SECONDS || reflection.length < MIN_REFLECTION_CHARS || !endPage}
+              disabled={saving || seconds < MIN_VERIFIED_SECONDS || reflection.length < MIN_REFLECTION_CHARS || !endPage || Number(endPage) < Number(startPage)}
               className="btn btn-teal" 
               style={{ width: "100%", marginTop: "auto", padding: "10px 0", fontSize: 13 }}
             >
@@ -756,30 +903,122 @@ export default function ReadingApp({ authState, go }) {
             <h3 style={{ fontSize: 14, fontWeight: 600 }}>หนังสือที่กำลังอ่านค้างไว้ ({myActiveBooks.length})</h3>
           </div>
           
-          {/* Add Book Quick Dropdown Selector */}
-          {availableBooks.length > 0 && (
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <select 
-                value={selectedBookToAdd} 
-                onChange={e => setSelectedBookToAdd(e.target.value)} 
-                style={{ fontSize: 11, padding: "5px 8px", borderRadius: 8, background: "var(--bg2)", border: "1px solid var(--br2)", maxWidth: 180 }}
-              >
-                <option value="">-- เลือกหนังสือเพื่อเพิ่มเข้าชั้น --</option>
-                {availableBooks.map(b => (
-                  <option key={b.id} value={b.id}>{b.title}</option>
-                ))}
-              </select>
+          <button 
+            onClick={() => setShowAddForm(!showAddForm)} 
+            className="btn btn-outline" 
+            style={{ fontSize: 11, padding: "6px 14px", borderRadius: 20 }}
+          >
+            <i className={`ti ${showAddForm ? "ti-minus" : "ti-plus"}`}></i> {showAddForm ? "ปิดช่องเพิ่มหนังสือ" : "เพิ่มหนังสือเข้าชั้น"}
+          </button>
+        </div>
+
+        {showAddForm && (
+          <div className="card" style={{ padding: 18, background: "var(--bg2)", border: "1.5px solid var(--br2)", borderRadius: 12, marginBottom: 16, animation: "pageFadeIn 0.2s ease-out" }}>
+            <div className="reader-control" style={{ marginBottom: 12, display: "flex", gap: 4, width: "fit-content" }}>
               <button 
-                onClick={addNewBookToShelf} 
-                disabled={!selectedBookToAdd}
-                className="btn btn-teal" 
-                style={{ fontSize: 11, padding: "5px 12px" }}
+                className={`reader-btn ${addMode === "library" ? "on" : ""}`} 
+                onClick={() => setAddMode("library")}
+                style={{ fontSize: 11, padding: "5px 12px", border: "none", cursor: "pointer", borderRadius: 20 }}
               >
-                + เพิ่ม
+                เลือกจากคลังของเว็บ
+              </button>
+              <button 
+                className={`reader-btn ${addMode === "external" ? "on" : ""}`} 
+                onClick={() => setAddMode("external")}
+                style={{ fontSize: 11, padding: "5px 12px", border: "none", cursor: "pointer", borderRadius: 20 }}
+              >
+                อัปโหลดไฟล์ / ลิงก์นอก
               </button>
             </div>
-          )}
-        </div>
+
+            {addMode === "library" ? (
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <select 
+                  value={selectedBookToAdd} 
+                  onChange={e => setSelectedBookToAdd(e.target.value)} 
+                  style={{ fontSize: 13, padding: "8px 12px", borderRadius: 8, background: "var(--card)", border: "1px solid var(--br)", flex: 1, minWidth: 200 }}
+                >
+                  <option value="">-- เลือกหนังสือจากคลังของเว็บ --</option>
+                  {availableBooks.map(b => (
+                    <option key={b.id} value={b.id}>{b.title}</option>
+                  ))}
+                </select>
+                <button 
+                  onClick={() => { addNewBookToShelf(); setShowAddForm(false); }} 
+                  disabled={!selectedBookToAdd}
+                  className="btn btn-teal" 
+                  style={{ padding: "8px 20px", fontSize: 12 }}
+                >
+                  เพิ่มเข้าชั้นหนังสือ
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <input 
+                    value={externalBook.title} 
+                    onChange={event => setExternalBook(prev => ({ ...prev, title: event.target.value }))} 
+                    placeholder="ชื่อหนังสือหรือไฟล์ *" 
+                    style={{ fontSize: 12, padding: "8px 10px" }}
+                  />
+                  <input 
+                    value={externalBook.author} 
+                    onChange={event => setExternalBook(prev => ({ ...prev, author: event.target.value }))} 
+                    placeholder="ผู้เขียน/แหล่งที่มา (ไม่บังคับ)" 
+                    style={{ fontSize: 12, padding: "8px 10px" }}
+                  />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 10 }}>
+                  <input 
+                    value={externalBook.fileUrl} 
+                    onChange={event => setExternalBook(prev => ({ ...prev, fileUrl: event.target.value }))} 
+                    placeholder="ลิงก์ PDF / Google Drive / URL อ่านออนไลน์" 
+                    style={{ fontSize: 12, padding: "8px 10px" }}
+                  />
+                  <input 
+                    type="number" 
+                    min="0" 
+                    value={externalBook.totalPages} 
+                    onChange={event => setExternalBook(prev => ({ ...prev, totalPages: event.target.value }))} 
+                    placeholder="จำนวนหน้าทั้งหมด" 
+                    style={{ fontSize: 12, padding: "8px 10px" }}
+                  />
+                </div>
+                <textarea 
+                  value={externalBook.desc} 
+                  onChange={event => setExternalBook(prev => ({ ...prev, desc: event.target.value }))} 
+                  placeholder="คำอธิบายหรือจดบันทึกเป้าหมายสั้น ๆ สำหรับหนังสือเล่มนี้..." 
+                  style={{ fontSize: 12, padding: "8px 10px", minHeight: 60 }} 
+                />
+                
+                <label className="bookshelf-file-input" style={{ 
+                  display: "flex", alignItems: "center", gap: 10, minHeight: 44, 
+                  border: "1px dashed var(--br)", borderRadius: 10, background: "var(--card)", 
+                  padding: "10px 12px", color: "var(--t2)", fontSize: 12, cursor: "pointer" 
+                }}>
+                  <i className="ti ti-upload" style={{ color: "var(--teal)", fontSize: 18 }}></i>
+                  <span>{externalBook.file ? externalBook.file.name : "หรือคลิกอัปโหลดไฟล์ PDF จากเครื่อง (จำกัด 20MB)"}</span>
+                  <input 
+                    type="file" 
+                    accept=".pdf,.epub,.doc,.docx,.txt" 
+                    onChange={event => setExternalBook(prev => ({ ...prev, file: event.target.files?.[0] || null }))} 
+                    style={{ display: "none" }}
+                  />
+                </label>
+                
+                <button 
+                  className="btn btn-teal" 
+                  onClick={async () => { await addExternalBook(); setShowAddForm(false); }} 
+                  disabled={uploadingExternal}
+                  style={{ width: "100%", padding: "10px", fontSize: 12 }}
+                >
+                  <i className={`ti ${uploadingExternal ? "ti-loader-2 spin" : "ti-plus"}`} style={{ marginRight: 6 }}></i>
+                  {uploadingExternal ? "กำลังอัปโหลดและบันทึกไฟล์..." : "บันทึกและเพิ่มไฟล์นอกเข้าชั้น"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {myActiveBooks.length === 0 ? (
           <div className="card" style={{ padding: "32px 16px", textAlign: "center", color: "var(--t3)" }}>

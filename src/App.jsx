@@ -3,24 +3,39 @@ import { useTheme } from "./hooks/useTheme.js"
 import { useAuth } from "./hooks/useAuth.js"
 import Nav from "./components/Nav.jsx"
 
-const Home = lazy(() => import("./pages/Home.jsx"))
-const Articles = lazy(() => import("./pages/Articles.jsx"))
-const ReadingApp = lazy(() => import("./pages/ReadingApp.jsx"))
-const ArticleDetail = lazy(() => import("./pages/ArticleDetail.jsx"))
-const Library = lazy(() => import("./pages/Library.jsx"))
-const LibraryDetail = lazy(() => import("./pages/LibraryDetail.jsx"))
-const Media = lazy(() => import("./pages/Media.jsx"))
-const MediaDetail = lazy(() => import("./pages/MediaDetail.jsx"))
-const Scholars = lazy(() => import("./pages/Scholars.jsx"))
-const Quran = lazy(() => import("./pages/Quran.jsx"))
-const Tracking = lazy(() => import("./pages/Tracking.jsx"))
-const Auth = lazy(() => import("./pages/Auth.jsx"))
-const MemberDashboard = lazy(() => import("./pages/MemberDashboard.jsx"))
-const StaffDashboard = lazy(() => import("./pages/StaffDashboard.jsx"))
-const StaffWork = lazy(() => import("./pages/StaffWork.jsx"))
-const StaffTranslation = lazy(() => import("./pages/StaffTranslation.jsx"))
-const Admin = lazy(() => import("./pages/Admin.jsx"))
-const Donation = lazy(() => import("./pages/Donation.jsx"))
+const lazyWithRetry = (componentImport) => {
+  return lazy(() =>
+    componentImport().catch((error) => {
+      console.error("Chunk load failed, forcing page reload...", error);
+      const hasReloaded = window.sessionStorage.getItem("chunk-reload");
+      if (!hasReloaded) {
+        window.sessionStorage.setItem("chunk-reload", "true");
+        window.location.reload();
+        return new Promise(() => {});
+      }
+      throw error;
+    })
+  );
+};
+
+const Home = lazyWithRetry(() => import("./pages/Home.jsx"))
+const Articles = lazyWithRetry(() => import("./pages/Articles.jsx"))
+const ReadingApp = lazyWithRetry(() => import("./pages/ReadingApp.jsx"))
+const ArticleDetail = lazyWithRetry(() => import("./pages/ArticleDetail.jsx"))
+const Library = lazyWithRetry(() => import("./pages/Library.jsx"))
+const LibraryDetail = lazyWithRetry(() => import("./pages/LibraryDetail.jsx"))
+const Media = lazyWithRetry(() => import("./pages/Media.jsx"))
+const MediaDetail = lazyWithRetry(() => import("./pages/MediaDetail.jsx"))
+const Scholars = lazyWithRetry(() => import("./pages/Scholars.jsx"))
+const Quran = lazyWithRetry(() => import("./pages/Quran.jsx"))
+const Tracking = lazyWithRetry(() => import("./pages/Tracking.jsx"))
+const Auth = lazyWithRetry(() => import("./pages/Auth.jsx"))
+const MemberDashboard = lazyWithRetry(() => import("./pages/MemberDashboard.jsx"))
+const StaffDashboard = lazyWithRetry(() => import("./pages/StaffDashboard.jsx"))
+const StaffWork = lazyWithRetry(() => import("./pages/StaffWork.jsx"))
+const StaffTranslation = lazyWithRetry(() => import("./pages/StaffTranslation.jsx"))
+const Admin = lazyWithRetry(() => import("./pages/Admin.jsx"))
+const Donation = lazyWithRetry(() => import("./pages/Donation.jsx"))
 import { Toaster } from "react-hot-toast"
 import PWAInstallBanner from "./components/PWAInstallBanner.jsx"
 import "./styles/global.css"
@@ -86,6 +101,8 @@ export default function App() {
     window.history.replaceState({ page: initialPage, ctx: finalCtx }, "", window.location.pathname + window.location.search)
     setPage(initialPage)
     setCtx(finalCtx)
+
+    window.sessionStorage.removeItem("chunk-reload");
 
     window.addEventListener("popstate", handlePopstate)
     return () => window.removeEventListener("popstate", handlePopstate)
@@ -176,7 +193,7 @@ export default function App() {
           {page === "donate" && <Donation />}
           {page === "reader" && (
             <RequireLogin authState={authState} go={go}>
-              <ReadingApp authState={authState} go={go} />
+              <ReadingApp authState={authState} go={go} ctx={ctx} />
             </RequireLogin>
           )}
         </Suspense>

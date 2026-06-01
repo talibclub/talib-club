@@ -70,11 +70,12 @@ self.addEventListener('fetch', (e) => {
           });
         }
         return networkResponse;
-      }).catch(() => {
+      }).catch((err) => {
         // Fallback for HTML navigation when offline
         if (e.request.headers.get('accept') && e.request.headers.get('accept').includes('text/html')) {
           return caches.match('/');
         }
+        throw err;
       });
     })
   );

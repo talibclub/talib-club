@@ -290,7 +290,7 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
         todaySeconds={todaySeconds}
         goalPercent={goalPercent}
         last7Days={last7Days}
-        onRead={() => setView("bookshelf")}
+        onRead={() => go("reader")}
         onFreeze={() => protectToday("freeze")}
         onLeave={() => protectToday("leave")}
       />
@@ -621,8 +621,6 @@ function todayKey() {
 }
 
 const DAILY_READING_GOAL_MINUTES = 10
-const MIN_VERIFIED_SECONDS = 180
-const MIN_REFLECTION_CHARS = 20
 const DEFAULT_FREEZE_CREDITS = 2
 const DEFAULT_LEAVE_CREDITS = 1
 
@@ -699,19 +697,7 @@ function getPagesRead(startPage, endPage) {
   return end - start + 1
 }
 
-function calculateVerificationReport({ activeSeconds = 0, inactiveSeconds = 0, startPage = 0, endPage = 0, reflection = "" }) {
-  const pagesRead = getPagesRead(startPage, endPage)
-  const reflectionLength = reflection.trim().length
-  const totalSeconds = Number(activeSeconds || 0) + Number(inactiveSeconds || 0)
-  const focusRatio = totalSeconds ? Number(activeSeconds || 0) / totalSeconds : 1
-  const timeScore = Math.min(40, Math.round((Number(activeSeconds || 0) / MIN_VERIFIED_SECONDS) * 40))
-  const pageScore = pagesRead > 0 ? 25 : 0
-  const reflectionScore = Math.min(25, Math.round((reflectionLength / MIN_REFLECTION_CHARS) * 25))
-  const focusScore = Math.round(Math.max(0, Math.min(1, focusRatio)) * 10)
-  const score = Math.min(100, timeScore + pageScore + reflectionScore + focusScore)
-  const verified = score >= 72 && Number(activeSeconds || 0) >= MIN_VERIFIED_SECONDS && pagesRead > 0 && reflectionLength >= MIN_REFLECTION_CHARS
-  return { score, verified, pagesRead, focusRatio }
-}
+
 
 function getShelfBook(item, books) {
   return books.find(book => String(book.id) === String(item.bookId)) || item.customBook || null
@@ -754,7 +740,7 @@ function BookshelfPanel({ authState, go, setView }) {
   const uid = authState?.user?.uid
   const { items: books } = useContentCollection("books", BOOKS)
   const { items: shelfItems, loading, saveItem, deleteItem } = useContentCollection("bookshelf", [])
-  const { items: readingSessions, saveItem: saveReadingSession } = useContentCollection("reading_sessions", [])
+  const { items: readingSessions } = useContentCollection("reading_sessions", [])
   const [bookId, setBookId] = useState("")
   const [addMode, setAddMode] = useState("library")
   const [externalBook, setExternalBook] = useState({
@@ -766,7 +752,6 @@ function BookshelfPanel({ authState, go, setView }) {
     file: null,
   })
   const [uploadingExternal, setUploadingExternal] = useState(false)
-  const [sessionTarget, setSessionTarget] = useState(null)
   const [quizState, setQuizState] = useState(null)
 
   const sessionsByShelf = useMemo(() => {
@@ -928,49 +913,6 @@ function BookshelfPanel({ authState, go, setView }) {
     toast.success("นำออกจากชั้นหนังสือแล้ว")
   }
 
-  async function finishReadingSession(item, payload) {
-    const report = calculateVerificationReport(payload)
-    const sessionId = `${uid}_${item.id}_${Date.now()}`
-    await saveReadingSession({
-      id: sessionId,
-      uid,
-      shelfItemId: item.id,
-      bookId: String(item.bookId),
-      bookTitle: item.book.title,
-      sourceType: item.sourceType || "library",
-      dayKey: todayKey(),
-      startedAt: payload.startedAt,
-      completedAt: Date.now(),
-      activeSeconds: payload.activeSeconds,
-      inactiveSeconds: payload.inactiveSeconds,
-      startPage: Number(payload.startPage || 0),
-      endPage: Number(payload.endPage || 0),
-      pagesRead: report.pagesRead,
-      reflection: payload.reflection.trim(),
-      focusRatio: report.focusRatio,
-      verificationScore: report.score,
-      verified: report.verified,
-    })
-
-    if (!report.verified) {
-      toast.error(`ยังไม่ผ่านการยืนยัน (${report.score}/100) ลองอ่านให้ครบเวลาและบันทึกข้อคิดเพิ่มอีกนิด`)
-      return false
-    }
-
-    const nextProgress = getProgressFromSession(item, payload.endPage, report.pagesRead)
-    await updateShelfItem(item, {
-      progress: nextProgress,
-      currentPage: Number(payload.endPage || item.currentPage || 0),
-      status: nextProgress >= 100 ? "finished" : "reading",
-      totalReadSeconds: Number(item.totalReadSeconds || 0) + Number(payload.activeSeconds || 0),
-      verifiedSessions: Number(item.verifiedSessions || 0) + 1,
-      lastReadAt: Date.now(),
-      lastVerificationScore: report.score,
-    })
-    toast.success(`อ่านจริงผ่านแล้ว +${formatReadingMinutes(payload.activeSeconds)} · คะแนนยืนยัน ${report.score}/100`)
-    return true
-  }
-
   async function startQuiz(item) {
     setQuizState({ item, loading: true, quiz: [], answers: {}, source: "" })
     try {
@@ -1123,7 +1065,7 @@ function BookshelfPanel({ authState, go, setView }) {
                     <p style={{ fontSize: 12, marginTop: 2 }}>{item.book.author} · {item.book.type} · อ่านจริง {item.sessionSummary.verifiedCount} ครั้ง</p>
                     {item.sourceType === "external" && <span className="tag tag-teal" style={{ marginTop: 6 }}>ไฟล์นอกของสมาชิก</span>}
                   </div>
-                  <button className="btn btn-teal" style={{ padding: "5px 10px", fontSize: 11, flexShrink: 0 }} onClick={() => setSessionTarget(item)}>
+                  <button className="btn btn-teal" style={{ padding: "5px 10px", fontSize: 11, flexShrink: 0 }} onClick={() => go("reader", { shelfItemId: item.id })}>
                     <i className="ti ti-player-play" style={{ marginRight: 4 }}></i>เริ่มอ่าน
                   </button>
                   {(item.status === "finished" || Number(item.progress || 0) >= 80) && (
@@ -1207,142 +1149,12 @@ function BookshelfPanel({ authState, go, setView }) {
           onFinish={finishQuiz}
         />
       )}
-      {sessionTarget && (
-        <ReadingSessionModal
-          item={sessionTarget}
-          onClose={() => setSessionTarget(null)}
-          onFinish={async payload => {
-            const ok = await finishReadingSession(sessionTarget, payload)
-            if (ok) setSessionTarget(null)
-          }}
-        />
-      )}
+
     </div>
   )
 }
 
-function ReadingSessionModal({ item, onClose, onFinish }) {
-  const initialStart = Math.max(1, Number(item.currentPage || 0) + 1)
-  const [startedAt] = useState(() => Date.now())
-  const [activeSeconds, setActiveSeconds] = useState(0)
-  const [inactiveSeconds, setInactiveSeconds] = useState(0)
-  const [startPage, setStartPage] = useState(String(initialStart))
-  const [endPage, setEndPage] = useState(String(initialStart))
-  const [reflection, setReflection] = useState("")
-  const [saving, setSaving] = useState(false)
-  const activeRef = useRef(true)
 
-  useEffect(() => {
-    const refreshActivity = () => {
-      activeRef.current = document.visibilityState === "visible" && document.hasFocus()
-    }
-    refreshActivity()
-    window.addEventListener("focus", refreshActivity)
-    window.addEventListener("blur", refreshActivity)
-    document.addEventListener("visibilitychange", refreshActivity)
-    const timer = window.setInterval(() => {
-      if (activeRef.current) setActiveSeconds(value => value + 1)
-      else setInactiveSeconds(value => value + 1)
-    }, 1000)
-    return () => {
-      window.clearInterval(timer)
-      window.removeEventListener("focus", refreshActivity)
-      window.removeEventListener("blur", refreshActivity)
-      document.removeEventListener("visibilitychange", refreshActivity)
-    }
-  }, [])
-
-  const report = calculateVerificationReport({ activeSeconds, inactiveSeconds, startPage, endPage, reflection })
-  const fileUrl = getBookFileUrl(item)
-  const checks = [
-    { label: `อ่านแบบ active อย่างน้อย ${Math.round(MIN_VERIFIED_SECONDS / 60)} นาที`, ok: activeSeconds >= MIN_VERIFIED_SECONDS },
-    { label: "ระบุหน้าที่อ่านอย่างน้อย 1 หน้า", ok: report.pagesRead > 0 },
-    { label: `บันทึกข้อคิดอย่างน้อย ${MIN_REFLECTION_CHARS} ตัวอักษร`, ok: reflection.trim().length >= MIN_REFLECTION_CHARS },
-    { label: "โฟกัสอยู่กับหน้าอ่านเป็นส่วนใหญ่", ok: report.focusRatio >= 0.65 },
-  ]
-
-  async function submit() {
-    setSaving(true)
-    try {
-      await onFinish({
-        startedAt,
-        activeSeconds,
-        inactiveSeconds,
-        startPage: Number(startPage || 0),
-        endPage: Number(endPage || 0),
-        reflection,
-      })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,.62)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
-      <div className="card" style={{ maxWidth: 780, maxHeight: "90vh", overflowY: "auto", padding: 22 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", marginBottom: 16 }}>
-          <div>
-            <span className="badge badge-teal">Verified reading session</span>
-            <h2 style={{ fontSize: 20, marginTop: 8 }}>อ่านจริงเพื่อรักษา streak</h2>
-            <p style={{ fontSize: 12, marginTop: 4 }}>{item.book?.title}</p>
-          </div>
-          <button className="btn btn-outline" style={{ padding: "6px 12px" }} onClick={onClose}>ปิด</button>
-        </div>
-
-        <div className="reading-session-grid">
-          <div className="reading-session-score">
-            <strong>{report.score}/100</strong>
-            <span>{report.verified ? "พร้อมบันทึกเป็นอ่านจริง" : "ยังต้องอ่าน/จดเพิ่ม"}</span>
-            <div className="streak-progress"><span style={{ width: `${report.score}%` }}></span></div>
-          </div>
-          <div className="reading-session-timer">
-            <div><span>เวลา active</span><strong>{formatReadingMinutes(activeSeconds)}</strong></div>
-            <div><span>เวลาหลุดโฟกัส</span><strong>{formatReadingMinutes(inactiveSeconds)}</strong></div>
-          </div>
-        </div>
-
-        {fileUrl && (
-          <a className="btn btn-outline" href={fileUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
-            <i className="ti ti-external-link"></i>เปิดไฟล์อ่านคู่กับตัวจับเวลา
-          </a>
-        )}
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-          <label style={fieldStyle}>
-            <span>เริ่มหน้า</span>
-            <input type="number" min="1" value={startPage} onChange={event => setStartPage(event.target.value)} />
-          </label>
-          <label style={fieldStyle}>
-            <span>ถึงหน้า</span>
-            <input type="number" min="1" value={endPage} onChange={event => setEndPage(event.target.value)} />
-          </label>
-        </div>
-
-        <label style={fieldStyle}>
-          <span>ข้อคิด/สรุปจากที่อ่าน</span>
-          <textarea value={reflection} onChange={event => setReflection(event.target.value)} placeholder="เขียนสรุปสั้น ๆ ว่าอ่านเรื่องอะไร ได้ข้อคิดอะไร หรือมีประเด็นไหนอยากกลับมาทบทวน..." style={{ minHeight: 110 }} />
-        </label>
-
-        <div className="reading-checklist">
-          {checks.map(check => (
-            <div key={check.label} className={check.ok ? "ok" : ""}>
-              <i className={`ti ${check.ok ? "ti-circle-check" : "ti-circle"}`}></i>
-              <span>{check.label}</span>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
-          <p style={{ fontSize: 12 }}>ระบบจะเพิ่ม progress และต่อ streak เฉพาะเซสชันที่ผ่านการยืนยันเท่านั้น</p>
-          <button className="btn btn-teal" disabled={saving} onClick={submit}>
-            <i className={`ti ${saving ? "ti-loader-2 spin" : "ti-shield-check"}`} style={{ marginRight: 6 }}></i>
-            {saving ? "กำลังบันทึก..." : "บันทึกเซสชัน"}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function QuizModal({ quizState, onAnswer, onClose, onFinish }) {
   const answered = Object.keys(quizState.answers || {}).length
