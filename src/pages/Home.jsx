@@ -180,7 +180,7 @@ export default function Home({ go }) {
       {/* STATS */}
       <div className="grid4" style={{ marginBottom:32 }}>
         {[
-          { n: site.stats.followers, l: site.stats.followersLabel, icon: "ti-users" },
+          { n: site.stats.followers, l: site.stats.followersLabel, icon: "ti-address-book" },
           { n: articles.length + "+", l: "บทความ", icon: "ti-file-text" },
           { n: books.length + "+", l: "หนังสือ/วารสาร", icon: "ti-books" },
           { n: media.length + "+", l: "มีเดีย", icon: "ti-player-play" },

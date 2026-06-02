@@ -29,6 +29,6 @@ export const SITE = {
   // Stats ที่แสดงหน้าหลัก
   stats: {
     followers: "7.6K",
-    followersLabel: "ผู้ติดตาม",
+    followersLabel: "รายนามทำเนียบบุคคล",
   },
 }

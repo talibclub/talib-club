@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react"
+import { createPortal } from "react-dom"
 import { SURA_LIST } from "../data/surahs.js"
 import { getSurahTheme } from "../data/quranThemes.js"
 import { useContentCollection } from "../lib/contentStore.js"
@@ -1922,7 +1923,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
       </div>
 
       {/* BOOKMARK REFLECTION MODAL */}
-      {activeBookmarkModal && (
+      {activeBookmarkModal && createPortal(
         <div style={{
           position: "fixed",
           inset: 0,
@@ -1931,7 +1932,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          zIndex: 1000,
+          zIndex: 100000,
           padding: 16
         }}>
           <div className="card" style={{
@@ -2030,17 +2031,18 @@ export default function Quran({ initialSura, initialAyah, authState }) {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* MOBILE BOTTOM SHEET NAVIGATION DRAWER */}
-      {isMobile && isMobileNavOpen && (
+      {isMobile && isMobileNavOpen && createPortal(
         <div style={{
           position: "fixed",
           inset: 0,
           background: "rgba(0, 0, 0, 0.4)",
           backdropFilter: "blur(4px)",
-          zIndex: 1000,
+          zIndex: 100000,
           display: "flex",
           alignItems: "flex-end",
           justifyContent: "center"
@@ -2365,7 +2367,8 @@ export default function Quran({ initialSura, initialAyah, authState }) {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
