@@ -26,7 +26,7 @@ export default function MemberDashboard({ authState, go, initialView = "overview
     const ayah = searchParams.get("ayah") || ctx?.ayah
     if (sura) setQuranSura(Number(sura))
     if (ayah) setQuranAyah(Number(ayah))
-    else if (initialView !== "quran" && view !== "quran") setQuranAyah(null)
+    else setQuranAyah(null)
   }, [initialView, ctx])
 
   const setView = (newView) => {

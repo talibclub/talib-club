@@ -39,8 +39,18 @@ const JUZ_STARTS = [
   { juz: 30, sura: 78, ayah: 1, label: "ยุซอ์ที่ 30 (ซูเราะฮ์ 78:1)" }
 ]
 
+const normalizeSuraNumber = (value) => {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 114 ? parsed : 1
+}
+
+const normalizeAyahNumber = (value) => {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
 export default function Quran({ initialSura, initialAyah, authState }) {
-  const [selectedSura, setSelectedSura] = useState(initialSura || 1)
+  const [selectedSura, setSelectedSura] = useState(() => normalizeSuraNumber(initialSura))
   const readingAreaRef = useRef(null)
   
   const scrollToReadingArea = () => {
@@ -57,6 +67,8 @@ export default function Quran({ initialSura, initialAyah, authState }) {
   const [scrollPercent, setScrollPercent] = useState(0)
   const [showScrollTop, setShowScrollTop] = useState(false)
   const [searchHasRun, setSearchHasRun] = useState(false)
+  const [targetScrollAyah, setTargetScrollAyah] = useState(() => normalizeAyahNumber(initialAyah))
+  const [reloadKey, setReloadKey] = useState(0)
   
   // Navigation Mode: "surah" | "juz" | "page"
   const [navMode, setNavMode] = useState("surah")
@@ -87,13 +99,17 @@ export default function Quran({ initialSura, initialAyah, authState }) {
       
       let changed = false
       if (prevSura !== String(selectedSura)) {
-        url.searchParams.set("sura", selectedSura)
+        url.searchParams.set("sura", String(selectedSura))
         url.searchParams.delete("ayah") // Clear ayah on surah change
         changed = true
       }
       
       if (targetScrollAyah && prevAyah !== String(targetScrollAyah)) {
         url.searchParams.set("ayah", targetScrollAyah)
+        changed = true
+      }
+      if (!targetScrollAyah && prevAyah) {
+        url.searchParams.delete("ayah")
         changed = true
       }
       
@@ -121,6 +137,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
     if (!selectedPage) return
     let active = true
     setPageLoading(true)
+    setPageVerses([])
     
     // Fetch Arabic text for Mushaf page display
     fetch(`https://api.alquran.cloud/v1/page/${selectedPage}/quran-simple`)
@@ -181,8 +198,6 @@ export default function Quran({ initialSura, initialAyah, authState }) {
   const [searchResults, setSearchResults] = useState([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchError, setSearchError] = useState(null)
-  const [targetScrollAyah, setTargetScrollAyah] = useState(initialAyah || null)
-  
   // Bookmarks (Reflection notes) from Firestore
   const { items: savedVerses, saveItem, deleteItem } = useContentCollection("quran_bookmarks", [])
   const uid = authState?.user?.uid
@@ -232,30 +247,18 @@ export default function Quran({ initialSura, initialAyah, authState }) {
     }
   }
 
-  const handleSelectPage = async (pageNumber) => {
+  const handleSelectPage = (pageNumber) => {
     const pNum = Number(pageNumber)
     if (isNaN(pNum) || pNum < 1 || pNum > 604) {
       toast.error("กรุณาระบุเลขหน้าตั้งแต่ 1 ถึง 604")
       return
     }
-    setLoading(true)
-    try {
-      const res = await fetch(`https://api.alquran.cloud/v1/page/${pNum}/quran-simple`)
-      const data = await res.json()
-      if (data.code === 200 && data.data?.ayahs?.length > 0) {
-        const firstAyah = data.data.ayahs[0]
-        setSelectedSura(firstAyah.surah.number)
-        setTargetScrollAyah(firstAyah.numberInSurah)
-        if (isMobile) setIsMobileNavOpen(false)
-      } else {
-        toast.error("ไม่สามารถโหลดข้อมูลของหน้านี้ได้")
-      }
-    } catch (err) {
-      console.error(err)
-      toast.error("การเชื่อมต่อล้มเหลว กรุณาลองใหม่อีกครั้ง")
-    } finally {
-      setLoading(false)
-    }
+    setMode("mushaf")
+    setSelectedPage(pNum)
+    setPageInput("")
+    setTargetScrollAyah(null)
+    if (isMobile) setIsMobileNavOpen(false)
+    window.setTimeout(scrollToReadingArea, 80)
   }
 
   const performSearch = async (query) => {
@@ -317,13 +320,13 @@ export default function Quran({ initialSura, initialAyah, authState }) {
   useEffect(() => {
     if (initialSura) {
       setSelectedPage(null)
-      setSelectedSura(initialSura)
+      setSelectedSura(normalizeSuraNumber(initialSura))
     }
   }, [initialSura])
 
   useEffect(() => {
     if (initialAyah) {
-      setTargetScrollAyah(initialAyah)
+      setTargetScrollAyah(normalizeAyahNumber(initialAyah))
     }
   }, [initialAyah])
 
@@ -473,7 +476,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
     return () => {
       active = false
     }
-  }, [selectedSura, translationKey])
+  }, [selectedSura, translationKey, reloadKey])
 
   useEffect(() => {
     if (targetScrollAyah && !loading && verses.length > 0) {
@@ -1441,7 +1444,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
               <i className="ti ti-alert-triangle" style={{ fontSize: 24, color: "var(--red)", marginBottom: 8 }}></i>
               <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 500, marginBottom: 4 }}>เกิดข้อผิดพลาด</div>
               <p style={{ fontSize: 12, color: "var(--t2)", marginBottom: 12 }}>{error}</p>
-              <button className="btn btn-teal" style={{ fontSize: 11, padding: "5px 14px" }} onClick={() => setTranslationKey(prev => prev)}>ลองอีกครั้ง</button>
+              <button className="btn btn-teal" style={{ fontSize: 11, padding: "5px 14px" }} onClick={() => setReloadKey(key => key + 1)}>ลองอีกครั้ง</button>
             </div>
           )}
 
@@ -1509,31 +1512,37 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                           lineHeight: 2.3
                         }}
                       >
-                        {pageVerses.map(v => (
-                          <span key={v.id}>
-                            {v.text || v.arabic_text}{" "}
-                            <span 
-                              style={{ 
-                                fontFamily: "sans-serif", 
-                                fontSize: `${Math.round(arabicSize * 0.5)}px`, 
-                                color: "var(--teal)", 
-                                fontWeight: "bold",
-                                margin: "0 4px",
-                                display: "inline-flex",
-                                width: `${Math.round(arabicSize * 0.95)}px`,
-                                height: `${Math.round(arabicSize * 0.95)}px`,
-                                border: "1.5px solid var(--teal)",
-                                borderRadius: "50%",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                direction: "ltr"
-                              }}
-                              title={`ซูเราะฮ์ ${v.suraName || ""} [${v.sura}:${v.aya}]`}
-                            >
-                              {getArabicNumber(v.aya)}
-                            </span>{" "}
-                          </span>
-                        ))}
+                        {pageVerses.length > 0 ? (
+                          pageVerses.map(v => (
+                            <span key={v.id}>
+                              {v.text || v.arabic_text}{" "}
+                              <span 
+                                style={{ 
+                                  fontFamily: "sans-serif", 
+                                  fontSize: `${Math.round(arabicSize * 0.5)}px`, 
+                                  color: "var(--teal)", 
+                                  fontWeight: "bold",
+                                  margin: "0 4px",
+                                  display: "inline-flex",
+                                  width: `${Math.round(arabicSize * 0.95)}px`,
+                                  height: `${Math.round(arabicSize * 0.95)}px`,
+                                  border: "1.5px solid var(--teal)",
+                                  borderRadius: "50%",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  direction: "ltr"
+                                }}
+                                title={`ซูเราะฮ์ ${v.suraName || ""} [${v.sura}:${v.aya}]`}
+                              >
+                                {getArabicNumber(v.aya)}
+                              </span>{" "}
+                            </span>
+                          ))
+                        ) : (
+                          <div style={{ direction: "ltr", textAlign: "center", fontFamily: "'Prompt', sans-serif", fontSize: 13, color: "var(--t2)", padding: "36px 12px" }}>
+                            ไม่พบข้อมูลหน้านี้ กรุณาลองเลือกหน้าใหม่อีกครั้ง
+                          </div>
+                        )}
                       </div>
                     )}
 

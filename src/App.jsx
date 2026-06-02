@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from "react"
+import { Component, useEffect, useState, lazy, Suspense } from "react"
 import { useTheme } from "./hooks/useTheme.js"
 import { useAuth } from "./hooks/useAuth.js"
 import Nav from "./components/Nav.jsx"
@@ -150,63 +150,108 @@ export default function App() {
       
       <Nav page={page} go={go} theme={theme} setTheme={setTheme} authState={authState} />
       <main className={`${page === "quran" || page === "member" ? "wide" : ""} fade-in-active`} key={page}>
-        <Suspense fallback={<LoadingState />}>
-          {page === "home" && <Home go={go} />}
-          {page === "articles" && <Articles go={go} authState={authState} ctx={ctx} />}      
-          {page === "article" && <ArticleDetail item={ctx} go={go} authState={authState} />}
-          {page === "library" && <Library go={go} authState={authState} ctx={ctx} />}
-          {page === "library-detail" && (
-            <RequireLogin authState={authState} go={go}>
-              <LibraryDetail item={ctx} go={go} authState={authState} />
-            </RequireLogin>
-          )}
-          {page === "media" && <Media go={go} ctx={ctx} />}
-          {page === "media-detail" && <MediaDetail item={ctx} go={go} authState={authState} />}
-          {page === "scholars" && <Scholars />}
-          {page === "quran" && (
-            <RequireLogin authState={authState} go={go}>
-              <MemberDashboard authState={authState} go={go} initialView="quran" ctx={ctx} />
-            </RequireLogin>
-          )}
-          {page === "tracking" && <Tracking />}
-          {page === "auth" && <Auth authState={authState} go={go} />}
-          
-          {page === "member" && (
-            <RequireLogin authState={authState} go={go}>
-              <MemberDashboard authState={authState} go={go} initialView={ctx?.view} ctx={ctx} />
-            </RequireLogin>
-          )}
-          {page === "staff" && (
-            <RequireLogin authState={authState} go={go}>
-              <StaffDashboard authState={authState} go={go} />
-            </RequireLogin>
-          )}
-          {page === "staff-work" && (
-            <RequireStaff authState={authState} go={go}>
-              <StaffWork authState={authState} go={go} />
-            </RequireStaff>
-          )}
-          {page === "staff-translation" && (
-            <RequireStaff authState={authState} go={go}>
-              <StaffTranslation authState={authState} go={go} />
-            </RequireStaff>
-          )}
-          {page === "admin" && (
-            <RequireStaff authState={authState} go={go}>
-              <Admin go={go} authState={authState} initialTab={ctx?.tab} />
-            </RequireStaff>
-          )}
-          {page === "donate" && <Donation />}
-          {page === "reader" && (
-            <RequireLogin authState={authState} go={go}>
-              <ReadingApp authState={authState} go={go} ctx={ctx} theme={theme} />
-            </RequireLogin>
-          )}
-        </Suspense>
+        <PageErrorBoundary resetKey={`${page}:${JSON.stringify(ctx || {})}`} go={go}>
+          <Suspense fallback={<LoadingState />}>
+            {page === "home" && <Home go={go} />}
+            {page === "articles" && <Articles go={go} authState={authState} ctx={ctx} />}      
+            {page === "article" && <ArticleDetail item={ctx} go={go} authState={authState} />}
+            {page === "library" && <Library go={go} authState={authState} ctx={ctx} />}
+            {page === "library-detail" && (
+              <RequireLogin authState={authState} go={go}>
+                <LibraryDetail item={ctx} go={go} authState={authState} />
+              </RequireLogin>
+            )}
+            {page === "media" && <Media go={go} ctx={ctx} />}
+            {page === "media-detail" && <MediaDetail item={ctx} go={go} authState={authState} />}
+            {page === "scholars" && <Scholars />}
+            {page === "quran" && (
+              <RequireLogin authState={authState} go={go}>
+                <MemberDashboard authState={authState} go={go} initialView="quran" ctx={ctx} />
+              </RequireLogin>
+            )}
+            {page === "tracking" && <Tracking />}
+            {page === "auth" && <Auth authState={authState} go={go} />}
+            
+            {page === "member" && (
+              <RequireLogin authState={authState} go={go}>
+                <MemberDashboard authState={authState} go={go} initialView={ctx?.view} ctx={ctx} />
+              </RequireLogin>
+            )}
+            {page === "staff" && (
+              <RequireLogin authState={authState} go={go}>
+                <StaffDashboard authState={authState} go={go} />
+              </RequireLogin>
+            )}
+            {page === "staff-work" && (
+              <RequireStaff authState={authState} go={go}>
+                <StaffWork authState={authState} go={go} />
+              </RequireStaff>
+            )}
+            {page === "staff-translation" && (
+              <RequireStaff authState={authState} go={go}>
+                <StaffTranslation authState={authState} go={go} />
+              </RequireStaff>
+            )}
+            {page === "admin" && (
+              <RequireStaff authState={authState} go={go}>
+                <Admin go={go} authState={authState} initialTab={ctx?.tab} />
+              </RequireStaff>
+            )}
+            {page === "donate" && <Donation />}
+            {page === "reader" && (
+              <RequireLogin authState={authState} go={go}>
+                <ReadingApp authState={authState} go={go} ctx={ctx} theme={theme} />
+              </RequireLogin>
+            )}
+          </Suspense>
+        </PageErrorBoundary>
       </main>
       <PWAInstallBanner />
     </div>
   )
+}
+
+class PageErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+
+  componentDidUpdate(prevProps) {
+    if (prevProps.resetKey !== this.props.resetKey && this.state.hasError) {
+      this.setState({ hasError: false, error: null })
+    }
+  }
+
+  componentDidCatch(error, info) {
+    console.error("Page render failed", error, info)
+  }
+
+  render() {
+    if (!this.state.hasError) return this.props.children
+
+    return (
+      <div className="card" style={{ maxWidth: 520, margin: "44px auto", padding: 24, textAlign: "center" }}>
+        <i className="ti ti-alert-triangle" style={{ fontSize: 28, color: "var(--red)", marginBottom: 10 }}></i>
+        <h2 style={{ fontSize: 18, marginBottom: 8 }}>เปิดหน้านี้ไม่สำเร็จ</h2>
+        <p style={{ marginBottom: 16 }}>
+          ระบบเจอข้อผิดพลาดระหว่างแสดงผลหน้า ลองโหลดใหม่ หรือกลับหน้าแรกเพื่อใช้งานต่อได้เลย
+        </p>
+        <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
+          <button className="btn btn-teal" onClick={() => window.location.reload()}>
+            <i className="ti ti-refresh" style={{ marginRight: 6 }}></i>โหลดใหม่
+          </button>
+          <button className="btn btn-outline" onClick={() => this.props.go("home")}>
+            <i className="ti ti-home" style={{ marginRight: 6 }}></i>กลับหน้าแรก
+          </button>
+        </div>
+      </div>
+    )
+  }
 }
 
 function RequireLogin({ authState, go, children }) {
