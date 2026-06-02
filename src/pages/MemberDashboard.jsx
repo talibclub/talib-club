@@ -7,6 +7,7 @@ import { useContentCollection } from "../lib/contentStore.js"
 import { storage } from "../lib/firebase.js"
 import { confirmAction } from "../utils/feedback.jsx"
 import Quran from "./Quran.jsx"
+import DashboardNav from "../components/DashboardNav.jsx"
 
 export default function MemberDashboard({ authState, go, initialView = "overview", ctx }) {
   const [view, setCurrentView] = useState("overview")
@@ -88,17 +89,7 @@ export default function MemberDashboard({ authState, go, initialView = "overview
         </div>
       )}
 
-      {view === "overview" && (
-        <Overview
-          authState={authState}
-          go={go}
-          setView={setView}
-          onOpenQuran={(sura, ayah) => {
-            go("quran", { sura: sura || 1, ayah: ayah || null })
-          }}
-          onOpenSavedVerses={() => setView("saved-verses")}
-        />
-      )}
+      {view === "overview" && <DashboardNav setView={setView} go={go} />}
       {view === "saved-articles" && <SavedArticlesPanel authState={authState} go={go} setView={setView} />}
       {view === "bookshelf" && <BookshelfPanel authState={authState} go={go} setView={setView} />}
       {view === "profile" && <ProfilePanel authState={authState} copied={copied} copyText={copyText} go={go} setView={setView} ctx={ctx} />}
