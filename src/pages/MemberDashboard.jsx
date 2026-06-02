@@ -2053,11 +2053,8 @@ function SavedVersesPanel({ authState, go, setView, setQuranSura, setQuranAyah }
   )
 }
 
-// ------------------------------------
-// โหมดแสดงหน้าต่างสอนใช้งาน (Onboarding)
-// ------------------------------------
 function TutorialModal({ onClose }) {
-  return createPortal(
+  return (
     <div style={{
       position: "fixed",
       inset: 0,
@@ -2137,7 +2134,6 @@ function TutorialModal({ onClose }) {
         </button>
 
       </div>
-    </div>,
-    document.body
+    </div>
   )
 }

@@ -37,6 +37,7 @@ export default function AdminArticles() {
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [categoryFilter, setCategoryFilter] = useState("all")
+  const [seriesFilter, setSeriesFilter] = useState("all") // ✅ เพิ่ม State สำหรับกรองซีรีส์
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   const [selected, setSelected] = useState([])
@@ -51,17 +52,25 @@ export default function AdminArticles() {
   const [page, setPage] = useState(1)
   const ITEMS_PER_PAGE = 20
 
+  // รีเซ็ตซีรีส์เป็นทั้งหมด ถ้าเปลี่ยนประเภทเป็นอย่างอื่นที่ไม่ใช่ซีรีส์หรือทั้งหมด
+  useEffect(() => {
+    if (typeFilter !== "all" && !isSeriesType(typeFilter)) {
+      setSeriesFilter("all")
+    }
+  }, [typeFilter])
+
   useEffect(() => {
     setPage(1)
-  }, [search, typeFilter, categoryFilter])
+  }, [search, typeFilter, categoryFilter, seriesFilter])
 
   const filtered = items.filter(a => {
     const matchSearch = String(a.title || "").toLowerCase().includes(search.toLowerCase()) ||
       String(a.author || "").toLowerCase().includes(search.toLowerCase())
     const matchType = typeFilter === "all" || a.type === typeFilter
     const matchCat = categoryFilter === "all" || a.category === categoryFilter
+    const matchSeries = seriesFilter === "all" || a.seriesId === seriesFilter // ✅ กรองด้วย seriesId
 
-    return matchSearch && matchType && matchCat
+    return matchSearch && matchType && matchCat && matchSeries
   })
 
   // เรียงข้อมูลจากใหม่ไปเก่า (เรียงตามวันที่ หรือ ID ถ้าวันที่เหมือนกัน)
@@ -258,6 +267,19 @@ export default function AdminArticles() {
               ))}
             </select>
           </label>
+
+          {/* ✅ กล่องตัวกรองซีรีส์ (แสดงเมื่อเลือกประเภททั้งหมด หรือ ประเภทซีรีส์) */}
+          {(typeFilter === "all" || isSeriesType(typeFilter)) && (
+            <label style={{ display: "grid", gap: 6 }}>
+              <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>กรองตามซีรีส์</span>
+              <select value={seriesFilter} onChange={e => setSeriesFilter(e.target.value)} style={{ background: "var(--card)", border: "none" }}>
+                <option value="all">-- ทุกซีรีส์ --</option>
+                {(taxonomy.articleSeries || []).map(series => (
+                  <option key={series.id} value={series.id}>{series.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
       )}
 
@@ -349,26 +371,36 @@ export default function AdminArticles() {
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {currentItems.map(article => (
-          <div key={article.id} className="card" style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, opacity: busy ? 0.6 : 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
-              <input type="checkbox" checked={selected.includes(article.id)} onChange={() => toggleSelect(article.id)} disabled={busy} style={{ width: 18, height: 18, cursor: busy ? "not-allowed" : "pointer", flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
-                  <span className="tag tag-teal">{article.category}</span>
-                  {/* เช็คประเภทซีรีส์ให้ยืดหยุ่นขึ้น */}
-                  {isSeriesType(article.type) && <span className="tag">ซีรีส์ ตอน {article.part}</span>}
+        {currentItems.map(article => {
+          // หากเป็นบทความซีรีส์ ให้ดึงชื่อซีรีส์มาแสดง
+          const seriesInfo = isSeriesType(article.type) && taxonomy.articleSeries?.find(s => s.id === article.seriesId);
+
+          return (
+            <div key={article.id} className="card" style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, opacity: busy ? 0.6 : 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
+                <input type="checkbox" checked={selected.includes(article.id)} onChange={() => toggleSelect(article.id)} disabled={busy} style={{ width: 18, height: 18, cursor: busy ? "not-allowed" : "pointer", flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", gap: 6, marginBottom: 4, flexWrap: "wrap", alignItems: "center" }}>
+                    <span className="tag tag-teal">{article.category}</span>
+                    {/* เช็คประเภทซีรีส์ให้ยืดหยุ่นขึ้น และแสดงชื่อซีรีส์ถ้ามี */}
+                    {isSeriesType(article.type) && (
+                      <span className="tag" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        {seriesInfo?.name || "ซีรีส์"}
+                        {article.part && <span style={{ opacity: 0.8 }}>ตอนที่ {article.part}</span>}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{article.title}</div>
+                  <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300, marginTop: 4 }}>{article.author} · {article.date}</div>
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{article.title}</div>
-                <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300, marginTop: 4 }}>{article.author} · {article.date}</div>
+              </div>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <button className="btn btn-outline" onClick={() => openEdit(article)} disabled={busy} style={{ padding: "6px 12px", fontSize: 12, opacity: busy ? 0.5 : 1, pointerEvents: busy ? 'none' : 'auto' }}><i className="ti ti-pencil"></i></button>
+                <button className="btn btn-outline" style={{ color: "#e05555", borderColor: "rgba(224,85,85,.3)", padding: "6px 12px", fontSize: 12, opacity: busy ? 0.5 : 1, pointerEvents: busy ? 'none' : 'auto' }} onClick={() => remove(article)} disabled={busy}><i className="ti ti-trash"></i></button>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-              <button className="btn btn-outline" onClick={() => openEdit(article)} disabled={busy} style={{ padding: "6px 12px", fontSize: 12, opacity: busy ? 0.5 : 1, pointerEvents: busy ? 'none' : 'auto' }}><i className="ti ti-pencil"></i></button>
-              <button className="btn btn-outline" style={{ color: "#e05555", borderColor: "rgba(224,85,85,.3)", padding: "6px 12px", fontSize: 12, opacity: busy ? 0.5 : 1, pointerEvents: busy ? 'none' : 'auto' }} onClick={() => remove(article)} disabled={busy}><i className="ti ti-trash"></i></button>
-            </div>
-          </div>
-        ))}
+          )
+        })}
         {filtered.length === 0 && <div className="empty">ไม่พบบทความที่ตรงกับเงื่อนไข</div>}
       </div>
 
