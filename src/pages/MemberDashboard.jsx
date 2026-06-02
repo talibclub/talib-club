@@ -2183,19 +2183,23 @@ function TutorialModal({ onClose }) {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      padding: 20
+      padding: "20px 16px",
+      overflowY: "auto",
     }}>
       <div className="card" style={{
         maxWidth: 500,
         width: "100%",
-        padding: "32px 24px",
+        padding: "28px 22px",
         display: "flex",
         flexDirection: "column",
-        gap: 16,
+        gap: 14,
         textAlign: "center",
         animation: "pageFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
         boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
-        position: "relative"
+        position: "relative",
+        maxHeight: "calc(100dvh - 40px)",
+        overflowY: "auto",
+        margin: "auto",
       }}>
         {/* ป้ายด้านบนสุด */}
         <div style={{ display: "flex", justifyContent: "center", marginBottom: -4 }}>
@@ -2210,7 +2214,7 @@ function TutorialModal({ onClose }) {
           ระบบนี้คือเครื่องมือช่วยสร้างวินัยรักการอ่านของคุณ ผ่านการจับเวลาจริง บันทึกผล และสะสมสถิติความต่อเนื่อง (Streak)
         </p>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, textAlign: "left", marginTop: 8 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, textAlign: "left", marginTop: 4 }}>
 
           <div style={{ display: "flex", gap: 14, background: "var(--bg2)", padding: 14, borderRadius: 12, border: "0.5px solid var(--br)" }}>
             <div style={{ width: 36, height: 36, background: "var(--teal-bg)", color: "var(--teal)", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 18, flexShrink: 0 }}>
@@ -2247,7 +2251,7 @@ function TutorialModal({ onClose }) {
         <button
           className="btn btn-teal"
           onClick={onClose}
-          style={{ width: "100%", padding: "12px", fontSize: 14, marginTop: 8 }}
+          style={{ width: "100%", padding: "12px", fontSize: 14, marginTop: 4, flexShrink: 0 }}
         >
           เข้าใจแล้ว เริ่มต้นใช้งานเลย!
         </button>
@@ -2256,3 +2260,4 @@ function TutorialModal({ onClose }) {
     </div>
   )
 }
+
