@@ -1,0 +1,389 @@
+diff --git a/src/App.jsx b/src/App.jsx
+index fb2406e..029a116 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useState, lazy, Suspense } from "react"
++import { Component, useEffect, useState, lazy, Suspense } from "react"
+ import { useTheme } from "./hooks/useTheme.js"
+ import { useAuth } from "./hooks/useAuth.js"
+ import Nav from "./components/Nav.jsx"
+@@ -125,60 +125,105 @@ export default function App() {
+       
+       <Nav page={page} go={go} theme={theme} setTheme={setTheme} authState={authState} />
+       <main className={`${page === "quran" || page === "member" ? "wide" : ""} fade-in-active`} key={page}>
+-        <Suspense fallback={<LoadingState />}>
+-          {page === "home" && <Home go={go} />}
+-          {page === "articles" && <Articles go={go} authState={authState} ctx={ctx} />}      
+-          {page === "article" && <ArticleDetail item={ctx} go={go} authState={authState} />}
+-          {page === "library" && <Library go={go} authState={authState} />}
+-          {page === "library-detail" && (
+-            <RequireLogin authState={authState} go={go}>
+-              <LibraryDetail item={ctx} go={go} authState={authState} />
+-            </RequireLogin>
+-          )}
+-          {page === "media" && <Media go={go} />}
+-          {page === "media-detail" && <MediaDetail item={ctx} go={go} authState={authState} />}
+-          {page === "scholars" && <Scholars />}
+-          {page === "quran" && (
+-            <RequireLogin authState={authState} go={go}>
+-              <MemberDashboard authState={authState} go={go} initialView="quran" ctx={ctx} />
+-            </RequireLogin>
+-          )}
+-          {page === "tracking" && <Tracking />}
+-          {page === "auth" && <Auth authState={authState} go={go} />}
+-          
+-          {page === "member" && (
+-            <RequireLogin authState={authState} go={go}>
+-              <MemberDashboard authState={authState} go={go} initialView={ctx?.view} ctx={ctx} />
+-            </RequireLogin>
+-          )}
+-          {page === "staff" && (
+-            <RequireLogin authState={authState} go={go}>
+-              <StaffDashboard authState={authState} go={go} />
+-            </RequireLogin>
+-          )}
+-          {page === "staff-work" && (
+-            <RequireStaff authState={authState} go={go}>
+-              <StaffWork authState={authState} go={go} />
+-            </RequireStaff>
+-          )}
+-          {page === "staff-translation" && (
+-            <RequireStaff authState={authState} go={go}>
+-              <StaffTranslation authState={authState} go={go} />
+-            </RequireStaff>
+-          )}
+-          {page === "admin" && (
+-            <RequireStaff authState={authState} go={go}>
+-              <Admin go={go} authState={authState} initialTab={ctx?.tab} />
+-            </RequireStaff>
+-          )}
+-          {page === "donate" && <Donation />}
+-        </Suspense>
++        <PageErrorBoundary resetKey={`${page}:${JSON.stringify(ctx || {})}`} go={go}>
++          <Suspense fallback={<LoadingState />}>
++            {page === "home" && <Home go={go} />}
++            {page === "articles" && <Articles go={go} authState={authState} ctx={ctx} />}      
++            {page === "article" && <ArticleDetail item={ctx} go={go} authState={authState} />}
++            {page === "library" && <Library go={go} authState={authState} />}
++            {page === "library-detail" && (
++              <RequireLogin authState={authState} go={go}>
++                <LibraryDetail item={ctx} go={go} authState={authState} />
++              </RequireLogin>
++            )}
++            {page === "media" && <Media go={go} />}
++            {page === "media-detail" && <MediaDetail item={ctx} go={go} authState={authState} />}
++            {page === "scholars" && <Scholars />}
++            {page === "quran" && (
++              <RequireLogin authState={authState} go={go}>
++                <MemberDashboard authState={authState} go={go} initialView="quran" ctx={ctx} />
++              </RequireLogin>
++            )}
++            {page === "tracking" && <Tracking />}
++            {page === "auth" && <Auth authState={authState} go={go} />}
++            
++            {page === "member" && (
++              <RequireLogin authState={authState} go={go}>
++                <MemberDashboard authState={authState} go={go} initialView={ctx?.view} ctx={ctx} />
++              </RequireLogin>
++            )}
++            {page === "staff" && (
++              <RequireLogin authState={authState} go={go}>
++                <StaffDashboard authState={authState} go={go} />
++              </RequireLogin>
++            )}
++            {page === "staff-work" && (
++              <RequireStaff authState={authState} go={go}>
++                <StaffWork authState={authState} go={go} />
++              </RequireStaff>
++            )}
++            {page === "staff-translation" && (
++              <RequireStaff authState={authState} go={go}>
++                <StaffTranslation authState={authState} go={go} />
++              </RequireStaff>
++            )}
++            {page === "admin" && (
++              <RequireStaff authState={authState} go={go}>
++                <Admin go={go} authState={authState} initialTab={ctx?.tab} />
++              </RequireStaff>
++            )}
++            {page === "donate" && <Donation />}
++          </Suspense>
++        </PageErrorBoundary>
+       </main>
+       <PWAInstallBanner />
+     </div>
+   )
+ }
+ 
++class PageErrorBoundary extends Component {
++  constructor(props) {
++    super(props)
++    this.state = { hasError: false, error: null }
++  }
++
++  static getDerivedStateFromError(error) {
++    return { hasError: true, error }
++  }
++
++  componentDidUpdate(prevProps) {
++    if (prevProps.resetKey !== this.props.resetKey && this.state.hasError) {
++      this.setState({ hasError: false, error: null })
++    }
++  }
++
++  componentDidCatch(error, info) {
++    console.error("Page render failed", error, info)
++  }
++
++  render() {
++    if (!this.state.hasError) return this.props.children
++
++    return (
++      <div className="card" style={{ maxWidth: 520, margin: "44px auto", padding: 24, textAlign: "center" }}>
++        <i className="ti ti-alert-triangle" style={{ fontSize: 28, color: "var(--red)", marginBottom: 10 }}></i>
++        <h2 style={{ fontSize: 18, marginBottom: 8 }}>เปิดหน้านี้ไม่สำเร็จ</h2>
++        <p style={{ marginBottom: 16 }}>
++          ระบบเจอข้อผิดพลาดระหว่างแสดงผลหน้า ลองโหลดใหม่ หรือกลับหน้าแรกเพื่อใช้งานต่อได้เลย
++        </p>
++        <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
++          <button className="btn btn-teal" onClick={() => window.location.reload()}>
++            <i className="ti ti-refresh" style={{ marginRight: 6 }}></i>โหลดใหม่
++          </button>
++          <button className="btn btn-outline" onClick={() => this.props.go("home")}>
++            <i className="ti ti-home" style={{ marginRight: 6 }}></i>กลับหน้าแรก
++          </button>
++        </div>
++      </div>
++    )
++  }
++}
++
+ function RequireLogin({ authState, go, children }) {
+   if (authState.loading) return <LoadingState />
+   if (!authState.user) return <Auth authState={authState} go={go} />
+@@ -199,4 +244,4 @@ function LoadingState() {
+       <p style={{ marginTop: 10 }}>กำลังตรวจสอบสถานะผู้ใช้...</p>
+     </div>
+   )
+-}
+\ No newline at end of file
++}
+diff --git a/src/pages/MemberDashboard.jsx b/src/pages/MemberDashboard.jsx
+index 2636612..77fadf4 100644
+--- a/src/pages/MemberDashboard.jsx
++++ b/src/pages/MemberDashboard.jsx
+@@ -26,7 +26,7 @@ export default function MemberDashboard({ authState, go, initialView = "overview
+     const ayah = searchParams.get("ayah") || ctx?.ayah
+     if (sura) setQuranSura(Number(sura))
+     if (ayah) setQuranAyah(Number(ayah))
+-    else if (initialView !== "quran" && view !== "quran") setQuranAyah(null)
++    else setQuranAyah(null)
+   }, [initialView, ctx])
+ 
+   const setView = (newView) => {
+diff --git a/src/pages/Quran.jsx b/src/pages/Quran.jsx
+index 4c57cd9..1e45f4f 100644
+--- a/src/pages/Quran.jsx
++++ b/src/pages/Quran.jsx
+@@ -39,8 +39,18 @@ const JUZ_STARTS = [
+   { juz: 30, sura: 78, ayah: 1, label: "ยุซอ์ที่ 30 (ซูเราะฮ์ 78:1)" }
+ ]
+ 
++const normalizeSuraNumber = (value) => {
++  const parsed = Number(value)
++  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 114 ? parsed : 1
++}
++
++const normalizeAyahNumber = (value) => {
++  const parsed = Number(value)
++  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
++}
++
+ export default function Quran({ initialSura, initialAyah, authState }) {
+-  const [selectedSura, setSelectedSura] = useState(initialSura || 1)
++  const [selectedSura, setSelectedSura] = useState(() => normalizeSuraNumber(initialSura))
+   const readingAreaRef = useRef(null)
+   
+   const scrollToReadingArea = () => {
+@@ -57,6 +67,8 @@ export default function Quran({ initialSura, initialAyah, authState }) {
+   const [scrollPercent, setScrollPercent] = useState(0)
+   const [showScrollTop, setShowScrollTop] = useState(false)
+   const [searchHasRun, setSearchHasRun] = useState(false)
++  const [targetScrollAyah, setTargetScrollAyah] = useState(() => normalizeAyahNumber(initialAyah))
++  const [reloadKey, setReloadKey] = useState(0)
+   
+   // Navigation Mode: "surah" | "juz" | "page"
+   const [navMode, setNavMode] = useState("surah")
+@@ -87,7 +99,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
+       
+       let changed = false
+       if (prevSura !== String(selectedSura)) {
+-        url.searchParams.set("sura", selectedSura)
++        url.searchParams.set("sura", String(selectedSura))
+         url.searchParams.delete("ayah") // Clear ayah on surah change
+         changed = true
+       }
+@@ -96,6 +108,10 @@ export default function Quran({ initialSura, initialAyah, authState }) {
+         url.searchParams.set("ayah", targetScrollAyah)
+         changed = true
+       }
++      if (!targetScrollAyah && prevAyah) {
++        url.searchParams.delete("ayah")
++        changed = true
++      }
+       
+       if (changed) {
+         window.history.replaceState(window.history.state, "", url.pathname + url.search)
+@@ -121,6 +137,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
+     if (!selectedPage) return
+     let active = true
+     setPageLoading(true)
++    setPageVerses([])
+     
+     // Fetch Arabic text for Mushaf page display
+     fetch(`https://api.alquran.cloud/v1/page/${selectedPage}/quran-simple`)
+@@ -181,8 +198,6 @@ export default function Quran({ initialSura, initialAyah, authState }) {
+   const [searchResults, setSearchResults] = useState([])
+   const [searchLoading, setSearchLoading] = useState(false)
+   const [searchError, setSearchError] = useState(null)
+-  const [targetScrollAyah, setTargetScrollAyah] = useState(initialAyah || null)
+-  
+   // Bookmarks (Reflection notes) from Firestore
+   const { items: savedVerses, saveItem, deleteItem } = useContentCollection("quran_bookmarks", [])
+   const uid = authState?.user?.uid
+@@ -232,30 +247,18 @@ export default function Quran({ initialSura, initialAyah, authState }) {
+     }
+   }
+ 
+-  const handleSelectPage = async (pageNumber) => {
++  const handleSelectPage = (pageNumber) => {
+     const pNum = Number(pageNumber)
+     if (isNaN(pNum) || pNum < 1 || pNum > 604) {
+       toast.error("กรุณาระบุเลขหน้าตั้งแต่ 1 ถึง 604")
+       return
+     }
+-    setLoading(true)
+-    try {
+-      const res = await fetch(`https://api.alquran.cloud/v1/page/${pNum}/quran-simple`)
+-      const data = await res.json()
+-      if (data.code === 200 && data.data?.ayahs?.length > 0) {
+-        const firstAyah = data.data.ayahs[0]
+-        setSelectedSura(firstAyah.surah.number)
+-        setTargetScrollAyah(firstAyah.numberInSurah)
+-        if (isMobile) setIsMobileNavOpen(false)
+-      } else {
+-        toast.error("ไม่สามารถโหลดข้อมูลของหน้านี้ได้")
+-      }
+-    } catch (err) {
+-      console.error(err)
+-      toast.error("การเชื่อมต่อล้มเหลว กรุณาลองใหม่อีกครั้ง")
+-    } finally {
+-      setLoading(false)
+-    }
++    setMode("mushaf")
++    setSelectedPage(pNum)
++    setPageInput("")
++    setTargetScrollAyah(null)
++    if (isMobile) setIsMobileNavOpen(false)
++    window.setTimeout(scrollToReadingArea, 80)
+   }
+ 
+   const performSearch = async (query) => {
+@@ -317,13 +320,13 @@ export default function Quran({ initialSura, initialAyah, authState }) {
+   useEffect(() => {
+     if (initialSura) {
+       setSelectedPage(null)
+-      setSelectedSura(initialSura)
++      setSelectedSura(normalizeSuraNumber(initialSura))
+     }
+   }, [initialSura])
+ 
+   useEffect(() => {
+     if (initialAyah) {
+-      setTargetScrollAyah(initialAyah)
++      setTargetScrollAyah(normalizeAyahNumber(initialAyah))
+     }
+   }, [initialAyah])
+ 
+@@ -473,7 +476,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
+     return () => {
+       active = false
+     }
+-  }, [selectedSura, translationKey])
++  }, [selectedSura, translationKey, reloadKey])
+ 
+   useEffect(() => {
+     if (targetScrollAyah && !loading && verses.length > 0) {
+@@ -1441,7 +1444,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
+               <i className="ti ti-alert-triangle" style={{ fontSize: 24, color: "var(--red)", marginBottom: 8 }}></i>
+               <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 500, marginBottom: 4 }}>เกิดข้อผิดพลาด</div>
+               <p style={{ fontSize: 12, color: "var(--t2)", marginBottom: 12 }}>{error}</p>
+-              <button className="btn btn-teal" style={{ fontSize: 11, padding: "5px 14px" }} onClick={() => setTranslationKey(prev => prev)}>ลองอีกครั้ง</button>
++              <button className="btn btn-teal" style={{ fontSize: 11, padding: "5px 14px" }} onClick={() => setReloadKey(key => key + 1)}>ลองอีกครั้ง</button>
+             </div>
+           )}
+ 
+@@ -1509,31 +1512,37 @@ export default function Quran({ initialSura, initialAyah, authState }) {
+                           lineHeight: 2.3
+                         }}
+                       >
+-                        {pageVerses.map(v => (
+-                          <span key={v.id}>
+-                            {v.text || v.arabic_text}{" "}
+-                            <span 
+-                              style={{ 
+-                                fontFamily: "sans-serif", 
+-                                fontSize: `${Math.round(arabicSize * 0.5)}px`, 
+-                                color: "var(--teal)", 
+-                                fontWeight: "bold",
+-                                margin: "0 4px",
+-                                display: "inline-flex",
+-                                width: `${Math.round(arabicSize * 0.95)}px`,
+-                                height: `${Math.round(arabicSize * 0.95)}px`,
+-                                border: "1.5px solid var(--teal)",
+-                                borderRadius: "50%",
+-                                alignItems: "center",
+-                                justifyContent: "center",
+-                                direction: "ltr"
+-                              }}
+-                              title={`ซูเราะฮ์ ${v.suraName || ""} [${v.sura}:${v.aya}]`}
+-                            >
+-                              {getArabicNumber(v.aya)}
+-                            </span>{" "}
+-                          </span>
+-                        ))}
++                        {pageVerses.length > 0 ? (
++                          pageVerses.map(v => (
++                            <span key={v.id}>
++                              {v.text || v.arabic_text}{" "}
++                              <span 
++                                style={{ 
++                                  fontFamily: "sans-serif", 
++                                  fontSize: `${Math.round(arabicSize * 0.5)}px`, 
++                                  color: "var(--teal)", 
++                                  fontWeight: "bold",
++                                  margin: "0 4px",
++                                  display: "inline-flex",
++                                  width: `${Math.round(arabicSize * 0.95)}px`,
++                                  height: `${Math.round(arabicSize * 0.95)}px`,
++                                  border: "1.5px solid var(--teal)",
++                                  borderRadius: "50%",
++                                  alignItems: "center",
++                                  justifyContent: "center",
++                                  direction: "ltr"
++                                }}
++                                title={`ซูเราะฮ์ ${v.suraName || ""} [${v.sura}:${v.aya}]`}
++                              >
++                                {getArabicNumber(v.aya)}
++                              </span>{" "}
++                            </span>
++                          ))
++                        ) : (
++                          <div style={{ direction: "ltr", textAlign: "center", fontFamily: "'Prompt', sans-serif", fontSize: 13, color: "var(--t2)", padding: "36px 12px" }}>
++                            ไม่พบข้อมูลหน้านี้ กรุณาลองเลือกหน้าใหม่อีกครั้ง
++                          </div>
++                        )}
+                       </div>
+                     )}
+ 

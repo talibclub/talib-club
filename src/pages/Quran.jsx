@@ -1457,7 +1457,10 @@ export default function Quran({ initialSura, initialAyah, authState }) {
           {/* READING AREA */}
           {!error && (verses.length > 0 || (mode === "mushaf" && selectedPage)) && (
             <div ref={readingAreaRef} className="card" style={{ 
-              padding: isMobile ? "16px 12px" : "24px 28px", 
+              padding: isMobile ? "20px 16px" : "24px 28px", 
+              border: isMobile ? "none" : "0.5px solid var(--br)", 
+              borderRadius: isMobile ? "0" : "16px",
+              boxShadow: isMobile ? "none" : "var(--shadow)",
               display: "flex", 
               flexDirection: "column", 
               gap: 16,
@@ -1684,11 +1687,10 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                         id={`ayah-${v.aya}`}
                         style={{ 
                           borderBottom: "0.5px solid var(--br2)", 
-                          paddingBottom: 20, 
                           display: "flex", 
                           flexDirection: "column", 
-                          gap: 12,
-                          padding: "10px 10px 20px 10px",
+                          gap: 16,
+                          padding: isMobile ? "24px 0" : "20px 10px",
                           transition: "background-color 0.3s"
                         }}
                       >
@@ -2173,18 +2175,21 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                           {filteredSurahs.map(s => (
                             <div 
                               key={s.number} 
-                              className={`surah-item ${selectedSura === s.number ? "active" : ""}`}
+                              className={`surah-item`}
                               onClick={() => {
                                 setSelectedSura(s.number);
                                 setIsMobileNavOpen(false);
                               }}
                               style={{ 
-                                padding: "10px 14px", 
+                                padding: "14px 16px", 
                                 display: "flex", 
                                 justifyContent: "space-between", 
                                 alignItems: "center", 
-                                borderBottom: "0.5px solid var(--quran-br)",
-                                borderRadius: 6
+                                borderBottom: selectedSura === s.number ? "none" : "0.5px solid var(--quran-br2)",
+                                background: selectedSura === s.number ? "var(--quran-teal-bg)" : "transparent",
+                                borderRadius: selectedSura === s.number ? "10px" : "0",
+                                marginBottom: "2px",
+                                transition: "all 0.2s ease"
                               }}
                             >
                               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
