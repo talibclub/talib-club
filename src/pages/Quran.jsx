@@ -2377,4 +2377,4 @@ export default function Quran({ initialSura, initialAyah, authState }) {
       )}
     </div>
   )
-}
+} 
