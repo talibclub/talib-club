@@ -231,51 +231,49 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
 
   async function claimMission(missionId) {
     if (!uid) return
-    const isM1 = missionId === "m1"
-    const isM2 = missionId === "m2"
-    const isM3 = missionId === "m3"
-
-    const todayClaims = streakSettings.claimedMissions?.[streak.todayKey] || {}
-    if (todayClaims[missionId]) {
-      toast.success("คุณรับรางวัลภารกิจนี้ไปแล้ว")
+    const weekKey = getWeekKey()
+    const weekClaims = streakSettings.claimedMissions?.[weekKey] || {}
+    if (weekClaims[missionId]) {
+      toast.success("คุณรับรางวัลภารกิจนี้แล้วในสัปดาห์นี้")
       return
     }
 
     let completed = false
-    if (isM1) completed = todaySeconds >= 600
-    if (isM2) completed = todaySessions.some(s => s.reflection && s.reflection.length >= 100)
-    if (isM3) completed = todayQuizPassed
+    if (missionId === "m1") completed = shelfItems.some(i =>
+      i.uid === uid && i.status === "finished" && i.finishedAt && getWeekKey(i.finishedAt) === getWeekKey()
+    )
+    if (missionId === "m2") completed = todaySessions.some(s => s.reflection && s.reflection.length >= MISSION_REFLECT_CHARS)
+    if (missionId === "m3") completed = shelfItems.some(item => {
+      if (item.uid !== uid || !item.lastQuiz) return false
+      return item.lastQuiz.score >= MISSION_QUIZ_MIN_SCORE
+    })
+
 
     if (!completed) {
-      toast.error("ภารกิจยังไม่เสร็จสมบูรณ์")
+      if (missionId === "m1") toast.error("ภารกิจยังไม่สำเร็จ: อ่านหนังสือจนจบแล้วกดเปลี่ยนสถานะเป็น 'อ่านจบ' ก่อน")
+      else if (missionId === "m2") toast.error("ภารกิจยังไม่สำเร็จ: เขียนข้อคิดครบ 3,000 ตัวอักษร")
+      else toast.error(`ภารกิจยังไม่สำเร็จ: ทำ Quiz ได้ ${MISSION_QUIZ_MIN_SCORE}/20 ขึ้นไป`)
       return
     }
 
     let nextFreeze = streakSettings.freezeCredits
     let nextLeave = streakSettings.leaveCredits
-    if (isM1 || isM3) nextFreeze += 1
-    if (isM2) nextLeave += 1
+    if (missionId === "m1" || missionId === "m3") {
+      if (nextFreeze >= MAX_FREEZE_CREDITS) { toast.error("น้ำแข็งเต็มแล้ว (สูงสุด 2 ชิ้น)"); return }
+      nextFreeze += 1
+    }
+    if (missionId === "m2") {
+      if (nextLeave >= MAX_LEAVE_CREDITS) { toast.error("สิทธิ์ลากิจเต็มแล้ว (สูงสุด 2 ชิ้น)"); return }
+      nextLeave += 1
+    }
 
     const nextClaimed = {
       ...streakSettings.claimedMissions,
-      [streak.todayKey]: {
-        ...(streakSettings.claimedMissions?.[streak.todayKey] || {}),
-        [missionId]: true
-      }
+      [weekKey]: { ...(streakSettings.claimedMissions?.[weekKey] || {}), [missionId]: true }
     }
 
-    await saveStreakSettings({
-      ...streakSettings,
-      freezeCredits: nextFreeze,
-      leaveCredits: nextLeave,
-      claimedMissions: nextClaimed
-    })
-
-    toast.success(
-      isM2
-        ? "สำเร็จ! รับรางวัล สิทธิ์ลากิจ +1 📅"
-        : "สำเร็จ! รับรางวัล น้ำแข็งคุ้มครอง +1 🧊"
-    )
+    await saveStreakSettings({ ...streakSettings, freezeCredits: nextFreeze, leaveCredits: nextLeave, claimedMissions: nextClaimed })
+    toast.success(missionId === "m2" ? "สำเร็จ! รับรางวัล สิทธิ์ลากิจ +1 📅" : "สำเร็จ! รับรางวัล น้ำแข็งคุ้มครอง +1 🧊")
   }
 
   useEffect(() => {
@@ -321,34 +319,36 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <MissionRow
             title="1. นักอ่านผู้ทุ่มเท"
-            desc="อ่านหนังสือสะสมเวลาอย่างน้อย 10 นาทีวันนี้"
-            progress={todaySeconds}
-            target={600}
-            formatProgress={(val) => `${Math.round(val / 60)}/10 นาที`}
+          <MissionRow
+            title="1. ผู้อ่านจนจบเล่ม"
+            desc="อ่านหนังสือจนจบ (กดเปลี่ยนสถานะเป็น อ่านจบ) สัปดาห์นี้"
+            progress={shelfItems.filter(i => i.uid === uid && i.status === "finished" && i.finishedAt && getWeekKey(i.finishedAt) === getWeekKey()).length}
+            target={1}
+            formatProgress={(val) => val >= 1 ? "จบแล้ว ✓" : "ยังไม่จบเล่ม"}
             rewardText="+1 น้ำแข็ง 🧊"
-            claimed={streakSettings.claimedMissions?.[streak.todayKey]?.m1}
+            claimed={streakSettings.claimedMissions?.[getWeekKey()]?.m1}
             onClaim={() => claimMission("m1")}
           />
 
           <MissionRow
-            title="2. ข้อคิดสะท้อนธรรมลึกซึ้ง"
-            desc="บันทึกเซสชันอ่านและเขียนข้อคิดความยาว 100 ตัวอักษรขึ้นไปวันนี้"
-            progress={todaySessions.reduce((max, s) => Math.max(max, s.reflection?.length || 0), 0)}
-            target={100}
-            formatProgress={(val) => `${val}/100 ตัวอักษร`}
+            title="2. บันทึกข้อคิดเชิงลึก"
+            desc="เขียนข้อคิดในเซสชันเดียว ความยาวตั้งแต่ 3,000 ตัวอักษรขึ้นไป"
+            progress={Math.min(3000, [...(todaySessions || [])].reduce((max, s) => Math.max(max, s.reflection?.length || 0), 0))}
+            target={3000}
+            formatProgress={(val) => `${val.toLocaleString()}/3,000 ตัว`}
             rewardText="+1 สิทธิ์ลากิจ 📅"
-            claimed={streakSettings.claimedMissions?.[streak.todayKey]?.m2}
+            claimed={streakSettings.claimedMissions?.[getWeekKey()]?.m2}
             onClaim={() => claimMission("m2")}
           />
 
           <MissionRow
             title="3. ผู้พิชิตแบบทดสอบ"
-            desc="ทำแบบทดสอบหนังสือวันนี้ และได้คะแนนตั้งแต่ 3/5 ข้อขึ้นไป"
-            progress={todayQuizPassed ? 1 : 0}
-            target={1}
-            formatProgress={(val) => val === 1 ? "สำเร็จ" : "ยังไม่สำเร็จ"}
+            desc="ทำ Quiz หนังสือและได้คะแนนตั้งแต่ 17/20 ข้อขึ้นไป"
+            progress={(() => { const best = shelfItems.filter(i => i.uid === uid && i.lastQuiz).map(i => i.lastQuiz.score || 0); return best.length ? Math.max(...best) : 0 })()}
+            target={17}
+            formatProgress={(val) => `${val}/20 ข้อ`}
             rewardText="+1 น้ำแข็ง 🧊"
-            claimed={streakSettings.claimedMissions?.[streak.todayKey]?.m3}
+            claimed={streakSettings.claimedMissions?.[getWeekKey()]?.m3}
             onClaim={() => claimMission("m3")}
           />
         </div>
@@ -641,7 +641,22 @@ function todayKey() {
   return getLocalDayKey(Date.now())
 }
 
+function getWeekKey(date) {
+  // ISO week: YYYY-W## based on UTC+7
+  const d = date ? new Date(date) : new Date(Date.now() + 7 * 3600000)
+  const day = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - day)
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  const week = Math.ceil((((d - yearStart) / 86400000) + 1) / 7)
+  return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`
+}
+
 const DAILY_READING_GOAL_MINUTES = 10
+const MISSION_READ_SECONDS = 20 * 60   // 20 นาที
+const MISSION_REFLECT_CHARS = 3000      // 3,000 ตัวอักษร
+const MISSION_QUIZ_MIN_SCORE = 17       // 17/20 ข้อ
+const MAX_FREEZE_CREDITS = 2
+const MAX_LEAVE_CREDITS = 2
 const DEFAULT_FREEZE_CREDITS = 2
 const DEFAULT_LEAVE_CREDITS = 1
 
@@ -916,12 +931,14 @@ function BookshelfPanel({ authState, go, setView }) {
   }
 
   async function updateShelfItem(item, patch) {
+    const isFinishing = patch.status === "finished" && item.status !== "finished"
     const nextProgress = patch.status === "finished" ? 100 : patch.progress
     await saveItem({
       ...cleanShelfItem(item),
       ...patch,
       progress: nextProgress !== undefined ? Number(nextProgress) : Number(item.progress || 0),
       updatedAt: Date.now(),
+      ...(isFinishing ? { finishedAt: Date.now() } : {}),
     })
   }
 
@@ -1061,20 +1078,40 @@ function BookshelfPanel({ authState, go, setView }) {
 
   async function claimMission(missionId) {
     if (!uid) return
-    const todayClaims = streakSettings.claimedMissions?.[streak.todayKey] || {}
-    if (todayClaims[missionId]) { toast.success("คุณรับรางวัลภารกิจนี้ไปแล้ว"); return }
+    const weekKey = getWeekKey()
+    const weekClaims = streakSettings.claimedMissions?.[weekKey] || {}
+    if (weekClaims[missionId]) { toast.success("รับรางวัลภารกิจนี้แล้วในสัปดาห์นี้"); return }
+
     let completed = false
-    if (missionId === "m1") completed = todaySeconds >= 600
-    if (missionId === "m2") completed = todaySessions.some(s => s.reflection && s.reflection.length >= 100)
-    if (missionId === "m3") completed = todayQuizPassed
-    if (!completed) { toast.error("ภารกิจยังไม่เสร็จสมบูรณ์"); return }
+    if (missionId === "m1") completed = todaySeconds >= MISSION_READ_SECONDS
+    if (missionId === "m2") completed = todaySessions.some(s => s.reflection && s.reflection.length >= MISSION_REFLECT_CHARS)
+    if (missionId === "m3") completed = shelfItems.some(item => {
+      if (item.uid !== uid || !item.lastQuiz) return false
+      const dateKey = getLocalDayKey(item.lastQuiz.takenAt)
+      return dateKey === streak.todayKey && item.lastQuiz.score >= MISSION_QUIZ_MIN_SCORE
+    })
+
+    if (!completed) {
+      if (missionId === "m1") toast.error(`ภารกิจยังไม่สำเร็จ: อ่านครบ 20 นาที (ปัจจุบัน ${Math.round(todaySeconds/60)} นาที)`)
+      else if (missionId === "m2") toast.error(`ภารกิจยังไม่สำเร็จ: เขียนข้อคิดครบ 3,000 ตัวอักษร`)
+      else toast.error(`ภารกิจยังไม่สำเร็จ: ทำแบบทดสอบได้ ${MISSION_QUIZ_MIN_SCORE}/20 ขึ้นไป`)
+      return
+    }
+
     let nextFreeze = streakSettings.freezeCredits
     let nextLeave = streakSettings.leaveCredits
-    if (missionId === "m1" || missionId === "m3") nextFreeze += 1
-    if (missionId === "m2") nextLeave += 1
+    if (missionId === "m1" || missionId === "m3") {
+      if (nextFreeze >= MAX_FREEZE_CREDITS) { toast.error("น้ำแข็งเต็มแล้ว (สูงสุด 2 ชิ้น)"); return }
+      nextFreeze += 1
+    }
+    if (missionId === "m2") {
+      if (nextLeave >= MAX_LEAVE_CREDITS) { toast.error("สิทธิ์ลากิจเต็มแล้ว (สูงสุด 2 ชิ้น)"); return }
+      nextLeave += 1
+    }
+
     const nextClaimed = {
       ...streakSettings.claimedMissions,
-      [streak.todayKey]: { ...(streakSettings.claimedMissions?.[streak.todayKey] || {}), [missionId]: true }
+      [weekKey]: { ...(streakSettings.claimedMissions?.[weekKey] || {}), [missionId]: true }
     }
     await saveStreakSettings({ ...streakSettings, freezeCredits: nextFreeze, leaveCredits: nextLeave, claimedMissions: nextClaimed })
     toast.success(missionId === "m2" ? "สำเร็จ! รับรางวัล สิทธิ์ลากิจ +1 📅" : "สำเร็จ! รับรางวัล น้ำแข็งคุ้มครอง +1 🧊")
@@ -1116,21 +1153,21 @@ function BookshelfPanel({ authState, go, setView }) {
         onShowTutorial={() => setShowTutorial(true)}
       />
 
-      {/* ─── Daily Missions ────────────────────────────────────────────────── */}
+      {/* ─── Weekly Missions ────────────────────────────────────────────────── */}
       <div className="card" style={{ padding: 24, marginBottom: 20, textAlign: "left" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--teal-bg)", display: "grid", placeItems: "center" }}>
             <i className="ti ti-target" style={{ color: "var(--teal)", fontSize: 18 }}></i>
           </div>
           <div>
-            <h3 style={{ fontSize: 15, fontWeight: 600 }}>ภารกิจรับไอเทมประจำวัน (Daily Missions)</h3>
-            <p style={{ fontSize: 11, color: "var(--t2)" }}>ทำภารกิจสะสมน้ำแข็ง 🧊 หรือสิทธิ์ลากิจ 📅 เพื่อใช้หยุดพักโดยไม่เสีย Streak</p>
+            <h3 style={{ fontSize: 15, fontWeight: 600 }}>ภารกิจรับไอเทมประจำสัปดาห์</h3>
+            <p style={{ fontSize: 11, color: "var(--t2)" }}>ทำครั้งเดียวต่อสัปดาห์ · รับน้ำแข็ง 🧊 หรือสิทธิ์ลากิจ 📅 สูงสุด 2 ชิ้นต่อประเภท</p>
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <MissionRow title="1. นักอ่านผู้ทุ่มเท" desc="อ่านหนังสือสะสมเวลาอย่างน้อย 10 นาทีวันนี้" progress={todaySeconds} target={600} formatProgress={(val) => `${Math.round(val / 60)}/10 นาที`} rewardText="+1 น้ำแข็ง 🧊" claimed={streakSettings.claimedMissions?.[streak.todayKey]?.m1} onClaim={() => claimMission("m1")} />
-          <MissionRow title="2. ข้อคิดสะท้อนธรรมลึกซึ้ง" desc="บันทึกเซสชันอ่านและเขียนข้อคิดความยาว 100 ตัวอักษรขึ้นไปวันนี้" progress={todaySessions.reduce((max, s) => Math.max(max, s.reflection?.length || 0), 0)} target={100} formatProgress={(val) => `${val}/100 ตัวอักษร`} rewardText="+1 สิทธิ์ลากิจ 📅" claimed={streakSettings.claimedMissions?.[streak.todayKey]?.m2} onClaim={() => claimMission("m2")} />
-          <MissionRow title="3. ผู้พิชิตแบบทดสอบ" desc="ทำแบบทดสอบหนังสือวันนี้ และได้คะแนนตั้งแต่ 3/5 ข้อขึ้นไป" progress={todayQuizPassed ? 1 : 0} target={1} formatProgress={(val) => val === 1 ? "สำเร็จ" : "ยังไม่สำเร็จ"} rewardText="+1 น้ำแข็ง 🧊" claimed={streakSettings.claimedMissions?.[streak.todayKey]?.m3} onClaim={() => claimMission("m3")} />
+          <MissionRow title="1. ผู้อ่านจนจบเล่ม" desc="อ่านหนังสือจนจบ (กดเปลี่ยนสถานะเป็น อ่านจบ) สัปดาห์นี้" progress={shelfItems.filter(i => i.uid === uid && i.status === "finished" && i.finishedAt && getWeekKey(i.finishedAt) === getWeekKey()).length} target={1} formatProgress={(val) => val >= 1 ? "จบแล้ว ✓" : "ยังไม่จบเล่ม"} rewardText="+1 น้ำแข็ง 🧊" claimed={streakSettings.claimedMissions?.[getWeekKey()]?.m1} onClaim={() => claimMission("m1")} />
+          <MissionRow title="2. บันทึกข้อคิดเชิงลึก" desc="เขียนข้อคิดในเซสชันเดียว ความยาวตั้งแต่ 3,000 ตัวอักษรขึ้นไป" progress={Math.min(3000, [...(todaySessions || [])].reduce((max, s) => Math.max(max, s.reflection?.length || 0), 0))} target={3000} formatProgress={(val) => `${val.toLocaleString()}/3,000 ตัว`} rewardText="+1 สิทธิ์ลากิจ 📅" claimed={streakSettings.claimedMissions?.[getWeekKey()]?.m2} onClaim={() => claimMission("m2")} />
+          <MissionRow title="3. ผู้พิชิตแบบทดสอบ" desc="ทำ Quiz หนังสือและได้คะแนนตั้งแต่ 17/20 ข้อขึ้นไป" progress={(() => { const best = shelfItems.filter(i => i.uid === uid && i.lastQuiz).map(i => i.lastQuiz.score || 0); return best.length ? Math.max(...best) : 0 })()} target={17} formatProgress={(val) => `${val}/20 ข้อ`} rewardText="+1 น้ำแข็ง 🧊" claimed={streakSettings.claimedMissions?.[getWeekKey()]?.m3} onClaim={() => claimMission("m3")} />
         </div>
       </div>
 
@@ -2181,7 +2218,7 @@ function TutorialModal({ onClose }) {
       backdropFilter: "blur(4px)",
       zIndex: 99999,
       display: "flex",
-      alignItems: "center",
+      alignItems: "flex-start",
       justifyContent: "center",
       padding: "20px 16px",
       overflowY: "auto",
@@ -2197,11 +2234,8 @@ function TutorialModal({ onClose }) {
         animation: "pageFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
         boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
         position: "relative",
-        maxHeight: "calc(100dvh - 40px)",
-        overflowY: "auto",
         margin: "auto",
       }}>
-        {/* ป้ายด้านบนสุด */}
         <div style={{ display: "flex", justifyContent: "center", marginBottom: -4 }}>
           <span className="badge badge-teal" style={{ fontSize: 11, padding: "4px 10px", fontWeight: 600 }}>แนะนำการใช้งาน 🚀</span>
         </div>
@@ -2211,38 +2245,62 @@ function TutorialModal({ onClose }) {
         </h2>
 
         <p style={{ fontSize: 13, color: "var(--t2)", lineHeight: 1.6, margin: 0 }}>
-          ระบบนี้คือเครื่องมือช่วยสร้างวินัยรักการอ่านของคุณ ผ่านการจับเวลาจริง บันทึกผล และสะสมสถิติความต่อเนื่อง (Streak)
+          เครื่องมือสร้างวินัยรักการอ่าน ผ่านการจับเวลาจริง บันทึกผล และสะสมสถิติความต่อเนื่อง (Streak)
         </p>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, textAlign: "left", marginTop: 4 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, textAlign: "left" }}>
 
-          <div style={{ display: "flex", gap: 14, background: "var(--bg2)", padding: 14, borderRadius: 12, border: "0.5px solid var(--br)" }}>
-            <div style={{ width: 36, height: 36, background: "var(--teal-bg)", color: "var(--teal)", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 18, flexShrink: 0 }}>
-              <i className="ti ti-book-upload"></i>
+          <div style={{ display: "flex", gap: 12, background: "var(--bg2)", padding: 13, borderRadius: 12, border: "0.5px solid var(--br)" }}>
+            <div style={{ width: 34, height: 34, background: "var(--teal-bg)", color: "var(--teal)", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 16, flexShrink: 0 }}>
+              <i className="ti ti-books"></i>
             </div>
             <div>
-              <strong style={{ fontSize: 13, color: "var(--text)", display: "block", marginBottom: 2 }}>1. เพิ่มหนังสือเข้าชั้น</strong>
-              <span style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.5 }}>คลิกที่ "ชั้นหนังสือของฉัน" ด้านล่าง เพื่อเลือกหนังสือจากคลัง หรืออัปโหลดไฟล์ PDF ของคุณเอง</span>
+              <strong style={{ fontSize: 13, color: "var(--text)", display: "block", marginBottom: 2 }}>เพิ่มหนังสือแล้วเริ่มอ่าน</strong>
+              <span style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.5 }}>เลือกหนังสือจากคลังหรืออัปโหลด PDF กด <span style={{ color: "var(--teal)", fontWeight: 500 }}>เริ่มอ่าน</span> เพื่อเข้าโหมดจับเวลา ระบบบันทึกเวลาที่อ่านจริงเท่านั้น</span>
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 14, background: "var(--bg2)", padding: 14, borderRadius: 12, border: "0.5px solid var(--br)" }}>
-            <div style={{ width: 36, height: 36, background: "rgba(255, 179, 0, 0.12)", color: "rgb(255, 179, 0)", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 18, flexShrink: 0 }}>
-              <i className="ti ti-clock-play"></i>
-            </div>
-            <div>
-              <strong style={{ fontSize: 13, color: "var(--text)", display: "block", marginBottom: 2 }}>2. เริ่มจับเวลาโฟกัส</strong>
-              <span style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.5 }}>กดปุ่ม <span style={{ color: "var(--teal)", fontWeight: 500 }}>เริ่มอ่าน</span> เพื่อเข้าสู่โหมดตัดสิ่งรบกวน ระบบจะเริ่มจับเวลาการอ่านของคุณทันที</span>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 14, background: "var(--bg2)", padding: 14, borderRadius: 12, border: "0.5px solid var(--br)" }}>
-            <div style={{ width: 36, height: 36, background: "rgba(248, 113, 113, 0.12)", color: "#f87171", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 18, flexShrink: 0 }}>
+          <div style={{ display: "flex", gap: 12, background: "var(--bg2)", padding: 13, borderRadius: 12, border: "0.5px solid var(--br)" }}>
+            <div style={{ width: 34, height: 34, background: "rgba(248, 113, 113, 0.12)", color: "#f87171", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 16, flexShrink: 0 }}>
               <i className="ti ti-flame"></i>
             </div>
             <div>
-              <strong style={{ fontSize: 13, color: "var(--text)", display: "block", marginBottom: 2 }}>3. รักษาสถิติ (Streak) 🔥</strong>
-              <span style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.5 }}>อ่านอย่างน้อยวันละ 3 นาที พร้อมบันทึกข้อคิด เพื่อรักษาไฟแห่งการอ่านไม่ให้ดับลง</span>
+              <strong style={{ fontSize: 13, color: "var(--text)", display: "block", marginBottom: 2 }}>รักษา Streak ต่อเนื่อง 🔥</strong>
+              <span style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.5 }}>อ่านและบันทึกเซสชันทุกวัน ระบบจะนับวันต่อเนื่อง หากวันไหนอ่านไม่ได้ ใช้ไอเทมคุ้มครองแทนได้</span>
+            </div>
+          </div>
+
+          {/* ─── น้ำแข็ง & ลากิจ ─── */}
+          <div style={{ background: "rgba(96,165,250,0.07)", border: "0.5px solid rgba(96,165,250,0.2)", borderRadius: 12, padding: 13 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+              <i className="ti ti-shield-check" style={{ color: "#60a5fa" }}></i>
+              ไอเทมคุ้มครอง Streak (สูงสุด 2 ชิ้นต่อประเภท)
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <span style={{ fontSize: 15, flexShrink: 0 }}>🧊</span>
+                <div>
+                  <strong style={{ fontSize: 12, color: "var(--text)" }}>น้ำแข็ง (Freeze)</strong>
+                  <span style={{ fontSize: 11, color: "var(--t2)", display: "block", lineHeight: 1.4 }}>ใช้วันที่ลืมอ่านหรือยุ่งกะทันหัน กด "น้ำแข็ง" ก่อนเที่ยงคืนเพื่อคุ้มครอง Streak วันนั้น ได้จากการทำภารกิจยาก</span>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <span style={{ fontSize: 15, flexShrink: 0 }}>📅</span>
+                <div>
+                  <strong style={{ fontSize: 12, color: "var(--text)" }}>ลากิจ (Leave)</strong>
+                  <span style={{ fontSize: 11, color: "var(--t2)", display: "block", lineHeight: 1.4 }}>ใช้วันที่วางแผนล่วงหน้าว่าจะไม่อ่าน เช่น เดินทาง หรือวันหยุด ได้จากการเขียนข้อคิดเชิงลึก</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 12, background: "var(--bg2)", padding: 13, borderRadius: 12, border: "0.5px solid var(--br)" }}>
+            <div style={{ width: 34, height: 34, background: "rgba(245,158,11,0.1)", color: "#f59e0b", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 16, flexShrink: 0 }}>
+              <i className="ti ti-target"></i>
+            </div>
+            <div>
+              <strong style={{ fontSize: 13, color: "var(--text)", display: "block", marginBottom: 2 }}>ภารกิจรายวัน (ไม่ง่าย)</strong>
+              <span style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.5 }}>อ่าน 20 นาที หรือเขียนข้อคิด 200 ตัวอักษร หรือผ่านแบบทดสอบ 4/5 ข้อ จึงจะได้รับไอเทม และมีสิทธิ์รับได้เพียงครั้งเดียวต่อวัน</span>
             </div>
           </div>
 
@@ -2251,7 +2309,7 @@ function TutorialModal({ onClose }) {
         <button
           className="btn btn-teal"
           onClick={onClose}
-          style={{ width: "100%", padding: "12px", fontSize: 14, marginTop: 4, flexShrink: 0 }}
+          style={{ width: "100%", padding: "12px", fontSize: 14, marginTop: 4 }}
         >
           เข้าใจแล้ว เริ่มต้นใช้งานเลย!
         </button>
