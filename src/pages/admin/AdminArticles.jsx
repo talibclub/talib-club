@@ -21,18 +21,25 @@ const EMPTY = {
   coverEmoji: "📖",
 }
 
+// ตัวช่วยเช็คประเภทให้ยืดหยุ่นขึ้น (รองรับทั้งภาษาไทยและอังกฤษ)
+const isSeriesType = (typeVal) => {
+  if (!typeVal) return false;
+  const str = String(typeVal).toLowerCase();
+  return str === "series" || str === "ซีรีส์";
+};
+
 export default function AdminArticles() {
   const { items, loading, error, saveItem, deleteItem, isUsingFallback } = useContentCollection("articles", ARTICLES)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
-  
+
   const [editing, setEdit] = useState(null)
-  
+
   const [search, setSearch] = useState("")
-  const [typeFilter, setTypeFilter] = useState("all") 
-  const [categoryFilter, setCategoryFilter] = useState("all") 
-  const [showAdvanced, setShowAdvanced] = useState(false) 
-  
-  const [selected, setSelected] = useState([]) 
+  const [typeFilter, setTypeFilter] = useState("all")
+  const [categoryFilter, setCategoryFilter] = useState("all")
+  const [showAdvanced, setShowAdvanced] = useState(false)
+
+  const [selected, setSelected] = useState([])
   const [busy, setBusy] = useState(false)
 
   const [bulkType, setBulkType] = useState("")
@@ -50,10 +57,10 @@ export default function AdminArticles() {
 
   const filtered = items.filter(a => {
     const matchSearch = String(a.title || "").toLowerCase().includes(search.toLowerCase()) ||
-                        String(a.author || "").toLowerCase().includes(search.toLowerCase())
+      String(a.author || "").toLowerCase().includes(search.toLowerCase())
     const matchType = typeFilter === "all" || a.type === typeFilter
     const matchCat = categoryFilter === "all" || a.category === categoryFilter
-    
+
     return matchSearch && matchType && matchCat
   })
 
@@ -71,7 +78,7 @@ export default function AdminArticles() {
   const toggleSelect = (id) => {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
-  
+
   const toggleAll = () => {
     if (selected.length === sorted.length) setSelected([])
     else setSelected(sorted.map(a => a.id))
@@ -81,7 +88,6 @@ export default function AdminArticles() {
     setEdit({ ...EMPTY, id: crypto.randomUUID() })
   }
 
-  // --- ฟังก์ชันที่หายไป เติมกลับมาให้แล้วครับ ---
   function openEdit(article) {
     setEdit({ ...article, tags: [...(article.tags || [])] })
   }
@@ -89,7 +95,8 @@ export default function AdminArticles() {
   async function save() {
     if (!editing.title?.trim()) return notifyError("กรุณาใส่ชื่อบทความ")
 
-    const payload = { ...editing, part: editing.type === "series" && editing.part ? Number(editing.part) : null }
+    // เช็คประเภทซีรีส์ให้ยืดหยุ่นขึ้น
+    const payload = { ...editing, part: isSeriesType(editing.type) && editing.part ? Number(editing.part) : null }
     delete payload.readTime;
 
     setBusy(true)
@@ -137,25 +144,26 @@ export default function AdminArticles() {
 
   async function handleBulkUpdate() {
     if (selected.length === 0) return
-    const ok = await confirmAction({ 
-      title: `ยืนยันการแก้ไข ${selected.length} รายการ?`, 
-      message: "ฟิลด์ที่กรอก/เลือกไว้จะถูกอัปเดตทดแทนค่าเดิมในบทความทั้งหมดที่เลือก", 
-      confirmText: "ยืนยันการอัปเดต", 
-      confirmColor: "var(--teal)" 
+    const ok = await confirmAction({
+      title: `ยืนยันการแก้ไข ${selected.length} รายการ?`,
+      message: "ฟิลด์ที่กรอก/เลือกไว้จะถูกอัปเดตทดแทนค่าเดิมในบทความทั้งหมดที่เลือก",
+      confirmText: "ยืนยันการอัปเดต",
+      confirmColor: "var(--teal)"
     })
     if (!ok) return
-    
+
     setBusy(true)
     try {
       let updatedCount = 0;
       await Promise.all(selected.map(async (id) => {
         const original = items.find(a => String(a.id) === String(id))
         if (!original) return
-        
+
         const next = { ...original }
         if (bulkType) {
           next.type = bulkType
-          if (bulkType === "series") {
+          // เช็คประเภทซีรีส์ให้ยืดหยุ่นขึ้น
+          if (isSeriesType(bulkType)) {
             next.seriesId = bulkSeries || original.seriesId || ""
           } else {
             next.seriesId = ""
@@ -171,18 +179,18 @@ export default function AdminArticles() {
         if (bulkDate) {
           next.date = bulkDate
         }
-        
+
         await saveItem(next)
         updatedCount++
       }))
-      
+
       setBulkType("")
       setBulkCategory("")
       setBulkSeries("")
       setBulkAuthor("")
       setBulkDate("")
       setSelected([])
-      
+
       notifySuccess(`อัปเดตข้อมูลบทความ ${updatedCount} รายการเรียบร้อยแล้ว`)
     } catch (err) {
       console.error(err)
@@ -213,11 +221,11 @@ export default function AdminArticles() {
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: showAdvanced ? 12 : 24 }}>
         <div style={{ flex: "1 1 250px", position: "relative" }}>
           <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
-          <input 
-            value={search} 
-            onChange={e => setSearch(e.target.value)} 
-            placeholder="ค้นหาชื่อบทความ, ผู้เขียน..." 
-            style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "10px 16px 10px 42px", background: "var(--bg2)", border: "none" }} 
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="ค้นหาชื่อบทความ, ผู้เขียน..."
+            style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "10px 16px 10px 42px", background: "var(--bg2)", border: "none" }}
           />
         </div>
 
@@ -230,8 +238,8 @@ export default function AdminArticles() {
           ))}
         </div>
 
-        <button 
-          className={`btn ${showAdvanced ? "btn-teal" : "btn-outline"}`} 
+        <button
+          className={`btn ${showAdvanced ? "btn-teal" : "btn-outline"}`}
           onClick={() => setShowAdvanced(!showAdvanced)}
           style={{ padding: "8px 16px", borderRadius: 24 }}
         >
@@ -272,7 +280,7 @@ export default function AdminArticles() {
           </div>
 
           <div className="divider" style={{ margin: "0 0 16px" }} />
-          
+
           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>
             <i className="ti ti-edit" style={{ marginRight: 6, color: "var(--teal)" }}></i>
             แก้ไขข้อมูลพร้อมกันทั้งหมด (Bulk Edit)
@@ -281,7 +289,10 @@ export default function AdminArticles() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, alignItems: "flex-end" }}>
             <label style={{ display: "grid", gap: 4 }}>
               <span style={{ fontSize: 11, color: "var(--t2)" }}>เปลี่ยนประเภท</span>
-              <select value={bulkType} onChange={e => { setBulkType(e.target.value); if (e.target.value !== "series") setBulkSeries("") }} style={{ fontSize: 12, padding: "6px 10px", background: "var(--card)" }}>
+              <select value={bulkType} onChange={e => {
+                setBulkType(e.target.value);
+                if (!isSeriesType(e.target.value)) setBulkSeries("");
+              }} style={{ fontSize: 12, padding: "6px 10px", background: "var(--card)" }}>
                 <option value="">-- ไม่เปลี่ยน --</option>
                 {(taxonomy.articleTypes || []).map(type => <option key={type.id} value={type.id}>{type.label}</option>)}
               </select>
@@ -295,7 +306,7 @@ export default function AdminArticles() {
               </select>
             </label>
 
-            {bulkType === "series" && (
+            {isSeriesType(bulkType) && (
               <label style={{ display: "grid", gap: 4 }}>
                 <span style={{ fontSize: 11, color: "var(--t2)" }}>ย้ายเข้าซีรีส์</span>
                 <select value={bulkSeries} onChange={e => setBulkSeries(e.target.value)} style={{ fontSize: 12, padding: "6px 10px", background: "var(--card)" }}>
@@ -315,9 +326,9 @@ export default function AdminArticles() {
               <input type="date" value={bulkDate} onChange={e => setBulkDate(e.target.value)} style={{ fontSize: 12, padding: "6px 10px", borderRadius: 8, background: "var(--card)", border: "0.5px solid var(--br)" }} />
             </label>
 
-            <button 
-              className="btn btn-teal" 
-              onClick={handleBulkUpdate} 
+            <button
+              className="btn btn-teal"
+              onClick={handleBulkUpdate}
               disabled={busy || (!bulkType && !bulkCategory && !bulkAuthor && !bulkDate)}
               style={{ padding: "8px 16px", fontSize: 12, height: "34px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
             >
@@ -345,7 +356,8 @@ export default function AdminArticles() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
                   <span className="tag tag-teal">{article.category}</span>
-                  {article.type === "series" && <span className="tag">ซีรีส์ ตอน {article.part}</span>}
+                  {/* เช็คประเภทซีรีส์ให้ยืดหยุ่นขึ้น */}
+                  {isSeriesType(article.type) && <span className="tag">ซีรีส์ ตอน {article.part}</span>}
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{article.title}</div>
                 <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300, marginTop: 4 }}>{article.author} · {article.date}</div>
@@ -419,7 +431,9 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
             {(taxonomy.articleCategories || []).map(category => <option key={category.id} value={category.id}>{category.label}</option>)}
           </select>
         </Field>
-        {item.type === "series" && (
+
+        {/* เช็คประเภทซีรีส์ให้ยืดหยุ่นขึ้น */}
+        {isSeriesType(item.type) && (
           <>
             <Field label="ซีรีส์">
               <select value={item.seriesId || ""} onChange={e => set("seriesId", e.target.value)}>
@@ -430,16 +444,17 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
             <Field label="ตอนที่"><input type="number" value={item.part || ""} onChange={e => set("part", e.target.value)} min="1" /></Field>
           </>
         )}
+
         {item.type === "specific" && <Field label="ชื่อหัวข้อย่อย" span><input value={item.seriesName || ""} onChange={e => set("seriesName", e.target.value)} /></Field>}
         <Field label="ผู้เขียน"><input value={item.author || ""} onChange={e => set("author", e.target.value)} /></Field>
         <Field label="วันที่เผยแพร่"><input type="date" value={item.date || ""} onChange={e => set("date", e.target.value)} /></Field>
 
         <Field label="รูปภาพปกบทความ (URL)" span>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <input 
-              value={item.coverUrl || ""} 
-              onChange={e => set("coverUrl", e.target.value)} 
-              placeholder="https://example.com/image.jpg หรืออัปโหลดไฟล์..." 
+            <input
+              value={item.coverUrl || ""}
+              onChange={e => set("coverUrl", e.target.value)}
+              placeholder="https://example.com/image.jpg หรืออัปโหลดไฟล์..."
               style={{ flex: 1 }}
             />
             <label className="btn btn-outline" style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", flexShrink: 0, padding: "10px 16px" }}>
@@ -452,24 +467,24 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
             <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ position: "relative", width: 120, height: 75, borderRadius: 8, overflow: "hidden", border: "1px solid var(--br2)", flexShrink: 0 }}>
                 <img src={item.coverUrl} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                <button 
-                  type="button" 
-                  onClick={() => set("coverUrl", "")} 
-                  style={{ 
-                    position: "absolute", 
-                    top: 4, 
-                    right: 4, 
-                    background: "rgba(0,0,0,0.6)", 
-                    color: "#fff", 
-                    border: "none", 
-                    borderRadius: "50%", 
-                    width: 20, 
-                    height: 20, 
-                    display: "flex", 
-                    alignItems: "center", 
-                    justifyContent: "center", 
-                    cursor: "pointer", 
-                    fontSize: 10 
+                <button
+                  type="button"
+                  onClick={() => set("coverUrl", "")}
+                  style={{
+                    position: "absolute",
+                    top: 4,
+                    right: 4,
+                    background: "rgba(0,0,0,0.6)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: 20,
+                    height: 20,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    fontSize: 10
                   }}
                 >
                   ✕
@@ -481,14 +496,14 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
         </Field>
 
         <Field label="อิโมจิประดับการ์ด (coverEmoji - แสดงผลเมื่อไม่มีรูปภาพปก)">
-          <input 
-            value={item.coverEmoji || ""} 
-            onChange={e => set("coverEmoji", e.target.value)} 
-            placeholder="📖" 
+          <input
+            value={item.coverEmoji || ""}
+            onChange={e => set("coverEmoji", e.target.value)}
+            placeholder="📖"
             maxLength={4}
           />
         </Field>
-        
+
         <div />
 
         <Field label="บทคัดย่อ (แสดงหน้าการ์ด)" span><textarea value={item.excerpt || ""} onChange={e => set("excerpt", e.target.value)} rows={2} placeholder="เนื้อหาสรุปสั้นๆ..." /></Field>
