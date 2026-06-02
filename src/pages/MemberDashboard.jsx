@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import toast from 'react-hot-toast'
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage"
 import { ARTICLES, BOOKS } from "../data/index.js"
@@ -12,7 +13,7 @@ export default function MemberDashboard({ authState, go, initialView = "overview
   const [copied, setCopied] = useState("")
   const [quranSura, setQuranSura] = useState(1)
   const [quranAyah, setQuranAyah] = useState(null)
-  
+
   const user = authState?.user
   const profile = authState?.profile || {}
   const name = profile.displayName || user?.displayName || user?.email || "สมาชิก"
@@ -20,7 +21,7 @@ export default function MemberDashboard({ authState, go, initialView = "overview
 
   useEffect(() => {
     if (initialView) setCurrentView(initialView)
-    
+
     const searchParams = new URLSearchParams(window.location.search)
     const sura = searchParams.get("sura") || ctx?.sura
     const ayah = searchParams.get("ayah") || ctx?.ayah
@@ -88,10 +89,10 @@ export default function MemberDashboard({ authState, go, initialView = "overview
       )}
 
       {view === "overview" && (
-        <Overview 
-          authState={authState} 
-          go={go} 
-          setView={setView} 
+        <Overview
+          authState={authState}
+          go={go}
+          setView={setView}
           onOpenQuran={(sura, ayah) => {
             go("quran", { sura: sura || 1, ayah: ayah || null })
           }}
@@ -103,25 +104,25 @@ export default function MemberDashboard({ authState, go, initialView = "overview
       {view === "profile" && <ProfilePanel authState={authState} copied={copied} copyText={copyText} go={go} setView={setView} ctx={ctx} />}
       {view === "quran" && (
         <div style={{ width: "100%", maxWidth: "1400px", margin: "0 auto" }}>
-          <button 
-            onClick={() => setView("overview")} 
-            className="sec-link" 
+          <button
+            onClick={() => setView("overview")}
+            className="sec-link"
             style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 16, background: "none", border: "none", fontFamily: "'Prompt', sans-serif", cursor: "pointer", color: "var(--t2)" }}
           >
             <i className="ti ti-arrow-left"></i> กลับหน้าแดชบอร์ด
           </button>
-          <Quran 
-            initialSura={quranSura} 
-            initialAyah={quranAyah} 
+          <Quran
+            initialSura={quranSura}
+            initialAyah={quranAyah}
             authState={authState}
           />
         </div>
       )}
       {view === "saved-verses" && (
-        <SavedVersesPanel 
-          authState={authState} 
-          go={go} 
-          setView={setView} 
+        <SavedVersesPanel
+          authState={authState}
+          go={go}
+          setView={setView}
           setQuranSura={setQuranSura}
           setQuranAyah={setQuranAyah}
         />
@@ -132,10 +133,25 @@ export default function MemberDashboard({ authState, go, initialView = "overview
 
 function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
   const [lastRead, setLastRead] = useState(null)
+  const [showTutorial, setShowTutorial] = useState(false)
+
   const uid = authState?.user?.uid
   const { items: readingSessions } = useContentCollection("reading_sessions", [])
   const { items: streakRecords, saveItem: saveStreakSettings } = useContentCollection("reading_streaks", [])
   const { items: shelfItems } = useContentCollection("bookshelf", [])
+
+  // เช็คว่าเคยเปิดดู Tutorial หรือยัง (Onboarding)
+  useEffect(() => {
+    const hasSeenTutorial = localStorage.getItem("talib_has_seen_onboarding")
+    if (!hasSeenTutorial) {
+      setShowTutorial(true)
+    }
+  }, [])
+
+  const handleCloseTutorial = () => {
+    localStorage.setItem("talib_has_seen_onboarding", "true")
+    setShowTutorial(false)
+  }
 
   const streakSettings = useMemo(() => {
     return normalizeStreakSettings(streakRecords.find(item => item.uid === uid || item.id === uid), uid)
@@ -170,18 +186,18 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
       const key = addDaysToKey(streak.todayKey, -i)
       const dateObj = new Date(`${key}T00:00:00`)
       const name = dayNames[dateObj.getDay()]
-      
+
       const daySessions = readingSessions.filter(
         item => item.uid === uid && item.verified && (item.dayKey || getLocalDayKey(item.completedAt)) === key
       )
       const secs = daySessions.reduce((sum, item) => sum + Number(item.activeSeconds || 0), 0)
       const minutes = Math.round(secs / 60)
       const metGoal = secs >= DAILY_READING_GOAL_MINUTES * 60
-      
+
       const protection = streakSettings.protectedDays.find(
         p => (p.date || p.dayKey || getLocalDayKey(p.createdAt || p.usedAt)) === key
       )
-      
+
       list.push({
         key,
         name,
@@ -227,28 +243,28 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
     const isM1 = missionId === "m1"
     const isM2 = missionId === "m2"
     const isM3 = missionId === "m3"
-    
+
     const todayClaims = streakSettings.claimedMissions?.[streak.todayKey] || {}
     if (todayClaims[missionId]) {
       toast.success("คุณรับรางวัลภารกิจนี้ไปแล้ว")
       return
     }
-    
+
     let completed = false
     if (isM1) completed = todaySeconds >= 600
     if (isM2) completed = todaySessions.some(s => s.reflection && s.reflection.length >= 100)
     if (isM3) completed = todayQuizPassed
-    
+
     if (!completed) {
       toast.error("ภารกิจยังไม่เสร็จสมบูรณ์")
       return
     }
-    
+
     let nextFreeze = streakSettings.freezeCredits
     let nextLeave = streakSettings.leaveCredits
     if (isM1 || isM3) nextFreeze += 1
     if (isM2) nextLeave += 1
-    
+
     const nextClaimed = {
       ...streakSettings.claimedMissions,
       [streak.todayKey]: {
@@ -256,14 +272,14 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
         [missionId]: true
       }
     }
-    
+
     await saveStreakSettings({
       ...streakSettings,
       freezeCredits: nextFreeze,
       leaveCredits: nextLeave,
       claimedMissions: nextClaimed
     })
-    
+
     toast.success(
       isM2
         ? "สำเร็จ! รับรางวัล สิทธิ์ลากิจ +1 📅"
@@ -284,6 +300,9 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
 
   return (
     <div>
+      {/* Onboarding Tutorial Modal */}
+      {showTutorial && <TutorialModal onClose={handleCloseTutorial} />}
+
       <ReadingStreakPanel
         streak={streak}
         settings={streakSettings}
@@ -293,6 +312,7 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
         onRead={() => go("reader")}
         onFreeze={() => protectToday("freeze")}
         onLeave={() => protectToday("leave")}
+        onShowTutorial={() => setShowTutorial(true)}
       />
 
       {/* 🎯 ภารกิจรับไอเทมประจำวัน (Daily Missions - Duolingo Style) */}
@@ -308,7 +328,7 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <MissionRow 
+          <MissionRow
             title="1. นักอ่านผู้ทุ่มเท"
             desc="อ่านหนังสือสะสมเวลาอย่างน้อย 10 นาทีวันนี้"
             progress={todaySeconds}
@@ -319,7 +339,7 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
             onClaim={() => claimMission("m1")}
           />
 
-          <MissionRow 
+          <MissionRow
             title="2. ข้อคิดสะท้อนธรรมลึกซึ้ง"
             desc="บันทึกเซสชันอ่านและเขียนข้อคิดความยาว 100 ตัวอักษรขึ้นไปวันนี้"
             progress={todaySessions.reduce((max, s) => Math.max(max, s.reflection?.length || 0), 0)}
@@ -330,7 +350,7 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
             onClaim={() => claimMission("m2")}
           />
 
-          <MissionRow 
+          <MissionRow
             title="3. ผู้พิชิตแบบทดสอบ"
             desc="ทำแบบทดสอบหนังสือวันนี้ และได้คะแนนตั้งแต่ 3/5 ข้อขึ้นไป"
             progress={todayQuizPassed ? 1 : 0}
@@ -344,13 +364,13 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
       </div>
 
       {lastRead && (
-        <div className="card" style={{ 
-          padding: "16px 20px", 
-          marginBottom: 20, 
-          background: "var(--teal-bg)", 
+        <div className="card" style={{
+          padding: "16px 20px",
+          marginBottom: 20,
+          background: "var(--teal-bg)",
           borderColor: "rgba(45, 190, 160, 0.2)",
-          display: "flex", 
-          justifyContent: "space-between", 
+          display: "flex",
+          justifyContent: "space-between",
           alignItems: "center",
           flexWrap: "wrap",
           gap: 12,
@@ -365,8 +385,8 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
               <strong style={{ fontSize: 13, color: "var(--text)" }}>ซูเราะฮ์ {lastRead.suraName} ({lastRead.suraThaiName}) อายะฮ์ที่ {lastRead.aya}</strong>
             </div>
           </div>
-          <button 
-            className="btn btn-teal" 
+          <button
+            className="btn btn-teal"
             style={{ padding: "6px 16px", fontSize: 12 }}
             onClick={() => onOpenQuran(lastRead.sura, lastRead.aya)}
           >
@@ -374,25 +394,25 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
           </button>
         </div>
       )}
-      
+
       <div className="grid3">
         <DashboardCard icon="ti-user-circle" title="โปรไฟล์ของฉัน" text="จัดการข้อมูลบัญชี" onClick={() => setView("profile")} />
         <DashboardCard icon="ti-book" title="อัลกุรอานของฉัน" text="เปิดอ่าน แปลไทย ตัฟซีรย่อ และค้นหาคำสำคัญ" onClick={() => onOpenQuran(1, null)} />
         <DashboardCard icon="ti-notebook" title="อายะฮ์ที่บันทึกไว้" text="ข้อคิดและประโยชน์ที่ได้รับจากอัลกุรอาน" onClick={onOpenSavedVerses} />
         <DashboardCard icon="ti-device-desktop" title="ห้องอ่านหนังสือส่วนตัว" text="โหมดแอปจับเวลาอ่านหนังสือ สะสมไอเทม และทำภารกิจรายวัน" onClick={() => go("reader")} />
         <DashboardCard icon="ti-flame" title={`${streak.current} วันต่อเนื่อง`} text={`ดีที่สุด ${streak.best} วัน · อ่านจริง ${streak.totalDays} วัน · คุ้มครอง ${streak.protectedTotal} วัน`} onClick={() => setView("bookshelf")} />
-        <DashboardCard 
-          icon="ti-bookmark" 
-          title="บทความที่บันทึกไว้" 
-          text="เก็บบทความที่อยากกลับมาอ่านภายหลัง" 
-          onClick={() => setView("saved-articles")} 
+        <DashboardCard
+          icon="ti-bookmark"
+          title="บทความที่บันทึกไว้"
+          text="เก็บบทความที่อยากกลับมาอ่านภายหลัง"
+          onClick={() => setView("saved-articles")}
         />
       </div>
     </div>
   )
 }
 
-function ReadingStreakPanel({ streak, settings, todaySeconds, goalPercent, last7Days, onRead, onFreeze, onLeave }) {
+function ReadingStreakPanel({ streak, settings, todaySeconds, goalPercent, last7Days, onRead, onFreeze, onLeave, onShowTutorial }) {
   const protectedLabel = streak.todayProtected?.type === "leave" ? "ลากิจ" : streak.todayProtected ? "น้ำแข็ง" : ""
   const statusText = streak.todayVerified
     ? "วันนี้อ่านจริงแล้ว ไฟยังต่อเนื่อง"
@@ -402,12 +422,22 @@ function ReadingStreakPanel({ streak, settings, todaySeconds, goalPercent, last7
 
   return (
     <section className="card streak-panel" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", width: "100%", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+      {/* ส่วนหัวพร้อมปุ่มวิธีใช้งาน */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", width: "100%" }}>
+        <span className="badge badge-teal">Daily reading streak</span>
+        <button
+          onClick={onShowTutorial}
+          style={{ background: "none", border: "none", color: "var(--teal)", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontFamily: "'Prompt', sans-serif" }}
+        >
+          <i className="ti ti-help-circle"></i> วิธีใช้งาน
+        </button>
+      </div>
+
+      <div style={{ display: "flex", width: "100%", gap: 16, alignItems: "center", flexWrap: "wrap", marginTop: -8 }}>
         <div className="streak-flame" style={{ flexShrink: 0 }}>
           <i className="ti ti-flame"></i>
         </div>
         <div className="streak-main" style={{ flex: 1, minWidth: 200, textAlign: "left" }}>
-          <span className="badge badge-teal">Daily reading streak</span>
           <h2>{streak.current} วันต่อเนื่อง</h2>
           <p>{statusText} · เป้าหมายวันนี้ {formatReadingMinutes(todaySeconds)}/{DAILY_READING_GOAL_MINUTES} นาที</p>
           <div className="streak-progress" aria-label="reading goal progress">
@@ -490,15 +520,15 @@ function ReadingStreakPanel({ streak, settings, todaySeconds, goalPercent, last7
 function MissionRow({ title, desc, progress, target, formatProgress, rewardText, claimed, onClaim }) {
   const completed = progress >= target
   const percent = Math.min(100, Math.round((progress / target) * 100))
-  
+
   return (
-    <div style={{ 
-      padding: "12px 14px", 
-      background: "var(--bg2)", 
-      borderRadius: 12, 
-      display: "flex", 
-      alignItems: "center", 
-      justifyContent: "space-between", 
+    <div style={{
+      padding: "12px 14px",
+      background: "var(--bg2)",
+      borderRadius: 12,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
       gap: 12,
       flexWrap: "wrap",
       textAlign: "left"
@@ -520,21 +550,21 @@ function MissionRow({ title, desc, progress, target, formatProgress, rewardText,
           </span>
         </div>
       </div>
-      
+
       <div>
         {claimed ? (
           <button className="btn btn-outline" disabled style={{ padding: "6px 12px", fontSize: 11, opacity: 0.6, cursor: "not-allowed" }}>
             <i className="ti ti-check" style={{ marginRight: 4 }}></i>รับแล้ว
           </button>
         ) : (
-          <button 
+          <button
             onClick={onClaim}
             disabled={!completed}
             className={`btn ${completed ? "btn-teal" : "btn-outline"}`}
-            style={{ 
-              padding: "6px 12px", 
-              fontSize: 11, 
-              opacity: completed ? 1 : 0.6, 
+            style={{
+              padding: "6px 12px",
+              fontSize: 11,
+              opacity: completed ? 1 : 0.6,
               cursor: completed ? "pointer" : "not-allowed",
               boxShadow: completed ? "0 4px 10px rgba(45,190,160,0.2)" : "none"
             }}
@@ -880,6 +910,7 @@ function BookshelfPanel({ authState, go, setView }) {
         progress: 0,
         note: "",
         addedAt: Date.now(),
+        updatedAt: Date.now(),
       })
       setExternalBook({ title: "", author: "", fileUrl: "", desc: "", totalPages: "", file: null })
       toast.success("เพิ่มไฟล์นอกเข้าชั้นหนังสือแล้ว")
@@ -1241,7 +1272,7 @@ function QuizModal({ quizState, onAnswer, onClose, onFinish }) {
 function SavedArticlesPanel({ authState, go, setView }) {
   const { items: articles, loading: loadingArticles } = useContentCollection("articles", ARTICLES)
   const { items: bookmarks, loading: loadingBookmarks } = useContentCollection("bookmarks", [])
-  
+
   const uid = authState?.user?.uid;
 
   const [search, setSearch] = useState("")
@@ -1254,11 +1285,11 @@ function SavedArticlesPanel({ authState, go, setView }) {
   const savedArticlesWithBookmarkInfo = useMemo(() => {
     if (!uid) return [];
     const userBookmarks = bookmarks.filter(b => b.uid === uid);
-    
+
     return userBookmarks.map(b => {
       const art = articles.find(a => String(a.id) === String(b.articleId));
       if (!art) return null;
-      
+
       let savedAtDate = null;
       if (b.savedAt) {
         if (b.savedAt.toDate) {
@@ -1269,9 +1300,9 @@ function SavedArticlesPanel({ authState, go, setView }) {
           savedAtDate = new Date(b.savedAt);
         }
       }
-      
+
       const savedMonthStr = savedAtDate ? getSavedMonthString(savedAtDate) : getArticleMonthString(art.date);
-      
+
       return {
         ...art,
         bookmarkId: b.id,
@@ -1306,7 +1337,7 @@ function SavedArticlesPanel({ authState, go, setView }) {
 
     if (search.trim()) {
       const q = search.toLowerCase();
-      result = result.filter(a => 
+      result = result.filter(a =>
         a.title.toLowerCase().includes(q) ||
         (a.excerpt && a.excerpt.toLowerCase().includes(q)) ||
         (a.author && a.author.toLowerCase().includes(q)) ||
@@ -1364,26 +1395,26 @@ function SavedArticlesPanel({ authState, go, setView }) {
     setSortBy("newest_saved");
   };
 
-  if (loadingArticles || loadingBookmarks) return <div style={{textAlign: "center", padding: 40}}><i className="ti ti-loader-2 spin" style={{fontSize: 24, color: "var(--teal)"}}></i></div>
+  if (loadingArticles || loadingBookmarks) return <div style={{ textAlign: "center", padding: 40 }}><i className="ti ti-loader-2 spin" style={{ fontSize: 24, color: "var(--teal)" }}></i></div>
 
   return (
     <div className="profile-layout" style={{ maxWidth: 720, margin: "0 auto" }}>
-      <button 
-        onClick={() => setView("overview")} 
-        className="sec-link" 
+      <button
+        onClick={() => setView("overview")}
+        className="sec-link"
         style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 16, background: "none", border: "none", fontFamily: "'Prompt', sans-serif", cursor: "pointer", color: "var(--t2)" }}
       >
         <i className="ti ti-arrow-left"></i> กลับหน้าแดชบอร์ด
       </button>
       <div className="card" style={{ padding: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-           <div style={{ width: 44, height: 44, borderRadius: 12, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-             <i className="ti ti-bookmark-filled" style={{ color: "var(--teal)", fontSize: 20 }}></i>
-           </div>
-           <div>
-             <h2 style={{ fontSize: 18 }}>บทความที่บันทึกไว้</h2>
-             <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>{filteredArticles.length} รายการ จากทั้งหมด {savedArticlesWithBookmarkInfo.length} รายการ</p>
-           </div>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <i className="ti ti-bookmark-filled" style={{ color: "var(--teal)", fontSize: 20 }}></i>
+          </div>
+          <div>
+            <h2 style={{ fontSize: 18 }}>บทความที่บันทึกไว้</h2>
+            <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>{filteredArticles.length} รายการ จากทั้งหมด {savedArticlesWithBookmarkInfo.length} รายการ</p>
+          </div>
         </div>
 
         {savedArticlesWithBookmarkInfo.length === 0 ? (
@@ -1396,17 +1427,17 @@ function SavedArticlesPanel({ authState, go, setView }) {
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 <div style={{ position: "relative", flex: 1, minWidth: 260 }}>
                   <i className="ti ti-search" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 14 }}></i>
-                  <input 
-                    placeholder="ค้นหาชื่อบทความ, ผู้เขียน, หรือคำสำคัญ..." 
-                    value={search} 
-                    onChange={e => setSearch(e.target.value)} 
-                    style={{ paddingLeft: 36, width: "100%", height: 38 }} 
+                  <input
+                    placeholder="ค้นหาชื่อบทความ, ผู้เขียน, หรือคำสำคัญ..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    style={{ paddingLeft: 36, width: "100%", height: 38 }}
                   />
                 </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  <select 
-                    value={sortBy} 
-                    onChange={e => setSortBy(e.target.value)} 
+                  <select
+                    value={sortBy}
+                    onChange={e => setSortBy(e.target.value)}
                     style={{ padding: "8px 12px", fontSize: 13, borderRadius: 8, border: "0.5px solid var(--br)", background: "var(--card)", color: "var(--text)", height: 38 }}
                   >
                     <option value="newest_saved">บันทึกล่าสุด</option>
@@ -1494,7 +1525,7 @@ function ProfilePanel({ authState, copied, copyText, go, setView, ctx }) {
   const setSubView = (newSub) => {
     go("member", { view: "profile", sub: newSub }, { replace: true, noScroll: true })
   }
-  
+
   const [form, setForm] = useState({
     displayName: displayName === "-" ? "" : displayName,
     email,
@@ -1502,13 +1533,13 @@ function ProfilePanel({ authState, copied, copyText, go, setView, ctx }) {
     newPassword: "",
   })
   const [busy, setBusy] = useState("")
-  
+
   // 💡 เชื่อมต่อกับคอลเลกชัน history ใน Firestore
   const { items: rawHistory, loading: loadingHistory } = useContentCollection("history", [])
   const { items: savedVerses } = useContentCollection("quran_bookmarks", [])
   const { items: readingSessions } = useContentCollection("reading_sessions", [])
   const { items: streakRecords } = useContentCollection("reading_streaks", [])
-  
+
   const history = useMemo(() => {
     if (!user?.uid) return [];
     return rawHistory
@@ -1559,7 +1590,7 @@ function ProfilePanel({ authState, copied, copyText, go, setView, ctx }) {
   async function saveAccount(e) {
     e.preventDefault()
     setBusy("account")
-    
+
     try {
       // 1. Update Display Name if changed
       if (form.displayName.trim() !== displayName.trim()) {
@@ -1617,9 +1648,9 @@ function ProfilePanel({ authState, copied, copyText, go, setView, ctx }) {
 
   return (
     <div className="profile-layout" style={{ maxWidth: 720, margin: "0 auto" }}>
-      <button 
-        onClick={() => setView("overview")} 
-        className="sec-link" 
+      <button
+        onClick={() => setView("overview")}
+        className="sec-link"
         style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 16, background: "none", border: "none", fontFamily: "'Prompt', sans-serif", cursor: "pointer", color: "var(--t2)" }}
       >
         <i className="ti ti-arrow-left"></i> กลับหน้าแดชบอร์ด
@@ -1708,15 +1739,15 @@ function ProfilePanel({ authState, copied, copyText, go, setView, ctx }) {
                       typeLabel = h.mediaType === "youtube" ? "YouTube" : "Spotify";
                     }
                     return (
-                      <div 
-                        key={`${h.id}-${h.timestamp}-${i}`} 
+                      <div
+                        key={`${h.id}-${h.timestamp}-${i}`}
                         onClick={() => handleHistoryClick(h)}
-                        className="card" 
-                        style={{ 
-                          padding: "10px 14px", 
-                          display: "flex", 
-                          alignItems: "center", 
-                          justifyContent: "space-between", 
+                        className="card"
+                        style={{
+                          padding: "10px 14px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
                           gap: 12,
                           cursor: "pointer",
                           transition: "transform 0.15s ease",
@@ -1839,7 +1870,7 @@ function SavedVersesPanel({ authState, go, setView, setQuranSura, setQuranAyah }
   const filteredSaved = useMemo(() => {
     if (!search.trim()) return userSaved;
     const q = search.toLowerCase();
-    return userSaved.filter(v => 
+    return userSaved.filter(v =>
       v.notes?.toLowerCase().includes(q) ||
       v.translation?.toLowerCase().includes(q) ||
       v.suraName?.toLowerCase().includes(q) ||
@@ -1889,13 +1920,13 @@ function SavedVersesPanel({ authState, go, setView, setQuranSura, setQuranAyah }
     }
   };
 
-  if (loading) return <div style={{textAlign: "center", padding: 40}}><i className="ti ti-loader-2 spin" style={{fontSize: 24, color: "var(--teal)"}}></i></div>
+  if (loading) return <div style={{ textAlign: "center", padding: 40 }}><i className="ti ti-loader-2 spin" style={{ fontSize: 24, color: "var(--teal)" }}></i></div>
 
   return (
     <div className="profile-layout" style={{ maxWidth: 840, margin: "0 auto" }}>
-      <button 
-        onClick={() => setView("overview")} 
-        className="sec-link" 
+      <button
+        onClick={() => setView("overview")}
+        className="sec-link"
         style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 16, background: "none", border: "none", fontFamily: "'Prompt', sans-serif", cursor: "pointer", color: "var(--t2)" }}
       >
         <i className="ti ti-arrow-left"></i> กลับหน้าแดชบอร์ด
@@ -1903,13 +1934,13 @@ function SavedVersesPanel({ authState, go, setView, setQuranSura, setQuranAyah }
 
       <div className="card" style={{ padding: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-           <div style={{ width: 44, height: 44, borderRadius: 12, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-             <i className="ti ti-notebook" style={{ color: "var(--teal)", fontSize: 20 }}></i>
-           </div>
-           <div>
-             <h2 style={{ fontSize: 18 }}>อายะฮ์อัลกุรอานที่บันทึกไว้</h2>
-             <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>{filteredSaved.length} รายการ (บันทึกข้อคิดและประโยชน์จากอายะฮ์)</p>
-           </div>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <i className="ti ti-notebook" style={{ color: "var(--teal)", fontSize: 20 }}></i>
+          </div>
+          <div>
+            <h2 style={{ fontSize: 18 }}>อายะฮ์อัลกุรอานที่บันทึกไว้</h2>
+            <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>{filteredSaved.length} รายการ (บันทึกข้อคิดและประโยชน์จากอายะฮ์)</p>
+          </div>
         </div>
 
         {userSaved.length === 0 ? (
@@ -1921,11 +1952,11 @@ function SavedVersesPanel({ authState, go, setView, setQuranSura, setQuranAyah }
             {/* ค้นหา */}
             <div style={{ position: "relative", marginBottom: 20 }}>
               <i className="ti ti-search" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 14 }}></i>
-              <input 
-                placeholder="ค้นหาตามข้อคิด คำแปล หรือซูเราะห์..." 
-                value={search} 
-                onChange={e => setSearch(e.target.value)} 
-                style={{ paddingLeft: 36, width: "100%", height: 38 }} 
+              <input
+                placeholder="ค้นหาตามข้อคิด คำแปล หรือซูเราะห์..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ paddingLeft: 36, width: "100%", height: 38 }}
               />
             </div>
 
@@ -1935,14 +1966,14 @@ function SavedVersesPanel({ authState, go, setView, setQuranSura, setQuranAyah }
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {filteredSaved.map(item => (
                   <div key={item.id} className="card" style={{ padding: 20, border: "0.5px solid var(--br)", background: "var(--bg3)" }}>
-                    
+
                     {/* Header */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
                       <span className="badge badge-teal" style={{ fontSize: 11, cursor: "pointer" }} onClick={() => handleOpenVerse(item.sura, item.aya)}>
                         <i className="ti ti-book" style={{ marginRight: 4 }}></i>
                         ซูเราะฮ์ {item.suraName} [{item.sura}:{item.aya}]
                       </span>
-                      
+
                       <div style={{ display: "flex", gap: 6 }}>
                         <button className="btn btn-outline" style={{ padding: "4px 10px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }} onClick={() => handleOpenVerse(item.sura, item.aya)}>
                           <i className="ti ti-eye"></i> เปิดอ่าน
@@ -1958,11 +1989,11 @@ function SavedVersesPanel({ authState, go, setView, setQuranSura, setQuranAyah }
 
                     {/* Verses Container */}
                     <div style={{ padding: 12, background: "var(--card)", borderRadius: 8, marginBottom: 12, border: "0.5px solid var(--br2)" }}>
-                      <div style={{ 
-                        fontFamily: "'Amiri', serif", 
-                        fontSize: 24, 
-                        direction: "rtl", 
-                        textAlign: "right", 
+                      <div style={{
+                        fontFamily: "'Amiri', serif",
+                        fontSize: 24,
+                        direction: "rtl",
+                        textAlign: "right",
                         marginBottom: 10,
                         lineHeight: 1.8,
                         color: "var(--text)"
@@ -1980,7 +2011,7 @@ function SavedVersesPanel({ authState, go, setView, setQuranSura, setQuranAyah }
                         <label style={{ fontSize: 11, fontWeight: 500, color: "var(--teal)" }}>
                           แก้ไขข้อคิด/ประโยชน์ที่ได้รับจากอายะฮ์นี้:
                         </label>
-                        <textarea 
+                        <textarea
                           value={editNote}
                           onChange={e => setEditNote(e.target.value)}
                           placeholder="เขียนบันทึกสิ่งที่คุณได้รับ หรือข้อคิดสำหรับเตือนตนเอง..."
@@ -1996,12 +2027,12 @@ function SavedVersesPanel({ authState, go, setView, setQuranSura, setQuranAyah }
                         </div>
                       </div>
                     ) : (
-                      <div style={{ 
-                        background: "rgba(45, 190, 160, 0.05)", 
-                        borderLeft: "3px solid var(--teal)", 
-                        padding: "10px 14px", 
+                      <div style={{
+                        background: "rgba(45, 190, 160, 0.05)",
+                        borderLeft: "3px solid var(--teal)",
+                        padding: "10px 14px",
                         borderRadius: "0 8px 8px 0",
-                        marginTop: 10 
+                        marginTop: 10
                       }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: "var(--teal)", marginBottom: 4 }}>
                           ประโยชน์และข้อคิดเตือนใจที่คุณบันทึกไว้:
@@ -2019,5 +2050,94 @@ function SavedVersesPanel({ authState, go, setView, setQuranSura, setQuranAyah }
         )}
       </div>
     </div>
+  )
+}
+
+// ------------------------------------
+// โหมดแสดงหน้าต่างสอนใช้งาน (Onboarding)
+// ------------------------------------
+function TutorialModal({ onClose }) {
+  return createPortal(
+    <div style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.65)",
+      backdropFilter: "blur(4px)",
+      zIndex: 99999,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20
+    }}>
+      <div className="card" style={{
+        maxWidth: 500,
+        width: "100%",
+        padding: "32px 24px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        textAlign: "center",
+        animation: "pageFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+        boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
+        position: "relative"
+      }}>
+        {/* ป้ายด้านบนสุด */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: -4 }}>
+          <span className="badge badge-teal" style={{ fontSize: 11, padding: "4px 10px", fontWeight: 600 }}>แนะนำการใช้งาน 🚀</span>
+        </div>
+
+        <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text)", margin: 0 }}>
+          ห้องอ่านหนังสือส่วนตัวคืออะไร?
+        </h2>
+
+        <p style={{ fontSize: 13, color: "var(--t2)", lineHeight: 1.6, margin: 0 }}>
+          ระบบนี้คือเครื่องมือช่วยสร้างวินัยรักการอ่านของคุณ ผ่านการจับเวลาจริง บันทึกผล และสะสมสถิติความต่อเนื่อง (Streak)
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, textAlign: "left", marginTop: 8 }}>
+
+          <div style={{ display: "flex", gap: 14, background: "var(--bg2)", padding: 14, borderRadius: 12, border: "0.5px solid var(--br)" }}>
+            <div style={{ width: 36, height: 36, background: "var(--teal-bg)", color: "var(--teal)", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 18, flexShrink: 0 }}>
+              <i className="ti ti-book-upload"></i>
+            </div>
+            <div>
+              <strong style={{ fontSize: 13, color: "var(--text)", display: "block", marginBottom: 2 }}>1. เพิ่มหนังสือเข้าชั้น</strong>
+              <span style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.5 }}>คลิกที่ "ชั้นหนังสือของฉัน" ด้านล่าง เพื่อเลือกหนังสือจากคลัง หรืออัปโหลดไฟล์ PDF ของคุณเอง</span>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 14, background: "var(--bg2)", padding: 14, borderRadius: 12, border: "0.5px solid var(--br)" }}>
+            <div style={{ width: 36, height: 36, background: "rgba(255, 179, 0, 0.12)", color: "rgb(255, 179, 0)", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 18, flexShrink: 0 }}>
+              <i className="ti ti-clock-play"></i>
+            </div>
+            <div>
+              <strong style={{ fontSize: 13, color: "var(--text)", display: "block", marginBottom: 2 }}>2. เริ่มจับเวลาโฟกัส</strong>
+              <span style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.5 }}>กดปุ่ม <span style={{ color: "var(--teal)", fontWeight: 500 }}>เริ่มอ่าน</span> เพื่อเข้าสู่โหมดตัดสิ่งรบกวน ระบบจะเริ่มจับเวลาการอ่านของคุณทันที</span>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 14, background: "var(--bg2)", padding: 14, borderRadius: 12, border: "0.5px solid var(--br)" }}>
+            <div style={{ width: 36, height: 36, background: "rgba(248, 113, 113, 0.12)", color: "#f87171", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 18, flexShrink: 0 }}>
+              <i className="ti ti-flame"></i>
+            </div>
+            <div>
+              <strong style={{ fontSize: 13, color: "var(--text)", display: "block", marginBottom: 2 }}>3. รักษาสถิติ (Streak) 🔥</strong>
+              <span style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.5 }}>อ่านอย่างน้อยวันละ 3 นาที พร้อมบันทึกข้อคิด เพื่อรักษาไฟแห่งการอ่านไม่ให้ดับลง</span>
+            </div>
+          </div>
+
+        </div>
+
+        <button
+          className="btn btn-teal"
+          onClick={onClose}
+          style={{ width: "100%", padding: "12px", fontSize: 14, marginTop: 8 }}
+        >
+          เข้าใจแล้ว เริ่มต้นใช้งานเลย!
+        </button>
+
+      </div>
+    </div>,
+    document.body
   )
 }
