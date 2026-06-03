@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { ARTICLES, BOOKS, MEDIA, SITE } from "../data/index.js"
+import { ARTICLES, BOOKS, MEDIA, SITE, SCHOLARS } from "../data/index.js"
 import { useContentCollection, useSiteSettings } from "../lib/contentStore.js"
 
 const QURAN_DUAS = [
@@ -57,6 +57,7 @@ export default function Home({ go }) {
   const { items: articles, loading: loadingArticles } = useContentCollection("articles", ARTICLES)
   const { items: books, loading: loadingBooks } = useContentCollection("books", BOOKS)
   const { items: media, loading: loadingMedia } = useContentCollection("media", MEDIA)
+  const { items: scholars } = useContentCollection("scholars", SCHOLARS)
   const { site } = useSiteSettings(SITE)
   const recent     = articles.slice(0, 3)
   const newBooks   = books.slice(0, 4)
@@ -180,7 +181,7 @@ export default function Home({ go }) {
       {/* STATS */}
       <div className="grid4" style={{ marginBottom:32 }}>
         {[
-          { n: site.stats.followers, l: site.stats.followersLabel, icon: "ti-address-book" },
+          { n: scholars.length + "+", l: "ทำเนียบบุคคล", icon: "ti-address-book" },
           { n: articles.length + "+", l: "บทความ", icon: "ti-file-text" },
           { n: books.length + "+", l: "หนังสือ/วารสาร", icon: "ti-books" },
           { n: media.length + "+", l: "มีเดีย", icon: "ti-player-play" },
