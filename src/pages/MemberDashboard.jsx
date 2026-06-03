@@ -446,7 +446,6 @@ function normalizeStreakSettings(settings, uid) {
     leaveCredits: Number.isFinite(Number(settings?.leaveCredits)) ? Number(settings.leaveCredits) : DEFAULT_LEAVE_CREDITS,
     protectedDays,
     claimedMissions: settings?.claimedMissions || {},
-    exp: Number(settings?.exp || 0),
     gems: Number(settings?.gems || 0),
   }
 }

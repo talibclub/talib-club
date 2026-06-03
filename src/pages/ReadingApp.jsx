@@ -97,7 +97,6 @@ function normalizeStreakSettings(settings, uid) {
     leaveCredits: Number.isFinite(Number(settings?.leaveCredits)) ? Number(settings.leaveCredits) : DEFAULT_LEAVE_CREDITS,
     protectedDays,
     claimedMissions: settings?.claimedMissions || {},
-    exp: Number(settings?.exp || 0),
     gems: Number(settings?.gems || 0),
   }
 }
@@ -407,7 +406,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     // Check if user actually had an active streak of at least 1 day before yesterday
     const hadStreakBeforeYesterday = streak.coveredDays && streak.coveredDays.has(addDaysToKey(yesterdayKey, -1))
 
-    if (!readYesterday && !protectedYesterday && streakSettings.freezeCredits > 0 && hadStreakBeforeYesterday) {
+    if (!readYesterday && !protectedYesterday && streakSettings.freezeCredits > 0 && hadStreakBeforeYesterday && streak.totalDays > 0) {
       const applyAutoFreeze = async () => {
         try {
           await saveStreakSettings({
