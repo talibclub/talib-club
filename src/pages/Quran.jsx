@@ -230,7 +230,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
   const uid = authState?.user?.uid
 
   // Last Read Position from Firestore & local storage
-  const { items: lastReadPos, saveItem: saveLastRead } = useContentCollection("quran_last_read", [])
+  const { items: lastReadPos, saveItem: saveLastRead, deleteItem: deleteLastRead } = useContentCollection("quran_last_read", [])
   const [lastRead, setLastRead] = useState(() => {
     try {
       const local = localStorage.getItem("quran-last-read")
@@ -251,6 +251,25 @@ export default function Quran({ initialSura, initialAyah, authState }) {
   }, [lastReadPos, uid])
 
   const updateLastRead = async (suraNum, ayahNum) => {
+    const isAlreadyBookmarked = lastRead?.sura === suraNum && lastRead?.aya === ayahNum
+    
+    if (isAlreadyBookmarked) {
+      setLastRead(null)
+      localStorage.removeItem("quran-last-read")
+      if (uid) {
+        try {
+          await deleteLastRead(`${uid}_last_read`)
+          toast.success("ยกเลิกการคั่นหน้าแล้ว")
+        } catch (err) {
+          console.error("Failed to delete last read", err)
+          toast.error("ยกเลิกคั่นหน้าไม่สำเร็จ")
+        }
+      } else {
+        toast.success("ยกเลิกการคั่นหน้าแล้ว")
+      }
+      return
+    }
+
     const suraInfo = SURA_LIST.find(s => s.number === suraNum)
     const newItem = {
       id: uid ? `${uid}_last_read` : "local_last_read",
@@ -268,9 +287,13 @@ export default function Quran({ initialSura, initialAyah, authState }) {
     if (uid) {
       try {
         await saveLastRead(newItem)
+        toast.success(`คั่นหน้าการอ่านที่ อายะฮ์ [${suraNum}:${ayahNum}] เรียบร้อย 📖`)
       } catch (err) {
         console.error("Failed to save last read to Firestore", err)
+        toast.error("บันทึกการคั่นหน้าไม่สำเร็จ")
       }
+    } else {
+      toast.success(`คั่นหน้าการอ่านที่ อายะฮ์ [${suraNum}:${ayahNum}] เรียบร้อย 📖`)
     }
   }
 
@@ -334,201 +357,15 @@ export default function Quran({ initialSura, initialAyah, authState }) {
 
   const [activeBookmarkModal, setActiveBookmarkModal] = useState(null)
   const [modalNotes, setModalNotes] = useState("")
+  const [activeAyahMenu, setActiveAyahMenu] = useState(null)
 
-  // Track mobile resize
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768)
-    window.addEventListener("resize", handleResize)
-    return () => window.removeEventListener("resize", handleResize)
-  }, [])
-
-  // Sync with dashboard triggers
-  useEffect(() => {
-    if (initialSura) {
-      setSelectedPage(null)
-      setSelectedSura(normalizeSuraNumber(initialSura))
+  const getVerseTranslation = (suraNum, ayaNum) => {
+    if (selectedSura === suraNum && verses.length > 0) {
+      const match = verses.find(item => item.aya === ayaNum)
+      if (match) return match.translation
     }
-  }, [initialSura])
-
-  useEffect(() => {
-    if (initialAyah) {
-      setTargetScrollAyah(normalizeAyahNumber(initialAyah))
-    }
-  }, [initialAyah])
-
-
-  const handleSelectSearchResult = (match) => {
-    setSelectedPage(null)
-    setSelectedSura(match.surah.number)
-    setTargetScrollAyah(match.numberInSurah)
+    return ""
   }
-
-  const handleOpenBookmarkModal = (v, existingBookmark) => {
-    if (!uid) {
-      toast.error("กรุณาเข้าสู่ระบบก่อนเพื่อทำบันทึกข้อคิด")
-      return
-    }
-
-    setActiveBookmarkModal({
-      verseId: v.id,
-      sura: selectedSura,
-      aya: v.aya,
-      suraName: currentSuraInfo.englishName,
-      arabicText: v.arabic_text,
-      translation: v.translation,
-      bookmarkId: existingBookmark?.id || null
-    })
-    setModalNotes(existingBookmark?.notes || "")
-  }
-
-  const handleSaveBookmark = async () => {
-    if (!activeBookmarkModal) return
-    const toastId = toast.loading("กำลังบันทึก...")
-
-    try {
-      const isNew = !activeBookmarkModal.bookmarkId
-      const id = activeBookmarkModal.bookmarkId || `${uid}_sura_${activeBookmarkModal.sura}_aya_${activeBookmarkModal.aya}`
-
-      await saveItem({
-        id,
-        uid,
-        sura: activeBookmarkModal.sura,
-        aya: activeBookmarkModal.aya,
-        suraName: activeBookmarkModal.suraName,
-        arabicText: activeBookmarkModal.arabicText,
-        translation: activeBookmarkModal.translation,
-        notes: modalNotes,
-        updatedAt: new Date()
-      })
-
-      toast.success(isNew ? "บันทึกอายะฮ์สำเร็จ" : "อัปเดตข้อคิดแล้ว", { id: toastId })
-      setActiveBookmarkModal(null)
-    } catch (err) {
-      toast.error("บันทึกผิดพลาดกรุณาลองใหม่", { id: toastId })
-    }
-  }
-
-  const handleDeleteBookmark = async () => {
-    if (!activeBookmarkModal?.bookmarkId) return
-    const ok = await confirmAction({
-      title: "ลบอายะฮ์ที่บันทึก?",
-      message: "คุณต้องการลบข้อบันทึกสำหรับอายะฮ์นี้ใช่หรือไม่?",
-      confirmText: "ลบออก",
-      danger: true
-    })
-
-    if (ok) {
-      const toastId = toast.loading("กำลังลบ...")
-      try {
-        await deleteItem(activeBookmarkModal.bookmarkId)
-        toast.success("ลบรายการบันทึกแล้ว", { id: toastId })
-        setActiveBookmarkModal(null)
-      } catch (err) {
-        toast.error("ลบไม่สำเร็จ", { id: toastId })
-      }
-    }
-  }
-
-  const getBookmarkForVerse = (ayaNumber) => {
-    if (!uid) return null
-    return savedVerses.find(v => v.uid === uid && v.sura === selectedSura && v.aya === ayaNumber)
-  }
-
-  // Filter Surahs
-  const filteredSurahs = SURA_LIST.filter(s => {
-    const query = search.toLowerCase().trim()
-    return !query ||
-      s.englishName.toLowerCase().includes(query) ||
-      s.englishNameTranslation.toLowerCase().includes(query) ||
-      s.name.includes(query) ||
-      String(s.number) === query
-  })
-
-  const currentSuraInfo = SURA_LIST.find(s => s.number === selectedSura) || SURA_LIST[0]
-
-  // Fetch Sura verses
-  useEffect(() => {
-    let active = true
-    const cacheKey = `${translationKey}-${selectedSura}`
-
-    if (cache.current[cacheKey]) {
-      setVerses(cache.current[cacheKey])
-      setError(null)
-      return
-    }
-
-    setLoading(true)
-    setError(null)
-
-    const transUrl = `https://quranenc.com/api/v1/translation/sura/${translationKey}/${selectedSura}`
-    const tafsirUrl = `https://quranenc.com/api/v1/translation/sura/thai_mokhtasar/${selectedSura}`
-
-    Promise.all([
-      fetch(transUrl).then(res => {
-        if (!res.ok) throw new Error("ไม่สามารถเชื่อมต่อคำแปลความหมายจากระบบ QuranEnc ได้")
-        return res.json()
-      }),
-      fetch(tafsirUrl).then(res => {
-        if (!res.ok) throw new Error("ไม่สามารถเชื่อมต่อบทอธิบายความหมายย่อ (Tafsir) ได้")
-        return res.json()
-      })
-    ])
-      .then(([transData, tafsirData]) => {
-        if (!active) return
-
-        const merged = transData.result.map((aya, idx) => {
-          const tafsirAya = tafsirData.result[idx] || {}
-          return {
-            id: aya.id,
-            sura: aya.sura,
-            aya: aya.aya,
-            arabic_text: aya.arabic_text,
-            translation: aya.translation,
-            tafsir: tafsirAya.translation || ""
-          }
-        })
-
-        cache.current[cacheKey] = merged
-        setVerses(merged)
-        setLoading(false)
-      })
-      .catch(err => {
-        if (!active) return
-        console.error(err)
-        setError(err.message || "เกิดข้อผิดพลาดในการโหลดข้อมูลกรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต")
-        setLoading(false)
-      })
-
-    return () => {
-      active = false
-    }
-  }, [selectedSura, translationKey, reloadKey])
-
-  useEffect(() => {
-    if (targetScrollAyah && !loading && verses.length > 0) {
-      const element = document.getElementById(`ayah-${targetScrollAyah}`)
-      if (element) {
-        const timer1 = setTimeout(() => {
-          element.scrollIntoView({ behavior: "smooth", block: "center" })
-          element.classList.add("pulse-highlight")
-    }
-
-    setSearchHasRun(false) // Reset immediately when typing starts
-
-    const delayDebounceFn = setTimeout(() => {
-      performSearch(keywordQuery)
-    }, 600) // 600ms debounce
-
-    return () => clearTimeout(delayDebounceFn)
-  }, [keywordQuery])
-
-  const handleKeywordSearch = (e) => {
-    if (e) e.preventDefault()
-    performSearch(keywordQuery)
-  }
-
-  const [activeBookmarkModal, setActiveBookmarkModal] = useState(null)
-  const [modalNotes, setModalNotes] = useState("")
 
   // Track mobile resize
   useEffect(() => {
@@ -1807,8 +1644,12 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                                     {v.text || v.arabic_text || ""}{" "}
                                     <span
                                       onClick={() => {
-                                        updateLastRead(v.sura, v.aya)
-                                        toast.success(`คั่นหน้าการอ่านที่ อายะฮ์ [${v.sura}:${v.aya}] เรียบร้อย 📖`)
+                                        setActiveAyahMenu({
+                                          sura: v.sura,
+                                          aya: v.aya,
+                                          arabicText: v.text || v.arabic_text || "",
+                                          verse: v
+                                        })
                                       }}
                                       style={{
                                         fontFamily: "sans-serif",
@@ -1896,8 +1737,12 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                             {v.arabic_text}{" "}
                             <span
                               onClick={() => {
-                                updateLastRead(v.sura, v.aya)
-                                toast.success(`คั่นหน้าการอ่านที่ อายะฮ์ [${v.sura}:${v.aya}] เรียบร้อย 📖`)
+                                setActiveAyahMenu({
+                                  sura: v.sura,
+                                  aya: v.aya,
+                                  arabicText: v.arabic_text || "",
+                                  verse: v
+                                })
                               }}
                               style={{
                                 fontFamily: "sans-serif",
@@ -1957,7 +1802,6 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                               <button
                                 onClick={() => {
                                   updateLastRead(v.sura, v.aya)
-                                  toast.success(`คั่นหน้าการอ่านที่ อายะฮ์ [${v.sura}:${v.aya}] เรียบร้อย`)
                                 }}
                                 style={{
                                   background: "transparent",
@@ -2080,7 +1924,342 @@ export default function Quran({ initialSura, initialAyah, authState }) {
           {/* VERSE BENEFITS (فوائد الآيات) */}
           {!loading && !error && verses.length > 0 && (() => {
             const suraBenefits = quranBenefits?.[selectedSura] || [];
-          onClick={() => setIsMobileNavOpen(false)}
+            if (suraBenefits.length === 0) return null;
+            return (
+              <div
+                className="card"
+                style={{
+                  marginTop: 20,
+                  padding: "20px 24px",
+                  borderLeft: "4px solid var(--quran-teal)",
+                  background: "var(--quran-teal-bg)"
+                }}
+              >
+                <div
+                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+                  onClick={() => setBenefitsExpanded(!benefitsExpanded)}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <i className="ti ti-bulb" style={{ color: "var(--quran-teal)", fontSize: 18 }}></i>
+                    <div style={{ textAlign: "left" }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--quran-text)", display: "block" }}>
+                        ประโยชน์และข้อคิดที่ได้รับจากโองการต่างๆ ในซูเราะฮ์นี้
+                      </span>
+                      <span style={{ fontSize: 10, color: "var(--quran-t2)" }}>
+                        فوائد الآيات وهداياتها (ตัฟซีรอัลมุคตะศ็อร)
+                      </span>
+                    </div>
+                  </div>
+                  <i className={`ti ${benefitsExpanded ? "ti-chevron-up" : "ti-chevron-down"}`} style={{ color: "var(--quran-t2)", fontSize: 16 }}></i>
+                </div>
+
+                {benefitsExpanded && (
+                  <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+                    {suraBenefits.map((b, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          borderBottom: idx === suraBenefits.length - 1 ? "none" : "0.5px solid var(--quran-br)",
+                          paddingBottom: idx === suraBenefits.length - 1 ? 0 : 12,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 6
+                        }}
+                      >
+                        {/* Arabic Benefit */}
+                        <div
+                          style={{
+                            fontFamily: "'Amiri', serif",
+                            fontSize: 20,
+                            direction: "rtl",
+                            textAlign: "right",
+                            lineHeight: 1.5,
+                            color: "var(--quran-teal)"
+                          }}
+                        >
+                          {b.arabic}
+                        </div>
+
+                        {/* Thai Benefit */}
+                        <div style={{ fontSize: "12.5px", lineHeight: 1.6, color: "var(--quran-text)", fontWeight: 400, textAlign: "left" }}>
+                          • {b.thai}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* LICENCE AND CREDIT BANNER */}
+          <div
+            style={{
+              marginTop: 24,
+              padding: "16px 20px",
+              borderRadius: 12,
+              border: "0.5px solid var(--quran-br)",
+              background: "var(--quran-card-bg)",
+              fontSize: "11px",
+              color: "var(--quran-t2)",
+              lineHeight: "1.6"
+            }}
+          >
+            <div style={{ fontWeight: 600, color: "var(--quran-text)", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+              <i className="ti ti-license" style={{ fontSize: 14, color: "var(--quran-teal)" }}></i>
+              แหล่งข้อมูลและลิขสิทธิ์ข้อมูลเผยแพร่
+            </div>
+            ข้อมูลแปลความหมายพระมหาคัมภีร์อัลกุรอานและตัฟซีรย่อภาษาไทยได้รับการสนับสนุนจาก <strong>โครงการสารานุกรมอัลกุรอาน (QuranEnc.com)</strong>
+            <ul style={{ paddingLeft: 16, marginTop: 4, display: "flex", flexDirection: "column", gap: 2, listStyleType: "none", textAlign: "left" }}>
+              <li>• สำนวนคำแปลภาษาไทย: ศูนย์แปล Rowwad Translation Center และ คณะผู้ทรงคุณวุฒิ (สมาคมศิษย์เก่ามหาวิทยาลัยในต่างประเทศ)</li>
+              <li>• บทอธิบายคำแปลย่อ (ตัฟซีรย่อ): หนังสือตัฟซีรอัลมุคตะศ็อร (Al-Mukhtasar fi Tafsir al-Qur'an) แปลภาษาไทย</li>
+              <li>• พัฒนาโดยอ้างอิงข้อมูลเวอร์ชันล่าสุดของโครงการ ซึ่งไม่อนุญาตให้ดัดแปลงหรือตัดต่อเนื้อหาคัดลอกใดๆ เพื่อความถูกต้องของพระดำรัส</li>
+            </ul>
+          </div>
+
+        </div>
+      </div>
+
+      {/* BOOKMARK REFLECTION MODAL */}
+      {activeBookmarkModal && createPortal(
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0, 0, 0, 0.6)",
+          backdropFilter: "blur(4px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 100000,
+          padding: 16
+        }}>
+          <div className="card" style={{
+            maxWidth: 540,
+            width: "100%",
+            padding: 24,
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+            background: "var(--quran-card-bg)",
+            border: "0.5px solid var(--quran-br)",
+            boxShadow: "0 20px 50px rgba(0, 0, 0, 0.3)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--quran-text)", margin: 0 }}>
+                {activeBookmarkModal.bookmarkId ? "แก้ไขบันทึกข้อคิดอายะฮ์" : "บันทึกข้อคิดและประโยชน์จากอายะฮ์"}
+              </h3>
+              <button
+                onClick={() => setActiveBookmarkModal(null)}
+                style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "var(--quran-t3)" }}
+              >
+                <i className="ti ti-x"></i>
+              </button>
+            </div>
+
+            <div style={{ padding: 12, background: "var(--quran-bg)", borderRadius: 8, border: "0.5px solid var(--quran-br2)" }}>
+              <span style={{ fontSize: 10, color: "var(--quran-t3)", fontWeight: 500 }}>
+                ซูเราะฮ์ {activeBookmarkModal.suraName} อายะฮ์ที่ {activeBookmarkModal.aya}
+              </span>
+              <div style={{
+                fontFamily: "'Amiri', serif",
+                fontSize: 22,
+                direction: "rtl",
+                textAlign: "right",
+                margin: "8px 0",
+                lineHeight: 1.6,
+                color: "var(--quran-text)"
+              }}>
+                {activeBookmarkModal.arabicText}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--quran-t2)", lineHeight: 1.45, textAlign: "left" }}>
+                {activeBookmarkModal.translation}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, textAlign: "left" }}>
+              <label style={{ fontSize: 12, fontWeight: 500, color: "var(--quran-teal)" }}>
+                บันทึกข้อคิด/ประโยชน์ที่ได้รับ (จดบันทึกส่วนตัวเพื่อเตือนตนเอง):
+              </label>
+              <textarea
+                value={modalNotes}
+                onChange={e => setModalNotes(e.target.value)}
+                placeholder="พิมพ์สิ่งที่ได้รับจากโองการนี้ เช่น ข้อเตือนใจ, ข้อปฏิบัติในชีวิตประจำวัน..."
+                style={{
+                  width: "100%",
+                  minHeight: 100,
+                  padding: 12,
+                  borderRadius: 8,
+                  border: "0.5px solid var(--quran-br)",
+                  background: "var(--quran-card-bg)",
+                  color: "var(--quran-text)",
+                  fontSize: 13,
+                  fontFamily: "'Prompt', sans-serif"
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+              <div>
+                {activeBookmarkModal.bookmarkId && (
+                  <button
+                    className="btn btn-outline"
+                    style={{ color: "var(--red)", borderColor: "rgba(220, 38, 38, 0.2)", fontSize: 12, padding: "6px 14px" }}
+                    onClick={handleDeleteBookmark}
+                  >
+                    <i className="ti ti-trash" style={{ marginRight: 4 }}></i> ลบบันทึก
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  className="btn btn-outline"
+                  style={{ fontSize: 12, padding: "6px 16px" }}
+                  onClick={() => setActiveBookmarkModal(null)}
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  className="btn btn-teal"
+                  style={{ fontSize: 12, padding: "6px 16px" }}
+                  onClick={handleSaveBookmark}
+                >
+                  บันทึก
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.querySelector(".app") || document.body
+      )}
+
+      {/* AYAH OPTIONS POPUP (MUSHAF MODE MENU) */}
+      {activeAyahMenu && createPortal(
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0, 0, 0, 0.45)",
+          backdropFilter: "blur(3px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 100001,
+          padding: 16
+        }} onClick={() => setActiveAyahMenu(null)}>
+          <div className="card" style={{
+            maxWidth: 360,
+            width: "100%",
+            padding: 20,
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+            background: "var(--quran-card-bg)",
+            border: "0.5px solid var(--quran-br)",
+            boxShadow: "0 15px 35px rgba(0, 0, 0, 0.25)",
+            animation: "scaleUp 0.15s cubic-bezier(0.16, 1, 0.3, 1)"
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "0.5px solid var(--quran-br2)", paddingBottom: 10 }}>
+              <span style={{ fontSize: 11, color: "var(--quran-t2)", fontWeight: 600, fontFamily: "'Prompt', sans-serif" }}>
+                ซูเราะฮ์ {SURA_LIST.find(s => s.number === activeAyahMenu.sura)?.englishName} อายะฮ์ที่ {activeAyahMenu.aya}
+              </span>
+              <button 
+                onClick={() => setActiveAyahMenu(null)} 
+                style={{ background: "none", border: "none", color: "var(--quran-t3)", cursor: "pointer", fontSize: 16 }}
+              >
+                <i className="ti ti-x"></i>
+              </button>
+            </div>
+
+            <div style={{ 
+              padding: 12, 
+              background: "var(--quran-bg)", 
+              borderRadius: 8, 
+              border: "0.5px solid var(--quran-br2)", 
+              textAlign: "right",
+              fontFamily: "'Amiri', serif",
+              fontSize: 20,
+              color: "var(--quran-text)",
+              lineHeight: 1.5,
+              maxHeight: 120,
+              overflowY: "auto",
+              direction: "rtl"
+            }}>
+              {activeAyahMenu.arabicText}
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {/* คั่นหน้า / ยกเลิกคั่นหน้า */}
+              <button
+                className="btn btn-teal"
+                style={{ 
+                  width: "100%", 
+                  fontSize: 12, 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center", 
+                  gap: 8,
+                  padding: "10px 0"
+                }}
+                onClick={() => {
+                  updateLastRead(activeAyahMenu.sura, activeAyahMenu.aya)
+                  setActiveAyahMenu(null)
+                }}
+              >
+                <i className={(lastRead?.sura === activeAyahMenu.sura && lastRead?.aya === activeAyahMenu.aya) ? "ti ti-flag-2-filled" : "ti ti-flag-2"} style={{ fontSize: 14 }}></i>
+                {(lastRead?.sura === activeAyahMenu.sura && lastRead?.aya === activeAyahMenu.aya) ? "ยกเลิกคั่นหน้าการอ่านล่าสุด" : "คั่นหน้านี้เป็นจุดอ่านล่าสุด"}
+              </button>
+
+              {/* บันทึกข้อคิด */}
+              <button
+                className="btn btn-outline"
+                style={{ 
+                  width: "100%", 
+                  fontSize: 12, 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center", 
+                  gap: 8,
+                  padding: "10px 0",
+                  borderColor: "var(--quran-br)"
+                }}
+                onClick={() => {
+                  const bookmark = getBookmarkForVerse(activeAyahMenu.aya)
+                  const tr = getVerseTranslation(activeAyahMenu.sura, activeAyahMenu.aya)
+                  handleOpenBookmarkModal(
+                    {
+                      id: activeAyahMenu.verse.id,
+                      sura: activeAyahMenu.sura,
+                      aya: activeAyahMenu.aya,
+                      arabic_text: activeAyahMenu.arabicText,
+                      translation: tr || "เปิดโหมดคำแปลเพื่ออ่านคำแปลและการอธิบายความหมายย่อสำหรับอายะฮ์นี้"
+                    },
+                    bookmark
+                  )
+                  setActiveAyahMenu(null)
+                }}
+              >
+                <i className={getBookmarkForVerse(activeAyahMenu.aya) ? "ti ti-bookmark-filled" : "ti ti-bookmark"} style={{ fontSize: 14 }}></i>
+                {getBookmarkForVerse(activeAyahMenu.aya) ? "แก้ไขหรือลบบันทึกข้อคิด" : "เขียนบันทึกข้อคิด / ประโยชน์"}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.querySelector(".app") || document.body
+      )}
+
+      {/* MOBILE BOTTOM SHEET NAVIGATION DRAWER */}
+      {isMobile && isMobileNavOpen && createPortal(
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0, 0, 0, 0.4)",
+          backdropFilter: "blur(4px)",
+          zIndex: 100000,
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "center"
+        }}
+        onClick={() => setIsMobileNavOpen(false)}
         >
           <div
             style={{

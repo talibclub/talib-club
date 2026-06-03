@@ -83,40 +83,36 @@ export default function Admin({ go, authState, initialTab = "articles" }) {
       `}} />
 
       <div className="admin-mobile-select-wrapper" style={{ display: "none" }}>
-        <div style={{
-          position: "relative",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "12px 16px",
-          background: "var(--bg2)",
-          border: "1px solid var(--br)",
-          borderRadius: 12,
-          cursor: "pointer",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <i className={`ti ${activeTabObj.icon}`} style={{ fontSize: 18, color: "var(--teal)" }}></i>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{activeTabObj.label}</span>
-          </div>
-          <i className="ti ti-chevron-down" style={{ fontSize: 14, color: "var(--t3)" }}></i>
-          
+        <div style={{ position: "relative", width: "100%" }}>
           <select 
             value={tab} 
             onChange={(e) => go("admin", { tab: e.target.value }, { replace: true, noScroll: true })}
             style={{ 
-              position: "absolute",
-              top: 0,
-              left: 0,
               width: "100%", 
-              height: "100%",
-              opacity: 0,
-              cursor: "pointer",
+              height: 48,
+              padding: "0 16px",
+              paddingRight: 40,
+              fontSize: 14,
+              fontWeight: 600,
+              borderRadius: 12,
+              border: "1px solid var(--br)",
+              background: "var(--bg2)",
+              color: "var(--text)",
+              fontFamily: "'Prompt', sans-serif",
               appearance: "none",
               WebkitAppearance: "none",
+              cursor: "pointer",
+              backgroundImage: "url(\"data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238d877d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")",
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right 16px center",
+              backgroundSize: "18px",
+              transition: "border-color 0.2s"
             }}
           >
             {TABS.map(t => (
-              <option key={t.id} value={t.id}>{t.label}</option>
+              <option key={t.id} value={t.id} style={{ background: "var(--card)", color: "var(--text)" }}>
+                {t.label}
+              </option>
             ))}
           </select>
         </div>

@@ -632,6 +632,13 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       }
       
       const report = calculateVerificationReport(payload)
+      
+      if (!report.verified) {
+        toast.error(`เซสชันนี้ยังไม่ผ่านเกณฑ์ทบทวนความรู้ (${report.score}/100) ลองอ่านสะสมเวลาต่อ หรือเพิ่มบันทึกข้อคิดสะท้อนธรรมยาวขึ้นอีกนิด (อย่างน้อย 20 ตัวอักษร)`)
+        setSaving(false)
+        return
+      }
+
       const sessionId = `${uid}_${activeBook.id}_${Date.now()}`
       
       await saveReadingSession({
@@ -654,12 +661,6 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
         verificationScore: report.score,
         verified: report.verified,
       })
-
-      if (!report.verified) {
-        toast.error(`เซสชันนี้ยังไม่ผ่านเกณฑ์ทบทวนความรู้ (${report.score}/100) ลองอ่านสะสมเวลาต่อ หรือเพิ่มบันทึกข้อคิดสะท้อนธรรมยาวขึ้นอีกนิด (อย่างน้อย 20 ตัวอักษร)`)
-        setSaving(false)
-        return
-      }
 
       // Calculate session rewards
       const sessionGems = Math.min(10, Math.floor(seconds / 120)) // 1 Gem per 2 mins, max 10
@@ -1540,11 +1541,11 @@ function TutorialModal({ onClose }) {
       backdropFilter: "blur(4px)",
       zIndex: 99999,
       display: "flex",
-      alignItems: "flex-start",
+      alignItems: "center",
       justifyContent: "center",
       padding: "20px 16px",
       overflowY: "auto",
-    }}>
+    }} onClick={onClose}>
       <div className="card" style={{
         maxWidth: 500,
         width: "100%",
@@ -1556,8 +1557,31 @@ function TutorialModal({ onClose }) {
         animation: "pageFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
         boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
         position: "relative",
-        margin: "auto",
-      }}>
+      }} onClick={e => e.stopPropagation()}>
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 12,
+            background: "none",
+            border: "none",
+            fontSize: 18,
+            cursor: "pointer",
+            color: "var(--t3)",
+            width: 32,
+            height: 32,
+            display: "grid",
+            placeItems: "center",
+            borderRadius: "50%",
+            transition: "background 0.15s",
+          }}
+          title="ปิด"
+        >
+          <i className="ti ti-x"></i>
+        </button>
+
         <div style={{ display: "flex", justifyContent: "center", marginBottom: -4 }}>
           <span className="badge badge-teal" style={{ fontSize: 11, padding: "4px 10px", fontWeight: 600 }}>แนะนำการใช้งาน 🚀</span>
         </div>
