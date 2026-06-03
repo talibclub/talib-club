@@ -67,31 +67,23 @@ export default function App() {
   const authState = useAuth()
   const [page, setPage] = useState("home")
   const [ctx, setCtx] = useState(null)
+  const [countdownText, setCountdownText] = useState("")
 
   const uid = authState?.user?.uid
   const { items: readingSessions } = useContentCollection("reading_sessions", [])
   const countdownNotifRef = useRef(null)
 
+  // --- Preferred Time Notification (60s interval, gated by user toggle) ---
   useEffect(() => {
     if (!uid) return
-
     const interval = setInterval(() => {
       const isNotifEnabled = localStorage.getItem("talib_notif_enabled") === "true"
-      if (!isNotifEnabled || typeof Notification === "undefined" || Notification.permission !== "granted") {
-        return
-      }
-
+      if (!isNotifEnabled || typeof Notification === "undefined" || Notification.permission !== "granted") return
       const now = new Date()
       const todayKey = getLocalDayKey(now.getTime())
-
-      // 1. Preferred Time Notification
       const notifTime = localStorage.getItem("talib_notif_time") || "20:00"
       const [prefHour, prefMin] = notifTime.split(":").map(Number)
-      
-      const currentHour = now.getHours()
-      const currentMin = now.getMinutes()
-
-      if (currentHour === prefHour && currentMin === prefMin) {
+      if (now.getHours() === prefHour && now.getMinutes() === prefMin) {
         const lastSent = localStorage.getItem("talib_last_pref_notif_sent")
         if (lastSent !== todayKey) {
           localStorage.setItem("talib_last_pref_notif_sent", todayKey)
@@ -101,9 +93,17 @@ export default function App() {
           })
         }
       }
+    }, 60000)
+    return () => clearInterval(interval)
+  }, [uid])
 
-      // 2. Realtime Countdown (23:00 - 00:00)
-      if (currentHour === 23) {
+  // --- Realtime Countdown Banner & Mandatory Notification (1s tick, 23:00 hour) ---
+  useEffect(() => {
+    if (!uid) return
+    const interval = setInterval(() => {
+      const now = new Date()
+      if (now.getHours() === 23) {
+        const todayKey = getLocalDayKey(now.getTime())
         const todaySessions = readingSessions.filter(
           item =>
             item.uid === uid &&
@@ -111,24 +111,33 @@ export default function App() {
             (item.dayKey || getLocalDayKey(item.completedAt || item.createdAt)) === todayKey
         )
         const todaySeconds = todaySessions.reduce((sum, item) => sum + Number(item.activeSeconds || 0), 0)
-
         if (todaySeconds < 600) {
-          const minutesLeft = 60 - currentMin
-          const notif = new Notification("รีบด่วน! เหลือเวลารักษา Streak ⏰", {
-            body: `คุณเหลือเวลาอีก ${minutesLeft} นาทีในการอ่านหนังสือเพื่อต่อไฟ Streak คืนนี้!`,
-            tag: "streak-countdown",
-            requireInteraction: true
-          })
-          countdownNotifRef.current = notif
+          const secondsLeft = 3600 - (now.getMinutes() * 60 + now.getSeconds())
+          const m = Math.floor(secondsLeft / 60)
+          const s = secondsLeft % 60
+          setCountdownText(`${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`)
+          // Mandatory native notification every 5 min (bypasses user toggle)
+          if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+            if (now.getMinutes() % 5 === 0 && now.getSeconds() < 2) {
+              const notif = new Notification("รีบด่วน! เหลือเวลารักษา Streak ⏰", {
+                body: `คุณเหลือเวลาอีก ${m} นาที ${s} วินาที!`,
+                tag: "streak-countdown",
+                requireInteraction: true
+              })
+              countdownNotifRef.current = notif
+            }
+          }
         } else {
+          setCountdownText("")
           if (countdownNotifRef.current) {
             countdownNotifRef.current.close()
             countdownNotifRef.current = null
           }
         }
+      } else {
+        setCountdownText("")
       }
-    }, 60000)
-
+    }, 1000)
     return () => clearInterval(interval)
   }, [uid, readingSessions])
 
@@ -240,6 +249,33 @@ export default function App() {
       <Toaster position="top-right" toastOptions={{ style: { fontFamily: "'Prompt', sans-serif", fontSize: 14 } }} />
       
       <Nav page={page} go={go} theme={theme} setTheme={setTheme} authState={authState} />
+      {countdownText && (
+        <div
+          className="countdown-banner"
+          onClick={() => go("reader")}
+          style={{
+            background: "linear-gradient(135deg, #dc2626, #991b1b)",
+            color: "#fff",
+            padding: "10px 20px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            cursor: "pointer",
+            fontFamily: "'Prompt', sans-serif",
+            fontSize: 14,
+            fontWeight: 500,
+            boxShadow: "0 4px 20px rgba(220, 38, 38, 0.3)",
+            position: "sticky",
+            top: 58,
+            zIndex: 99,
+          }}
+        >
+          <i className="ti ti-alert-triangle" style={{ fontSize: 18, animation: "countdown-pulse 1s infinite" }} />
+          <span>⏰ เหลือเวลาอีก <strong style={{ fontSize: 20, fontFamily: "monospace", letterSpacing: 2, margin: "0 4px" }}>{countdownText}</strong> รีบอ่านหนังสือเพื่อรักษา Streak!</span>
+          <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.7 }} />
+        </div>
+      )}
       <main className={`${page === "quran" || page === "member" ? "wide" : ""} fade-in-active`} key={page}>
         <PageErrorBoundary resetKey={`${page}:${JSON.stringify(ctx || {})}`} go={go}>
           <Suspense fallback={<LoadingState />}>

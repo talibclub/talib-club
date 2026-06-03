@@ -202,23 +202,24 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
       onClick: () => nav("member", { view: "profile" })
     })
 
-    // 5. Daily Reading Reminders
-    if (uid && userSettings?.remindersEnabled && !hasReadToday) {
-      // Add countdown warning if between 23:00 - 00:00
+    // 5. Mandatory 23:00 Countdown (bypasses remindersEnabled)
+    if (uid && !hasReadToday) {
       const now = new Date()
       if (now.getHours() === 23) {
-        list.unshift({ // Make it first (high priority)
+        list.unshift({
           id: "streak-countdown",
           title: "⚠️ วันนี้คุณยังไม่ได้อ่านหนังสือ!",
           desc: `กรุณาเข้ามาอ่านหนังสือเพื่อรักษา Streak ของคุณ! เวลาคงเหลือ: ${timeRemaining || "59:59"} นาที`,
           time: "ด่วนที่สุด",
           icon: "ti-alert-triangle",
           color: "#ff4444",
-          onClick: () => nav("library")
+          onClick: () => nav("reader")
         })
       }
+    }
 
-      // Add passed custom reminder times
+    // 6. Daily Reading Reminders (gated by remindersEnabled)
+    if (uid && userSettings?.remindersEnabled && !hasReadToday) {
       userSettings.reminderTimes.forEach(timeStr => {
         const [h, m] = timeStr.split(":").map(Number)
         const remDate = new Date()
@@ -232,7 +233,7 @@ export default function Nav({ page, go, theme, setTheme, authState }) {
             time: `${timeStr} น.`,
             icon: "ti-alarm",
             color: "var(--teal)",
-            onClick: () => nav("library")
+            onClick: () => nav("reader")
           })
         }
       })

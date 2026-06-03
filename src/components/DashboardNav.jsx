@@ -72,27 +72,36 @@ export default function DashboardNav({
   }
 
   return (
-    <div className="dashboard-nav-grid">
+    <div className="grid3" style={{ gap: 12 }}>
       {navItems.map((item) => (
         <button
           key={item.view}
-          className="dashboard-nav-item"
+          className="card dashboard-card"
           onClick={() => handleClick(item.view)}
         >
           <div
-            className="dashboard-nav-icon"
-            style={{ background: item.bgVar, color: item.colorVar }}
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 14,
+              background: item.bgVar,
+              color: item.colorVar,
+              display: "grid",
+              placeItems: "center",
+              fontSize: 22,
+              marginBottom: 4,
+            }}
           >
             <i className={item.icon} />
           </div>
-          <div className="dashboard-nav-text">
-            <span className="dashboard-nav-label">{item.label}</span>
-            <span className="dashboard-nav-desc">{item.desc}</span>
-          </div>
-          <i className="ti ti-chevron-right dashboard-nav-arrow" />
+          <h2 style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>
+            {item.label}
+          </h2>
+          <p style={{ fontSize: 12, fontWeight: 300, color: "var(--t2)", lineHeight: 1.4 }}>
+            {item.desc}
+          </p>
         </button>
       ))}
     </div>
   )
 }
-

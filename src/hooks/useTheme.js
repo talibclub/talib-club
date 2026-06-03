@@ -6,6 +6,7 @@ export function useTheme() {
   })
   useEffect(() => {
     try { localStorage.setItem("talib-theme", theme) } catch {}
+    document.body.className = theme
   }, [theme])
   return { theme, setTheme }
 }
