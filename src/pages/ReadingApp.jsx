@@ -97,6 +97,8 @@ function normalizeStreakSettings(settings, uid) {
     leaveCredits: Number.isFinite(Number(settings?.leaveCredits)) ? Number(settings.leaveCredits) : DEFAULT_LEAVE_CREDITS,
     protectedDays,
     claimedMissions: settings?.claimedMissions || {},
+    exp: Number(settings?.exp || 0),
+    gems: Number(settings?.gems || 0),
   }
 }
 
@@ -1046,7 +1048,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
                 {myActiveBooks.map(item => (
-                  <div key={item.id} className="card" style={{ padding: 16, display: "flex", flexDirection: "column", justifyContent: "space-between", maxWidth: 320, width: "100%" }}>
+                  <div key={item.id} className="card" style={{ padding: 16, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                     <div>
                       <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
                         <span className="tag tag-teal" style={{ fontSize: 9, padding: "1px 6px" }}>{item.book.category || "หนังสือ"}</span>
@@ -1106,10 +1108,10 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
             </div>
 
             <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-              <div className="btn btn-outline" style={{ flex: 1, padding: "6px 8px", fontSize: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 4, opacity: 0.8, pointerEvents: "none", cursor: "default" }}>
+              <div className="btn btn-outline" style={{ flex: 1, padding: "6px 8px", fontSize: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 4, opacity: 0.8, pointerEvents: "none", cursor: "default", whiteSpace: "nowrap" }}>
                 <i className="ti ti-snowflake" style={{ color: "#64c8ff" }}></i>น้ำแข็ง {streakSettings.freezeCredits}
               </div>
-              <button className="btn btn-outline" onClick={() => protectToday("leave")} disabled={streak.todayVerified || streak.todayProtected || streakSettings.leaveCredits <= 0} style={{ flex: 1, padding: "6px 8px", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+              <button className="btn btn-outline" onClick={() => protectToday("leave")} disabled={streak.todayVerified || streak.todayProtected || streakSettings.leaveCredits <= 0} style={{ flex: 1, padding: "6px 8px", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, whiteSpace: "nowrap" }}>
                 <i className="ti ti-calendar-pause" style={{ color: "#3b73c4" }}></i>ลากิจ {streakSettings.leaveCredits}
               </button>
             </div>

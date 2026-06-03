@@ -646,6 +646,8 @@ function normalizeStreakSettings(settings, uid) {
     leaveCredits: Number.isFinite(Number(settings?.leaveCredits)) ? Number(settings.leaveCredits) : DEFAULT_LEAVE_CREDITS,
     protectedDays,
     claimedMissions: settings?.claimedMissions || {},
+    exp: Number(settings?.exp || 0),
+    gems: Number(settings?.gems || 0),
   }
 }
 
@@ -2015,138 +2017,142 @@ function ProfilePanel({ authState, copied, copyText, go, setView, ctx }) {
                       const val = e.target.value
                       setNotifTime(val)
                       localStorage.setItem("talib_notif_time", val)
-                      toast.success(`ตั้งเวลาแจ้งเตือนเป็น ${val} เรียบร้อยแล้ว`)
-                    }}
-                    style={{ maxWidth: 200 }}
-                  />
-                </label>
-                
-                <div style={{ background: "rgba(45,190,160,0.06)", border: "0.5px solid rgba(45,190,160,0.25)", padding: 12, borderRadius: 8, fontSize: 11, color: "var(--teal)", lineHeight: 1.5 }}>
-                  <i className="ti ti-info-circle" style={{ marginRight: 6 }}></i>
-                  ระบบจะทำการเตือนสติให้อ่านหนังสือตามเวลาที่คุณเลือก และจะแจ้งเตือนสัญญาณนับถอยหลังระหว่างเวลา 23:00 - 00:00 น. หากคุณยังไม่ผ่านเป้าหมายประจำวันเพื่อช่วยคุ้มครอง Streak ของคุณ
-                </div>
-              </div>
-            </section>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function DashboardCard({ icon, title, text, onClick }) {
-  const Tag = onClick ? "button" : "div"
+                      toast.success(`ตั้งเวลาแจ้งเตือนเป็น ${val} เรียบร้อยแล้�function TutorialModal({ onClose }) {
   return (
-    <Tag onClick={onClick} className="card dashboard-card">
-      <i className={`ti ${icon}`}></i>
-      <h2>{title}</h2>
-      <p>{text}</p>
-    </Tag>
-  )
-}
-
-function initials(name, email) {
-  const source = name && name !== "-" ? name : email
-  return source.split(/\s|@/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join("") || "TC"
-}
-
-function formEmailChanged(nextEmail, currentEmail) {
-  return nextEmail?.trim().toLowerCase() !== currentEmail?.trim().toLowerCase()
-}
-
-const fieldStyle = { display: "grid", gap: 6, marginTop: 12, fontSize: 12, color: "var(--t2)" }
-
-function SavedVersesPanel({ authState, go, setView, setQuranSura, setQuranAyah }) {
-  const { items: savedVerses, loading, deleteItem, saveItem } = useContentCollection("quran_bookmarks", [])
-  const uid = authState?.user?.uid;
-  const [search, setSearch] = useState("");
-  const [editingId, setEditingId] = useState(null);
-  const [editNote, setEditNote] = useState("");
-
-  const userSaved = useMemo(() => {
-    if (!uid) return [];
-    return savedVerses.filter(v => v.uid === uid);
-  }, [savedVerses, uid]);
-
-  const filteredSaved = useMemo(() => {
-    if (!search.trim()) return userSaved;
-    const q = search.toLowerCase();
-    return userSaved.filter(v =>
-      v.notes?.toLowerCase().includes(q) ||
-      v.translation?.toLowerCase().includes(q) ||
-      v.suraName?.toLowerCase().includes(q) ||
-      String(v.sura).includes(q)
-    );
-  }, [userSaved, search]);
-
-  const handleOpenVerse = (sura, aya) => {
-    go("quran", { sura, ayah: aya })
-  };
-
-  const handleEdit = (item) => {
-    setEditingId(item.id);
-    setEditNote(item.notes || "");
-  };
-
-  const handleSaveNote = async (item) => {
-    const toastId = toast.loading("กำลังบันทึก...");
-    try {
-      await saveItem({
-        ...item,
-        notes: editNote,
-        updatedAt: new Date()
-      });
-      toast.success("บันทึกข้อคิดเรียบร้อยแล้ว", { id: toastId });
-      setEditingId(null);
-    } catch (err) {
-      toast.error("ไม่สามารถบันทึกได้", { id: toastId });
-    }
-  };
-
-  const handleDelete = async (id) => {
-    const ok = await confirmAction({
-      title: "ลบอายะฮ์ที่บันทึก?",
-      message: "คุณต้องการยกเลิกการบันทึกอายะฮ์นี้ใช่หรือไม่?",
-      confirmText: "ลบออก",
-      danger: true
-    });
-    if (ok) {
-      const toastId = toast.loading("กำลังลบ...");
-      try {
-        await deleteItem(id);
-        toast.success("ลบรายการแล้ว", { id: toastId });
-      } catch (err) {
-        toast.error("ลบไม่สำเร็จ", { id: toastId });
-      }
-    }
-  };
-
-  if (loading) return <div style={{ textAlign: "center", padding: 40 }}><i className="ti ti-loader-2 spin" style={{ fontSize: 24, color: "var(--teal)" }}></i></div>
-
-  return (
-    <div className="profile-layout" style={{ maxWidth: 840, margin: "0 auto" }}>
-      <button
-        onClick={() => setView("overview")}
-        className="sec-link"
-        style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 16, background: "none", border: "none", fontFamily: "'Prompt', sans-serif", cursor: "pointer", color: "var(--t2)" }}
-      >
-        <i className="ti ti-arrow-left"></i> กลับหน้าแดชบอร์ด
-      </button>
-
-      <div className="card" style={{ padding: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <i className="ti ti-notebook" style={{ color: "var(--teal)", fontSize: 20 }}></i>
+    <div style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.65)",
+      backdropFilter: "blur(4px)",
+      zIndex: 99999,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "20px 16px",
+    }}>
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: var(--br);
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: var(--teal);
+        }
+      `}</style>
+      <div className="card" style={{
+        maxWidth: 500,
+        width: "100%",
+        maxHeight: "calc(100dvh - 40px)",
+        padding: "24px 20px 20px 20px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 14,
+        textAlign: "center",
+        animation: "pageFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+        boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
+        position: "relative",
+        margin: "auto",
+        boxSizing: "border-box",
+      }}>
+        <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: -4 }}>
+            <span className="badge badge-teal" style={{ fontSize: 11, padding: "4px 10px", fontWeight: 600 }}>แนะนำการใช้งาน 🚀</span>
           </div>
-          <div>
-            <h2 style={{ fontSize: 18 }}>อายะฮ์อัลกุรอานที่บันทึกไว้</h2>
-            <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>{filteredSaved.length} รายการ (บันทึกข้อคิดและประโยชน์จากอายะฮ์)</p>
-          </div>
+
+          <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text)", margin: 0 }}>
+            ห้องอ่านหนังสือส่วนตัวคืออะไร?
+          </h2>
+
+          <p style={{ fontSize: 13, color: "var(--t2)", lineHeight: 1.5, margin: 0 }}>
+            เครื่องมือสร้างวินัยรักการอ่าน ผ่านการจับเวลาจริง บันทึกผล และสะสมสถิติความต่อเนื่อง (Streak)
+          </p>
         </div>
 
-        {userSaved.length === 0 ? (
-          <div className="empty" style={{ padding: "40px 0" }}>
-            คุณยังไม่มีอายะฮ์ที่บันทึกไว้ ไปเปิดคัมภีร์อัลกุรอานเพื่อบันทึกและจดข้อคิดกันเลยครับ!
+        <div className="custom-scrollbar" style={{
+          flex: "1 1 auto",
+          overflowY: "auto",
+          textAlign: "left",
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          paddingRight: 6,
+          marginRight: -6,
+        }}>
+
+          <div style={{ display: "flex", gap: 12, background: "var(--bg2)", padding: 13, borderRadius: 12, border: "0.5px solid var(--br)" }}>
+            <div style={{ width: 34, height: 34, background: "var(--teal-bg)", color: "var(--teal)", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 16, flexShrink: 0 }}>
+              <i className="ti ti-books"></i>
+            </div>
+            <div>
+              <strong style={{ fontSize: 13, color: "var(--text)", display: "block", marginBottom: 2 }}>เพิ่มหนังสือแล้วเริ่มอ่าน</strong>
+              <span style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.5 }}>เลือกหนังสือจากคลังหรืออัปโหลด PDF กด <span style={{ color: "var(--teal)", fontWeight: 500 }}>เริ่มอ่าน</span> เพื่อเข้าโหมดจับเวลา ระบบบันทึกเวลาที่อ่านจริงเท่านั้น</span>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 12, background: "var(--bg2)", padding: 13, borderRadius: 12, border: "0.5px solid var(--br)" }}>
+            <div style={{ width: 34, height: 34, background: "rgba(248, 113, 113, 0.12)", color: "#f87171", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 16, flexShrink: 0 }}>
+              <i className="ti ti-flame"></i>
+            </div>
+            <div>
+              <strong style={{ fontSize: 13, color: "var(--text)", display: "block", marginBottom: 2 }}>รักษา Streak ต่อเนื่อง 🔥</strong>
+              <span style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.5 }}>อ่านและบันทึกเซสชันทุกวัน ระบบจะนับวันต่อเนื่อง หากวันไหนอ่านไม่ได้ ใช้ไอเทมคุ้มครองแทนได้</span>
+            </div>
+          </div>
+
+          {/* ─── น้ำแข็ง & ลากิจ ─── */}
+          <div style={{ background: "rgba(96,165,250,0.07)", border: "0.5px solid rgba(96,165,250,0.2)", borderRadius: 12, padding: 13 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+              <i className="ti ti-shield-check" style={{ color: "#60a5fa" }}></i>
+              ไอเทมคุ้มครอง Streak (สูงสุด 2 ชิ้นต่อประเภท)
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <span style={{ fontSize: 15, flexShrink: 0 }}>🧊</span>
+                <div>
+                  <strong style={{ fontSize: 12, color: "var(--text)" }}>น้ำแข็ง (Freeze)</strong>
+                  <span style={{ fontSize: 11, color: "var(--t2)", display: "block", lineHeight: 1.4 }}>ระบบใช้อัตโนมัติเมื่อลืมอ่านหนังสือในวันก่อนหน้า เพื่อรักษา Streak ของคุณ ได้จากภารกิจสะสม</span>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <span style={{ fontSize: 15, flexShrink: 0 }}>📅</span>
+                <div>
+                  <strong style={{ fontSize: 12, color: "var(--text)" }}>ลากิจ (Leave)</strong>
+                  <span style={{ fontSize: 11, color: "var(--t2)", display: "block", lineHeight: 1.4 }}>ใช้เมื่อวางแผนล่วงหน้าแล้วว่าน่าจะเรียนไม่ทันหรือไม่ว่าง สามารถกดใช้วันนี้ด้วยตัวเอง ได้จากภารกิจสะสม</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 12, background: "var(--bg2)", padding: 13, borderRadius: 12, border: "0.5px solid var(--br)" }}>
+            <div style={{ width: 34, height: 34, background: "rgba(245,158,11,0.1)", color: "#f59e0b", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 16, flexShrink: 0 }}>
+              <i className="ti ti-target"></i>
+            </div>
+            <div>
+              <strong style={{ fontSize: 13, color: "var(--text)", display: "block", marginBottom: 2 }}>ภารกิจรายวัน (ไม่ง่าย)</strong>
+              <span style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.5 }}>อ่าน 20 นาที หรือเขียนข้อคิด 200 ตัวอักษร หรือผ่านแบบทดสอบ 4/5 ข้อ จึงจะได้รับไอเทม และมีสิทธิ์รับได้เพียงครั้งเดียวต่อวัน</span>
+            </div>
+          </div>
+
+        </div>
+
+        <div style={{ flexShrink: 0, marginTop: 4 }}>
+          <button
+            className="btn btn-teal"
+            onClick={onClose}
+            style={{ width: "100%", padding: "12px", fontSize: 14 }}
+          >
+            เข้าใจแล้ว เริ่มต้นใช้งานเลย!
+          </button>
+        </div>
+
+      </div>
+    </div>��ะจดข้อคิดกันเลยครับ!
           </div>
         ) : (
           <>
