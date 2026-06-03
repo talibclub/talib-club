@@ -89,7 +89,19 @@ export default function MemberDashboard({ authState, go, initialView = "overview
         </div>
       )}
 
-      {view === "overview" && <DashboardNav setView={setView} go={go} />}
+      {view === "overview" && (
+        <Overview
+          authState={authState}
+          go={go}
+          setView={setView}
+          onOpenQuran={(sura, ayah) => {
+            setQuranSura(sura || 1)
+            setQuranAyah(ayah || null)
+            setView("quran")
+          }}
+          onOpenSavedVerses={() => setView("saved-verses")}
+        />
+      )}
       {view === "saved-articles" && <SavedArticlesPanel authState={authState} go={go} setView={setView} />}
       {view === "bookshelf" && <BookshelfPanel authState={authState} go={go} setView={setView} />}
       {view === "profile" && <ProfilePanel authState={authState} copied={copied} copyText={copyText} go={go} setView={setView} ctx={ctx} />}
