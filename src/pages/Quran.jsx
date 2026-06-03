@@ -569,7 +569,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap');
         
-        .quran-container {
+        .app, .quran-container {
           --quran-bg: var(--bg);
           --quran-card-bg: var(--card);
           --quran-text: var(--text);
@@ -580,7 +580,9 @@ export default function Quran({ initialSura, initialAyah, authState }) {
           --quran-acc2: var(--acc2);
           --quran-teal: var(--teal);
           --quran-teal-bg: var(--teal-bg);
+        }
 
+        .quran-container {
           padding: 0;
           background: transparent;
           border-radius: 20px;
@@ -1025,7 +1027,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                           onChange={e => {
                             if (e.target.value) handleSelectPage(e.target.value)
                           }}
-                          style={{ width: "100%", height: 36, padding: "0 10px", fontSize: 12, borderRadius: 8, border: "0.5px solid var(--quran-br)" }}
+                          style={{ width: "100%", height: 38, padding: "0 10px", fontSize: 12, borderRadius: 8, border: "0.5px solid var(--br)", background: "var(--inp)", color: "var(--text)" }}
                         >
                           <option value="">-- เลือกจากรายการ --</option>
                           {Array.from({ length: 604 }, (_, i) => i + 1).map(p => (
@@ -1481,13 +1483,14 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                     onChange={e => setTranslationKey(e.target.value)}
                     style={{
                       width: "100%",
-                      padding: "8px 36px 8px 12px",
+                      height: 38,
+                      padding: "0 36px 0 12px",
                       borderRadius: 8,
-                      border: "0.5px solid var(--quran-br)",
+                      border: "0.5px solid var(--br)",
                       fontSize: 12,
                       fontFamily: "'Prompt', sans-serif",
-                      background: "var(--quran-card-bg)",
-                      color: "var(--quran-text)",
+                      background: "var(--inp)",
+                      color: "var(--text)",
                       appearance: "none",
                       WebkitAppearance: "none",
                       cursor: "pointer",
@@ -2467,7 +2470,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                           onChange={e => {
                             if (e.target.value) handleSelectPage(e.target.value)
                           }}
-                          style={{ width: "100%", height: 36, padding: "0 10px", fontSize: 12, borderRadius: 8, border: "0.5px solid var(--quran-br)" }}
+                          style={{ width: "100%", height: 38, padding: "0 10px", fontSize: 12, borderRadius: 8, border: "0.5px solid var(--br)", background: "var(--inp)", color: "var(--text)" }}
                         >
                           <option value="">-- เลือกจากรายการ --</option>
                           {Array.from({ length: 604 }, (_, i) => i + 1).map(p => (

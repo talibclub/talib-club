@@ -1918,21 +1918,18 @@ button.dashboard-card:hover {
     display: block !important
   }
 
-  /* Quran immersive mobile reading - remove cream border distraction */
+  /* Quran mobile reading - add clean margins and card borders */
   main.wide:has(.quran-container) {
-    padding-left: 0;
-    padding-right: 0;
+    padding-left: 16px;
+    padding-right: 16px;
     padding-top: 16px;
   }
   .quran-container {
     padding: 0 !important;
-    border-radius: 0 !important;
   }
   .quran-container > .card,
   .quran-container .card {
-    border-radius: 0 !important;
-    border-left: none !important;
-    border-right: none !important;
+    border-radius: 12px !important;
   }
 }
 

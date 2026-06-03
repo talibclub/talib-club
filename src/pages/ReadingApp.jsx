@@ -1537,8 +1537,7 @@ function TutorialModal({ onClose }) {
     <div style={{
       position: "fixed",
       inset: 0,
-      background: "rgba(0,0,0,0.65)",
-      backdropFilter: "blur(4px)",
+      background: "rgba(0,0,0,0.45)",
       zIndex: 99999,
       display: "flex",
       alignItems: "center",

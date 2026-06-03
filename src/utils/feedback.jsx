@@ -133,8 +133,13 @@ export function confirmAction({
   danger = false,
 } = {}) {
   return new Promise(resolve => {
+    const appEl = document.querySelector(".app")
     const container = document.createElement("div")
-    document.body.appendChild(container)
+    if (appEl) {
+      appEl.appendChild(container)
+    } else {
+      document.body.appendChild(container)
+    }
     const root = createRoot(container)
 
     function cleanup(value) {
