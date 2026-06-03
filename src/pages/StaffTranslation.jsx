@@ -89,7 +89,13 @@ export default function StaffTranslation({ go }) {
   const [statusFilter, setStatusFilter] = useState("all")
   const [editItem, setEditItem] = useState(null)
 
-  // Workspace states for side-by-side translation
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [query, statusFilter])  // Workspace states for side-by-side translation
   const [activeWorkspaceItem, setActiveWorkspaceItem] = useState(null)
   const [workspaceParagraphs, setWorkspaceParagraphs] = useState([])
   const [workspaceThaiTitle, setWorkspaceThaiTitle] = useState("")
@@ -218,6 +224,11 @@ export default function StaffTranslation({ go }) {
       (!q || i.title.toLowerCase().includes(q) || (i.thaiTitle || "").toLowerCase().includes(q))
     )
   }, [items, query, statusFilter])
+
+  const totalPages = Math.ceil(filtered.length / pageSize)
+  const paginatedItems = useMemo(() => {
+    return filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  }, [filtered, currentPage, pageSize])
 
   if (activeWorkspaceItem) {
     return (
@@ -442,24 +453,30 @@ export default function StaffTranslation({ go }) {
       )}
 
       {/* Search & Filter */}
-      <div style={{ display: "flex", gap: "10px", marginBottom: "12px", flexWrap: "wrap" }}>
-        <input
-          type="text"
-          placeholder="ค้นหาบทความ (อังกฤษหรือไทย)..."
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          style={{ flex: 1, minWidth: "200px" }}
-        />
+      <div className="filter-bar">
+        <div className="filter-search">
+          <i className="ti ti-search"></i>
+          <input
+            type="text"
+            placeholder="ค้นหาบทความ (อังกฤษหรือไทย)..."
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+          />
+        </div>
         <select
+          className="filter-select"
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value)}
-          style={{ width: "auto" }}
         >
           <option value="all">ทั้งหมด ({total})</option>
           <option value={STATUS.pending}>ยังไม่แปล ({pending})</option>
           <option value={STATUS.progress}>กำลังแปล ({inProgress})</option>
           <option value={STATUS.completed}>แปลเสร็จแล้ว ({completed})</option>
         </select>
+      </div>
+
+      <div style={{ marginBottom: "16px", fontSize: "12.5px", color: "var(--t2)" }}>
+        แสดง {filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, filtered.length)} จาก {filtered.length} บทความที่ตรงตามเงื่อนไข
       </div>
 
       {/* Table */}
@@ -471,7 +488,7 @@ export default function StaffTranslation({ go }) {
           </div>
         ) : filtered.length === 0 ? (
           <div className="empty">ไม่พบบทความ</div>
-        ) : filtered.map(item => (
+        ) : paginatedItems.map(item => (
           <div key={item.id} style={{
             display: "grid",
             gridTemplateColumns: "minmax(0,1fr) auto",
@@ -512,47 +529,60 @@ export default function StaffTranslation({ go }) {
             </div>
 
             {/* Controls */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-end" }}>
-              <select
-                value={item.status || STATUS.pending}
-                onChange={e => updateItem(item, { status: e.target.value })}
-                style={{ width: "auto", fontSize: "12px", padding: "5px 10px" }}
-              >
-                {Object.values(STATUS).map(s => (
-                  <option key={s} value={s}>{STATUS_LABEL[s]}</option>
-                ))}
-              </select>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "flex-end" }}>
+              {/* Status Badge */}
+              {item.status === STATUS.completed ? (
+                <span className="badge" style={{ background: "rgba(16,185,129,0.08)", color: "var(--teal)", border: "0.5px solid rgba(16,185,129,0.2)", fontSize: "11px", padding: "3px 10px", borderRadius: "12px" }}>
+                  <i className="ti ti-circle-check" style={{ marginRight: 4 }} />แปลเสร็จแล้ว
+                </span>
+              ) : item.status === STATUS.progress ? (
+                <span className="badge" style={{ background: "rgba(59,115,196,0.08)", color: "#3b73c4", border: "0.5px solid rgba(59,115,196,0.2)", fontSize: "11px", padding: "3px 10px", borderRadius: "12px" }}>
+                  <i className="ti ti-hourglass-low" style={{ marginRight: 4 }} />กำลังแปล
+                </span>
+              ) : (
+                <span className="badge" style={{ background: "rgba(245,158,11,0.08)", color: "#bd7a13", border: "0.5px solid rgba(245,158,11,0.2)", fontSize: "11px", padding: "3px 10px", borderRadius: "12px" }}>
+                  <i className="ti ti-dots" style={{ marginRight: 4 }} />ยังไม่แปล
+                </span>
+              )}
 
-              <div style={{ display: "flex", gap: "6px" }}>
+              {/* Action Buttons Row */}
+              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                {/* 1. Claim/Unclaim */}
                 {!item.assignee && item.status !== STATUS.completed && (
-                  <button className="btn btn-outline" style={{ padding: "5px 12px", fontSize: "12px" }}
+                  <button className="btn btn-teal" style={{ padding: "5px 12px", fontSize: "12px", height: "30px", display: "inline-flex", alignItems: "center" }}
                     onClick={() => claimItem(item)}>
                     รับงาน
                   </button>
                 )}
                 {item.assignee && item.status !== STATUS.completed && (
-                  <button className="btn btn-outline" style={{ padding: "5px 12px", fontSize: "12px", color: "var(--t3)" }}
+                  <button className="btn btn-outline" style={{ padding: "5px 12px", fontSize: "12px", height: "30px", color: "#ef4444", borderColor: "rgba(239,68,68,0.2)", background: "rgba(239,68,68,0.02)", display: "inline-flex", alignItems: "center" }}
                     onClick={() => unclaimItem(item)}>
-                    ยกเลิก
+                    ยกเลิกรับงาน
                   </button>
                 )}
-                <button className="btn btn-outline" style={{ padding: "5px 12px", fontSize: "12px" }}
-                  onClick={() => setEditItem(item)}>
-                  <i className="ti ti-pencil" />
-                </button>
-              </div>
 
-              {/* Workspace Entry Button */}
-              <div style={{ marginTop: "4px" }}>
+                {/* 2. Edit metadata */}
+                <button className="btn btn-outline" style={{ padding: "5px 8px", fontSize: "12px", height: "30px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                  onClick={() => setEditItem(item)}
+                  title="แก้ไขรายละเอียดบทความ"
+                >
+                  <i className="ti ti-settings" />
+                </button>
+
+                {/* 3. Workspace / AI translate */}
                 {item.status === STATUS.completed ? (
                   <button 
                     className="btn btn-outline" 
                     style={{ 
                       padding: "5px 12px", 
                       fontSize: "12px", 
+                      height: "30px",
                       color: "var(--teal)", 
                       borderColor: "rgba(15,110,86,0.3)",
-                      background: "rgba(15,110,86,0.05)"
+                      background: "rgba(15,110,86,0.05)",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px"
                     }}
                     onClick={() => {
                       setActiveWorkspaceItem(item);
@@ -560,7 +590,7 @@ export default function StaffTranslation({ go }) {
                       setWorkspaceThaiTitle(item.thaiTitle || "");
                     }}
                   >
-                    <i className="ti ti-eye" style={{ marginRight: "4px" }} /> ดูและแก้ไขคำแปล
+                    <i className="ti ti-eye" /> ดู/แก้ไขคำแปล
                   </button>
                 ) : item.status === STATUS.progress ? (
                   <button 
@@ -568,8 +598,12 @@ export default function StaffTranslation({ go }) {
                     style={{ 
                       padding: "5px 12px", 
                       fontSize: "12px", 
+                      height: "30px",
                       background: "#3b73c4", 
-                      color: "#fff" 
+                      color: "#fff",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px"
                     }}
                     onClick={() => {
                       setActiveWorkspaceItem(item);
@@ -577,7 +611,7 @@ export default function StaffTranslation({ go }) {
                       setWorkspaceThaiTitle(item.thaiTitle || "");
                     }}
                   >
-                    <i className="ti ti-pencil" style={{ marginRight: "4px" }} /> แปลต่อ / ตรวจทาน
+                    <i className="ti ti-pencil" /> แปลต่อ/ตรวจทาน
                   </button>
                 ) : (
                   <button 
@@ -585,8 +619,12 @@ export default function StaffTranslation({ go }) {
                     style={{ 
                       padding: "5px 12px", 
                       fontSize: "12px", 
+                      height: "30px",
                       background: "#bd7a13", 
-                      color: "#fff" 
+                      color: "#fff",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px"
                     }}
                     onClick={() => {
                       setActiveWorkspaceItem(item);
@@ -594,7 +632,7 @@ export default function StaffTranslation({ go }) {
                       setWorkspaceThaiTitle(item.thaiTitle || "");
                     }}
                   >
-                    <i className="ti ti-cpu" style={{ marginRight: "4px" }} /> สั่ง AI แปลบทความ
+                    <i className="ti ti-cpu" /> สั่ง AI แปล
                   </button>
                 )}
               </div>
@@ -602,6 +640,37 @@ export default function StaffTranslation({ go }) {
           </div>
         ))}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="pagination-container" style={{ marginTop: "24px" }}>
+          <button 
+            className={`pagination-btn ${currentPage === 1 ? 'disabled' : ''}`}
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+          >
+            « ก่อนหน้า
+          </button>
+          
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+            <button
+              key={p}
+              className={`pagination-btn ${currentPage === p ? 'active' : ''}`}
+              onClick={() => setCurrentPage(p)}
+            >
+              {p}
+            </button>
+          ))}
+
+          <button 
+            className={`pagination-btn ${currentPage === totalPages ? 'disabled' : ''}`}
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+          >
+            ถัดไป »
+          </button>
+        </div>
+      )}
 
       {editItem && (
         <EditModal

@@ -2325,3 +2325,92 @@ button.dashboard-card:hover {
   from { opacity: 0; transform: translateY(40px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ─── Unified Filter Bar ─── */
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-search {
+  position: relative;
+  flex: 1;
+  min-width: 220px;
+}
+
+.filter-search i {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 15px;
+  color: var(--t3);
+  pointer-events: none;
+}
+
+.filter-search input {
+  padding-left: 38px;
+  height: 40px;
+  border-radius: 12px;
+  width: 100%;
+}
+
+.filter-search input,
+.filter-select {
+  background: var(--card);
+  color: var(--text);
+  border: 0.5px solid var(--br);
+  font-family: inherit;
+  font-size: 13.5px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.filter-search input:focus,
+.filter-select:focus {
+  outline: none;
+  border-color: var(--teal);
+  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.15);
+}
+
+.filter-select {
+  height: 40px;
+  border-radius: 12px;
+  padding: 0 14px;
+  width: auto;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.filter-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.filter-pill {
+  font-size: 12.5px;
+  font-family: inherit;
+  font-weight: 400;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 0.5px solid var(--br);
+  background: var(--card);
+  color: var(--t2);
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.filter-pill:hover {
+  background: var(--bg2);
+  color: var(--text);
+}
+
+.filter-pill.active {
+  background: var(--teal);
+  color: #fff;
+  border-color: var(--teal);
+}

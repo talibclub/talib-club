@@ -127,85 +127,78 @@ export default function Scholars() {
           <strong>ชี้แจง:</strong> รายชื่อและฐานข้อมูลบุคคลด้านล่างนี้ยังอยู่ในขั้นตอนการปรับปรุงและอัปเดตข้อมูลให้สมบูรณ์ ทีมงานกำลังทยอยตรวจสอบรายละเอียดวิชาการทีละท่านอย่างรอบคอบ
         </span>
       </div>
-
       {/* SEARCH + FILTER */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
-            <i className="ti ti-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 14 }}></i>
-            <input 
-              placeholder="ค้นหาชื่ออุลามาอ์ (ไทย/English/ประวัติ)..." 
-              value={search}
-              onChange={e => { setSearch(e.target.value); resetVisible(); }} 
-              style={{ paddingLeft: 32, width: "100%" }} 
-            />
-          </div>
-          <select 
-            value={field} 
-            onChange={e => { setField(e.target.value); resetVisible(); }} 
-            style={{ width: "auto", flex: "0 0 auto", fontFamily: "'Prompt', sans-serif" }}
-          >
-            {fields.map(f => <option key={f} value={f}>{f === "all" ? "ทุกสาขาวิชา" : f}</option>)}
-          </select>
+      <div className="filter-bar">
+        <div className="filter-search">
+          <i className="ti ti-search"></i>
+          <input 
+            placeholder="ค้นหาชื่ออุลามาอ์ (ไทย/English/ประวัติ)..." 
+            value={search}
+            onChange={e => { setSearch(e.target.value); resetVisible(); }} 
+          />
         </div>
-        
-        {/* Advanced Filters */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
-          <select 
-            value={aqFilter} 
-            onChange={e => { setAqFilter(e.target.value); resetVisible(); }} 
-            style={{ width: "100%", fontFamily: "'Prompt', sans-serif" }}
-          >
-            <option value="">ทุกอะกีดะฮฺ</option>
-            <option value="สะลัฟ">สะลัฟ / อะฮฺลุสสุนนะฮฺ</option>
-            <option value="อะชะอะรี">อะชะอะรี</option>
-            <option value="มาตุรีดี">มาตุรีดี</option>
-            <option value="ไม่ระบุ">ไม่ระบุ</option>
-          </select>
-          <select 
-            value={mhFilter} 
-            onChange={e => { setMhFilter(e.target.value); resetVisible(); }} 
-            style={{ width: "100%", fontFamily: "'Prompt', sans-serif" }}
-          >
-            <option value="">ทุกมันฮัจญ์</option>
-            <option value="สะลัฟี">สะลัฟี</option>
-            <option value="ศูฟี">ศูฟี / ตะเซาวุฟ</option>
-            <option value="เดโอบันดี">เดโอบันดี</option>
-            <option value="บะเรลวี">บะเรลวี</option>
-            <option value="ตับลีฆ">ตับลีฆ</option>
-            <option value="อิควาน">อิควาน</option>
-            <option value="กลาสสิก">กลาสสิก / อะชะอะรี</option>
-            <option value="ไม่ระบุ">ไม่ระบุ</option>
-          </select>
-          <select 
-            value={mzFilter} 
-            onChange={e => { setMzFilter(e.target.value); resetVisible(); }} 
-            style={{ width: "100%", fontFamily: "'Prompt', sans-serif" }}
-          >
-            <option value="">ทุกมัซฮับ</option>
-            <option value="หัมบะลี">หัมบะลี</option>
-            <option value="ชาฟิอี">ชาฟิอี</option>
-            <option value="มาลิกี">มาลิกี</option>
-            <option value="หะนะฟี">หะนะฟี</option>
-            <option value="ซอฮิรี">ซอฮิรี</option>
-            <option value="ไม่ระบุ">ไม่ระบุ</option>
-          </select>
-        </div>
+        <select 
+          className="filter-select"
+          value={field} 
+          onChange={e => { setField(e.target.value); resetVisible(); }} 
+        >
+          {fields.map(f => <option key={f} value={f}>{f === "all" ? "ทุกสาขาวิชา" : f}</option>)}
+        </select>
+      </div>
+      
+      {/* Advanced Filters */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 20 }}>
+        <select 
+          className="filter-select"
+          value={aqFilter} 
+          onChange={e => { setAqFilter(e.target.value); resetVisible(); }} 
+          style={{ width: "100%" }}
+        >
+          <option value="">ทุกอะกีดะฮฺ</option>
+          <option value="สะลัฟ">สะลัฟ / อะฮฺลุสสุนนะฮฺ</option>
+          <option value="อะชะอะรี">อะชะอะรี</option>
+          <option value="มาตุรีดี">มาตุรีดี</option>
+          <option value="ไม่ระบุ">ไม่ระบุ</option>
+        </select>
+        <select 
+          className="filter-select"
+          value={mhFilter} 
+          onChange={e => { setMhFilter(e.target.value); resetVisible(); }} 
+          style={{ width: "100%" }}
+        >
+          <option value="">ทุกมันฮัจญ์</option>
+          <option value="สะลัฟี">สะลัฟี</option>
+          <option value="ศูฟี">ศูฟี / ตะเซาวุฟ</option>
+          <option value="เดโอบันดี">เดโอบันดี</option>
+          <option value="บะเรลวี">บะเรลวี</option>
+          <option value="ตับลีฆ">ตับลีฆ</option>
+          <option value="อิควาน">อิควาน</option>
+          <option value="กลาสสิก">กลาสสิก / อะชะอะรี</option>
+          <option value="ไม่ระบุ">ไม่ระบุ</option>
+        </select>
+        <select 
+          className="filter-select"
+          value={mzFilter} 
+          onChange={e => { setMzFilter(e.target.value); resetVisible(); }} 
+          style={{ width: "100%" }}
+        >
+          <option value="">ทุกมัซฮับ</option>
+          <option value="หัมบะลี">หัมบะลี</option>
+          <option value="ชาฟิอี">ชาฟิอี</option>
+          <option value="มาลิกี">มาลิกี</option>
+          <option value="หะนะฟี">หะนะฟี</option>
+          <option value="ซอฮิรี">ซอฮิรี</option>
+          <option value="ไม่ระบุ">ไม่ระบุ</option>
+        </select>
       </div>
 
       {/* ERA TABS */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 28, flexWrap: "wrap" }}>
+      <div className="filter-pills">
         {eras.map(e => (
           <button 
             key={e} 
             onClick={() => { setEra(e); resetVisible(); }} 
-            style={{
-              fontFamily: "'Prompt', sans-serif", fontSize: 11, fontWeight: 300,
-              padding: "5px 12px", borderRadius: 20, border: ".5px solid var(--br)",
-              cursor: "pointer", transition: "all .15s",
-              background: era === e ? "var(--acc)" : "var(--card)",
-              color: era === e ? "var(--bg)" : "var(--t2)"
-            }}
+            className={`filter-pill ${era === e ? 'active' : ''}`}
           >
             {e === "0" ? "ทั้งหมด" : eraLabelMap[e] || ERA_LABELS[e] || `ยุคที่ ${e}`}
           </button>

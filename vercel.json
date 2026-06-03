@@ -5,6 +5,10 @@
       "destination": "https://talib-club-web.firebaseapp.com/__/auth/:path*"
     },
     {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
       "source": "/:path*",
       "destination": "/index.html"
     }

@@ -151,32 +151,31 @@ export default function Media({ go, ctx }) {
       {!selectedPlaylist ? (
         <>
           {/* แถบค้นหา และ กรองเพลย์ลิสต์ */}
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 24 }}>
-            <div style={{ flex: "1 1 250px", position: "relative" }}>
-              <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
+          <div className="filter-bar">
+            <div className="filter-search">
+              <i className="ti ti-search"></i>
               <input 
                 value={searchPlaylist} 
                 onChange={e => { setSearchPlaylist(e.target.value); updateFilters({ searchPlaylist: e.target.value }) }} 
                 placeholder="ค้นหาเพลย์ลิสต์ หรือ ชื่อช่อง..." 
-                style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "10px 16px 10px 42px", background: "var(--bg2)", border: "none" }} 
               />
             </div>
+            <select className="filter-select" value={sortOrder} onChange={e => updateFilters({ sort: e.target.value })}>
+              <option value="newest">ใหม่ไปเก่า</option>
+              <option value="oldest">เก่าไปใหม่</option>
+            </select>
+          </div>
 
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-              {filters.map(item => (
-                <button
-                  key={item.id}
-                  className={filter === item.id ? "btn btn-teal" : "btn btn-outline"}
-                  onClick={() => updateFilters({ filter: item.id })}
-                >
-                  <i className={`ti ${item.icon}`} style={{ marginRight: 6 }}></i>{item.label}
-                </button>
-              ))}
-              <select value={sortOrder} onChange={e => updateFilters({ sort: e.target.value })} style={{ width: "auto", height: 36, borderRadius: 24, padding: "0 16px", background: "var(--bg2)", border: "none", color: "var(--text)" }}>
-                <option value="newest">ใหม่ไปเก่า</option>
-                <option value="oldest">เก่าไปใหม่</option>
-              </select>
-            </div>
+          <div className="filter-pills">
+            {filters.map(item => (
+              <button
+                key={item.id}
+                className={`filter-pill ${filter === item.id ? 'active' : ''}`}
+                onClick={() => updateFilters({ filter: item.id })}
+              >
+                <i className={`ti ${item.icon}`} style={{ marginRight: 6 }}></i>{item.label}
+              </button>
+            ))}
           </div>
 
           {loading ? (
@@ -245,17 +244,16 @@ export default function Media({ go, ctx }) {
           </div>
 
           {/* แถบค้นหาคลิปภายในเพลย์ลิสต์ */}
-          <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap", alignItems: "center" }}>
-            <div style={{ position: "relative", flex: 1, minWidth: 200, maxWidth: 400 }}>
-              <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
+          <div className="filter-bar">
+            <div className="filter-search" style={{ maxWidth: 400 }}>
+              <i className="ti ti-search"></i>
               <input 
                 value={searchClip} 
                 onChange={e => { setSearchClip(e.target.value); updateFilters({ searchClip: e.target.value }) }} 
                 placeholder={`ค้นหาคลิปใน ${selectedPlaylist.name}...`} 
-                style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "10px 16px 10px 42px", background: "var(--bg2)", border: ".5px solid var(--br)" }} 
               />
             </div>
-            <select value={sortOrder} onChange={e => updateFilters({ sort: e.target.value })} style={{ width: "auto", height: 38, borderRadius: 24, padding: "0 16px", background: "var(--bg2)", border: ".5px solid var(--br)", color: "var(--text)" }}>
+            <select className="filter-select" value={sortOrder} onChange={e => updateFilters({ sort: e.target.value })}>
               <option value="newest">ใหม่ไปเก่า</option>
               <option value="oldest">เก่าไปใหม่</option>
             </select>

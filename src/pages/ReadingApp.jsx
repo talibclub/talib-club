@@ -1033,6 +1033,153 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     )
   }
 
+  const hasConfiguredNotif = !!notifEnabled || !!streakSettings?.remindersEnabled;
+
+  const renderNotificationSettings = (highlighted) => (
+    <div className="card" style={{ 
+      padding: 18, 
+      marginBottom: 0,
+      border: highlighted ? "2px solid var(--teal)" : undefined,
+      boxShadow: highlighted ? "0 4px 20px rgba(13, 148, 136, 0.15)" : undefined,
+      position: "relative"
+    }}>
+      {highlighted && (
+        <div style={{
+          position: "absolute",
+          top: -10,
+          right: 12,
+          background: "var(--teal)",
+          color: "#fff",
+          fontSize: "10px",
+          fontWeight: "bold",
+          padding: "2px 8px",
+          borderRadius: "10px",
+          boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+        }}>
+          แนะนำให้ตั้งค่า 🔔
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <i className="ti ti-bell" style={{ color: "var(--teal)", fontSize: 16 }}></i>
+        <h3 style={{ fontSize: 13, fontWeight: 600 }}>ตั้งค่าการแจ้งเตือนอ่านหนังสือรายวัน</h3>
+      </div>
+
+      <div style={{ display: "grid", gap: 14 }}>
+        {/* 1. Browser Notification Switch */}
+        <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 12 }}>
+          <input
+            type="checkbox"
+            checked={notifEnabled}
+            onChange={async (e) => {
+              const val = e.target.checked
+              setNotifEnabled(val)
+              localStorage.setItem("talib_notif_enabled", String(val))
+              if (val) {
+                if (typeof Notification === "undefined") {
+                  toast.error("เบราว์เซอร์ของคุณไม่รองรับการแจ้งเตือน")
+                  setNotifEnabled(false)
+                  localStorage.setItem("talib_notif_enabled", "false")
+                  return
+                }
+                const perm = await Notification.requestPermission()
+                if (perm === "granted") {
+                  toast.success("เปิดใช้งานแจ้งเตือนแล้ว 🔔")
+                  new Notification("เปิดการแจ้งเตือนแล้ว 🔔", {
+                    body: "ระบบจะแจ้งเตือนเมื่อถึงเวลาอ่านหนังสือที่คุณตั้งค่าไว้"
+                  })
+                } else {
+                  toast.error("เบราว์เซอร์ปฏิเสธสิทธิ์การแจ้งเตือน กรุณาเปิดสิทธิ์ในตั้งค่าเบราว์เซอร์")
+                }
+              } else {
+                toast.success("ปิดการแจ้งเตือนแล้ว")
+              }
+            }}
+            style={{ width: 16, height: 16 }}
+          />
+          <span style={{ color: "var(--text)" }}>เปิดแจ้งเตือนจากเบราว์เซอร์</span>
+        </label>
+
+        {/* 2. Browser Alarm Time Setting */}
+        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, color: "var(--t2)" }}>
+          <span>เวลาอ่านหนังสือประจำวัน (เบราว์เซอร์)</span>
+          <input
+            type="time"
+            value={notifTime}
+            disabled={!notifEnabled}
+            onChange={(e) => {
+              const val = e.target.value
+              setNotifTime(val)
+              localStorage.setItem("talib_notif_time", val)
+              toast.success(`ตั้งเวลาแจ้งเตือนเป็น ${val} เรียบร้อยแล้ว`)
+            }}
+            style={{ width: "100%", padding: "6px 10px", fontSize: 12, background: "var(--card)", border: "0.5px solid var(--br)", color: "var(--text)", borderRadius: 8 }}
+          />
+        </label>
+
+        <div style={{ margin: "8px 0", height: "1px", background: "var(--br2)" }} />
+
+        {/* 3. Sync Cloud Notifications (Daily Goal Streak) */}
+        <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 12 }}>
+          <input
+            type="checkbox"
+            checked={streakSettings.remindersEnabled}
+            onChange={(e) => handleToggleReminders(e.target.checked)}
+            style={{ width: 16, height: 16 }}
+          />
+          <span style={{ fontWeight: 500, color: "var(--text)" }}>ตั้งเตือนรักษาสถิติการอ่านรายวัน (Sync คลาวด์)</span>
+        </label>
+
+        {streakSettings.remindersEnabled && (
+          <div style={{ display: "grid", gap: 10, padding: 12, background: "var(--bg2)", borderRadius: 10, border: "0.5px solid var(--br)", marginTop: 2 }}>
+            <div style={{ fontSize: 11, fontWeight: 500, color: "var(--t2)" }}>ตั้งเตือนเวลาอื่น ๆ:</div>
+            
+            {streakSettings.reminderTimes.length === 0 ? (
+              <div style={{ fontSize: 11, color: "var(--t3)" }}>ยังไม่มีเวลาแจ้งเตือนที่ตั้งค่าไว้</div>
+            ) : (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {streakSettings.reminderTimes.map((timeStr) => (
+                  <div key={timeStr} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--teal-bg)", border: "0.5px solid var(--teal)", color: "var(--teal)", padding: "3px 8px", borderRadius: 12, fontSize: 11 }}>
+                    <i className="ti ti-alarm" style={{ fontSize: 10 }}></i>
+                    <span>{timeStr}</span>
+                    <button 
+                      type="button" 
+                      onClick={() => handleRemoveReminderTime(timeStr)} 
+                      style={{ background: "none", border: "none", color: "red", cursor: "pointer", display: "grid", placeItems: "center", padding: 0 }}
+                    >
+                      <i className="ti ti-x" style={{ fontSize: 11 }}></i>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}>
+              <input 
+                type="time" 
+                id="new-reader-reminder-time" 
+                defaultValue="20:00" 
+                style={{ flex: 1, padding: "4px 8px", fontSize: 12, background: "var(--card)", border: "0.5px solid var(--br)", color: "var(--text)", borderRadius: 6, height: 28 }}
+              />
+              <button 
+                type="button" 
+                className="btn btn-teal" 
+                style={{ padding: "0 10px", fontSize: 11, height: 28, borderRadius: 6 }}
+                onClick={() => {
+                  const input = document.getElementById("new-reader-reminder-time")
+                  if (input && input.value) {
+                    handleAddReminderTime(input.value)
+                  }
+                }}
+              >
+                <i className="ti ti-plus" style={{ marginRight: 4 }}></i>เพิ่ม
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   // --- Reading App Home / Dashboard View ---
   return (
     <div style={{ maxWidth: 980, margin: "0 auto", paddingBottom: 40, width: "100%", textAlign: "left" }}>
@@ -1455,6 +1602,9 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
             </div>
           </section>
 
+          {/* If NOT configured, place it as position #2 (promoted with highlight border) */}
+          {!hasConfiguredNotif && renderNotificationSettings(true)}
+
           {/* 💎 Item Shop & Currency Card */}
           <div className="card" style={{ padding: 18, marginBottom: 0, display: "flex", flexDirection: "column", gap: 12, textAlign: "left" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1552,127 +1702,8 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
             </div>
           </div>
 
-          {/* 🔔 Daily Reading Reminders Settings */}
-          <div className="card" style={{ padding: 18, marginBottom: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <i className="ti ti-bell" style={{ color: "var(--teal)", fontSize: 16 }}></i>
-              <h3 style={{ fontSize: 13, fontWeight: 600 }}>ตั้งค่าการแจ้งเตือนอ่านหนังสือรายวัน</h3>
-            </div>
-
-            <div style={{ display: "grid", gap: 14 }}>
-              {/* 1. Browser Notification Switch */}
-              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 12 }}>
-                <input
-                  type="checkbox"
-                  checked={notifEnabled}
-                  onChange={async (e) => {
-                    const val = e.target.checked
-                    setNotifEnabled(val)
-                    localStorage.setItem("talib_notif_enabled", String(val))
-                    if (val) {
-                      if (typeof Notification === "undefined") {
-                        toast.error("เบราว์เซอร์ของคุณไม่รองรับการแจ้งเตือน")
-                        setNotifEnabled(false)
-                        localStorage.setItem("talib_notif_enabled", "false")
-                        return
-                      }
-                      const perm = await Notification.requestPermission()
-                      if (perm === "granted") {
-                        toast.success("เปิดใช้งานแจ้งเตือนแล้ว 🔔")
-                        new Notification("เปิดการแจ้งเตือนแล้ว 🔔", {
-                          body: "ระบบจะแจ้งเตือนเมื่อถึงเวลาอ่านหนังสือที่คุณตั้งค่าไว้"
-                        })
-                      } else {
-                        toast.error("เบราว์เซอร์ปฏิเสธสิทธิ์การแจ้งเตือน กรุณาเปิดสิทธิ์ในตั้งค่าเบราว์เซอร์")
-                      }
-                    } else {
-                      toast.success("ปิดการแจ้งเตือนแล้ว")
-                    }
-                  }}
-                  style={{ width: 16, height: 16 }}
-                />
-                <span style={{ color: "var(--text)" }}>เปิดแจ้งเตือนจากเบราว์เซอร์</span>
-              </label>
-
-              {/* 2. Browser Alarm Time Setting */}
-              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, color: "var(--t2)" }}>
-                <span>เวลาอ่านหนังสือประจำวัน (เบราว์เซอร์)</span>
-                <input
-                  type="time"
-                  value={notifTime}
-                  disabled={!notifEnabled}
-                  onChange={(e) => {
-                    const val = e.target.value
-                    setNotifTime(val)
-                    localStorage.setItem("talib_notif_time", val)
-                    toast.success(`ตั้งเวลาแจ้งเตือนเป็น ${val} เรียบร้อยแล้ว`)
-                  }}
-                  style={{ width: "100%", padding: "6px 10px", fontSize: 12, background: "var(--card)", border: "0.5px solid var(--br)", color: "var(--text)", borderRadius: 8 }}
-                />
-              </label>
-
-              <div style={{ margin: "8px 0", height: "1px", background: "var(--br2)" }} />
-
-              {/* 3. Sync Cloud Notifications (Daily Goal Streak) */}
-              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 12 }}>
-                <input
-                  type="checkbox"
-                  checked={streakSettings.remindersEnabled}
-                  onChange={(e) => handleToggleReminders(e.target.checked)}
-                  style={{ width: 16, height: 16 }}
-                />
-                <span style={{ fontWeight: 500, color: "var(--text)" }}>ตั้งเตือนรักษาสถิติการอ่านรายวัน (Sync คลาวด์)</span>
-              </label>
-
-              {streakSettings.remindersEnabled && (
-                <div style={{ display: "grid", gap: 10, padding: 12, background: "var(--bg2)", borderRadius: 10, border: "0.5px solid var(--br)", marginTop: 2 }}>
-                  <div style={{ fontSize: 11, fontWeight: 500, color: "var(--t2)" }}>ตั้งเตือนเวลาอื่น ๆ:</div>
-                  
-                  {streakSettings.reminderTimes.length === 0 ? (
-                    <div style={{ fontSize: 11, color: "var(--t3)" }}>ยังไม่มีเวลาแจ้งเตือนที่ตั้งค่าไว้</div>
-                  ) : (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {streakSettings.reminderTimes.map((timeStr) => (
-                        <div key={timeStr} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--teal-bg)", border: "0.5px solid var(--teal)", color: "var(--teal)", padding: "3px 8px", borderRadius: 12, fontSize: 11 }}>
-                          <i className="ti ti-alarm" style={{ fontSize: 10 }}></i>
-                          <span>{timeStr}</span>
-                          <button 
-                            type="button" 
-                            onClick={() => handleRemoveReminderTime(timeStr)} 
-                            style={{ background: "none", border: "none", color: "red", cursor: "pointer", display: "grid", placeItems: "center", padding: 0 }}
-                          >
-                            <i className="ti ti-x" style={{ fontSize: 11 }}></i>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}>
-                    <input 
-                      type="time" 
-                      id="new-reader-reminder-time" 
-                      defaultValue="20:00" 
-                      style={{ flex: 1, padding: "4px 8px", fontSize: 12, background: "var(--card)", border: "0.5px solid var(--br)", color: "var(--text)", borderRadius: 6, height: 28 }}
-                    />
-                    <button 
-                      type="button" 
-                      className="btn btn-teal" 
-                      style={{ padding: "0 10px", fontSize: 11, height: 28, borderRadius: 6 }}
-                      onClick={() => {
-                        const input = document.getElementById("new-reader-reminder-time")
-                        if (input && input.value) {
-                          handleAddReminderTime(input.value)
-                        }
-                      }}
-                    >
-                      <i className="ti ti-plus" style={{ marginRight: 4 }}></i>เพิ่ม
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          {/* If configured, place it at the bottom (position #4) */}
+          {hasConfiguredNotif && renderNotificationSettings(false)}
         </div>
       </div>
     </div>

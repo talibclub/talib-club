@@ -141,120 +141,63 @@ export default function Library({ go, authState, ctx }) {
       {loading && <p style={{ marginBottom: 24, fontSize: 12 }}>กำลังโหลดรายการล่าสุด...</p>}
 
       {/* SEARCH + MAIN FILTER */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 24 }}>
-        {/* Row 1: Search Bar */}
-        <div style={{ position: "relative", width: "100%" }}>
-          <i className="ti ti-search" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
+      <div className="filter-bar">
+        <div className="filter-search">
+          <i className="ti ti-search"></i>
           <input 
             placeholder="ค้นหาชื่อหนังสือ, ผู้เขียน, หรือเนื้อหา..." 
             value={search} 
             onChange={e => { setSearch(e.target.value); updateFilters({ search: e.target.value }) }} 
-            style={{ 
-              paddingLeft: 38, 
-              height: 38, 
-              borderRadius: 20, 
-              fontSize: 13,
-              width: "100%",
-              boxSizing: "border-box"
-            }} 
           />
         </div>
+        {filter === "วารสาร" ? (
+          <select
+            className="filter-select"
+            value={sortBy}
+            onChange={e => updateFilters({ sortBy: e.target.value })}
+          >
+            <option value="issue-desc">เล่มใหม่ล่าสุด ➜ เล่มเก่า</option>
+            <option value="issue-asc">เล่มเก่าสุด ➜ เล่มใหม่</option>
+          </select>
+        ) : (
+          <select
+            className="filter-select"
+            value={sortBy}
+            onChange={e => updateFilters({ sortBy: e.target.value })}
+          >
+            <option value="newest">ปีที่พิมพ์ ใหม่ ➜ เก่า</option>
+            <option value="oldest">ปีที่พิมพ์ เก่า ➜ ใหม่</option>
+          </select>
+        )}
         
-        {/* Row 2: Filter Pills & Sorting Select */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          {/* Left: Type pills */}
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {types.map(t => (
-              <button 
-                key={t} 
-                onClick={() => updateFilters({ filter: t })} 
-                style={{ 
-                  fontFamily: "'Prompt',sans-serif", 
-                  fontSize: 12, 
-                  fontWeight: filter === t ? "500" : "400", 
-                  padding: "6px 16px", 
-                  borderRadius: 20, 
-                  border: filter === t ? "1px solid var(--teal)" : ".5px solid var(--br)", 
-                  cursor: "pointer", 
-                  transition: "all .15s", 
-                  background: filter === t ? "var(--teal)" : "var(--card)", 
-                  color: filter === t ? "var(--bg)" : "var(--t2)",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  height: 36
-                }}
-              >
-                {t === "all" ? "ทั้งหมด" : t}
-              </button>
-            ))}
-          </div>
+        <button 
+          onClick={() => updateFilters({ showAdv: !showAdvancedFilters ? "true" : "false" })} 
+          className={showAdvancedFilters ? "btn btn-teal" : "btn btn-outline"} 
+          style={{ 
+            padding: "0 16px", 
+            display: "inline-flex", 
+            alignItems: "center", 
+            gap: 6, 
+            fontSize: 12, 
+            height: 40, 
+            borderRadius: 12,
+            boxSizing: "border-box"
+          }}
+        >
+          <i className="ti ti-filter"></i> ตัวกรองเพิ่มเติม
+        </button>
+      </div>
 
-          {/* Right: Sort select and extra filters */}
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            {filter === "วารสาร" ? (
-              <select
-                value={sortBy}
-                onChange={e => updateFilters({ sortBy: e.target.value })}
-                style={{
-                  fontFamily: "'Prompt', sans-serif",
-                  fontSize: 12,
-                  padding: "0 28px 0 14px",
-                  borderRadius: 20,
-                  border: ".5px solid var(--br)",
-                  background: "var(--card)",
-                  color: "var(--t2)",
-                  cursor: "pointer",
-                  outline: "none",
-                  height: 36,
-                  width: 180,
-                  boxSizing: "border-box"
-                }}
-              >
-                <option value="issue-desc">เล่มใหม่ล่าสุด ➜ เล่มเก่า</option>
-                <option value="issue-asc">เล่มเก่าสุด ➜ เล่มใหม่</option>
-              </select>
-            ) : (
-              <select
-                value={sortBy}
-                onChange={e => updateFilters({ sortBy: e.target.value })}
-                style={{
-                  fontFamily: "'Prompt', sans-serif",
-                  fontSize: 12,
-                  padding: "0 28px 0 14px",
-                  borderRadius: 20,
-                  border: ".5px solid var(--br)",
-                  background: "var(--card)",
-                  color: "var(--t2)",
-                  cursor: "pointer",
-                  outline: "none",
-                  height: 36,
-                  width: 180,
-                  boxSizing: "border-box"
-                }}
-              >
-                <option value="newest">ปีที่พิมพ์ ใหม่ ➜ เก่า</option>
-                <option value="oldest">ปีที่พิมพ์ เก่า ➜ ใหม่</option>
-              </select>
-            )}
-            
-            <button 
-              onClick={() => updateFilters({ showAdv: !showAdvancedFilters ? "true" : "false" })} 
-              className={showAdvancedFilters ? "btn btn-teal" : "btn btn-outline"} 
-              style={{ 
-                padding: "0 16px", 
-                display: "inline-flex", 
-                alignItems: "center", 
-                gap: 6, 
-                fontSize: 12, 
-                height: 36, 
-                borderRadius: 20,
-                boxSizing: "border-box"
-              }}
-            >
-              <i className="ti ti-filter"></i> ตัวกรองเพิ่มเติม
-            </button>
-          </div>
-        </div>
+      <div className="filter-pills">
+        {types.map(t => (
+          <button 
+            key={t} 
+            onClick={() => updateFilters({ filter: t })} 
+            className={`filter-pill ${filter === t ? 'active' : ''}`}
+          >
+            {t === "all" ? "ทั้งหมด" : t}
+          </button>
+        ))}
       </div>
 
       {/* ADVANCED FILTERS */}

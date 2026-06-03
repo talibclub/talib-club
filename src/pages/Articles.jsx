@@ -209,31 +209,25 @@ export default function Articles({ go, authState, ctx }) {
         </div>
       ) : (
         <>
-          <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
-            <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
-              <i className="ti ti-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 14 }}></i>
+          <div className="filter-bar">
+            <div className="filter-search">
+              <i className="ti ti-search"></i>
               <input placeholder="ค้นหาบทความ..." value={search}
-                onChange={e => { setSearch(e.target.value); updateFilters({ search: e.target.value, showAllBrowse: e.target.value ? true : showAllBrowse }) }}
-                style={{ paddingLeft: 32 }} />
+                onChange={e => { setSearch(e.target.value); updateFilters({ search: e.target.value, showAllBrowse: e.target.value ? true : showAllBrowse }) }} />
             </div>
-            <select value={type} onChange={e => updateFilters({ type: e.target.value, showAllBrowse: e.target.value !== "all" ? true : showAllBrowse })} style={{ width: "auto", flex: "0 0 auto" }}>
+            <select className="filter-select" value={type} onChange={e => updateFilters({ type: e.target.value, showAllBrowse: e.target.value !== "all" ? true : showAllBrowse })}>
               {types.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
             </select>
-            <select value={sortOrder} onChange={e => updateFilters({ sort: e.target.value })} style={{ width: "auto", flex: "0 0 auto" }}>
+            <select className="filter-select" value={sortOrder} onChange={e => updateFilters({ sort: e.target.value })}>
               <option value="newest">ใหม่ไปเก่า</option>
               <option value="oldest">เก่าไปใหม่</option>
             </select>
           </div>
 
-          <div style={{ display: "flex", gap: 6, marginBottom: 24, flexWrap: "wrap" }}>
+          <div className="filter-pills">
             {categories.map(c => (
-              <button key={c.id} onClick={() => updateFilters({ cat: c.id, showAllBrowse: c.id !== "all" ? true : showAllBrowse })} style={{
-                fontFamily: "'Prompt',sans-serif", fontSize: 12, fontWeight: 300,
-                padding: "5px 12px", borderRadius: 20, border: ".5px solid var(--br)",
-                cursor: "pointer", transition: "all .15s",
-                background: cat === c.id ? "var(--teal)" : "var(--card)",
-                color: cat === c.id ? "#fff" : "var(--t2)"
-              }}>
+              <button key={c.id} onClick={() => updateFilters({ cat: c.id, showAllBrowse: c.id !== "all" ? true : showAllBrowse })}
+                className={`filter-pill ${cat === c.id ? 'active' : ''}`}>
                 {c.label}
               </button>
             ))}
