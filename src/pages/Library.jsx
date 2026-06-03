@@ -32,7 +32,7 @@ export default function Library({ go, authState, ctx }) {
   const sourceFilter = ctx?.source || "all"
   const sortBy = ctx?.sortBy || (filter === "วารสาร" ? "issue-desc" : "newest")
   const showAdvancedFilters = ctx?.showAdv === "true"
-  const currentPage = parseInt(ctx?.page, 10) || 1
+  const requestedPage = parseInt(ctx?.page, 10) || 1
   const ITEMS_PER_PAGE = 12
 
   const [search, setSearch] = useState(() => ctx?.search || "")
@@ -61,7 +61,7 @@ export default function Library({ go, authState, ctx }) {
       sortBy,
       search: newParams.search !== undefined ? newParams.search : search,
       showAdv: showAdvancedFilters ? "true" : "false",
-      page: currentPage,
+      page: requestedPage,
       ...newParams
     }
     if (newParams.filter !== undefined || newParams.cat !== undefined || newParams.source !== undefined || newParams.search !== undefined || newParams.showAdv !== undefined || newParams.sortBy !== undefined) {
@@ -106,8 +106,15 @@ export default function Library({ go, authState, ctx }) {
   }, [books, filter, categoryFilter, sourceFilter, search, sortBy])
 
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
+  const currentPage = totalPages > 0 ? Math.min(Math.max(requestedPage, 1), totalPages) : 1
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
   const currentItems = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+
+  useEffect(() => {
+    if (totalPages > 0 && requestedPage !== currentPage) {
+      updateFilters({ page: currentPage })
+    }
+  }, [currentPage, requestedPage, totalPages])
 
   return (
     <div style={{ marginBottom: 28 }}>

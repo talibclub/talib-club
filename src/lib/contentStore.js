@@ -35,6 +35,24 @@ function cleanForFirestore(value) {
   )
 }
 
+function isPlainObject(value) {
+  return Boolean(value) && Object.getPrototypeOf(value) === Object.prototype
+}
+
+function deepMerge(base, patch) {
+  if (Array.isArray(base) && Array.isArray(patch)) return patch
+  if (!isPlainObject(base) || !isPlainObject(patch)) {
+    return patch === undefined ? base : patch
+  }
+
+  const result = { ...base }
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) continue
+    result[key] = key in base ? deepMerge(base[key], value) : value
+  }
+  return result
+}
+
 function getMs(val) {
   if (!val) return 0
   if (typeof val.toDate === "function") return val.toDate().getTime()
@@ -160,7 +178,7 @@ export function useSiteSettings(fallbackSite) {
     const unsubscribe = onSnapshot(
       doc(db, SITE_DOC.collection, SITE_DOC.id),
       snapshot => {
-        setSite(snapshot.exists() ? { ...fallbackSite, ...snapshot.data() } : fallbackSite)
+        setSite(snapshot.exists() ? deepMerge(fallbackSite, snapshot.data()) : fallbackSite)
         setError(null)
         setLoading(false)
       },
@@ -194,7 +212,7 @@ export function useTaxonomySettings(fallbackTaxonomy) {
     const unsubscribe = onSnapshot(
       doc(db, TAXONOMY_DOC.collection, TAXONOMY_DOC.id),
       snapshot => {
-        setTaxonomy(snapshot.exists() ? { ...fallbackTaxonomy, ...snapshot.data() } : fallbackTaxonomy)
+        setTaxonomy(snapshot.exists() ? deepMerge(fallbackTaxonomy, snapshot.data()) : fallbackTaxonomy)
         setError(null)
         setLoading(false)
       },

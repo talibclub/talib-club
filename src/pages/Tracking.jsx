@@ -37,8 +37,17 @@ export default function Tracking() {
       script.src = "https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js";
       document.head.appendChild(script);
     }
-    if (localStorage.getItem("talib_admin_auth") === "true") setIsAdminAuthenticated(true);
+    if (localStorage.getItem("talib_admin_auth") === "true") {
+      setIsAdminAuthenticated(true);
+      setView("admin-dashboard");
+    }
   }, []);
+
+  useEffect(() => {
+    if (isAdminAuthenticated && view === "home") {
+      setView("admin-dashboard");
+    }
+  }, [isAdminAuthenticated, view]);
 
   // Fetch Data when tabs change
   useEffect(() => {
@@ -119,7 +128,7 @@ export default function Tracking() {
     const newCount = secretClicks + 1;
     setSecretClicks(newCount);
     if (newCount >= 3) {
-      setView("admin-login");
+      setView(isAdminAuthenticated ? "admin-dashboard" : "admin-login");
       setSecretClicks(0);
     }
     setTimeout(() => setSecretClicks(0), 1500);

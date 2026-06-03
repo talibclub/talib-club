@@ -36,16 +36,20 @@ const POPUP_FALLBACK_CODES = new Set([
 async function saveGoogleProfile(firebaseUser) {
   const ref = doc(db, "users", firebaseUser.uid)
   const snap = await getDoc(ref)
-  if (!snap.exists()) {
-    await setDoc(ref, {
-      role: "member",
-      displayName: firebaseUser.displayName || "",
-      email: firebaseUser.email || "",
-      photoURL: firebaseUser.photoURL || "",
-      provider: "google",
-      createdAt: serverTimestamp(),
-    })
+  const payload = {
+    role: snap.exists() ? snap.data()?.role || "member" : "member",
+    displayName: firebaseUser.displayName || "",
+    email: firebaseUser.email || "",
+    photoURL: firebaseUser.photoURL || "",
+    provider: "google",
+    updatedAt: serverTimestamp(),
   }
+
+  if (!snap.exists()) {
+    payload.createdAt = serverTimestamp()
+  }
+
+  await setDoc(ref, payload, { merge: true })
 }
 
 export function useAuth() {
@@ -77,15 +81,26 @@ export function useAuth() {
         const snap = await getDoc(ref)
         if (snap.exists()) {
           const snapData = snap.data()
-          if (snapData.email !== currentUser.email) {
-            await setDoc(ref, { email: currentUser.email }, { merge: true }).catch(e => console.error("Sync email to firestore failed", e))
+          const nextProfileData = {
+            email: currentUser.email || "",
+            displayName: currentUser.displayName || snapData.displayName || "",
+            photoURL: currentUser.photoURL || snapData.photoURL || "",
+            updatedAt: serverTimestamp(),
+          }
+          if (
+            snapData.email !== nextProfileData.email ||
+            snapData.displayName !== nextProfileData.displayName ||
+            snapData.photoURL !== nextProfileData.photoURL
+          ) {
+            await setDoc(ref, nextProfileData, { merge: true }).catch(e => console.error("Sync profile to firestore failed", e))
           }
           setProfile({
             ...DEFAULT_PROFILE,
             ...snapData,
-            displayName: snapData.displayName || currentUser.displayName || "",
-            email: currentUser.email,
-            photoURL: currentUser.photoURL || "",
+            ...nextProfileData,
+            displayName: nextProfileData.displayName,
+            email: nextProfileData.email,
+            photoURL: nextProfileData.photoURL,
           })
         } else {
           const nextProfile = {

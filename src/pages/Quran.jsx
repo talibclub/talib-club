@@ -5,7 +5,6 @@ import { getSurahTheme } from "../data/quranThemes.js"
 import { useContentCollection } from "../lib/contentStore.js"
 import toast from "react-hot-toast"
 import { confirmAction } from "../utils/feedback.jsx"
-import QURAN_BENEFITS from "../data/quranBenefits.json"
 
 const JUZ_STARTS = [
   { juz: 1, sura: 1, ayah: 1, label: "ยุซอ์ที่ 1 (ซูเราะฮ์ 1:1)" },
@@ -71,6 +70,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
   const [searchHasRun, setSearchHasRun] = useState(false)
   const [targetScrollAyah, setTargetScrollAyah] = useState(() => normalizeAyahNumber(initialAyah))
   const [reloadKey, setReloadKey] = useState(0)
+  const [quranBenefits, setQuranBenefits] = useState(null)
 
   // Navigation Mode: "surah" | "juz" | "page"
   const [navMode, setNavMode] = useState("surah")
@@ -89,6 +89,30 @@ export default function Quran({ initialSura, initialAyah, authState }) {
     setBenefitsExpanded(false)
     setShowObjective(false)
   }, [selectedSura])
+
+  useEffect(() => {
+    let active = true
+
+    if (!quranBenefits) {
+      fetch("/quranBenefits.json")
+        .then(res => {
+          if (!res.ok) {
+            throw new Error(`Failed to load Quran benefits: ${res.status}`)
+          }
+          return res.json()
+        })
+        .then(data => {
+          if (active) setQuranBenefits(data)
+        })
+        .catch(err => {
+          console.error("Failed to load Quran benefits data", err)
+        })
+    }
+
+    return () => {
+      active = false
+    }
+  }, [quranBenefits])
 
   // Synchronize Quran selection (selectedSura and targetScrollAyah) with the browser URL query parameters
   useEffect(() => {
@@ -1856,7 +1880,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
 
           {/* VERSE BENEFITS (فوائد الآيات) */}
           {!loading && !error && verses.length > 0 && (() => {
-            const suraBenefits = QURAN_BENEFITS[selectedSura] || [];
+            const suraBenefits = quranBenefits?.[selectedSura] || [];
             if (suraBenefits.length === 0) return null;
             return (
               <div

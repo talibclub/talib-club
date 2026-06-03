@@ -9,7 +9,7 @@ export default function Articles({ go, authState, ctx }) {
   const cat = ctx?.cat || "all"
   const type = ctx?.type || "all"
   const showAllBrowse = ctx?.showAllBrowse === "true" || ctx?.showAllBrowse === true || false
-  const page = parseInt(ctx?.page, 10) || 1
+  const requestedPage = parseInt(ctx?.page, 10) || 1
 
   const [search, setSearch] = useState(() => ctx?.search || "")
 
@@ -38,7 +38,7 @@ export default function Articles({ go, authState, ctx }) {
       search: newParams.search !== undefined ? newParams.search : search,
       showAllBrowse,
       selectedSeriesId: ctx?.selectedSeriesId || "",
-      page,
+      page: requestedPage,
       ...newParams
     }
     if (newParams.cat !== undefined || newParams.type !== undefined || newParams.search !== undefined || newParams.showAllBrowse !== undefined || newParams.selectedSeriesId !== undefined) {
@@ -56,17 +56,24 @@ export default function Articles({ go, authState, ctx }) {
         search,
         showAllBrowse,
         selectedSeriesId: selectedSeries?.id || "",
-        page
+        page: requestedPage
       }
     })
   }
 
-  const paginatedFiltered = useMemo(() => {
-    const startIndex = (page - 1) * ITEMS_PER_PAGE
-    return filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE)
-  }, [filtered, page])
-
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
+  const currentPage = totalPages > 0 ? Math.min(Math.max(requestedPage, 1), totalPages) : 1
+
+  const paginatedFiltered = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+    return filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+  }, [filtered, currentPage])
+
+  useEffect(() => {
+    if (totalPages > 0 && requestedPage !== currentPage) {
+      updateFilters({ page: currentPage })
+    }
+  }, [currentPage, requestedPage, totalPages])
 
   const seriesGroups = useMemo(() => {
     return (taxonomy.articleSeries || []).map(s => {
@@ -106,9 +113,9 @@ export default function Articles({ go, authState, ctx }) {
   }, [filtered]);
 
   const paginatedGeneral = useMemo(() => {
-    const startIndex = (page - 1) * ITEMS_PER_PAGE;
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     return filteredGeneral.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredGeneral, page]);
+  }, [filteredGeneral, currentPage]);
 
   const totalGeneralPages = Math.ceil(filteredGeneral.length / ITEMS_PER_PAGE);
 
@@ -397,7 +404,7 @@ export default function Articles({ go, authState, ctx }) {
                                 <button 
                                   key={i} 
                                   onClick={() => { updateFilters({ page: i + 1 }); window.scrollTo(0, 0); }}
-                                  className={page === i + 1 ? "btn btn-teal" : "btn btn-outline"} 
+                                  className={currentPage === i + 1 ? "btn btn-teal" : "btn btn-outline"} 
                                   style={{ padding: "6px 14px", fontSize: 12 }}
                                 >
                                   {i + 1}
@@ -446,7 +453,7 @@ export default function Articles({ go, authState, ctx }) {
                             <button 
                               key={i} 
                               onClick={() => { updateFilters({ page: i + 1 }); window.scrollTo(0, 0); }}
-                              className={page === i + 1 ? "btn btn-teal" : "btn btn-outline"} 
+                              className={currentPage === i + 1 ? "btn btn-teal" : "btn btn-outline"} 
                               style={{ padding: "6px 14px", fontSize: 12 }}
                             >
                               {i + 1}

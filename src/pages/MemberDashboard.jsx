@@ -1540,7 +1540,7 @@ function ProfilePanel({ authState, copied, copyText, go, setView, ctx }) {
   }, [history, readingSessions, streakRecords, user?.uid])
 
   const handleHistoryClick = (h) => {
-    const targetId = h.itemId || h.id;
+    const targetId = h.itemId || parseHistoryTargetId(h) || h.id;
     if (h.type === "article") go("article", { id: targetId });
     else if (h.type === "book") go("library-detail", { id: targetId });
     else if (h.type === "media") go("media-detail", { id: targetId });
@@ -1872,6 +1872,12 @@ function DashboardCard({ icon, title, text, onClick }) {
 function initials(name, email) {
   const source = name && name !== "-" ? name : email
   return source.split(/\s|@/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join("") || "TC"
+}
+
+function parseHistoryTargetId(historyItem) {
+  const rawId = String(historyItem?.id || "")
+  const match = rawId.match(/_(article|book|media)_(.+)$/)
+  return match?.[2] || null
 }
 
 function formEmailChanged(nextEmail, currentEmail) {

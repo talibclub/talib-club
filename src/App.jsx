@@ -354,7 +354,7 @@ function RequireLogin({ authState, go, children }) {
 function RequireStaff({ authState, go, children }) {
   if (authState.loading) return <LoadingState />
   if (!authState.user) return <Auth authState={authState} go={go} />
-  if (!authState.isStaff) return <StaffDashboard authState={authState} go={go} />
+  if (!authState.isStaff) return <UnauthorizedState go={go} />
   return children
 }
 
@@ -363,6 +363,26 @@ function LoadingState() {
     <div className="card" style={{ maxWidth: 420, margin: "44px auto", padding: 24, textAlign: "center" }}>
       <i className="ti ti-loader-2 spin" style={{ fontSize: 28, color: "var(--teal)" }}></i>
       <p style={{ marginTop: 10 }}>กำลังตรวจสอบสถานะผู้ใช้...</p>
+    </div>
+  )
+}
+
+function UnauthorizedState({ go }) {
+  return (
+    <div className="card" style={{ maxWidth: 520, margin: "44px auto", padding: 24, textAlign: "center" }}>
+      <i className="ti ti-shield-lock" style={{ fontSize: 28, color: "var(--teal)", marginBottom: 10 }}></i>
+      <h2 style={{ fontSize: 18, marginBottom: 8 }}>หน้านี้สำหรับเจ้าหน้าที่เท่านั้น</h2>
+      <p style={{ marginBottom: 16 }}>
+        บัญชีของคุณยังไม่มีสิทธิ์เข้าถึงส่วนนี้ หากต้องการใช้งานพื้นที่ staff หรือ admin ให้ใช้บัญชีที่กำหนดสิทธิ์ไว้ก่อน
+      </p>
+      <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
+        <button className="btn btn-teal" onClick={() => go("home")}>
+          <i className="ti ti-home" style={{ marginRight: 6 }}></i>กลับหน้าหลัก
+        </button>
+        <button className="btn btn-outline" onClick={() => go("member", { view: "overview" })}>
+          <i className="ti ti-layout-dashboard" style={{ marginRight: 6 }}></i>ไปแดชบอร์ดสมาชิก
+        </button>
+      </div>
     </div>
   )
 }

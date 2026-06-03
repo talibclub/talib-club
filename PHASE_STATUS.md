@@ -5,6 +5,8 @@
 - Phase 1: complete.
 - Phase 2: complete for the current Firebase implementation.
 - Phase 3: complete for the planned AI quiz and article bookmark scope.
+- Current project stage: stabilization and hardening.
+- Primary focus now: fix edge-case logic, tighten access control, and reduce bundle weight.
 
 ## Phase 2 Completed
 

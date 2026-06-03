@@ -5,6 +5,7 @@ import path from "path"
 const command = process.argv[2] || "dev"
 
 const viteConfig = {
+  configFile: false,
   root: process.cwd(),
   plugins: [react()],
   resolve: {

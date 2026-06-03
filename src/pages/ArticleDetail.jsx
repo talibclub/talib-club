@@ -9,6 +9,14 @@ const READER_STORAGE_KEY = "talibReaderPrefs"
 const READER_SIZE_LABELS = { sm: "ก-", md: "ก", lg: "ก+" }
 const READER_TONE_LABELS = { 1: "1", 2: "2", 3: "3", 4: "4", 5: "5" }
 
+function sanitizeArticleForStore(article) {
+  if (!article) return article
+  const clean = { ...article }
+  delete clean.fromFilters
+  delete clean.viewMode
+  return clean
+}
+
 export default function ArticleDetail({ item, go, authState }) {
   const { items: articles, loading: loadingArticles, saveItem } = useContentCollection("articles", ARTICLES)
   
@@ -53,7 +61,10 @@ export default function ArticleDetail({ item, go, authState }) {
   useEffect(() => {
     if (displayItem && !loadingArticles && saveItem && hasIncrementedView.current !== displayItem.id) {
       hasIncrementedView.current = displayItem.id;
-      const updatedItem = { ...displayItem, views: (displayItem.views || 0) + 1 };
+      const updatedItem = {
+        ...sanitizeArticleForStore(displayItem),
+        views: (displayItem.views || 0) + 1
+      };
       saveItem(updatedItem).catch(e => console.error("อัปเดตยอดวิวไม่สำเร็จ", e));
     }
   }, [displayItem, loadingArticles, saveItem])
@@ -126,7 +137,10 @@ export default function ArticleDetail({ item, go, authState }) {
     navigator.clipboard.writeText(window.location.href);
     toast.success("คัดลอกลิงก์สำหรับแชร์แล้ว");
     if (saveItem && displayItem) {
-      saveItem({ ...displayItem, shares: (displayItem.shares || 0) + 1 }).catch(e => console.error(e));
+      saveItem({
+        ...sanitizeArticleForStore(displayItem),
+        shares: (displayItem.shares || 0) + 1
+      }).catch(e => console.error(e));
     }
   }
 
