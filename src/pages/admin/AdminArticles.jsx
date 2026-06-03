@@ -52,9 +52,9 @@ export default function AdminArticles() {
   const [page, setPage] = useState(1)
   const ITEMS_PER_PAGE = 20
 
-  // รีเซ็ตซีรีส์เป็นทั้งหมด ถ้าเปลี่ยนประเภทเป็นอย่างอื่นที่ไม่ใช่ซีรีส์หรือทั้งหมด
+  // รีเซ็ตซีรีส์เป็นทั้งหมด ถ้าเปลี่ยนประเภทเป็นอย่างอื่นที่ไม่ใช่ซีรีส์
   useEffect(() => {
-    if (typeFilter !== "all" && !isSeriesType(typeFilter)) {
+    if (!isSeriesType(typeFilter)) {
       setSeriesFilter("all")
     }
   }, [typeFilter])
@@ -247,8 +247,8 @@ export default function AdminArticles() {
           ))}
         </div>
 
-        {/* ✅ กล่องตัวกรองซีรีส์ (แสดงเมื่อเลือกประเภททั้งหมด หรือ ประเภทซีรีส์) */}
-        {(typeFilter === "all" || isSeriesType(typeFilter)) && (
+        {/* ✅ กล่องตัวกรองซีรีส์ (แสดงเมื่อเลือกประเภทซีรีส์) */}
+        {isSeriesType(typeFilter) && (
           <select 
             value={seriesFilter} 
             onChange={e => setSeriesFilter(e.target.value)} 
