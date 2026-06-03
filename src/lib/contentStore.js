@@ -129,13 +129,16 @@ export function useContentCollection(name, fallbackItems = []) {
     return unsubscribe
   }, [collectionName, name])
 
+  const serializedFallback = JSON.stringify(fallbackItems)
+  const stableFallbackItems = useMemo(() => fallbackItems, [serializedFallback])
+
   const items = useMemo(() => {
     if (loading && remoteItems === null) {
       return []
     }
-    const merged = mergeWithFallback(fallbackItems, remoteItems)
+    const merged = mergeWithFallback(stableFallbackItems, remoteItems)
     return [...merged].filter(item => !item.deleted).sort(byNewest)
-  }, [fallbackItems, loading, remoteItems])
+  }, [stableFallbackItems, loading, remoteItems])
 
   async function saveItem(item) {
     const id = String(item.id || crypto.randomUUID())

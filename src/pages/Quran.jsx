@@ -540,16 +540,19 @@ export default function Quran({ initialSura, initialAyah, authState }) {
     if (targetScrollAyah && !loading && verses.length > 0) {
       const element = document.getElementById(`ayah-${targetScrollAyah}`)
       if (element) {
+        let timer2
         const timer1 = setTimeout(() => {
           element.scrollIntoView({ behavior: "smooth", block: "center" })
           element.classList.add("pulse-highlight")
-          const timer2 = setTimeout(() => {
+          timer2 = setTimeout(() => {
             element.classList.remove("pulse-highlight")
             setTargetScrollAyah(null)
           }, 3000)
-          return () => clearTimeout(timer2)
         }, 350)
-        return () => clearTimeout(timer1)
+        return () => {
+          clearTimeout(timer1)
+          if (timer2) clearTimeout(timer2)
+        }
       }
     }
   }, [targetScrollAyah, loading, verses])

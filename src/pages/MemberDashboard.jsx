@@ -148,11 +148,21 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
   const uid = authState?.user?.uid
   const { items: shelfItems } = useContentCollection("bookshelf", [])
   const { items: savedVerses } = useContentCollection("quran_bookmarks", [])
+  const { items: lastReadPos } = useContentCollection("quran_last_read", [])
   
   const userSavedVerses = useMemo(() => savedVerses.filter(item => item.uid === uid), [savedVerses, uid])
   const activeBooks = useMemo(() => shelfItems.filter(item => item.uid === uid && item.status !== "finished"), [shelfItems, uid])
 
   useEffect(() => {
+    if (uid && lastReadPos && lastReadPos.length > 0) {
+      const userLastRead = lastReadPos.find(item => item.uid === uid)
+      if (userLastRead) {
+        setLastRead(userLastRead)
+        localStorage.setItem("quran-last-read", JSON.stringify(userLastRead))
+        return
+      }
+    }
+
     try {
       const local = localStorage.getItem("quran-last-read")
       if (local) {
@@ -161,7 +171,7 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
     } catch (err) {
       console.error(err)
     }
-  }, [])
+  }, [lastReadPos, uid])
 
   return (
     <div>
