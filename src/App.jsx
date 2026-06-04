@@ -296,7 +296,7 @@ export default function App() {
                 <MemberDashboard authState={authState} go={go} initialView="quran" ctx={ctx} />
               </RequireLogin>
             )}
-            {page === "tracking" && <Tracking />}
+            {page === "tracking" && <Tracking authState={authState} />}
             {page === "auth" && <Auth authState={authState} go={go} />}
             
             {page === "member" && (

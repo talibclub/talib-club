@@ -3,6 +3,7 @@ import toast from "react-hot-toast"
 import { ARTICLES, SERIES } from "../data/index.js"
 import { useContentCollection } from "../lib/contentStore.js"
 import { serverTimestamp } from "firebase/firestore"
+import { bumpContentMetric } from "../utils/contentMetrics.js"
 
 const READER_DEFAULTS = { size: "md", tone: "3" }
 const READER_STORAGE_KEY = "talibReaderPrefs"
@@ -30,10 +31,14 @@ export default function ArticleDetail({ item, go, authState }) {
   const hasIncrementedView = useRef(null)
 
   const displayItem = useMemo(() => {
-    if (item && item.title && !item.viewMode) return item;
-    if (urlId && articles.length > 0) return articles.find(a => String(a.id) === String(urlId));
-    if (item && item.id && articles.length > 0) return articles.find(a => String(a.id) === String(item.id));
-    return null;
+    const id = urlId || item?.id
+    const fromFilters = item?.fromFilters
+    if (id && articles.length > 0) {
+      const live = articles.find(a => String(a.id) === String(id))
+      if (live) return fromFilters ? { ...live, fromFilters } : live
+    }
+    if (item?.title && !item.viewMode) return item
+    return null
   }, [item, urlId, articles])
 
   const seriesArticles = useMemo(() => {
@@ -59,15 +64,11 @@ export default function ArticleDetail({ item, go, authState }) {
 
   // อัปเดตยอดวิวขึ้น Firestore
   useEffect(() => {
-    if (displayItem && !loadingArticles && saveItem && hasIncrementedView.current !== displayItem.id) {
-      hasIncrementedView.current = displayItem.id;
-      const updatedItem = {
-        ...sanitizeArticleForStore(displayItem),
-        views: (displayItem.views || 0) + 1
-      };
-      saveItem(updatedItem).catch(e => console.error("อัปเดตยอดวิวไม่สำเร็จ", e));
+    if (displayItem && !loadingArticles && hasIncrementedView.current !== displayItem.id) {
+      hasIncrementedView.current = displayItem.id
+      bumpContentMetric("articles", displayItem.id, "views")
     }
-  }, [displayItem, loadingArticles, saveItem])
+  }, [displayItem, loadingArticles])
 
   // บันทึกประวัติการอ่านบทความ
   useEffect(() => {
@@ -134,13 +135,12 @@ export default function ArticleDetail({ item, go, authState }) {
   }
 
   const handleShare = async () => {
-    navigator.clipboard.writeText(window.location.href);
-    toast.success("คัดลอกลิงก์สำหรับแชร์แล้ว");
-    if (saveItem && displayItem) {
-      saveItem({
-        ...sanitizeArticleForStore(displayItem),
-        shares: (displayItem.shares || 0) + 1
-      }).catch(e => console.error(e));
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      toast.success("คัดลอกลิงก์สำหรับแชร์แล้ว")
+      if (displayItem) bumpContentMetric("articles", displayItem.id, "shares")
+    } catch {
+      toast.error("คัดลอกลิงก์ไม่สำเร็จ กรุณาคัดลอกจากแถบที่อยู่ด้วยตนเอง")
     }
   }
 
@@ -169,7 +169,10 @@ export default function ArticleDetail({ item, go, authState }) {
     return <p key={index}>{para}</p>;
   });
 
-  const related = articles.filter(a => a.id !== displayItem.id && a.category === displayItem.category).slice(0, 3)
+  const related = articles.filter(a =>
+    a.id !== displayItem.id &&
+    String(a.category || "").toLowerCase() === String(displayItem.category || "").toLowerCase()
+  ).slice(0, 3)
   const readerClass = `article-body reader-size-${readerPrefs.size} reader-tone-${readerPrefs.tone}`
 
   return (

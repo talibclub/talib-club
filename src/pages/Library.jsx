@@ -2,6 +2,10 @@ import { useState, useEffect, useMemo } from "react"
 import { BOOKS, DEFAULT_TAXONOMY } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 import toast from "react-hot-toast"
+import { bumpContentMetric } from "../utils/contentMetrics.js"
+import { clampPage } from "../utils/pagination.js"
+import PaginationBar from "../components/PaginationBar.jsx"
+import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
 
 // ฟังก์ชันดึงรูปปก
 function getDirectUrl(url) {
@@ -24,7 +28,7 @@ function getDownloadUrl(url) {
 }
 
 export default function Library({ go, authState, ctx }) {
-  const { items: books, loading, saveItem } = useContentCollection("books", BOOKS)
+  const { items: books, loading, error, isUsingFallback } = useContentCollection("books", BOOKS)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
 
   const filter = ctx?.filter || "all"
@@ -76,13 +80,9 @@ export default function Library({ go, authState, ctx }) {
   }
 
   const handleDownloadClick = async (b) => {
-    if (!b || !saveItem) return
+    if (!b?.id) return
     try {
-      const updatedItem = {
-        ...b,
-        downloads: (b.downloads || 0) + 1
-      }
-      await saveItem(updatedItem)
+      await bumpContentMetric("books", b.id, "downloads")
     } catch (err) {
       console.error("ไม่สามารถอัปเดตยอดดาวน์โหลดได้:", err)
     }
@@ -123,8 +123,8 @@ export default function Library({ go, authState, ctx }) {
     })
   }, [books, filter, categoryFilter, sourceFilter, search, sortBy])
 
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
-  const currentPage = totalPages > 0 ? Math.min(Math.max(requestedPage, 1), totalPages) : 1
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1)
+  const currentPage = clampPage(requestedPage, totalPages)
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
   const currentItems = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE)
 
@@ -138,7 +138,7 @@ export default function Library({ go, authState, ctx }) {
     <div style={{ marginBottom: 28 }}>
       <h1 style={{ marginBottom: 8 }}>ห้องสมุด</h1>
       <p style={{ marginBottom: loading ? 4 : 24 }}>หนังสือ วารสาร และสื่อดาวน์โหลดทั้งหมดของ Talib Club</p>
-      {loading && <p style={{ marginBottom: 24, fontSize: 12 }}>กำลังโหลดรายการล่าสุด...</p>}
+      <ContentStatusBanner loading={loading} error={error} isUsingFallback={isUsingFallback} />
 
       {/* SEARCH + MAIN FILTER */}
       <div className="filter-bar">
@@ -353,21 +353,7 @@ export default function Library({ go, authState, ctx }) {
       )}
 
       {/* PAGINATION CONTROLS */}
-      {totalPages > 1 && (
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, marginTop: 32 }}>
-          <button onClick={() => { updateFilters({ page: Math.max(currentPage - 1, 1) }); window.scrollTo(0, 0) }} disabled={currentPage === 1} className="btn btn-outline" style={{ padding: "6px 12px", opacity: currentPage === 1 ? 0.4 : 1, cursor: currentPage === 1 ? "not-allowed" : "pointer" }}>
-            <i className="ti ti-chevron-left" style={{ fontSize: 14 }}></i>
-          </button>
-          {Array.from({ length: totalPages }).map((_, i) => (
-            <button key={i} onClick={() => { updateFilters({ page: i + 1 }); window.scrollTo(0, 0) }} className={currentPage === i + 1 ? "btn btn-teal" : "btn btn-outline"} style={{ padding: "6px 14px", fontSize: 12, minWidth: 32 }}>
-              {i + 1}
-            </button>
-          ))}
-          <button onClick={() => { updateFilters({ page: Math.min(currentPage + 1, totalPages) }); window.scrollTo(0, 0) }} disabled={currentPage === totalPages} className="btn btn-outline" style={{ padding: "6px 12px", opacity: currentPage === totalPages ? 0.4 : 1, cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}>
-            <i className="ti ti-chevron-right" style={{ fontSize: 14 }}></i>
-          </button>
-        </div>
-      )}
+      <PaginationBar currentPage={currentPage} totalPages={totalPages} onPageChange={p => updateFilters({ page: p })} />
 
       {/* DONATE */}
       <div style={{ marginTop: 40, padding: "20px 24px", background: "var(--acc2)", border: ".5px solid var(--acc-br)", borderRadius: 14, textAlign: "center" }}>

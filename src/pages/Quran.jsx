@@ -641,7 +641,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
         
         .surah-item.active {
           background: var(--quran-teal-bg) !important;
-          border-left: 3.5px solid var(--quran-teal) !important;
+          border-top: 3px solid var(--quran-teal) !important;
           color: var(--quran-teal) !important;
           font-weight: 500;
         }
@@ -709,9 +709,9 @@ export default function Quran({ initialSura, initialAyah, authState }) {
         }
         .tafsir-box {
           background: var(--quran-acc2);
-          border-left: 3px solid var(--quran-teal);
+          border-top: 3px solid var(--quran-teal);
           padding: 14px 18px;
-          border-radius: 0 10px 10px 0;
+          border-radius: 10px;
           margin-top: 8px;
         }
         .tafsir-box div {
@@ -957,6 +957,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                               onClick={() => {
                                 setSelectedPage(null)
                                 setSelectedSura(s.number)
+                                setTargetScrollAyah(null)
                               }}
                               style={{
                                 padding: "10px 14px",
@@ -1202,7 +1203,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
 
           {/* SURAH OBJECTIVE CARD */}
           {getSurahTheme(selectedSura) && (
-            <div className="card" style={{ padding: "14px 18px", marginBottom: 16, borderLeft: "4px solid var(--teal)", background: "var(--bg3)" }}>
+            <div className="card" style={{ padding: "14px 18px", marginBottom: 16, borderTop: "3px solid var(--teal)", background: "var(--bg3)" }}>
               <div
                 style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
                 onClick={() => setShowObjective(!showObjective)}
@@ -1892,9 +1893,9 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                           {bookmark && (
                             <div style={{
                               background: "rgba(45, 190, 160, 0.04)",
-                              borderLeft: "3px solid var(--teal)",
-                              padding: "8px 12px",
-                              borderRadius: "0 8px 8px 0",
+                              borderTop: "2px solid var(--teal)",
+                              padding: "10px 12px",
+                              borderRadius: "8px",
                               marginTop: 8,
                               display: "flex",
                               justifyContent: "space-between",
@@ -1937,7 +1938,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                 style={{
                   marginTop: 20,
                   padding: "20px 24px",
-                  borderLeft: "4px solid var(--quran-teal)",
+                  borderTop: "3px solid var(--quran-teal)",
                   background: "var(--quran-teal-bg)"
                 }}
               >
@@ -2394,6 +2395,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                               className={`surah-item`}
                               onClick={() => {
                                 setSelectedSura(s.number);
+                                setTargetScrollAyah(null);
                                 setIsMobileNavOpen(false);
                               }}
                               style={{

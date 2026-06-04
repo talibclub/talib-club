@@ -4,6 +4,7 @@ import { collection, doc, getDocs, serverTimestamp, writeBatch } from "firebase/
 import { db } from "../lib/firebase.js"
 import { useAuth } from "../hooks/useAuth.js"
 import { notifyError, notifySuccess } from "../utils/feedback.jsx"
+import { buildPageRange } from "../utils/pagination.js"
 
 const COLLECTION = "translation_abuiyaad"
 const STATUS = { pending: "Pending", progress: "In progress", completed: "Completed" }
@@ -25,14 +26,6 @@ function matchesStatus(item, filter) {
 
 function getMyName(profile) {
   return profile?.displayName || profile?.email || ""
-}
-
-/** Compact page numbers with gaps for large lists */
-function buildPageRange(current, total) {
-  if (total <= 0) return []
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
-  const set = new Set([1, total, current, current - 1, current + 1])
-  return [...set].filter(p => p >= 1 && p <= total).sort((a, b) => a - b)
 }
 
 // ── Modal ──────────────────────────────────────────────────────────

@@ -2,6 +2,8 @@ import { useState, useEffect } from "react"
 import { ARTICLES, DEFAULT_TAXONOMY } from "../../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
+import ContentStatusBanner from "../../components/ContentStatusBanner.jsx"
+import { clampPage } from "../../utils/pagination.js"
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage"
 import { storage } from "../../lib/firebase.js"
 
@@ -67,7 +69,8 @@ export default function AdminArticles() {
   const filtered = items.filter(a => {
     const matchSearch = String(a.title || "").toLowerCase().includes(search.toLowerCase()) ||
       String(a.author || "").toLowerCase().includes(search.toLowerCase())
-    const matchType = typeFilter === "all" || a.type === typeFilter
+    const matchType = typeFilter === "all" ||
+      (isSeriesType(typeFilter) ? isSeriesType(a.type) : String(a.type) === typeFilter)
     const matchCat = categoryFilter === "all" || a.category === categoryFilter
     const matchSeries = seriesFilter === "all" || a.seriesId === seriesFilter // ✅ กรองด้วย seriesId
 
@@ -87,8 +90,13 @@ export default function AdminArticles() {
     }
   })
 
-  const totalPages = Math.ceil(sorted.length / ITEMS_PER_PAGE)
-  const currentItems = sorted.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+  const totalPages = Math.max(1, Math.ceil(sorted.length / ITEMS_PER_PAGE) || 1)
+  const safePage = clampPage(page, totalPages)
+  const currentItems = sorted.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE)
+
+  useEffect(() => {
+    if (page !== safePage) setPage(safePage)
+  }, [page, safePage])
 
   const toggleSelect = (id) => {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -109,6 +117,9 @@ export default function AdminArticles() {
 
   async function save() {
     if (!editing.title?.trim()) return notifyError("กรุณาใส่ชื่อบทความ")
+    if (isSeriesType(editing.type) && (!editing.seriesId?.trim() || !editing.part)) {
+      return notifyError("บทความซีรีส์ต้องระบุรหัสซีรีส์และหมายเลขตอน")
+    }
 
     // เช็คประเภทซีรีส์ให้ยืดหยุ่นขึ้น
     const payload = { ...editing, part: isSeriesType(editing.type) && editing.part ? Number(editing.part) : null }
@@ -225,8 +236,9 @@ export default function AdminArticles() {
         <div style={{ flex: 1 }}>
           <h2 style={{ minWidth: 150 }}>บทความ <span style={{ fontSize: 12, color: "var(--t3)" }}>({sorted.length} รายการ)</span></h2>
           <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>
-            บทความวิชาการอิสลามทั้งหมดของ Talib Club {totalPages > 0 && `(หน้า ${page}/${totalPages})`}
+            บทความวิชาการอิสลามทั้งหมดของ Talib Club {totalPages > 0 && `(หน้า ${safePage}/${totalPages})`}
           </p>
+          <ContentStatusBanner loading={loading} error={error} isUsingFallback={isUsingFallback} />
         </div>
         <button className="btn btn-teal" onClick={openNew} disabled={busy} style={{ opacity: busy ? 0.6 : 1 }}>
           <i className="ti ti-plus" style={{ marginRight: 6 }}></i>เพิ่มใหม่

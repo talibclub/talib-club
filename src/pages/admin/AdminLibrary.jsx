@@ -2,6 +2,8 @@ import { useState, useEffect } from "react"
 import { BOOKS, DEFAULT_TAXONOMY } from "../../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
+import ContentStatusBanner from "../../components/ContentStatusBanner.jsx"
+import { clampPage } from "../../utils/pagination.js"
 
 const EMPTY = {
   title: "",
@@ -89,8 +91,13 @@ export default function AdminLibrary() {
     }
   })
 
-  const totalPages = Math.ceil(sorted.length / ITEMS_PER_PAGE)
-  const currentItems = sorted.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+  const totalPages = Math.max(1, Math.ceil(sorted.length / ITEMS_PER_PAGE) || 1)
+  const safePage = clampPage(page, totalPages)
+  const currentItems = sorted.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE)
+
+  useEffect(() => {
+    if (page !== safePage) setPage(safePage)
+  }, [page, safePage])
 
   const toggleSelect = (id) => {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -222,8 +229,9 @@ export default function AdminLibrary() {
         <div style={{ flex: 1 }}>
           <h2 style={{ minWidth: 150 }}>หนังสือและ PDF <span style={{ fontSize: 12, color: "var(--t3)" }}>({sorted.length} รายการ)</span></h2>
           <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>
-            หนังสือ วารสาร และสื่อดาวน์โหลดทั้งหมดของ Talib Club {totalPages > 0 && `(หน้า ${page}/${totalPages})`}
+            หนังสือ วารสาร และสื่อดาวน์โหลดทั้งหมดของ Talib Club {totalPages > 0 && `(หน้า ${safePage}/${totalPages})`}
           </p>
+          <ContentStatusBanner loading={loading} error={error} isUsingFallback={isUsingFallback} />
         </div>
         <button className="btn btn-teal" onClick={openNew} disabled={busy} style={{ opacity: busy ? 0.6 : 1 }}>
           <i className="ti ti-plus" style={{ marginRight: 6 }}></i>เพิ่มใหม่

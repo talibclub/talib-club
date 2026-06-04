@@ -166,6 +166,15 @@ function getPreviewUrl(url) {
 
 export default function ReadingApp({ authState, go, ctx, theme }) {
   const uid = authState?.user?.uid
+  const dismissedShelfRef = useRef(null)
+
+  function clearShelfLaunchContext() {
+    if (!ctx?.shelfItemId) return
+    dismissedShelfRef.current = ctx.shelfItemId
+    const next = { ...ctx }
+    delete next.shelfItemId
+    go("reader", Object.keys(next).length ? next : null, { replace: true, noScroll: true })
+  }
   const { items: books } = useContentCollection("books", BOOKS)
   const { items: shelfItems, saveItem: saveShelfItem, deleteItem: deleteShelfItem } = useContentCollection("bookshelf", [])
   const { items: readingSessions, loading: loadingSessions, saveItem: saveReadingSession } = useContentCollection("reading_sessions", [])
@@ -648,16 +657,14 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 
   // Auto-start reading session when shelfItemId is passed via context
   useEffect(() => {
-    if (ctx?.shelfItemId && shelfItems.length > 0 && books.length > 0 && !activeBook) {
-      const item = shelfItems.find(s => s.id === ctx.shelfItemId)
-      if (item) {
-        const book = getShelfBook(item, books)
-        if (book) {
-          startReading({ ...item, book })
-        }
-      }
+    if (!ctx?.shelfItemId || shelfItems.length === 0 || books.length === 0 || activeBook) return
+    if (dismissedShelfRef.current === ctx.shelfItemId) return
+    const item = shelfItems.find(s => s.id === ctx.shelfItemId)
+    if (item) {
+      const book = getShelfBook(item, books)
+      if (book) startReading({ ...item, book })
     }
-  }, [ctx, shelfItems, books, activeBook])
+  }, [ctx?.shelfItemId, shelfItems, books, activeBook])
 
   function startReading(shelfItem) {
     setActiveBook(shelfItem)
@@ -685,6 +692,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     setIsRunning(false)
     setActiveBook(null)
     setSeconds(0)
+    clearShelfLaunchContext()
   }
 
   const saveReadingProgress = async () => {
@@ -772,6 +780,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       setIsRunning(false)
       setActiveBook(null)
       setSeconds(0)
+      clearShelfLaunchContext()
     } catch (err) {
       console.error(err)
       toast.error("บันทึกข้อมูลล้มเหลว กรุณาลองอีกครั้ง")

@@ -21,8 +21,13 @@ export default function Donation() {
   ]
 
   // ฟังก์ชันกดคัดลอกเลขบัญชี
-  const handleCopy = (number) => {
-    navigator.clipboard.writeText(number.replace(/-/g, ""))
+  const handleCopy = async (number) => {
+    try {
+      await navigator.clipboard.writeText(number.replace(/-/g, ""))
+    } catch {
+      toast.error("คัดลอกไม่สำเร็จ กรุณาคัดลอกด้วยตนเอง")
+      return
+    }
     toast.success("คัดลอกเลขบัญชีเรียบร้อยแล้ว", {
       icon: '✅',
       style: {

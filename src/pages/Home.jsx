@@ -91,7 +91,10 @@ export default function Home({ go }) {
     const dua = QURAN_DUAS[index]
 
     fetch(`https://quranenc.com/api/v1/translation/aya/thai_rwwad/${dua.sura}/${dua.aya}`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
       .then(data => {
         if (data && data.result) {
           const fetchedDua = {

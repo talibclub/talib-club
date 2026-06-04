@@ -19,9 +19,15 @@ export default function AdminDraftList({ title, collectionName, initialItems = [
   }
 
   async function save() {
+    const required = fields.find(f => String(f.label || "").includes("*"))
+    const key = required?.key || fields[0]?.key
+    if (key && !String(editing?.[key] || "").trim()) {
+      notifyError(`กรุณากรอก${required?.label || key}`)
+      return
+    }
     setBusy(true)
     try {
-      await saveItem(editing)
+      await saveItem({ ...editing })
       setEditing(null)
       notifySuccess("บันทึกข้อมูลขึ้นเว็บไซต์เรียบร้อยแล้ว")
     } catch (err) {

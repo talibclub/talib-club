@@ -1,6 +1,9 @@
 import { useState, useMemo, useEffect } from "react"
 import { MEDIA, DEFAULT_TAXONOMY, SITE } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings, useSiteSettings } from "../lib/contentStore.js"
+import { clampPage } from "../utils/pagination.js"
+import PaginationBar from "../components/PaginationBar.jsx"
+import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
 
 export default function Media({ go, ctx }) {
   const { items: media, loading, error, isUsingFallback } = useContentCollection("media", MEDIA)
@@ -132,20 +135,24 @@ export default function Media({ go, ctx }) {
     })
   }, [selectedPlaylist, searchClip, sortOrder])
 
-  // จัดการข้อมูลหน้า Pagination สำหรับคลิปที่กรองแล้ว
-  const currentItems = useMemo(() => {
-    const startIndex = (page - 1) * ITEMS_PER_PAGE
-    return filteredClips.slice(startIndex, startIndex + ITEMS_PER_PAGE)
-  }, [filteredClips, page])
+  const totalPages = Math.max(1, Math.ceil(filteredClips.length / ITEMS_PER_PAGE) || 1)
+  const currentPage = clampPage(page, totalPages)
 
-  const totalPages = Math.ceil(filteredClips.length / ITEMS_PER_PAGE)
+  useEffect(() => {
+    if (page !== currentPage) updateFilters({ page: currentPage })
+  }, [currentPage, page, totalPages])
+
+  const currentItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+    return filteredClips.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+  }, [filteredClips, currentPage])
 
   return (
     <div>
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ marginBottom: 8 }}>มีเดีย</h1>
         <p>วิดีโอ YouTube และพอดแคสต์ Spotify จาก Talib Club</p>
-        {loading && <p style={{ marginTop: 8, fontSize: 12 }}>กำลังโหลดข้อมูล...</p>}
+        <ContentStatusBanner loading={loading} error={error} isUsingFallback={isUsingFallback} />
       </div>
 
       {!selectedPlaylist ? (
@@ -239,7 +246,7 @@ export default function Media({ go, ctx }) {
             <div style={{ fontSize: 12, color: "var(--teal)", marginBottom: 4, fontWeight: 500 }}>จากช่อง: {selectedPlaylist.teacher}</div>
             <h2 style={{ fontSize: 18, fontWeight: 500 }}>{selectedPlaylist.name}</h2>
             <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 4 }}>
-              รวมเนื้อหาทั้งหมด {filteredClips.length} คลิป {totalPages > 0 && `(หน้าที่ ${page}/${totalPages})`}
+              รวมเนื้อหาทั้งหมด {filteredClips.length} คลิป {totalPages > 1 && `(หน้า ${currentPage}/${totalPages})`}
             </p>
           </div>
 
@@ -286,7 +293,12 @@ export default function Media({ go, ctx }) {
                     key={item.id} 
                     className="card" 
                     style={{ padding: 0, overflow: "hidden", cursor: "pointer", display: "flex", flexDirection: "column" }}
-                    onClick={() => go ? go("media-detail", item) : undefined}
+                    onClick={() => go?.("media-detail", {
+                      ...item,
+                      playlist: ctx?.playlist || "",
+                      filter: ctx?.filter,
+                      page: currentPage,
+                    })}
                   >
                     <div style={{ height: 150, background: "var(--acc2)", position: "relative" }}>
                       {thumbUrl ? (
@@ -315,20 +327,7 @@ export default function Media({ go, ctx }) {
           )}
 
           {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 32, flexWrap: "wrap" }}>
-              {Array.from({ length: totalPages }).map((_, i) => (
-                <button 
-                  key={i} 
-                  onClick={() => { updateFilters({ page: i + 1 }); window.scrollTo(0, 0); }}
-                  className={page === i + 1 ? "btn btn-teal" : "btn btn-outline"} 
-                  style={{ padding: "6px 14px", fontSize: 12 }}
-                >
-                  {i + 1}
-                </button>
-              ))}
-            </div>
-          )}
+          <PaginationBar currentPage={currentPage} totalPages={totalPages} onPageChange={p => updateFilters({ page: p })} />
         </div>
       )}
 

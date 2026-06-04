@@ -209,7 +209,7 @@ export default function Scholars() {
       {loading ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
           {[1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} className="card" style={{ padding: 16, borderLeft: "2px solid var(--br2)", display: "flex", flexDirection: "column", gap: 8 }}>
+            <div key={i} className="card scholar-skeleton-card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div className="skeleton-shimmer" style={{ height: 14, width: "50%", borderRadius: 4 }}></div>
                 <div className="skeleton-shimmer" style={{ height: 12, width: "20%", borderRadius: 4 }}></div>
@@ -248,10 +248,10 @@ export default function Scholars() {
               {visibleScholars.map(s => (
                 <div 
                   key={s.id} 
-                  className="card" 
+                  className="card scholar-card"
                   style={{ 
                     padding: 16, 
-                    borderLeft: `2px solid ${color}`,
+                    borderTop: `3px solid ${color}`,
                     display: "flex",
                     flexDirection: "column",
                     gap: 6

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react"
 import toast from "react-hot-toast"
 import { BOOKS } from "../data/index.js"
 import { useContentCollection } from "../lib/contentStore.js"
+import { bumpContentMetric } from "../utils/contentMetrics.js"
 
 function getDirectUrl(url) {
   if (!url) return ""
@@ -35,10 +36,13 @@ export default function LibraryDetail({ item, go, authState }) {
   const hasIncrementedView = useRef(null) // ตัวรั้งสำหรับป้องกันการบวกยอดวิวซ้ำตอนเรนเดอร์
 
   const displayItem = useMemo(() => {
-    if (item && item.title) return item;
-    if (urlId && books.length > 0) return books.find(b => String(b.id) === String(urlId));
-    if (item && item.id && books.length > 0) return books.find(b => String(b.id) === String(item.id));
-    return null;
+    const id = urlId || item?.id
+    if (id && books.length > 0) {
+      const live = books.find(b => String(b.id) === String(id))
+      if (live) return live
+    }
+    if (item?.title) return item
+    return null
   }, [item, urlId, books])
 
   // บันทึกประวัติการดูหนังสือ
@@ -59,19 +63,11 @@ export default function LibraryDetail({ item, go, authState }) {
 
   // --- ระบบนับยอดเข้าชมของจริง (ยิงขึ้น Firebase) ---
   useEffect(() => {
-    if (displayItem && !loading && saveItem && hasIncrementedView.current !== displayItem.id) {
-      hasIncrementedView.current = displayItem.id // ล็อค ID ไว้ว่าเล่มนี้ถูกนับวิวในรอบนี้แล้ว
-      
-      const updatedItem = {
-        ...displayItem,
-        views: (displayItem.views || 0) + 1
-      }
-      
-      saveItem(updatedItem).catch(err => {
-        console.error("ไม่สามารถอัปเดตยอดเข้าชมได้:", err)
-      })
+    if (displayItem && !loading && hasIncrementedView.current !== displayItem.id) {
+      hasIncrementedView.current = displayItem.id
+      bumpContentMetric("books", displayItem.id, "views")
     }
-  }, [displayItem, loading, saveItem])
+  }, [displayItem, loading])
 
   useEffect(() => {
     if (!loading && !displayItem) {
@@ -81,22 +77,22 @@ export default function LibraryDetail({ item, go, authState }) {
 
   // --- ระบบนับยอดดาวน์โหลดของจริง (ยิงขึ้น Firebase) ---
   const handleDownloadClick = async () => {
-    if (!displayItem || !saveItem) return
+    if (!displayItem) return
     
     try {
-      const updatedItem = {
-        ...displayItem,
-        downloads: (displayItem.downloads || 0) + 1
-      }
-      await saveItem(updatedItem)
+      await bumpContentMetric("books", displayItem.id, "downloads")
     } catch (err) {
       console.error("ไม่สามารถอัปเดตยอดดาวน์โหลดได้:", err)
     }
   }
 
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href)
-    toast.success("คัดลอกลิงก์เรียบร้อยแล้ว นำไปแชร์ให้เพื่อนได้เลย!")
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      toast.success("คัดลอกลิงก์เรียบร้อยแล้ว นำไปแชร์ให้เพื่อนได้เลย!")
+    } catch {
+      toast.error("คัดลอกลิงก์ไม่สำเร็จ")
+    }
   }
 
   if (loading && !displayItem) {

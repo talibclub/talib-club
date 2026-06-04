@@ -2,8 +2,11 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { collection, getDocs, writeBatch, doc, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
 import { trackingDb as db } from "../lib/trackingFirebase.js";
+import { canAccessTrackingAdmin, verifyTrackingAdminPassword } from "../utils/trackingAuth.js";
 
-export default function Tracking() {
+const TRACKING_AUTH_KEY = "talib_tracking_admin_v2";
+
+export default function Tracking({ authState }) {
   // --- View & Routing State ---
   const [view, setView] = useState("home"); 
   const [adminTab, setAdminTab] = useState(1);
@@ -38,11 +41,18 @@ export default function Tracking() {
       script.src = "https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js";
       document.head.appendChild(script);
     }
-    if (localStorage.getItem("talib_admin_auth") === "true") {
+    if (canAccessTrackingAdmin(authState) || localStorage.getItem(TRACKING_AUTH_KEY) === "staff") {
       setIsAdminAuthenticated(true);
       setView("admin-dashboard");
     }
-  }, []);
+  }, [authState?.isStaff]);
+
+  useEffect(() => {
+    if (canAccessTrackingAdmin(authState)) {
+      setIsAdminAuthenticated(true);
+      localStorage.setItem(TRACKING_AUTH_KEY, "staff");
+    }
+  }, [authState?.isStaff]);
 
   useEffect(() => {
     if (isAdminAuthenticated && view === "home") {
@@ -143,10 +153,14 @@ export default function Tracking() {
       const targetCol = mode === "recipient" ? "recipients" : "records";
       const snap = await getDocs(collection(db, targetCol));
       const qClean = userQuery.trim().toLowerCase().replace(/\s+/g, '');
-      const found = snap.docs.map(d => d.data()).filter(item => 
-        (item.fullName || "").toLowerCase().replace(/\s+/g, '').includes(qClean) ||
-        (item.phone || "").replace(/[-\s]/g, '').includes(qClean)
-      );
+      const found = snap.docs.map(d => d.data()).filter(item => {
+        const name = (item.fullName || "").toLowerCase().replace(/\s+/g, "")
+        const phone = String(item.phone || "").replace(/[-\s]/g, "")
+        const track = String(item.trackingNumber || "").replace(/\s/g, "").toUpperCase()
+        const qTrack = userQuery.trim().replace(/\s/g, "").toUpperCase()
+        return name.includes(qClean) || phone.includes(qClean) ||
+          (targetCol === "records" && track.includes(qTrack))
+      });
       setUserSearchResult(found.length > 0 ? found : "NOT_FOUND");
     } catch (err) { console.error(err); }
     setIsLoading(false);
@@ -164,12 +178,10 @@ export default function Tracking() {
       header: true, skipEmptyLines: true,
       complete: async (res) => {
         try {
-          const batch = writeBatch(db);
-          let count = 0;
           const now = Timestamp.now();
-          
+          const rows = [];
+
           res.data.forEach((row, idx) => {
-            // ค้นหาคอลัมน์จากชื่อที่ใกล้เคียงเผื่อหัวข้อในไฟล์เพี้ยน
             const getVal = (keys) => {
               for (const k of Object.keys(row)) {
                 if (keys.some(key => k.replace(/\s/g,'').toLowerCase().includes(key))) return row[k];
@@ -182,26 +194,33 @@ export default function Tracking() {
 
             const dataObj = {
               fullName: fullName.trim(),
-              phone: getVal(['เบอร์', 'phone']).replace(/[-\s]/g, ''),
-              address: getVal(['ที่อยู่', 'address']).trim(),
-              postalCode: getVal(['รหัสไปรษณีย์', 'zip']).trim() || (getVal(['ที่อยู่', 'address']).match(/\b\d{5}\b/)?.[0] || ""),
-              bonusNote: getVal(['โบนัส', 'พิเศษ', 'bonus']).trim(),
-              csvIndex: idx, // เก็บตำแหน่งเพื่อเรียงให้ตรงกับ Excel
+              phone: String(getVal(['เบอร์', 'phone']) || "").replace(/[-\s]/g, ''),
+              address: String(getVal(['ที่อยู่', 'address']) || "").trim(),
+              postalCode: String(getVal(['รหัสไปรษณีย์', 'zip']) || "").trim() || (String(getVal(['ที่อยู่', 'address']) || "").match(/\b\d{5}\b/)?.[0] || ""),
+              bonusNote: String(getVal(['โบนัส', 'พิเศษ', 'bonus']) || "").trim(),
+              csvIndex: idx,
               createdAt: now
             };
 
             if (targetCollection === "records") {
-              dataObj.trackingNumber = getVal(['เลข', 'tracking', 'track']).replace(/\s/g, '').toUpperCase();
-              dataObj.city = getVal(['เมือง', 'จังหวัด', 'city']).trim() || "";
+              dataObj.trackingNumber = String(getVal(['เลข', 'tracking', 'track']) || "").replace(/\s/g, '').toUpperCase();
+              dataObj.city = String(getVal(['เมือง', 'จังหวัด', 'city']) || "").trim() || "";
             }
 
-            const docRef = doc(collection(db, targetCollection));
-            batch.set(docRef, dataObj);
-            count++;
+            rows.push(dataObj);
           });
 
-          if (count > 0) {
+          const BATCH_LIMIT = 450;
+          for (let i = 0; i < rows.length; i += BATCH_LIMIT) {
+            const batch = writeBatch(db);
+            for (const dataObj of rows.slice(i, i + BATCH_LIMIT)) {
+              batch.set(doc(collection(db, targetCollection)), dataObj);
+            }
             await batch.commit();
+          }
+
+          const count = rows.length;
+          if (count > 0) {
             await myAlert(`บันทึกข้อมูลสำเร็จ ${count} รายการเข้าสู่ระบบ`, "สำเร็จ");
             if (targetCollection === "recipients") setAdminTab(2);
             else setAdminTab(4);
@@ -304,7 +323,8 @@ export default function Tracking() {
     setIsLoading(true);
     try {
       const collectionName = activeModal === 'edit-recipient' ? "recipients" : "records";
-      await updateDoc(doc(db, collectionName, editData.id), editData);
+      const { id, ...patch } = editData
+      await updateDoc(doc(db, collectionName, id), patch);
       setActiveModal(null);
       if (collectionName === "recipients") fetchRecipients();
       else fetchRecords();
@@ -477,8 +497,23 @@ export default function Tracking() {
             <p style={{ color: "var(--t2)", fontSize: "13px", marginBottom: "24px" }}>จัดการข้อมูลแบบครบวงจร</p>
             <input type="password" className="inp" placeholder="Password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} style={{ marginBottom: "16px", textAlign: "center" }} />
             <button className="btn btn-main style-full" style={{ width: "100%", background: "var(--teal)", color: "white" }} onClick={async () => {
-              if (adminPassword === "admin1234") { setIsAdminAuthenticated(true); localStorage.setItem("talib_admin_auth", "true"); setView("admin-dashboard"); } else { await myAlert("รหัสผ่านไม่ถูกต้อง"); }
+              if (canAccessTrackingAdmin(authState)) {
+                setIsAdminAuthenticated(true);
+                localStorage.setItem(TRACKING_AUTH_KEY, "staff");
+                setView("admin-dashboard");
+              } else if (verifyTrackingAdminPassword(adminPassword)) {
+                setIsAdminAuthenticated(true);
+                localStorage.setItem(TRACKING_AUTH_KEY, "password");
+                setView("admin-dashboard");
+              } else if (!import.meta.env.VITE_TRACKING_ADMIN_PASSWORD) {
+                await myAlert("ยังไม่ได้ตั้งรหัสแอดมิน (VITE_TRACKING_ADMIN_PASSWORD) และบัญชีนี้ไม่ใช่ staff\n\nล็อกอินด้วยบัญชีสตาฟหรือตั้งค่าใน .env");
+              } else {
+                await myAlert("รหัสผ่านไม่ถูกต้อง");
+              }
             }}>เข้าสู่ระบบ</button>
+            {canAccessTrackingAdmin(authState) && (
+              <p style={{ fontSize: 11, color: "var(--teal)", marginTop: 12 }}>บัญชีสตาฟที่ล็อกอินอยู่สามารถเข้าแอดมินได้โดยไม่ต้องใส่รหัส</p>
+            )}
             <button className="btn btn-outline btn-sm" style={{ width: "100%", marginTop: "12px", border: "none" }} onClick={() => setView("home")}>← กลับหน้าหลัก</button>
           </div>
         </div>
@@ -498,7 +533,7 @@ export default function Tracking() {
                  <p style={{ fontSize: "12px", opacity: 0.8, margin: 0 }}>จัดการข้อมูลแบบครบวงจร</p>
                </div>
             </div>
-            <button onClick={() => { setIsAdminAuthenticated(false); localStorage.removeItem("talib_admin_auth"); setView("home"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.3)", color: "white", padding: "6px 16px", borderRadius: "20px", cursor: "pointer", fontSize: "13px" }}>ออกจากระบบ</button>
+            <button onClick={() => { setIsAdminAuthenticated(false); localStorage.removeItem(TRACKING_AUTH_KEY); localStorage.removeItem("talib_admin_auth"); setView("home"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.3)", color: "white", padding: "6px 16px", borderRadius: "20px", cursor: "pointer", fontSize: "13px" }}>ออกจากระบบแอดมิน</button>
           </div>
 
           {/* Admin Tabs */}
@@ -794,7 +829,7 @@ export default function Tracking() {
       {/* 🛎️ CUSTOM DIALOG: ALERT / CONFIRM / PROMPT */}
       {/* ========================================================= */}
       {dialogConfig && createPortal(
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
            <div className="card animate-fade-in" style={{ width: "100%", maxWidth: "400px", padding: "24px", background: "var(--card)", borderRadius: "12px", textAlign: "center", boxShadow: "0 10px 25px rgba(0,0,0,0.2)" }}>
               <div style={{ fontSize: "48px", marginBottom: "16px" }}>
                  {dialogConfig.type === 'alert' ? (dialogConfig.title === "ข้อผิดพลาด" ? '❌' : '✅') : dialogConfig.type === 'confirm' ? '❓' : '📝'}

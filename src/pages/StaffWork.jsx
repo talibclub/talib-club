@@ -8,6 +8,7 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { toast } from "react-hot-toast"
 import { db } from "../lib/firebase.js"
 import { triggerPushNotification } from "../utils/pushNotifications.js"
+import { Z } from "../utils/ui.js"
 
 
 // ฟังก์ชันแจ้งเตือนด้วย Toast
@@ -31,9 +32,9 @@ const DEFAULT_MAGAZINE = [
   { month: "พฤศจิกายน", user: "มะห์ดี" }, { month: "ธันวาคม", user: "ชาฟิน" }
 ]
 
-// ━━━ TELEGRAM CONFIG ━━━
-const TELEGRAM_BOT_TOKEN = "8683156343:AAEn8qfYjvhq2XhOkb0UuO3HP2re8U1emgk";
-const TELEGRAM_CHAT_ID = "-1003358204239";
+// ━━━ TELEGRAM (ตั้งใน .env — ดู .env.example) ━━━
+const TELEGRAM_BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || ""
+const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID || ""
 
 const sendBotNotification = async (message) => {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
@@ -383,7 +384,7 @@ export default function StaffWork({ authState, go }) {
       
       {/* ━━━ CUSTOM MODAL (แทนที่ Alert เบราว์เซอร์) ━━━ */}
       {confirmDialog.isOpen && createPortal(
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: Z.modal, padding: '20px' }}>
           <div className="card animate-fade-in" style={{ background: 'var(--bg)', padding: '24px', width: '100%', maxWidth: '420px', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', color: '#d84f4f' }}>
               <i className="ti ti-alert-triangle" style={{ fontSize: '28px' }}></i>
