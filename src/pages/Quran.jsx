@@ -51,7 +51,20 @@ const normalizeAyahNumber = (value) => {
 
 const stripTajweedTags = (html) => {
   if (!html) return ""
-  return html.replace(/<\/?tajweed[^>]*>/g, "")
+  // Remove <tajweed> custom elements (colors/rules only — keep span.end)
+  let cleaned = html.replace(/<\/?tajweed[^>]*>/g, "")
+  // Remove any self-closing <span/> artifacts
+  cleaned = cleaned.replace(/<span\/>/gi, "")
+  return cleaned.trim()
+}
+
+// Strip ALL HTML including span.end — for plain text rendering (non-Mushaf translation view)
+const stripAllTags = (html) => {
+  if (!html) return ""
+  let cleaned = html.replace(/<\/?tajweed[^>]*>/g, "")
+  cleaned = cleaned.replace(/<span[^>]*class=["']?end["']?[^>]*>.*?<\/span>/gi, "")
+  cleaned = cleaned.replace(/<span\/>/gi, "")
+  return cleaned.trim()
 }
 
 export default function Quran({ initialSura, initialAyah, authState }) {
@@ -899,6 +912,27 @@ export default function Quran({ initialSura, initialAyah, authState }) {
         .quran-sidebar::-webkit-scrollbar-thumb {
           background: var(--quran-br);
           border-radius: 4px;
+        }
+        /* Quran.com API verse-end markers — styled as elegant ayah indicators */
+        .mushaf-flow span.end,
+        .mushaf-flow [class=end] {
+          color: var(--quran-t3);
+          font-size: 0.78em;
+          margin: 0 4px;
+          user-select: none;
+          cursor: pointer;
+          display: inline-block;
+          transition: color 0.2s;
+        }
+        .mushaf-flow span.end:hover,
+        .mushaf-flow [class=end]:hover {
+          color: var(--quran-teal);
+        }
+        /* Bookmarked verse glow on the entire ayah span in mushaf */
+        .mushaf-ayah-bookmarked span.end,
+        .mushaf-ayah-bookmarked [class=end] {
+          color: var(--quran-teal) !important;
+          text-shadow: 0 0 8px rgba(45, 190, 160, 0.5);
         }
         .arabic-font {
           font-family: ${quranFont === "UthmanicHafs" ? "'UthmanicHafs', " : quranFont === "Amiri" ? "'Amiri', " : quranFont === "NotoNaskh" ? "'Noto Naskh Arabic', " : ""}'Amiri', 'Noto Naskh Arabic', 'Traditional Arabic', serif;
@@ -2241,47 +2275,31 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                               pageVerses.map(v => {
                                 const isBookmarked = lastRead?.sura === v.sura && lastRead?.aya === v.aya
                                 const rawText = v.arabic_text_tajweed || v.text || v.arabic_text || ""
-                                const cleanedText = rawText.replace(/<span[^>]*class=["']?end["']?[^>]*>.*?<\/span>/gi, "")
+                                // Keep span.end from API — it IS the ayah marker. Style it via CSS class.
+                                const displayHtml = tajweedEnabled ? rawText : stripTajweedTags(rawText)
                                 const isActive = playingAudio?.sura === v.sura && playingAudio?.aya === v.aya
                                 return (
                                   <span 
                                     key={v.id}
                                     id={`mushaf-ayah-${v.sura}-${v.aya}`}
+                                    className={isBookmarked ? "mushaf-ayah-bookmarked" : ""}
                                     style={{
                                       backgroundColor: isActive ? "rgba(45, 190, 160, 0.25)" : "transparent",
                                       borderRadius: isActive ? "4px" : "0",
-                                      transition: "background-color 0.3s ease"
+                                      transition: "background-color 0.3s ease",
+                                      cursor: "pointer"
                                     }}
+                                    onClick={() => {
+                                      setActiveAyahMenu({
+                                        sura: v.sura,
+                                        aya: v.aya,
+                                        arabicText: v.text || v.arabic_text || "",
+                                        verse: v
+                                      })
+                                    }}
+                                    title={`แตะเพื่อดูคำแปลและคั่นหน้า [${v.sura}:${v.aya}]`}
                                   >
-                                    {tajweedEnabled ? (
-                                      <span dangerouslySetInnerHTML={{ __html: cleanedText }} />
-                                    ) : (
-                                      <span dangerouslySetInnerHTML={{ __html: stripTajweedTags(cleanedText) }} />
-                                    )}{" "}
-                                    <span
-                                      onClick={() => {
-                                        setActiveAyahMenu({
-                                          sura: v.sura,
-                                          aya: v.aya,
-                                          arabicText: v.text || v.arabic_text || "",
-                                          verse: v
-                                        })
-                                      }}
-                                      style={{
-                                        fontFamily: quranFont === "UthmanicHafs" ? "'UthmanicHafs', serif" : quranFont === "Amiri" ? "'Amiri', serif" : "'Noto Naskh Arabic', serif",
-                                        fontSize: `${arabicSize}px`,
-                                        color: isBookmarked ? "var(--teal)" : "var(--t3)",
-                                        cursor: "pointer",
-                                        userSelect: "none",
-                                        margin: "0 6px",
-                                        display: "inline-block",
-                                        textShadow: isBookmarked ? "0 0 8px rgba(45, 190, 160, 0.5)" : "none",
-                                        transition: "all 0.2s ease"
-                                      }}
-                                      title={`คั่นหน้าการอ่าน [${v.sura}:${v.aya}]`}
-                                    >
-                                      {`\u06dd${getArabicNumber(v.aya)}`}
-                                    </span>{" "}
+                                    <span dangerouslySetInnerHTML={{ __html: displayHtml }} />{" "}
                                   </span>
                                 )
                               })
@@ -2341,47 +2359,31 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                       {verses.map(v => {
                         const isBookmarked = lastRead?.sura === v.sura && lastRead?.aya === v.aya
                         const rawText = v.arabic_text_tajweed || v.arabic_text || ""
-                        const cleanedText = rawText.replace(/<span[^>]*class=["']?end["']?[^>]*>.*?<\/span>/gi, "")
+                        // Keep span.end — it is the correct ayah marker. No manual duplicate needed.
+                        const displayHtml = tajweedEnabled ? rawText : stripTajweedTags(rawText)
                         const isActive = playingAudio?.sura === v.sura && playingAudio?.aya === v.aya
                         return (
                           <span 
                             key={v.id}
                             id={`mushaf-ayah-${v.sura}-${v.aya}`}
+                            className={isBookmarked ? "mushaf-ayah-bookmarked" : ""}
                             style={{
                               backgroundColor: isActive ? "rgba(45, 190, 160, 0.25)" : "transparent",
                               borderRadius: isActive ? "4px" : "0",
-                              transition: "background-color 0.3s ease"
+                              transition: "background-color 0.3s ease",
+                              cursor: "pointer"
                             }}
+                            onClick={() => {
+                              setActiveAyahMenu({
+                                sura: v.sura,
+                                aya: v.aya,
+                                arabicText: v.arabic_text || "",
+                                verse: v
+                              })
+                            }}
+                            title={`แตะเพื่อดูคำแปลและคั่นหน้า [${v.sura}:${v.aya}]`}
                           >
-                            {tajweedEnabled ? (
-                              <span dangerouslySetInnerHTML={{ __html: cleanedText }} />
-                            ) : (
-                              <span dangerouslySetInnerHTML={{ __html: stripTajweedTags(cleanedText) }} />
-                            )}{" "}
-                            <span
-                              onClick={() => {
-                                setActiveAyahMenu({
-                                  sura: v.sura,
-                                  aya: v.aya,
-                                  arabicText: v.arabic_text || "",
-                                  verse: v
-                                })
-                              }}
-                              style={{
-                                fontFamily: quranFont === "UthmanicHafs" ? "'UthmanicHafs', serif" : quranFont === "Amiri" ? "'Amiri', serif" : "'Noto Naskh Arabic', serif",
-                                fontSize: `${arabicSize}px`,
-                                color: isBookmarked ? "var(--teal)" : "var(--t3)",
-                                cursor: "pointer",
-                                userSelect: "none",
-                                margin: "0 6px",
-                                display: "inline-block",
-                                textShadow: isBookmarked ? "0 0 8px rgba(45, 190, 160, 0.5)" : "none",
-                                transition: "all 0.2s ease"
-                              }}
-                              title={`คั่นหน้าการอ่าน [${v.sura}:${v.aya}]`}
-                            >
-                              {`\u06dd${getArabicNumber(v.aya)}`}
-                            </span>{" "}
+                            <span dangerouslySetInnerHTML={{ __html: displayHtml }} />{" "}
                           </span>
                         )
                       })}
