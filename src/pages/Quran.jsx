@@ -71,6 +71,15 @@ const stripAllTags = (html) => {
   return cleaned.trim()
 }
 
+const cleanTajweedTags = (html) => {
+  if (!html) return ""
+  // Strip U+25CC dotted circles if any
+  let cleaned = html.replace(/\u25cc/g, "")
+  // Strip tajweed tags wrapping combining diacritics to prevent dotted circles
+  cleaned = cleaned.replace(/<tajweed[^>]*>([\u0610-\u061a\u064b-\u065f\u0670\u06d6-\u06dc\u06df-\u06e8\u06ea-\u06ed].*?)<\/tajweed>/g, "$1")
+  return cleaned
+}
+
 export default function Quran({ initialSura, initialAyah, authState }) {
   const [selectedSura, setSelectedSura] = useState(() => normalizeSuraNumber(initialSura))
   const readingAreaRef = useRef(null)
@@ -206,7 +215,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
             const suraNum = parseInt(parts[0])
             const ayaNum = parseInt(parts[1])
             const suraInfo = SURA_LIST.find(s => s.number === suraNum)
-            const cleanText = (v.text_uthmani_tajweed || "").replace(/\u25cc/g, "")
+            const cleanText = cleanTajweedTags(v.text_uthmani_tajweed || "")
             return {
               id: v.id,
               sura: suraNum,
@@ -232,7 +241,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
             if (data.code === 200 && data.data?.ayahs) {
               const ayahs = data.data.ayahs
               setPageVerses(ayahs.map(aya => {
-                const cleanText = (aya.text || "").replace(/\u25cc/g, "")
+                const cleanText = cleanTajweedTags(aya.text || "")
                 return {
                   id: aya.number,
                   sura: aya.surah.number,
@@ -759,8 +768,8 @@ export default function Quran({ initialSura, initialAyah, authState }) {
             id: aya.id,
             sura: aya.sura,
             aya: aya.aya,
-            arabic_text: (aya.arabic_text || "").replace(/\u25cc/g, ""),
-            arabic_text_tajweed: (tajweedText || aya.arabic_text || "").replace(/\u25cc/g, ""),
+            arabic_text: cleanTajweedTags(aya.arabic_text || ""),
+            arabic_text_tajweed: cleanTajweedTags(tajweedText || aya.arabic_text || ""),
             translation: aya.translation,
             tafsir: tafsirAya.translation || ""
           }
