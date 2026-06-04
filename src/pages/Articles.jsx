@@ -1,9 +1,12 @@
 import { useState, useMemo, useEffect, useRef } from "react"
 import { ARTICLES, DEFAULT_TAXONOMY } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
+import { clampPage } from "../utils/pagination.js"
+import PaginationBar from "../components/PaginationBar.jsx"
+import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
 
 export default function Articles({ go, authState, ctx }) {
-  const { items: articles, loading } = useContentCollection("articles", ARTICLES)
+  const { items: articles, loading, error, isUsingFallback } = useContentCollection("articles", ARTICLES, null, { live: false })
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   
   const cat = ctx?.cat || "all"
@@ -57,7 +60,10 @@ export default function Articles({ go, authState, ctx }) {
       page: requestedPage,
       ...newParams
     }
-    if (newParams.cat !== undefined || newParams.type !== undefined || newParams.search !== undefined || newParams.showAllBrowse !== undefined || newParams.selectedSeriesId !== undefined || newParams.sort !== undefined) {
+    if (
+      newParams.cat !== undefined || newParams.type !== undefined || newParams.search !== undefined ||
+      newParams.showAllBrowse !== undefined || newParams.selectedSeriesId !== undefined || newParams.sort !== undefined
+    ) {
       updated.page = 1
     }
     go("articles", updated, { replace: true, noScroll: true })
@@ -77,8 +83,15 @@ export default function Articles({ go, authState, ctx }) {
     })
   }
 
-  const totalPages = Math.ceil(sortedFiltered.length / ITEMS_PER_PAGE)
-  const currentPage = totalPages > 0 ? Math.min(Math.max(requestedPage, 1), totalPages) : 1
+  const filteredGeneral = useMemo(() => {
+    return sortedFiltered.filter(a => String(a.type).toLowerCase() !== "series")
+  }, [sortedFiltered])
+
+  const browseGeneralMode = showAllBrowse && !search.trim()
+  const totalPagesAll = Math.max(1, Math.ceil(sortedFiltered.length / ITEMS_PER_PAGE) || 1)
+  const totalGeneralPages = Math.max(1, Math.ceil(filteredGeneral.length / ITEMS_PER_PAGE) || 1)
+  const effectiveTotalPages = browseGeneralMode ? totalGeneralPages : totalPagesAll
+  const currentPage = clampPage(requestedPage, effectiveTotalPages)
 
   const paginatedFiltered = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
@@ -86,10 +99,15 @@ export default function Articles({ go, authState, ctx }) {
   }, [sortedFiltered, currentPage])
 
   useEffect(() => {
-    if (totalPages > 0 && requestedPage !== currentPage) {
+    if (requestedPage !== currentPage) {
       updateFilters({ page: currentPage })
     }
-  }, [currentPage, requestedPage, totalPages])
+  }, [currentPage, requestedPage, effectiveTotalPages])
+
+  const paginatedGeneral = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+    return filteredGeneral.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+  }, [filteredGeneral, currentPage])
 
   const seriesGroups = useMemo(() => {
     return (taxonomy.articleSeries || []).map(s => {
@@ -124,17 +142,6 @@ export default function Articles({ go, authState, ctx }) {
     }).filter(s => seriesIds.has(String(s.id).toLowerCase()));
   }, [taxonomy.articleSeries, sortedFiltered, articles]);
 
-  const filteredGeneral = useMemo(() => {
-    return sortedFiltered.filter(a => String(a.type).toLowerCase() !== "series");
-  }, [sortedFiltered]);
-
-  const paginatedGeneral = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredGeneral.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredGeneral, currentPage]);
-
-  const totalGeneralPages = Math.ceil(filteredGeneral.length / ITEMS_PER_PAGE);
-
   const isDefaultView = !search && cat === "all" && type === "all" && !showAllBrowse
   const recentArticles = sortedFiltered.slice(0, 6)
 
@@ -143,7 +150,7 @@ export default function Articles({ go, authState, ctx }) {
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ marginBottom: 8 }}>บทความ</h1>
         <p>คลังบทความวิชาการอิสลาม จัดหมวดหมู่และซีรีส์ให้ค้นหาง่าย</p>
-        {loading && <p style={{ marginTop: 8, fontSize: 12 }}>กำลังโหลดบทความล่าสุด...</p>}
+        <ContentStatusBanner loading={loading} error={error} isUsingFallback={isUsingFallback} />
       </div>
 
       {/* ปุ่มลัดเข้าดูคลังส่วนตัว (โชว์เฉพาะคนล็อกอิน) */}
@@ -412,20 +419,11 @@ export default function Articles({ go, authState, ctx }) {
                             ))}
                           </div>
 
-                          {totalGeneralPages > 1 && (
-                            <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 32, flexWrap: "wrap" }}>
-                              {Array.from({ length: totalGeneralPages }).map((_, i) => (
-                                <button 
-                                  key={i} 
-                                  onClick={() => { updateFilters({ page: i + 1 }); window.scrollTo(0, 0); }}
-                                  className={currentPage === i + 1 ? "btn btn-teal" : "btn btn-outline"} 
-                                  style={{ padding: "6px 14px", fontSize: 12 }}
-                                >
-                                  {i + 1}
-                                </button>
-                              ))}
-                            </div>
-                          )}
+                          <PaginationBar
+                            currentPage={currentPage}
+                            totalPages={totalGeneralPages}
+                            onPageChange={p => updateFilters({ page: p })}
+                          />
                         </div>
                       )}
                     </div>
@@ -461,20 +459,11 @@ export default function Articles({ go, authState, ctx }) {
                         ))}
                       </div>
 
-                      {totalPages > 1 && (
-                        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 32, flexWrap: "wrap" }}>
-                          {Array.from({ length: totalPages }).map((_, i) => (
-                            <button 
-                              key={i} 
-                              onClick={() => { updateFilters({ page: i + 1 }); window.scrollTo(0, 0); }}
-                              className={currentPage === i + 1 ? "btn btn-teal" : "btn btn-outline"} 
-                              style={{ padding: "6px 14px", fontSize: 12 }}
-                            >
-                              {i + 1}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                      <PaginationBar
+                        currentPage={currentPage}
+                        totalPages={effectiveTotalPages}
+                        onPageChange={p => updateFilters({ page: p })}
+                      />
                     </>
                   )}
                 </>

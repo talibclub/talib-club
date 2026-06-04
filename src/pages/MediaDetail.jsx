@@ -1,19 +1,34 @@
-import { useEffect, useMemo } from "react"
-import { useContentCollection } from "../lib/contentStore.js"
+import { useEffect, useMemo, useRef } from "react"
+import { useContentCollection, useContentDoc } from "../lib/contentStore.js"
 import { MEDIA } from "../data/index.js"
 
 export default function MediaDetail({ item: initialItem, go, authState }) {
-  const { items: mediaList, loading } = useContentCollection("media", MEDIA)
-  const { saveItem: saveHistory } = useContentCollection("history", [])
-
+  const uid = authState?.user?.uid;
   const urlId = new URLSearchParams(window.location.search).get("id")
+  const mediaId = urlId || initialItem?.id
+  const fallbackMedia = useMemo(
+    () => (mediaId ? MEDIA.find(m => String(m.id) === String(mediaId)) : null) ?? null,
+    [mediaId]
+  )
+  const { item: remoteMedia, loading } = useContentDoc("media", mediaId, fallbackMedia)
+  const { saveItem: saveHistory } = useContentCollection("history", [], uid, { live: false })
+  const hasSavedHistory = useRef(null)
 
   const item = useMemo(() => {
-    if (initialItem && initialItem.title) return initialItem;
-    if (urlId && mediaList.length > 0) return mediaList.find(m => String(m.id) === String(urlId));
-    if (initialItem && initialItem.id && mediaList.length > 0) return mediaList.find(m => String(m.id) === String(initialItem.id));
-    return null;
-  }, [initialItem, urlId, mediaList])
+    if (remoteMedia) return remoteMedia
+    if (initialItem?.title) return initialItem
+    return null
+  }, [initialItem, remoteMedia])
+
+  const spotifyEmbedSrc = useMemo(() => {
+    const url = item?.spotifyUrl || ""
+    if (!url) return ""
+    if (url.includes("/embed/")) return url
+    if (url.includes("open.spotify.com/episode/") || url.includes("open.spotify.com/show/")) {
+      return url.replace("open.spotify.com/", "open.spotify.com/embed/")
+    }
+    return url
+  }, [item?.spotifyUrl])
 
   // ถ้ารีเฟรชแล้วไม่มีข้อมูล ให้กลับไปหน้ามีเดีย
   useEffect(() => {
@@ -24,7 +39,8 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
 
   // บันทึกประวัติการดูสื่อ
   useEffect(() => {
-    if (item && authState?.user?.uid && saveHistory) {
+    if (item && authState?.user?.uid && saveHistory && hasSavedHistory.current !== item.id) {
+      hasSavedHistory.current = item.id
       const uid = authState.user.uid;
       const historyId = `${uid}_media_${item.id}`;
       saveHistory({
@@ -46,7 +62,11 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
     <div className="article-page" style={{ maxWidth: 800, margin: "0 auto", paddingBottom: 40, width: "100%" }}>
       {/* ปุ่มย้อนกลับ */}
       <button 
-        onClick={() => go("media")}
+        onClick={() => go("media", initialItem?.playlist ? {
+          playlist: initialItem.playlist,
+          filter: initialItem.filter,
+          page: initialItem.page,
+        } : null)}
         className="sec-link" 
         style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 20, fontSize: 13, background: "none", border: "none", fontFamily: "'Prompt', sans-serif", cursor: "pointer" }}
       >
@@ -54,7 +74,7 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
       </button>
 
       {/* ส่วนเล่นมีเดีย (ปรับขอบมน 16px และคุมระบบ Responsive ไม่ให้ดันจอแตก) */}
-      {item.type === "youtube" && (
+      {item.type === "youtube" && item.embedId && (
         <div style={{
           marginBottom: 24, borderRadius: 16, overflow: "hidden",
           border: ".5px solid var(--br2)", background: "#000",
@@ -69,6 +89,16 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
           </div>
         </div>
       )}
+      {item.type === "youtube" && !item.embedId && (
+        <div className="empty card" style={{ marginBottom: 24, padding: 20 }}>
+          ยังไม่ได้ตั้งค่า YouTube Video ID
+          {item.url && (
+            <a href={item.url} target="_blank" rel="noreferrer" className="btn btn-teal" style={{ marginTop: 12, display: "inline-block" }}>
+              เปิดใน YouTube
+            </a>
+          )}
+        </div>
+      )}
 
       {item.type === "spotify" && (
         <div style={{
@@ -77,11 +107,9 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
           boxShadow: "0 10px 30px -10px rgba(0,0,0,0.1)",
           width: "100%"
         }}>
-          {item.spotifyUrl ? (
+          {spotifyEmbedSrc ? (
             <iframe style={{ width: "100%", height: 152, border: "none" }}
-              src={item.spotifyUrl.includes("/embed/")
-                ? item.spotifyUrl
-                : item.spotifyUrl.replace("open.spotify.com/", "open.spotify.com/embed/")}
+              src={spotifyEmbedSrc}
               allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
               loading="lazy" title={item.title} />
           ) : (

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from "react"
 import toast from "react-hot-toast"
 import { BOOKS } from "../data/index.js"
-import { useContentCollection } from "../lib/contentStore.js"
+import { useContentCollection, useContentDoc } from "../lib/contentStore.js"
+import { bumpContentMetric } from "../utils/contentMetrics.js"
 
 function getDirectUrl(url) {
   if (!url) return ""
@@ -25,25 +26,29 @@ function getPreviewUrl(url) {
 }
 
 export default function LibraryDetail({ item, go, authState }) {
-  // ดึง saveItem ออกมาจากคอลเล็กชันเพื่อใช้อัปเดตข้อมูลขึ้น Firebase
-  const { items: books, loading, saveItem } = useContentCollection("books", BOOKS)
-  
-  // 💡 เชื่อมต่อกับคอลเลกชัน history ใน Firestore
-  const { saveItem: saveHistory } = useContentCollection("history", [])
-  
+  const uid = authState?.user?.uid;
   const urlId = new URLSearchParams(window.location.search).get("id")
-  const hasIncrementedView = useRef(null) // ตัวรั้งสำหรับป้องกันการบวกยอดวิวซ้ำตอนเรนเดอร์
+  const bookId = urlId || item?.id
+  const fallbackBook = useMemo(
+    () => (bookId ? BOOKS.find(b => String(b.id) === String(bookId)) : null) ?? null,
+    [bookId]
+  )
+  const { item: remoteBook, loading } = useContentDoc("books", bookId, fallbackBook)
+  const { saveItem: saveHistory } = useContentCollection("history", [], uid, { live: false })
+
+  const hasIncrementedView = useRef(null)
+  const hasSavedHistory = useRef(null)
 
   const displayItem = useMemo(() => {
-    if (item && item.title) return item;
-    if (urlId && books.length > 0) return books.find(b => String(b.id) === String(urlId));
-    if (item && item.id && books.length > 0) return books.find(b => String(b.id) === String(item.id));
-    return null;
-  }, [item, urlId, books])
+    if (remoteBook) return remoteBook
+    if (item?.title) return item
+    return null
+  }, [item, remoteBook])
 
   // บันทึกประวัติการดูหนังสือ
   useEffect(() => {
-    if (displayItem && authState?.user?.uid && saveHistory) {
+    if (displayItem && authState?.user?.uid && saveHistory && hasSavedHistory.current !== displayItem.id) {
+      hasSavedHistory.current = displayItem.id
       const uid = authState.user.uid;
       const historyId = `${uid}_book_${displayItem.id}`;
       saveHistory({
@@ -59,19 +64,11 @@ export default function LibraryDetail({ item, go, authState }) {
 
   // --- ระบบนับยอดเข้าชมของจริง (ยิงขึ้น Firebase) ---
   useEffect(() => {
-    if (displayItem && !loading && saveItem && hasIncrementedView.current !== displayItem.id) {
-      hasIncrementedView.current = displayItem.id // ล็อค ID ไว้ว่าเล่มนี้ถูกนับวิวในรอบนี้แล้ว
-      
-      const updatedItem = {
-        ...displayItem,
-        views: (displayItem.views || 0) + 1
-      }
-      
-      saveItem(updatedItem).catch(err => {
-        console.error("ไม่สามารถอัปเดตยอดเข้าชมได้:", err)
-      })
+    if (displayItem && !loading && hasIncrementedView.current !== displayItem.id) {
+      hasIncrementedView.current = displayItem.id
+      bumpContentMetric("books", displayItem.id, "views")
     }
-  }, [displayItem, loading, saveItem])
+  }, [displayItem, loading])
 
   useEffect(() => {
     if (!loading && !displayItem) {
@@ -81,22 +78,22 @@ export default function LibraryDetail({ item, go, authState }) {
 
   // --- ระบบนับยอดดาวน์โหลดของจริง (ยิงขึ้น Firebase) ---
   const handleDownloadClick = async () => {
-    if (!displayItem || !saveItem) return
+    if (!displayItem) return
     
     try {
-      const updatedItem = {
-        ...displayItem,
-        downloads: (displayItem.downloads || 0) + 1
-      }
-      await saveItem(updatedItem)
+      await bumpContentMetric("books", displayItem.id, "downloads")
     } catch (err) {
       console.error("ไม่สามารถอัปเดตยอดดาวน์โหลดได้:", err)
     }
   }
 
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href)
-    toast.success("คัดลอกลิงก์เรียบร้อยแล้ว นำไปแชร์ให้เพื่อนได้เลย!")
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      toast.success("คัดลอกลิงก์เรียบร้อยแล้ว นำไปแชร์ให้เพื่อนได้เลย!")
+    } catch {
+      toast.error("คัดลอกลิงก์ไม่สำเร็จ")
+    }
   }
 
   if (loading && !displayItem) {

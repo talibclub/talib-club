@@ -166,10 +166,19 @@ function getPreviewUrl(url) {
 
 export default function ReadingApp({ authState, go, ctx, theme }) {
   const uid = authState?.user?.uid
-  const { items: books } = useContentCollection("books", BOOKS)
-  const { items: shelfItems, saveItem: saveShelfItem, deleteItem: deleteShelfItem } = useContentCollection("bookshelf", [])
-  const { items: readingSessions, loading: loadingSessions, saveItem: saveReadingSession } = useContentCollection("reading_sessions", [])
-  const { items: streakRecords, loading: loadingStreaks, saveItem: saveStreakSettings } = useContentCollection("reading_streaks", [])
+  const dismissedShelfRef = useRef(null)
+
+  function clearShelfLaunchContext() {
+    if (!ctx?.shelfItemId) return
+    dismissedShelfRef.current = ctx.shelfItemId
+    const next = { ...ctx }
+    delete next.shelfItemId
+    go("reader", Object.keys(next).length ? next : null, { replace: true, noScroll: true })
+  }
+  const { items: books } = useContentCollection("books", BOOKS, null, { live: false })
+  const { items: shelfItems, saveItem: saveShelfItem, deleteItem: deleteShelfItem } = useContentCollection("bookshelf", [], uid, { live: false })
+  const { items: readingSessions, loading: loadingSessions, saveItem: saveReadingSession } = useContentCollection("reading_sessions", [], uid, { live: false })
+  const { items: streakRecords, loading: loadingStreaks, saveItem: saveStreakSettings } = useContentCollection("reading_streaks", [], uid, { live: false })
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
 
   // Reading Mode State
@@ -195,6 +204,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   const [isRunning, setIsRunning] = useState(false)
   const timerRef = useRef(null)
   const startTimestampRef = useRef(null)
+  const accumulatedSecondsRef = useRef(0)
 
   // Log Form states
   const [startPage, setStartPage] = useState("")
@@ -635,9 +645,25 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   // --- Stopwatch logic ---
   useEffect(() => {
     if (isRunning) {
-      timerRef.current = setInterval(() => {
-        setSeconds(prev => prev + 1)
-      }, 1000)
+      const tick = () => {
+        const elapsed = Math.floor((Date.now() - startTimestampRef.current) / 1000)
+        setSeconds(accumulatedSecondsRef.current + elapsed)
+      }
+      
+      tick()
+      timerRef.current = setInterval(tick, 1000)
+
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === "visible") {
+          tick()
+        }
+      }
+      document.addEventListener("visibilitychange", handleVisibilityChange)
+
+      return () => {
+        if (timerRef.current) clearInterval(timerRef.current)
+        document.removeEventListener("visibilitychange", handleVisibilityChange)
+      }
     } else {
       if (timerRef.current) clearInterval(timerRef.current)
     }
@@ -648,19 +674,18 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 
   // Auto-start reading session when shelfItemId is passed via context
   useEffect(() => {
-    if (ctx?.shelfItemId && shelfItems.length > 0 && books.length > 0 && !activeBook) {
-      const item = shelfItems.find(s => s.id === ctx.shelfItemId)
-      if (item) {
-        const book = getShelfBook(item, books)
-        if (book) {
-          startReading({ ...item, book })
-        }
-      }
+    if (!ctx?.shelfItemId || shelfItems.length === 0 || books.length === 0 || activeBook) return
+    if (dismissedShelfRef.current === ctx.shelfItemId) return
+    const item = shelfItems.find(s => s.id === ctx.shelfItemId)
+    if (item) {
+      const book = getShelfBook(item, books)
+      if (book) startReading({ ...item, book })
     }
-  }, [ctx, shelfItems, books, activeBook])
+  }, [ctx?.shelfItemId, shelfItems, books, activeBook])
 
   function startReading(shelfItem) {
     setActiveBook(shelfItem)
+    accumulatedSecondsRef.current = 0
     setSeconds(0)
     setIsRunning(true)
     setStartPage(shelfItem.currentPage || 1)
@@ -671,6 +696,13 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   }
 
   const toggleStopwatch = () => {
+    if (isRunning) {
+      const elapsed = Math.floor((Date.now() - startTimestampRef.current) / 1000)
+      accumulatedSecondsRef.current += elapsed
+      setSeconds(accumulatedSecondsRef.current)
+    } else {
+      startTimestampRef.current = Date.now()
+    }
     setIsRunning(!isRunning)
   }
 
@@ -685,6 +717,8 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     setIsRunning(false)
     setActiveBook(null)
     setSeconds(0)
+    accumulatedSecondsRef.current = 0
+    clearShelfLaunchContext()
   }
 
   const saveReadingProgress = async () => {
@@ -772,6 +806,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       setIsRunning(false)
       setActiveBook(null)
       setSeconds(0)
+      clearShelfLaunchContext()
     } catch (err) {
       console.error(err)
       toast.error("บันทึกข้อมูลล้มเหลว กรุณาลองอีกครั้ง")

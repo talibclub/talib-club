@@ -1,8 +1,10 @@
 import { useEffect, useState, useMemo, useRef } from "react"
 import toast from "react-hot-toast"
 import { ARTICLES, SERIES } from "../data/index.js"
-import { useContentCollection } from "../lib/contentStore.js"
-import { serverTimestamp } from "firebase/firestore"
+import { useContentCollection, useContentDoc, CONTENT_COLLECTIONS } from "../lib/contentStore.js"
+import { collection, getDocs, query, where, serverTimestamp } from "firebase/firestore"
+import { db } from "../lib/firebase.js"
+import { bumpContentMetric } from "../utils/contentMetrics.js"
 
 const READER_DEFAULTS = { size: "md", tone: "3" }
 const READER_STORAGE_KEY = "talibReaderPrefs"
@@ -18,32 +20,54 @@ function sanitizeArticleForStore(article) {
 }
 
 export default function ArticleDetail({ item, go, authState }) {
-  const { items: articles, loading: loadingArticles, saveItem } = useContentCollection("articles", ARTICLES)
-  
-  // 💡 เชื่อมต่อกับคอลเลกชัน bookmarks ใน Firestore
-  const { items: bookmarks, saveItem: saveBookmark, deleteItem: deleteBookmark } = useContentCollection("bookmarks", [])
-  
-  // 💡 เชื่อมต่อกับคอลเลกชัน history ใน Firestore
-  const { saveItem: saveHistory } = useContentCollection("history", [])
-  
+  const uid = authState?.user?.uid;
   const urlId = new URLSearchParams(window.location.search).get("id")
+  const articleId = urlId || item?.id
+  const fallbackArticle = useMemo(
+    () => (articleId ? ARTICLES.find(a => String(a.id) === String(articleId)) : null) ?? null,
+    [articleId]
+  )
+  const { item: remoteArticle, loading: loadingArticles } = useContentDoc("articles", articleId, fallbackArticle)
+
+  const { items: bookmarks, saveItem: saveBookmark, deleteItem: deleteBookmark } = useContentCollection("bookmarks", [], uid, { live: false })
+  const { saveItem: saveHistory } = useContentCollection("history", [], uid, { live: false })
+
   const hasIncrementedView = useRef(null)
+  const hasSavedHistory = useRef(null)
+  const [seriesArticles, setSeriesArticles] = useState([])
 
   const displayItem = useMemo(() => {
-    if (item && item.title && !item.viewMode) return item;
-    if (urlId && articles.length > 0) return articles.find(a => String(a.id) === String(urlId));
-    if (item && item.id && articles.length > 0) return articles.find(a => String(a.id) === String(item.id));
-    return null;
-  }, [item, urlId, articles])
-
-  const seriesArticles = useMemo(() => {
-    if (displayItem?.type === "series" && displayItem?.seriesId) {
-      return articles
-        .filter(a => String(a.type).toLowerCase() === "series" && String(a.seriesId).toLowerCase() === String(displayItem.seriesId).toLowerCase())
-        .sort((a, b) => (a.part || 0) - (b.part || 0));
+    const fromFilters = item?.fromFilters
+    if (remoteArticle) {
+      return fromFilters ? { ...remoteArticle, fromFilters } : remoteArticle
     }
-    return [];
-  }, [displayItem, articles]);
+    if (item?.title && !item.viewMode) return item
+    return null
+  }, [item, remoteArticle])
+
+  useEffect(() => {
+    if (displayItem?.type !== "series" || !displayItem?.seriesId) {
+      setSeriesArticles([])
+      return undefined
+    }
+    let cancelled = false
+    const seriesId = String(displayItem.seriesId).toLowerCase()
+    const q = query(
+      collection(db, CONTENT_COLLECTIONS.articles),
+      where("seriesId", "==", displayItem.seriesId)
+    )
+    getDocs(q)
+      .then(snapshot => {
+        if (cancelled) return
+        const episodes = snapshot.docs
+          .map(d => ({ ...d.data(), id: d.data().id ?? d.id }))
+          .filter(a => !a.deleted && String(a.type).toLowerCase() === "series" && String(a.seriesId).toLowerCase() === seriesId)
+          .sort((a, b) => (a.part || 0) - (b.part || 0))
+        setSeriesArticles(episodes)
+      })
+      .catch(err => console.error("Cannot load series episodes", err))
+    return () => { cancelled = true }
+  }, [displayItem?.type, displayItem?.seriesId])
 
   const seriesName = useMemo(() => {
     if (displayItem?.seriesId) {
@@ -59,19 +83,16 @@ export default function ArticleDetail({ item, go, authState }) {
 
   // อัปเดตยอดวิวขึ้น Firestore
   useEffect(() => {
-    if (displayItem && !loadingArticles && saveItem && hasIncrementedView.current !== displayItem.id) {
-      hasIncrementedView.current = displayItem.id;
-      const updatedItem = {
-        ...sanitizeArticleForStore(displayItem),
-        views: (displayItem.views || 0) + 1
-      };
-      saveItem(updatedItem).catch(e => console.error("อัปเดตยอดวิวไม่สำเร็จ", e));
+    if (displayItem && !loadingArticles && hasIncrementedView.current !== displayItem.id) {
+      hasIncrementedView.current = displayItem.id
+      bumpContentMetric("articles", displayItem.id, "views")
     }
-  }, [displayItem, loadingArticles, saveItem])
+  }, [displayItem, loadingArticles])
 
   // บันทึกประวัติการอ่านบทความ
   useEffect(() => {
-    if (displayItem && authState?.user?.uid && saveHistory) {
+    if (displayItem && authState?.user?.uid && saveHistory && hasSavedHistory.current !== displayItem.id) {
+      hasSavedHistory.current = displayItem.id
       const uid = authState.user.uid;
       const historyId = `${uid}_article_${displayItem.id}`;
       saveHistory({
@@ -95,7 +116,6 @@ export default function ArticleDetail({ item, go, authState }) {
   }, [readerPrefs])
 
   // --- ระบบเช็คสถานะการบันทึกจาก Firestore (อิงตาม UID) ---
-  const uid = authState?.user?.uid;
   
   const savedList = useMemo(() => {
     if (!uid) return [];
@@ -134,13 +154,12 @@ export default function ArticleDetail({ item, go, authState }) {
   }
 
   const handleShare = async () => {
-    navigator.clipboard.writeText(window.location.href);
-    toast.success("คัดลอกลิงก์สำหรับแชร์แล้ว");
-    if (saveItem && displayItem) {
-      saveItem({
-        ...sanitizeArticleForStore(displayItem),
-        shares: (displayItem.shares || 0) + 1
-      }).catch(e => console.error(e));
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      toast.success("คัดลอกลิงก์สำหรับแชร์แล้ว")
+      if (displayItem) bumpContentMetric("articles", displayItem.id, "shares")
+    } catch {
+      toast.error("คัดลอกลิงก์ไม่สำเร็จ กรุณาคัดลอกจากแถบที่อยู่ด้วยตนเอง")
     }
   }
 
@@ -169,7 +188,10 @@ export default function ArticleDetail({ item, go, authState }) {
     return <p key={index}>{para}</p>;
   });
 
-  const related = articles.filter(a => a.id !== displayItem.id && a.category === displayItem.category).slice(0, 3)
+  const related = articles.filter(a =>
+    a.id !== displayItem.id &&
+    String(a.category || "").toLowerCase() === String(displayItem.category || "").toLowerCase()
+  ).slice(0, 3)
   const readerClass = `article-body reader-size-${readerPrefs.size} reader-tone-${readerPrefs.tone}`
 
   return (

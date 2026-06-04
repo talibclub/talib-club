@@ -43,7 +43,7 @@ export default function StaffDashboard({ authState, go }) {
       <div className="grid3">
         <ActionCard icon="ti-file-text" title="จัดการเนื้อหา" text="เพิ่ม/แก้บทความ หนังสือ มีเดีย อุลามาอฺ และข้อมูลเว็บ" onClick={() => go("admin")} />
         <ActionCard icon="ti-package" title="Tracking" text="ตรวจสอบและจัดการข้อมูลการจัดส่ง" onClick={() => go("admin", { tab: "tracking" })} />
-        <ActionCard icon="ti-users" title="สมาชิก" text="โครงสำหรับดูแลสมาชิกและสิทธิ์ในเฟสถัดไป" />
+        <ActionCard icon="ti-users" title="สมาชิก" text="โครงสำหรับดูแลสมาชิกและสิทธิ์ในเฟสถัดไป" disabled />
       </div>
 
       <h2 style={{ marginTop: 28, marginBottom: 12 }}>เครื่องมือของสตาฟ</h2>
@@ -69,13 +69,14 @@ export default function StaffDashboard({ authState, go }) {
   )
 }
 
-function ActionCard({ icon, title, text, onClick }) {
+function ActionCard({ icon, title, text, onClick, disabled }) {
   return (
-    <button onClick={onClick} className="card" style={{
+    <button type="button" onClick={disabled ? undefined : onClick} disabled={disabled} className="card" style={{
       padding: 18,
       minHeight: 160,
       textAlign: "left",
-      cursor: onClick ? "pointer" : "default",
+      cursor: onClick && !disabled ? "pointer" : "default",
+      opacity: disabled ? 0.65 : 1,
       color: "var(--text)",
       fontFamily: "'Prompt',sans-serif",
     }}>

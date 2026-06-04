@@ -44,7 +44,7 @@ export default function Admin({ go, authState, initialTab = "articles" }) {
           <button className="btn btn-outline" onClick={() => go("staff")}>
             <i className="ti ti-arrow-left" style={{ marginRight: 6 }}></i>Staff
           </button>
-          <button className="btn btn-outline" onClick={authState.logout}>
+          <button className="btn btn-outline" onClick={() => authState?.logout?.()}>
             <i className="ti ti-logout" style={{ marginRight: 6 }}></i>ออกจากระบบ
           </button>
         </div>

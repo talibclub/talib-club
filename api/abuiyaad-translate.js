@@ -148,6 +148,96 @@ Return ONLY a valid JSON object with the "translations" array, no markdown block
   return JSON.parse(jsonText)
 }
 
+async function translateWithGemini(elements, apiKey) {
+  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash"
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{
+          text: `${translationPrompt(elements)}\n\nReturn the output as a valid JSON object containing the translations array. Do not wrap in markdown code blocks.`
+        }]
+      }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.1
+      }
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error("Gemini translate error:", response.status, errorText)
+    throw new Error(`Gemini error: ${response.status} - ${errorText}`)
+  }
+
+  const data = await response.json()
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "{}"
+  const jsonText = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim()
+  return JSON.parse(jsonText)
+}function repairParagraphs(html) {
+  const tokens = html.split(/(<\/?[a-zA-Z0-9]+(?:\s+[^>]*)?>)/g)
+  let result = []
+  let pOpen = false
+
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i]
+    if (i % 2 === 1) { // It is a tag
+      const isStartTag = token.startsWith("<") && !token.startsWith("</") && !token.endsWith("/>")
+      const isEndTag = token.startsWith("</")
+      const tagName = token.replace(/[<>\/]/g, "").split(/\s+/)[0].toLowerCase()
+
+      if (isStartTag) {
+        if (tagName === "p") {
+          if (pOpen) {
+            result.push("</p>")
+          }
+          pOpen = true
+          result.push("<p>")
+        } else if (["div", "blockquote", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "hr", "br"].includes(tagName)) {
+          if (pOpen) {
+            result.push("</p>")
+            pOpen = false
+          }
+          result.push(token)
+        } else {
+          result.push(token)
+        }
+      } else if (isEndTag) {
+        if (tagName === "p") {
+          if (pOpen) {
+            result.push("</p>")
+            pOpen = false
+          }
+        } else if (["div", "blockquote", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li"].includes(tagName)) {
+          if (pOpen) {
+            result.push("</p>")
+            pOpen = false
+          }
+          result.push(token)
+        } else {
+          result.push(token)
+        }
+      } else {
+        result.push(token)
+      }
+    } else { // It is text
+      result.push(token)
+    }
+  }
+
+  if (pOpen) {
+    result.push("</p>")
+  }
+
+  return result.join("")
+}
+
 export default async function handler(req, res) {
   const method = req.method || req.httpMethod
   if (method === "OPTIONS") return send(res, 200, { ok: true })
@@ -178,12 +268,14 @@ export default async function handler(req, res) {
       return send(res, 404, { error: "Article content wrapper (.articleContent) not found on the page." })
     }
 
+    const repairedHtml = repairParagraphs(contentHtml)
+
     // 3. Extract text elements
     const elements = []
     const regex = /<(p|h1|h2|h3|h4|h5|li|blockquote)\b[^>]*>([\s\S]*?)<\/\1>/gi
     let match
     let index = 0
-    while ((match = regex.exec(contentHtml))) {
+    while ((match = regex.exec(repairedHtml))) {
       const tag = match[1].toLowerCase()
       const text = cleanText(match[2])
       
@@ -202,22 +294,34 @@ export default async function handler(req, res) {
     // 4. Translate using LLM (Try OpenAI, then Anthropic, else fail)
     let translationResult = null
     let source = ""
+    const openaiKey = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY
+    const anthropicKey = process.env.ANTHROPIC_API_KEY || process.env.VITE_ANTHROPIC_API_KEY
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY
 
-    if (process.env.OPENAI_API_KEY) {
+    if (openaiKey) {
       try {
-        translationResult = await translateWithOpenAI(elements, process.env.OPENAI_API_KEY)
+        translationResult = await translateWithOpenAI(elements, openaiKey)
         source = "openai"
       } catch (err) {
-        console.error("OpenAI translation failed, trying Anthropic:", err)
+        console.error("OpenAI translation failed, trying Anthropic/Gemini:", err)
       }
     }
 
-    if (!translationResult && process.env.ANTHROPIC_API_KEY) {
+    if (!translationResult && anthropicKey) {
       try {
-        translationResult = await translateWithAnthropic(elements, process.env.ANTHROPIC_API_KEY)
+        translationResult = await translateWithAnthropic(elements, anthropicKey)
         source = "anthropic"
       } catch (err) {
-        console.error("Anthropic translation failed:", err)
+        console.error("Anthropic translation failed, trying Gemini:", err)
+      }
+    }
+
+    if (!translationResult && geminiKey) {
+      try {
+        translationResult = await translateWithGemini(elements, geminiKey)
+        source = "gemini"
+      } catch (err) {
+        console.error("Gemini translation failed:", err)
       }
     }
 

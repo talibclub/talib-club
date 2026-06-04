@@ -118,6 +118,7 @@ export default function AdminSite() {
 
       const totalItems = collectionsToSeed.reduce((acc, c) => acc + c.data.length, 0)
       let uploadedCount = 0
+      let processedTotal = 0
 
       addLog(`เริ่มต้นทำการอัปโหลดข้อมูลตั้งต้นจำนวนรวมทั้งหมด ${totalItems} รายการ...`)
 
@@ -143,27 +144,23 @@ export default function AdminSite() {
           const id = String(item.id)
           if (!forceOverwrite && existingIds.has(id)) {
             skippedInCol++
+          } else {
+            const payload = cleanObject({
+              ...item,
+              id,
+              deleted: false,
+              updatedAt: serverTimestamp(),
+              createdAt: item.createdAt ? item.createdAt : serverTimestamp()
+            })
+
+            await setDoc(doc(db, col.colName, id), payload, { merge: true })
+            addedInCol++
             uploadedCount++
-            setProgress(Math.round((uploadedCount / totalItems) * 100))
-            continue
+            await new Promise(r => setTimeout(r, 15))
           }
 
-          // คลีนค่า object และเตรียมอัปโหลด
-          const payload = cleanObject({
-            ...item,
-            id,
-            deleted: false,
-            updatedAt: serverTimestamp(),
-            createdAt: item.createdAt ? item.createdAt : serverTimestamp()
-          })
-
-          await setDoc(doc(db, col.colName, id), payload, { merge: true })
-          addedInCol++
-          uploadedCount++
-          setProgress(Math.round((uploadedCount / totalItems) * 100))
-
-          // หน่วงเวลาเล็กน้อยเพื่อป้องกัน Firebase ทราฟฟิกหนาแน่นและอัปเดตหน้าจอทัน
-          await new Promise(r => setTimeout(r, 15))
+          processedTotal++
+          setProgress(totalItems ? Math.min(100, Math.round((processedTotal / totalItems) * 100)) : 100)
         }
 
         addLog(`เสร็จสิ้นคอลเลกชัน ${col.label}: อัปโหลดสำเร็จ ${addedInCol} รายการ, ข้าม ${skippedInCol} รายการ`)

@@ -16,6 +16,7 @@ export default function Auth({ authState, go }) {
   const [status, setStatus] = useState("")
 
   function validateForm() {
+    if (mode === "register" && !displayName.trim()) return "กรุณากรอกชื่อที่แสดงในบัญชี"
     if (!email.trim()) return "กรุณากรอกอีเมลก่อนครับ"
     if (!password) return "กรุณากรอกรหัสผ่านก่อนครับ"
     if (password.length < 6) return "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษรครับ"
@@ -46,7 +47,7 @@ export default function Auth({ authState, go }) {
     } catch (err) {
       console.error(err)
       setStatus("")
-      setError("เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบอีเมลหรือรหัสผ่าน")
+      setError(mode === "register" ? "สมัครสมาชิกไม่สำเร็จ อีเมลนี้อาจถูกใช้แล้วหรือรหัสผ่านไม่ตรงเงื่อนไข" : "เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบอีเมลหรือรหัสผ่าน")
     }
     setBusy(false)
   }

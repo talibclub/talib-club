@@ -3,14 +3,19 @@ import { createPortal } from "react-dom"
 import toast from 'react-hot-toast'
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage"
 import { ARTICLES, BOOKS } from "../data/index.js"
-import { useContentCollection } from "../lib/contentStore.js"
+import { useContentCollection, useUserCollection, useUserDoc } from "../lib/contentStore.js"
 import { storage } from "../lib/firebase.js"
 import { confirmAction } from "../utils/feedback.jsx"
 import Quran from "./Quran.jsx"
 import DashboardNav from "../components/DashboardNav.jsx"
 
+function resolveDashboardView(initialView) {
+  if (!initialView || initialView === "bookshelf" || initialView === "streak") return "overview"
+  return initialView
+}
+
 export default function MemberDashboard({ authState, go, initialView = "overview", ctx, theme }) {
-  const [view, setCurrentView] = useState("overview")
+  const [view, setCurrentView] = useState(() => resolveDashboardView(initialView))
   const [copied, setCopied] = useState("")
   const [quranSura, setQuranSura] = useState(1)
   const [quranAyah, setQuranAyah] = useState(null)
@@ -21,12 +26,9 @@ export default function MemberDashboard({ authState, go, initialView = "overview
   const role = profile.role || "member"
 
   useEffect(() => {
-    if (initialView) {
-      if (initialView === "bookshelf" || initialView === "streak") {
-        go("reader")
-      } else {
-        setCurrentView(initialView)
-      }
+    if (initialView === "bookshelf" || initialView === "streak") {
+      go("reader", ctx?.shelfItemId ? { shelfItemId: ctx.shelfItemId } : null)
+      return
     }
 
     const searchParams = new URLSearchParams(window.location.search)
@@ -43,7 +45,8 @@ export default function MemberDashboard({ authState, go, initialView = "overview
     } else if (newView === "bookshelf" || newView === "streak") {
       go("reader")
     } else {
-      go("member", { view: newView })
+      setCurrentView(newView)
+      go("member", { view: newView }, { replace: true, noScroll: true })
     }
   }
 
@@ -116,7 +119,6 @@ export default function MemberDashboard({ authState, go, initialView = "overview
         />
       )}
       {view === "saved-articles" && <SavedArticlesPanel authState={authState} go={go} setView={setView} />}
-      {view === "bookshelf" && <BookshelfPanel authState={authState} go={go} setView={setView} />}
       {view === "profile" && <ProfilePanel authState={authState} copied={copied} copyText={copyText} go={go} setView={setView} ctx={ctx} />}
       {view === "quran" && (
         <div style={{ width: "100%", maxWidth: "1400px", margin: "0 auto" }}>
@@ -151,21 +153,18 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
   const [lastRead, setLastRead] = useState(null)
 
   const uid = authState?.user?.uid
-  const { items: shelfItems } = useContentCollection("bookshelf", [])
-  const { items: savedVerses } = useContentCollection("quran_bookmarks", [])
-  const { items: lastReadPos } = useContentCollection("quran_last_read", [])
+  const { items: shelfItems } = useContentCollection("bookshelf", [], uid, { live: false })
+  const { items: savedVerses } = useUserCollection("quran_bookmarks", uid)
+  const { item: remoteLastRead } = useUserDoc("quran_last_read", uid, uid ? `${uid}_last_read` : null)
   
   const userSavedVerses = useMemo(() => savedVerses.filter(item => item.uid === uid), [savedVerses, uid])
   const activeBooks = useMemo(() => shelfItems.filter(item => item.uid === uid && item.status !== "finished"), [shelfItems, uid])
 
   useEffect(() => {
-    if (uid && lastReadPos && lastReadPos.length > 0) {
-      const userLastRead = lastReadPos.find(item => item.uid === uid)
-      if (userLastRead) {
-        setLastRead(userLastRead)
-        localStorage.setItem("quran-last-read", JSON.stringify(userLastRead))
-        return
-      }
+    if (uid && remoteLastRead) {
+      setLastRead(remoteLastRead)
+      localStorage.setItem("quran-last-read", JSON.stringify(remoteLastRead))
+      return
     }
 
     try {
@@ -176,7 +175,7 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
     } catch (err) {
       console.error(err)
     }
-  }, [lastReadPos, uid])
+  }, [remoteLastRead, uid])
 
   return (
     <div>
@@ -220,132 +219,10 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
   )
 }
 
-function ReadingStreakPanel({ streak, settings, todaySeconds, goalPercent, last7Days, onRead, onFreeze, onLeave, onShowTutorial }) {
-  const protectedLabel = streak.todayProtected?.type === "leave" ? "ลากิจ" : streak.todayProtected ? "น้ำแข็ง" : ""
-  const statusText = streak.todayVerified
-    ? "วันนี้อ่านจริงแล้ว ไฟยังต่อเนื่อง"
-    : protectedLabel
-      ? `วันนี้ใช้${protectedLabel}คุ้มครอง streak`
-      : "อ่านอย่างน้อยวันละนิดเพื่อรักษาไฟ"
-
-  return (
-    <section className="card streak-panel" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* ส่วนหัวพร้อมปุ่มวิธีใช้งาน */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", width: "100%" }}>
-        <span className="badge badge-teal">Daily reading streak</span>
-        <button
-          onClick={onShowTutorial}
-          style={{ background: "none", border: "none", color: "var(--teal)", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontFamily: "'Prompt', sans-serif" }}
-        >
-          <i className="ti ti-help-circle"></i> วิธีใช้งาน
-        </button>
-      </div>
-
-      <div style={{ display: "flex", width: "100%", gap: 16, alignItems: "center", flexWrap: "wrap", marginTop: -8 }}>
-        <div className="streak-flame" style={{ flexShrink: 0 }}>
-          <i className="ti ti-flame"></i>
-        </div>
-        <div className="streak-main" style={{ flex: 1, minWidth: 200, textAlign: "left" }}>
-          <h2>{streak.current} วันต่อเนื่อง</h2>
-          <p>{statusText} · เป้าหมายวันนี้ {formatReadingMinutes(todaySeconds)}/{DAILY_READING_GOAL_MINUTES} นาที</p>
-          <div className="streak-progress" aria-label="reading goal progress">
-            <span style={{ width: `${goalPercent}%` }}></span>
-          </div>
-        </div>
-        <div className="streak-actions" style={{ flexShrink: 0, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="btn btn-teal" onClick={onRead}>
-            <i className="ti ti-player-play" style={{ marginRight: 6 }}></i>เริ่มอ่าน
-          </button>
-          <div className="btn btn-outline" style={{ display: "inline-flex", alignItems: "center", gap: 6, opacity: 0.8, pointerEvents: "none", cursor: "default" }}>
-            <i className="ti ti-snowflake" style={{ color: "#64c8ff" }}></i>น้ำแข็ง {settings.freezeCredits}
-          </div>
-          <button className="btn btn-outline" onClick={onLeave} disabled={streak.todayVerified || streak.todayProtected || settings.leaveCredits <= 0}>
-            <i className="ti ti-calendar-pause" style={{ marginRight: 6 }}></i>ลากิจ {settings.leaveCredits}
-          </button>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function MissionRow({ title, desc, progress, target, formatProgress, rewardText, claimed, onClaim }) {
-  const completed = progress >= target
-  const percent = Math.min(100, Math.round((progress / target) * 100))
-
-  const containerBg = claimed 
-    ? "rgba(45, 190, 160, 0.04)" 
-    : completed 
-      ? "rgba(45, 190, 160, 0.08)" 
-      : "var(--bg2)"
-  const borderColor = claimed 
-    ? "rgba(45, 190, 160, 0.15)" 
-    : completed 
-      ? "rgba(45, 190, 160, 0.35)" 
-      : "var(--br)"
-
-  return (
-    <div style={{
-      padding: "12px 14px",
-      background: containerBg,
-      border: `1px solid ${borderColor}`,
-      borderRadius: 12,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
-      flexWrap: "wrap",
-      textAlign: "left",
-      transition: "all 0.2s ease"
-    }}>
-      <div style={{ flex: 1, minWidth: 200 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-          <strong style={{ fontSize: 13, color: "var(--text)" }}>{title}</strong>
-          <span style={{ fontSize: 10, fontWeight: 500, color: "var(--teal)", background: "var(--teal-bg)", padding: "1px 6px", borderRadius: 4 }}>
-            {rewardText}
-          </span>
-        </div>
-        <p style={{ fontSize: 11, color: "var(--t2)", marginBottom: 8 }}>{desc}</p>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ flex: 1, height: 6, background: "var(--bg3)", borderRadius: 3, overflow: "hidden" }}>
-            <div style={{ width: `${percent}%`, height: "100%", background: "var(--teal)", borderRadius: 3 }}></div>
-          </div>
-          <span style={{ fontSize: 10, color: "var(--t3)", fontWeight: 500, whiteSpace: "nowrap" }}>
-            {formatProgress(progress)}
-          </span>
-        </div>
-      </div>
-
-      <div>
-        {claimed ? (
-          <button className="btn btn-outline" disabled style={{ padding: "6px 12px", fontSize: 11, opacity: 0.6, cursor: "not-allowed", color: "var(--teal)", borderColor: "rgba(45, 190, 160, 0.2)" }}>
-            <i className="ti ti-check" style={{ marginRight: 4 }}></i>รับแล้ว
-          </button>
-        ) : (
-          <button
-            onClick={onClaim}
-            disabled={!completed}
-            className={`btn ${completed ? "btn-teal" : "btn-outline"}`}
-            style={{
-              padding: "6px 12px",
-              fontSize: 11,
-              opacity: completed ? 1 : 0.6,
-              cursor: completed ? "pointer" : "not-allowed",
-              boxShadow: completed ? "0 4px 10px rgba(45,190,160,0.2)" : "none"
-            }}
-          >
-            {completed ? "รับรางวัล" : "ยังไม่เสร็จ"}
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// แผงแสดงผลบทความบุ๊กมาร์กจริงจากคอลเลกชันใน Firestore พร้อมระบบกรองข้อมูลและค้นหาขั้นสูง
 const THAI_MONTHS = [
   "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
   "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
-];
+]
 
 const CATEGORY_MAP = {
   aqeedah: "อากีดะฮ์",
@@ -354,33 +231,31 @@ const CATEGORY_MAP = {
   hadith: "ฮะดีษ",
   social: "สังคมศาสตร์",
   tafsir: "ตัฟซีร"
-};
+}
 
 const TYPE_MAP = {
   series: "ซีรีส์",
   general: "บทความทั่วไป",
   specific: "บทความเฉพาะเรื่อง",
   social: "สังคมศาสตร์"
-};
+}
 
 function getArticleMonthString(dateStr) {
-  if (!dateStr) return "ไม่ระบุเวลา";
-  const parts = dateStr.split("-");
+  if (!dateStr) return "ไม่ระบุเวลา"
+  const parts = dateStr.split("-")
   if (parts.length >= 2) {
-    const y = parseInt(parts[0]);
-    const m = parseInt(parts[1]) - 1;
-    if (m >= 0 && m < 12) {
-      return `${THAI_MONTHS[m]} ${y}`;
+    const y = parseInt(parts[0], 10)
+    const m = parseInt(parts[1], 10) - 1
+    if (!Number.isNaN(y) && !Number.isNaN(m) && m >= 0 && m < 12) {
+      return `${THAI_MONTHS[m]} ${y + 543}`
     }
   }
-  return "ไม่ระบุเวลา";
+  return dateStr
 }
 
 function getSavedMonthString(date) {
-  if (!date || isNaN(date.getTime())) return "ไม่ระบุเวลา";
-  const month = THAI_MONTHS[date.getMonth()];
-  const year = date.getFullYear() + 543; // ปี พ.ศ.
-  return `${month} ${year}`;
+  if (!date || Number.isNaN(date.getTime())) return "ไม่ระบุเวลา"
+  return `${THAI_MONTHS[date.getMonth()]} ${date.getFullYear() + 543}`
 }
 
 function getTimeMs(value) {
@@ -393,7 +268,6 @@ function getTimeMs(value) {
 }
 
 function getLocalDayKey(value) {
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value
   const ms = getTimeMs(value)
   if (!ms) return ""
   const date = new Date(ms)
@@ -404,91 +278,52 @@ function getLocalDayKey(value) {
   ].join("-")
 }
 
-function addDaysToKey(dayKey, amount) {
-  const date = new Date(`${dayKey}T00:00:00`)
-  date.setDate(date.getDate() + amount)
-  return getLocalDayKey(date.getTime())
-}
-
-function todayKey() {
-  return getLocalDayKey(Date.now())
-}
-
 function getWeekKey(date) {
-  // ISO week: YYYY-W## based on UTC+7
-  const d = date ? new Date(date) : new Date(Date.now() + 7 * 3600000)
-  const day = d.getUTCDay() || 7
-  d.setUTCDate(d.getUTCDate() + 4 - day)
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
-  const week = Math.ceil((((d - yearStart) / 86400000) + 1) / 7)
-  return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`
+  const ms = getTimeMs(date || Date.now())
+  const d = new Date(ms)
+  const day = d.getDay()
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+  const monday = new Date(d.setDate(diff))
+  return getLocalDayKey(monday.getTime())
 }
-
-const DAILY_READING_GOAL_MINUTES = 10
-const MISSION_READ_SECONDS = 20 * 60   // 20 นาที
-const MISSION_REFLECT_CHARS = 3000      // 3,000 ตัวอักษร
-const MISSION_QUIZ_MIN_SCORE = 12       // 12/20 ข้อ
-const MAX_FREEZE_CREDITS = 2
-const MAX_LEAVE_CREDITS = 2
-const DEFAULT_FREEZE_CREDITS = 2
-const DEFAULT_LEAVE_CREDITS = 1
 
 function normalizeStreakSettings(settings, uid) {
-  const protectedDays = Array.isArray(settings?.protectedDays) ? settings.protectedDays : []
-  const reminderTimes = Array.isArray(settings?.reminderTimes) ? settings.reminderTimes : []
+  const base = settings || {}
   return {
-    id: uid,
-    uid,
-    freezeCredits: Number.isFinite(Number(settings?.freezeCredits)) ? Number(settings.freezeCredits) : DEFAULT_FREEZE_CREDITS,
-    leaveCredits: Number.isFinite(Number(settings?.leaveCredits)) ? Number(settings.leaveCredits) : DEFAULT_LEAVE_CREDITS,
-    protectedDays,
-    claimedMissions: settings?.claimedMissions || {},
-    gems: Number(settings?.gems || 0),
-    remindersEnabled: settings?.remindersEnabled ?? false,
-    reminderTimes,
+    id: base.id || uid,
+    uid: base.uid || uid,
+    gems: Number(base.gems || 0),
+    freezeCredits: Number(base.freezeCredits ?? 2),
+    leaveCredits: Number(base.leaveCredits ?? 1),
+    protectedDays: Array.isArray(base.protectedDays) ? base.protectedDays : [],
+    claimedMissions: base.claimedMissions || {},
+    remindersEnabled: Boolean(base.remindersEnabled),
+    reminderTimes: Array.isArray(base.reminderTimes) ? base.reminderTimes : [],
   }
 }
 
 function calculateReadingStreak(values, protections = []) {
-  const days = new Set(values.map(getLocalDayKey).filter(Boolean))
-  const protectedByDay = new Map(
-    protections
-      .map(item => ({
-        ...item,
-        date: item.date || item.dayKey || getLocalDayKey(item.createdAt || item.usedAt),
-      }))
-      .filter(item => item.date)
-      .map(item => [item.date, item])
-  )
-  const coveredDays = new Set([...days, ...protectedByDay.keys()])
-  const sorted = [...coveredDays].sort()
-  let best = 0
-  let run = 0
-  let prevTime = 0
-
-  sorted.forEach(day => {
-    const currentTime = new Date(`${day}T00:00:00`).getTime()
-    run = prevTime && currentTime - prevTime === 86400000 ? run + 1 : 1
-    best = Math.max(best, run)
-    prevTime = currentTime
+  const days = new Set()
+  values.forEach(value => {
+    const key = getLocalDayKey(value)
+    if (key) days.add(key)
   })
-
+  const protectedByDay = new Map()
+  protections.forEach(item => {
+    if (item?.date) protectedByDay.set(item.date, item)
+  })
+  const coveredDays = new Set([...days, ...protectedByDay.keys()])
+  const today = getLocalDayKey(Date.now())
   let current = 0
-  const today = todayKey()
-  const yesterday = addDaysToKey(today, -1)
-  const startDay = coveredDays.has(today) ? today : coveredDays.has(yesterday) ? yesterday : ""
-
-  if (startDay) {
-    const cursor = new Date(`${startDay}T00:00:00`)
-    while (coveredDays.has(getLocalDayKey(cursor.getTime()))) {
-      current += 1
-      cursor.setDate(cursor.getDate() - 1)
-    }
+  let cursor = today
+  while (coveredDays.has(cursor)) {
+    current += 1
+    const [y, m, d] = cursor.split("-").map(Number)
+    const prev = new Date(y, m - 1, d - 1)
+    cursor = getLocalDayKey(prev.getTime())
   }
-
   return {
     current,
-    best,
     totalDays: days.size,
     protectedTotal: protectedByDay.size,
     todayKey: today,
@@ -498,739 +333,10 @@ function calculateReadingStreak(values, protections = []) {
   }
 }
 
-function formatReadingMinutes(seconds) {
-  const minutes = Math.round(Number(seconds || 0) / 60)
-  return minutes <= 0 ? "0 นาที" : `${minutes} นาที`
-}
-
-function getPagesRead(startPage, endPage) {
-  const start = Number(startPage || 0)
-  const end = Number(endPage || 0)
-  if (!start || !end || end < start) return 0
-  return end - start + 1
-}
-
-
-
-function getShelfBook(item, books) {
-  return books.find(book => String(book.id) === String(item.bookId)) || item.customBook || null
-}
-
-function getBookFileUrl(item) {
-  return item?.book?.fileUrl || item?.customBook?.fileUrl || item?.fileUrl || ""
-}
-
-function getProgressFromSession(item, endPage, pagesRead) {
-  const totalPages = Number(item.totalPages || item.customBook?.totalPages || 0)
-  const currentProgress = Number(item.progress || 0)
-  if (totalPages > 0 && Number(endPage || 0) > 0) {
-    return Math.min(100, Math.round((Number(endPage) / totalPages) * 100))
-  }
-  return Math.min(100, currentProgress + Math.max(3, Math.min(12, Number(pagesRead || 1) * 3)))
-}
-
-function sanitizeStorageName(name) {
-  return String(name || "book.pdf")
-    .replace(/[^\w.\-ก-๙]+/g, "-")
-    .replace(/-+/g, "-")
-    .slice(0, 90)
-}
-
-function compactSessionSummary(sessions) {
-  const verified = sessions.filter(item => item.verified)
-  const totalSeconds = verified.reduce((sum, item) => sum + Number(item.activeSeconds || 0), 0)
-  const pages = verified.reduce((sum, item) => sum + Number(item.pagesRead || 0), 0)
-  return { verifiedCount: verified.length, totalSeconds, pages }
-}
-
-const BOOK_STATUS = [
-  { id: "reading", label: "กำลังอ่าน" },
-  { id: "finished", label: "อ่านจบแล้ว" },
-  { id: "planned", label: "อยากอ่าน" },
-]
-
-function BookshelfPanel({ authState, go, setView }) {
-  const uid = authState?.user?.uid
-  const { items: books } = useContentCollection("books", BOOKS)
-  const { items: shelfItems, loading, saveItem, deleteItem } = useContentCollection("bookshelf", [])
-  const { items: readingSessions } = useContentCollection("reading_sessions", [])
-  const { items: streakRecords, saveItem: saveStreakSettings } = useContentCollection("reading_streaks", [])
-  const [showTutorial, setShowTutorial] = useState(false)
-  const [bookId, setBookId] = useState("")
-  const [addMode, setAddMode] = useState("library")
-  const [externalBook, setExternalBook] = useState({
-    title: "",
-    author: "",
-    fileUrl: "",
-    desc: "",
-    totalPages: "",
-    file: null,
-  })
-  const [uploadingExternal, setUploadingExternal] = useState(false)
-  const [quizState, setQuizState] = useState(null)
-
-  const sessionsByShelf = useMemo(() => {
-    const map = new Map()
-    readingSessions
-      .filter(item => item.uid === uid)
-      .forEach(item => {
-        const key = String(item.shelfItemId || "")
-        if (!key) return
-        map.set(key, [...(map.get(key) || []), item])
-      })
-    return map
-  }, [readingSessions, uid])
-
-  const myShelf = useMemo(() => {
-    return shelfItems
-      .filter(item => item.uid === uid)
-      .map(item => {
-        const itemSessions = sessionsByShelf.get(String(item.id)) || []
-        return {
-          ...item,
-          book: getShelfBook(item, books),
-          sessionSummary: compactSessionSummary(itemSessions),
-        }
-      })
-      .filter(item => item.book)
-      .sort((a, b) => getTimeMs(b.updatedAt || b.addedAt) - getTimeMs(a.updatedAt || a.addedAt))
-  }, [books, sessionsByShelf, shelfItems, uid])
-
-  const availableBooks = useMemo(() => {
-    const savedIds = new Set(myShelf.filter(item => item.sourceType !== "external").map(item => String(item.bookId)))
-    return books.filter(book => !savedIds.has(String(book.id)))
-  }, [books, myShelf])
-
-  const stats = useMemo(() => {
-    const finished = myShelf.filter(item => item.status === "finished").length
-    const reading = myShelf.filter(item => item.status === "reading").length
-    const verifiedSessions = myShelf.reduce((sum, item) => sum + Number(item.sessionSummary?.verifiedCount || 0), 0)
-    const totalSeconds = myShelf.reduce((sum, item) => sum + Number(item.sessionSummary?.totalSeconds || 0), 0)
-    const avgProgress = myShelf.length
-      ? Math.round(myShelf.reduce((sum, item) => sum + Number(item.progress || 0), 0) / myShelf.length)
-      : 0
-    return { finished, reading, avgProgress, verifiedSessions, totalSeconds }
-  }, [myShelf])
-
-  function cleanShelfItem(item) {
-    const { book, sessionSummary, ...rest } = item
-    return rest
-  }
-
-  async function addBook() {
-    if (!bookId || !uid) return
-    const book = books.find(item => String(item.id) === String(bookId))
-    if (!book) return
-
-    await saveItem({
-      id: `${uid}_book_${book.id}`,
-      uid,
-      bookId: String(book.id),
-      status: "reading",
-      progress: 0,
-      note: "",
-      totalPages: Number(book.totalPages || 0),
-      sourceType: "library",
-      addedAt: Date.now(),
-    })
-    setBookId("")
-    toast.success("เพิ่มเข้าชั้นหนังสือแล้ว")
-  }
-
-  async function addExternalBook() {
-    if (!uid) return
-    const title = externalBook.title.trim() || externalBook.file?.name || ""
-    const hasSource = externalBook.fileUrl.trim() || externalBook.file
-    if (!title) {
-      toast.error("กรุณาใส่ชื่อหนังสือหรือเลือกไฟล์")
-      return
-    }
-    if (!hasSource) {
-      toast.error("กรุณาใส่ลิงก์ไฟล์หรืออัปโหลดไฟล์")
-      return
-    }
-
-    setUploadingExternal(true)
-    try {
-      let fileUrl = externalBook.fileUrl.trim()
-      let fileMeta = {}
-
-      if (externalBook.file) {
-        const safeName = sanitizeStorageName(externalBook.file.name)
-        const fileRef = ref(storage, `members/${uid}/bookshelf/${Date.now()}-${safeName}`)
-        await uploadBytes(fileRef, externalBook.file, {
-          contentType: externalBook.file.type || "application/octet-stream",
-          customMetadata: { uid, title },
-        })
-        fileUrl = await getDownloadURL(fileRef)
-        fileMeta = {
-          fileName: externalBook.file.name,
-          fileSize: externalBook.file.size,
-          fileType: externalBook.file.type,
-        }
-      }
-
-      const externalId = `external-${crypto.randomUUID()}`
-      const customBook = {
-        id: externalId,
-        title,
-        author: externalBook.author.trim() || "ไฟล์ของสมาชิก",
-        type: "ไฟล์นอก",
-        source: "เพิ่มโดยสมาชิก",
-        category: "หนังสือส่วนตัว",
-        fileUrl,
-        desc: externalBook.desc.trim(),
-        totalPages: Number(externalBook.totalPages || 0),
-        ...fileMeta,
-      }
-
-      await saveItem({
-        id: `${uid}_book_${externalId}`,
-        uid,
-        bookId: externalId,
-        sourceType: "external",
-        customBook,
-        totalPages: Number(externalBook.totalPages || 0),
-        status: "reading",
-        progress: 0,
-        note: "",
-        addedAt: Date.now(),
-        updatedAt: Date.now(),
-      })
-      setExternalBook({ title: "", author: "", fileUrl: "", desc: "", totalPages: "", file: null })
-      toast.success("เพิ่มไฟล์นอกเข้าชั้นหนังสือแล้ว")
-    } catch (error) {
-      console.error(error)
-      toast.error("เพิ่มไฟล์นอกไม่สำเร็จ กรุณาตรวจสอบสิทธิ์อัปโหลดหรือใช้ลิงก์ไฟล์แทน")
-    } finally {
-      setUploadingExternal(false)
-    }
-  }
-
-  async function updateShelfItem(item, patch) {
-    const isFinishing = patch.status === "finished" && item.status !== "finished"
-    const nextProgress = patch.status === "finished" ? 100 : patch.progress
-    await saveItem({
-      ...cleanShelfItem(item),
-      ...patch,
-      progress: nextProgress !== undefined ? Number(nextProgress) : Number(item.progress || 0),
-      updatedAt: Date.now(),
-      ...(isFinishing ? { finishedAt: Date.now() } : {}),
-    })
-  }
-
-  async function removeShelfItem(id) {
-    const ok = await confirmAction({
-      title: "นำออกจากชั้นหนังสือ?",
-      message: "รายการนี้จะถูกลบออกจากชั้นหนังสือของคุณ",
-      confirmText: "นำออก",
-      danger: true,
-    })
-    if (!ok) return
-    await deleteItem(id)
-    toast.success("นำออกจากชั้นหนังสือแล้ว")
-  }
-
-  async function startQuiz(item) {
-    setQuizState({ item, loading: true, quiz: [], answers: {}, source: "" })
-    try {
-      const itemSessions = readingSessions.filter(session => session.uid === uid && session.shelfItemId === item.id && session.verified)
-      const response = await fetch("/api/generate-quiz", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          book: {
-            id: item.book.id,
-            title: item.book.title,
-            author: item.book.author,
-            type: item.book.type,
-            category: item.book.category,
-            desc: item.book.desc,
-            note: item.note || "",
-            readingEvidence: {
-              progress: item.progress || 0,
-              verifiedSessions: itemSessions.length,
-              totalMinutes: Math.round(itemSessions.reduce((sum, session) => sum + Number(session.activeSeconds || 0), 0) / 60),
-              reflections: itemSessions.slice(0, 5).map(session => session.reflection).filter(Boolean),
-            },
-          },
-        }),
-      })
-      const data = await response.json()
-      setQuizState({ item, loading: false, quiz: data.quiz || [], answers: {}, source: data.source || "fallback" })
-    } catch (error) {
-      console.error(error)
-      toast.error("สร้างแบบทดสอบไม่สำเร็จ")
-      setQuizState(null)
-    }
-  }
-
-  function answerQuiz(index, answerIndex) {
-    setQuizState(prev => prev ? ({
-      ...prev,
-      answers: { ...prev.answers, [index]: answerIndex },
-    }) : prev)
-  }
-
-  async function finishQuiz() {
-    if (!quizState?.item) return
-    const score = quizState.quiz.reduce((sum, question, index) => {
-      return sum + (quizState.answers[index] === question.answerIndex ? 1 : 0)
-    }, 0)
-    await updateShelfItem(quizState.item, {
-      lastQuiz: {
-        score,
-        total: quizState.quiz.length,
-        source: quizState.source,
-        takenAt: Date.now(),
-      },
-    })
-    toast.success(`บันทึกคะแนนแล้ว: ${score}/${quizState.quiz.length}`)
-    setQuizState(null)
-  }
-
-  // ─── Streak & Missions logic ───────────────────────────────────────────────
-  const streakSettings = useMemo(() => {
-    return normalizeStreakSettings(streakRecords.find(item => item.uid === uid || item.id === uid), uid)
-  }, [streakRecords, uid])
-
-  const streak = useMemo(() => {
-    const verifiedDays = readingSessions
-      .filter(item => item.uid === uid && item.verified)
-      .map(item => item.dayKey || item.completedAt || item.createdAt)
-    return calculateReadingStreak(verifiedDays, streakSettings.protectedDays)
-  }, [readingSessions, streakSettings.protectedDays, uid])
-
-  const todaySessions = useMemo(() => {
-    return readingSessions.filter(item => item.uid === uid && item.verified && (item.dayKey || getLocalDayKey(item.completedAt)) === streak.todayKey)
-  }, [readingSessions, streak.todayKey, uid])
-
-  const todaySeconds = todaySessions.reduce((sum, item) => sum + Number(item.activeSeconds || 0), 0)
-  const goalPercent = Math.min(100, Math.round((todaySeconds / (DAILY_READING_GOAL_MINUTES * 60)) * 100))
-
-  const todayQuizPassed = useMemo(() => {
-    return shelfItems.some(item => {
-      if (item.uid !== uid || !item.lastQuiz) return false
-      const dateKey = getLocalDayKey(item.lastQuiz.takenAt)
-      return dateKey === streak.todayKey && item.lastQuiz.score >= 3
-    })
-  }, [shelfItems, streak.todayKey, uid])
-
-  const last7Days = useMemo(() => {
-    const list = []
-    const dayNames = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."]
-    for (let i = 6; i >= 0; i--) {
-      const key = addDaysToKey(streak.todayKey, -i)
-      const dateObj = new Date(`${key}T00:00:00`)
-      const name = dayNames[dateObj.getDay()]
-      const daySessions = readingSessions.filter(
-        item => item.uid === uid && item.verified && (item.dayKey || getLocalDayKey(item.completedAt)) === key
-      )
-      const secs = daySessions.reduce((sum, item) => sum + Number(item.activeSeconds || 0), 0)
-      const minutes = Math.round(secs / 60)
-      const metGoal = secs >= DAILY_READING_GOAL_MINUTES * 60
-      const protection = streakSettings.protectedDays.find(
-        p => (p.date || p.dayKey || getLocalDayKey(p.createdAt || p.usedAt)) === key
-      )
-      list.push({ key, name, minutes, metGoal, protection, hasRead: daySessions.length > 0 })
-    }
-    return list
-  }, [readingSessions, streak.todayKey, streakSettings.protectedDays, uid])
-
-  async function protectToday(type) {
-    if (!uid) return
-    if (streak.todayVerified) { toast.success("วันนี้ต่อไฟด้วยการอ่านจริงแล้ว"); return }
-    if (streak.todayProtected) { toast.success("วันนี้ได้รับการคุ้มครอง streak แล้ว"); return }
-
-    // Check if streak is 0 (i.e. yesterday was not read/protected)
-    const yesterdayKey = addDaysToKey(streak.todayKey, -1)
-    if (!streak.coveredDays || !streak.coveredDays.has(yesterdayKey)) {
-      toast.error("คุณไม่มีวันสะสมต่อเนื่อง (Streak เป็น 0) จึงไม่สามารถใช้สิทธิ์คุ้มครองได้")
-      return
-    }
-
-    const key = streak.todayKey
-    const isLeave = type === "leave"
-    const creditKey = isLeave ? "leaveCredits" : "freezeCredits"
-    if (Number(streakSettings[creditKey] || 0) <= 0) { toast.error(isLeave ? "สิทธิ์ลากิจหมดแล้ว" : "น้ำแข็งหมดแล้ว"); return }
-    await saveStreakSettings({
-      ...streakSettings,
-      [creditKey]: Number(streakSettings[creditKey] || 0) - 1,
-      protectedDays: [...streakSettings.protectedDays, { date: key, type, usedAt: Date.now() }],
-    })
-    toast.success(isLeave ? "บันทึกวันลากิจแล้ว streak ยังปลอดภัย" : "ใช้น้ำแข็งคุ้มครอง streak วันนี้แล้ว")
-  }
-
-
-  async function claimMission(missionId) {
-    if (!uid) return
-    const currentWeekKey = getWeekKey()
-    if (streakSettings.claimedMissions?.[currentWeekKey]?.[missionId]) {
-      toast.success("คุณรับรางวัลภารกิจนี้ไปแล้วในสัปดาห์นี้")
-      return
-    }
-
-    // Check if mission is actually completed
-    const weekSessions = readingSessions.filter(s => s.uid === uid && s.verified && getWeekKey(s.completedAt || s.createdAt || s.startedAt) === currentWeekKey)
-    let completed = false
-    if (missionId === "m1") {
-      const totalSecs = weekSessions.reduce((sum, s) => sum + Number(s.activeSeconds || 0), 0)
-      completed = totalSecs >= 10800
-    } else if (missionId === "m2") {
-      const maxLen = weekSessions.reduce((max, s) => Math.max(max, s.reflection?.length || 0), 0)
-      completed = maxLen >= 3000
-    } else if (missionId === "m3") {
-      const best = shelfItems.filter(i => i.uid === uid && i.lastQuiz).map(i => i.lastQuiz.score || 0)
-      completed = best.length > 0 && Math.max(...best) >= 17
-    }
-
-    if (!completed) {
-      toast.error("ภารกิจยังไม่เสร็จสมบูรณ์")
-      return
-    }
-
-    let gemsReward = 0
-    if (missionId === "m1") gemsReward = 50
-    else if (missionId === "m2") gemsReward = 60
-    else if (missionId === "m3") gemsReward = 80
-
-    const nextClaimed = {
-      ...streakSettings.claimedMissions,
-      [currentWeekKey]: {
-        ...(streakSettings.claimedMissions?.[currentWeekKey] || {}),
-        [missionId]: true
-      }
-    }
-    await saveStreakSettings({
-      ...streakSettings,
-      gems: Number(streakSettings.gems || 0) + gemsReward,
-      claimedMissions: nextClaimed
-    })
-    toast.success(`สำเร็จ! รับรางวัล +${gemsReward} 💎`)
-  }
-
-  // ─── Onboarding ─────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const hasSeen = localStorage.getItem("talib_has_seen_onboarding")
-    if (!hasSeen) setShowTutorial(true)
-  }, [])
-
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  if (loading) {
-    return <div style={{ textAlign: "center", padding: 40 }}><i className="ti ti-loader-2 spin" style={{ fontSize: 24, color: "var(--teal)" }}></i></div>
-  }
-
-  return (
-    <div className="profile-layout" style={{ maxWidth: 980, margin: "0 auto" }}>
-      {showTutorial && <TutorialModal onClose={() => { localStorage.setItem("talib_has_seen_onboarding", "true"); setShowTutorial(false) }} theme={theme} />}
-      <button
-        onClick={() => setView("overview")}
-        className="sec-link"
-        style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 16, background: "none", border: "none", fontFamily: "'Prompt', sans-serif", cursor: "pointer", color: "var(--t2)" }}
-      >
-        <i className="ti ti-arrow-left"></i> กลับหน้าแดชบอร์ด
-      </button>
-
-      {/* ─── Streak Panel ─────────────────────────────────────────────────── */}
-      <ReadingStreakPanel
-        streak={streak}
-        settings={streakSettings}
-        todaySeconds={todaySeconds}
-        goalPercent={goalPercent}
-        last7Days={last7Days}
-        onRead={() => go("reader")}
-        onFreeze={() => protectToday("freeze")}
-        onLeave={() => protectToday("leave")}
-        onShowTutorial={() => setShowTutorial(true)}
-      />
-
-      {/* ─── Weekly Missions ────────────────────────────────────────────────── */}
-      <div className="card" style={{ padding: 24, marginBottom: 20, textAlign: "left" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--teal-bg)", display: "grid", placeItems: "center" }}>
-            <i className="ti ti-target" style={{ color: "var(--teal)", fontSize: 18 }}></i>
-          </div>
-          <div>
-            <h3 style={{ fontSize: 15, fontWeight: 600 }}>ภารกิจสะสมเพชรรายสัปดาห์</h3>
-            <p style={{ fontSize: 11, color: "var(--t2)" }}>ทำครั้งเดียวต่อสัปดาห์ · สะสม Gems เพื่อนำไปใช้แลกเปลี่ยนไอเทม</p>
-          </div>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <MissionRow title="1. ผู้อ่านสะสมเวลา" desc="อ่านสะสมครบ 3 ชั่วโมงในสัปดาห์นี้" progress={readingSessions.filter(s => s.uid === uid && s.verified && getWeekKey(s.completedAt || s.createdAt || s.startedAt) === getWeekKey()).reduce((sum, s) => sum + Number(s.activeSeconds || 0), 0)} target={10800} formatProgress={(val) => { const hours = Math.floor(val / 3600); const mins = Math.floor((val % 3600) / 60); return `${hours} ชม. ${mins} นาที / 3 ชม.`; }} rewardText="+50 💎" claimed={streakSettings.claimedMissions?.[getWeekKey()]?.m1} onClaim={() => claimMission("m1")} />
-          <MissionRow title="2. บันทึกข้อคิดเชิงลึก" desc="เขียนข้อคิดในเซสชันเดียว ความยาวตั้งแต่ 3,000 ตัวอักษรขึ้นไป" progress={Math.min(3000, readingSessions.filter(s => s.uid === uid && s.verified && getWeekKey(s.completedAt || s.createdAt || s.startedAt) === getWeekKey()).reduce((max, s) => Math.max(max, s.reflection?.length || 0), 0))} target={3000} formatProgress={(val) => `${val.toLocaleString()}/3,000 ตัว`} rewardText="+60 💎" claimed={streakSettings.claimedMissions?.[getWeekKey()]?.m2} onClaim={() => claimMission("m2")} />
-          <MissionRow title="3. ผู้พิชิตแบบทดสอบ" desc="ทำ Quiz หนังสือและได้คะแนนตั้งแต่ 17/20 ข้อขึ้นไป" progress={(() => { const best = shelfItems.filter(i => i.uid === uid && i.lastQuiz).map(i => i.lastQuiz.score || 0); return best.length ? Math.max(...best) : 0 })()} target={17} formatProgress={(val) => `${val}/20 ข้อ`} rewardText="+80 💎" claimed={streakSettings.claimedMissions?.[getWeekKey()]?.m3} onClaim={() => claimMission("m3")} />
-        </div>
-      </div>
-
-
-      <div className="card" style={{ padding: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 22, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: "var(--teal-bg)", display: "grid", placeItems: "center" }}>
-              <i className="ti ti-books" style={{ color: "var(--teal)", fontSize: 20 }}></i>
-            </div>
-            <div>
-              <h2 style={{ fontSize: 18 }}>ชั้นหนังสือของฉัน</h2>
-              <p style={{ fontSize: 12, marginTop: 2 }}>เพิ่มหนังสือจากคลังหรือไฟล์นอก แล้วต่อ streak ด้วยเซสชันอ่านจริง</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="profile-stat-grid">
-          <div className="card profile-stat-card">
-            <div className="profile-stat-icon" style={{ background: "var(--teal-bg)", color: "var(--teal)" }}><i className="ti ti-book-2"></i></div>
-            <div><div className="profile-stat-label">กำลังอ่าน</div><div className="profile-stat-value">{stats.reading} เล่ม</div></div>
-          </div>
-          <div className="card profile-stat-card">
-            <div className="profile-stat-icon" style={{ background: "rgba(255,179,0,.12)", color: "rgb(255,179,0)" }}><i className="ti ti-check"></i></div>
-            <div><div className="profile-stat-label">อ่านจบแล้ว</div><div className="profile-stat-value">{stats.finished} เล่ม</div></div>
-          </div>
-          <div className="card profile-stat-card">
-            <div className="profile-stat-icon" style={{ background: "rgba(59,115,196,.14)", color: "#6ba0ff" }}><i className="ti ti-chart-dots"></i></div>
-            <div><div className="profile-stat-label">ความคืบหน้าเฉลี่ย</div><div className="profile-stat-value">{stats.avgProgress}%</div></div>
-          </div>
-          <div className="card profile-stat-card">
-            <div className="profile-stat-icon" style={{ background: "rgba(167,139,250,.14)", color: "#a78bfa" }}><i className="ti ti-shield-check"></i></div>
-            <div><div className="profile-stat-label">อ่านจริงที่ยืนยันแล้ว</div><div className="profile-stat-value">{stats.verifiedSessions} ครั้ง · {formatReadingMinutes(stats.totalSeconds)}</div></div>
-          </div>
-        </div>
-
-        <div className="bookshelf-add-panel">
-          <div className="reader-control" style={{ marginBottom: 12 }}>
-            <button className={`reader-btn ${addMode === "library" ? "on" : ""}`} onClick={() => setAddMode("library")}>จากคลังเว็บ</button>
-            <button className={`reader-btn ${addMode === "external" ? "on" : ""}`} onClick={() => setAddMode("external")}>ไฟล์/ลิงก์นอก</button>
-          </div>
-
-          {addMode === "library" ? (
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10, alignItems: "center" }}>
-              <select value={bookId} onChange={event => setBookId(event.target.value)}>
-                <option value="">เลือกหนังสือเพื่อเพิ่มเข้าชั้น</option>
-                {availableBooks.map(book => (
-                  <option key={book.id} value={book.id}>{book.title}</option>
-                ))}
-              </select>
-              <button className="btn btn-teal" onClick={addBook} disabled={!bookId}>เพิ่ม</button>
-            </div>
-          ) : (
-            <div className="bookshelf-external-form">
-              <input value={externalBook.title} onChange={event => setExternalBook(prev => ({ ...prev, title: event.target.value }))} placeholder="ชื่อหนังสือหรือไฟล์" />
-              <input value={externalBook.author} onChange={event => setExternalBook(prev => ({ ...prev, author: event.target.value }))} placeholder="ผู้เขียน/แหล่งที่มา (ไม่บังคับ)" />
-              <input value={externalBook.fileUrl} onChange={event => setExternalBook(prev => ({ ...prev, fileUrl: event.target.value }))} placeholder="ลิงก์ PDF / Google Drive / แหล่งอ่านออนไลน์" />
-              <input type="number" min="0" value={externalBook.totalPages} onChange={event => setExternalBook(prev => ({ ...prev, totalPages: event.target.value }))} placeholder="จำนวนหน้าทั้งหมด (ถ้ารู้)" />
-              <textarea value={externalBook.desc} onChange={event => setExternalBook(prev => ({ ...prev, desc: event.target.value }))} placeholder="คำอธิบายสั้น ๆ หรือเป้าหมายการอ่าน" style={{ minHeight: 70 }} />
-              <label className="bookshelf-file-input">
-                <i className="ti ti-upload"></i>
-                <span>{externalBook.file ? externalBook.file.name : "อัปโหลดไฟล์จากเครื่อง (PDF/เอกสาร)"}</span>
-                <input type="file" accept=".pdf,.epub,.doc,.docx,.txt,image/*" onChange={event => setExternalBook(prev => ({ ...prev, file: event.target.files?.[0] || null }))} />
-              </label>
-              <button className="btn btn-teal" onClick={addExternalBook} disabled={uploadingExternal}>
-                <i className={`ti ${uploadingExternal ? "ti-loader-2 spin" : "ti-plus"}`} style={{ marginRight: 6 }}></i>
-                {uploadingExternal ? "กำลังเพิ่ม..." : "เพิ่มไฟล์นอก"}
-              </button>
-            </div>
-          )}
-        </div>
-
-        {myShelf.length === 0 ? (
-          <div className="empty" style={{ padding: "40px 0" }}>ยังไม่มีหนังสือในชั้น เลือกหนังสือด้านบนเพื่อเริ่มติดตามได้เลย</div>
-        ) : (
-          <div style={{ display: "grid", gap: 12 }}>
-            {myShelf.map(item => (
-              <div key={item.id} className="card bookshelf-item" style={{ padding: 16, boxShadow: "none", background: "var(--bg2)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", marginBottom: 12 }}>
-                  <div style={{ minWidth: 0 }}>
-                    <h3 style={{ fontSize: 15, lineHeight: 1.45 }}>{item.book.title}</h3>
-                    <p style={{ fontSize: 12, marginTop: 2 }}>{item.book.author} · {item.book.type} · อ่านจริง {item.sessionSummary.verifiedCount} ครั้ง</p>
-                    {item.sourceType === "external" && <span className="tag tag-teal" style={{ marginTop: 6 }}>ไฟล์นอกของสมาชิก</span>}
-                  </div>
-                  <button className="btn btn-teal" style={{ padding: "5px 10px", fontSize: 11, flexShrink: 0 }} onClick={() => go("reader", { shelfItemId: item.id })}>
-                    <i className="ti ti-player-play" style={{ marginRight: 4 }}></i>เริ่มอ่าน
-                  </button>
-                  {(item.status === "finished" || Number(item.progress || 0) >= 80) && (
-                    <button className="btn btn-teal" style={{ padding: "5px 10px", fontSize: 11, flexShrink: 0 }} onClick={() => startQuiz(item)}>
-                      <i className="ti ti-sparkles" style={{ marginRight: 4 }}></i>Quiz
-                    </button>
-                  )}
-                  <button className="btn btn-outline" style={{ padding: "5px 10px", fontSize: 11, flexShrink: 0 }} onClick={() => {
-                    if (item.sourceType === "external" && getBookFileUrl(item)) window.open(getBookFileUrl(item), "_blank", "noopener,noreferrer")
-                    else go("library-detail", item.book)
-                  }}>
-                    เปิด
-                  </button>
-                </div>
-
-                <div className="bookshelf-progress">
-                  <div>
-                    <span>ความคืบหน้า</span>
-                    <strong>{Number(item.progress || 0)}%</strong>
-                  </div>
-                  <div className="streak-progress"><span style={{ width: `${Number(item.progress || 0)}%` }}></span></div>
-                  <div>
-                    <span>เวลาที่ผ่านการยืนยัน</span>
-                    <strong>{formatReadingMinutes(item.sessionSummary.totalSeconds)}</strong>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end", marginTop: 12 }}>
-                  <div style={{ flex: "1 1 140px" }}>
-                    <select 
-                      value={item.status || "reading"} 
-                      onChange={event => updateShelfItem(item, { status: event.target.value })}
-                      style={{ width: "100%", height: 36, fontSize: 12 }}
-                    >
-                      {BOOK_STATUS.map(status => <option key={status.id} value={status.id}>{status.label}</option>)}
-                    </select>
-                  </div>
-                  <label style={{ display: "grid", gap: 6, fontSize: 11, color: "var(--t2)", flex: "1 1 90px" }}>
-                    <span>หน้าปัจจุบัน</span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={Number(item.currentPage || 0)}
-                      onChange={event => updateShelfItem(item, { currentPage: Number(event.target.value || 0) })}
-                      style={{ height: 36, fontSize: 12 }}
-                    />
-                  </label>
-                  <label style={{ display: "grid", gap: 6, fontSize: 11, color: "var(--t2)", flex: "1 1 90px" }}>
-                    <span>จำนวนหน้า</span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={Number(item.totalPages || item.customBook?.totalPages || 0)}
-                      onChange={event => updateShelfItem(item, { totalPages: Number(event.target.value || 0) })}
-                      style={{ height: 36, fontSize: 12 }}
-                    />
-                  </label>
-                  <button className="btn btn-outline" style={{ padding: "7px 10px", fontSize: 11, color: "#e05555", height: 36, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => removeShelfItem(item.id)}>
-                    ลบ
-                  </button>
-                </div>
-
-                <textarea
-                  value={item.note || ""}
-                  placeholder="บันทึกข้อคิดหรือหน้าที่อ่านค้างไว้..."
-                  onChange={event => updateShelfItem(item, { note: event.target.value })}
-                  style={{ marginTop: 12, minHeight: 70 }}
-                />
-                {item.lastQuiz && (
-                  <div style={{ marginTop: 10, fontSize: 11, color: "var(--teal)", background: "var(--teal-bg)", padding: "8px 10px", borderRadius: 8 }}>
-                    คะแนน Quiz ล่าสุด {item.lastQuiz.score}/{item.lastQuiz.total} · {item.lastQuiz.source || "AI"}
-                  </div>
-                )}
-                {item.lastVerificationScore && (
-                  <div style={{ marginTop: 10, fontSize: 11, color: "var(--t2)" }}>
-                    คะแนนยืนยันการอ่านล่าสุด {item.lastVerificationScore}/100 · หน้าล่าสุด {item.currentPage || 0}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      {quizState && (
-        <QuizModal
-          quizState={quizState}
-          onAnswer={answerQuiz}
-          onClose={() => setQuizState(null)}
-          onFinish={finishQuiz}
-        />
-      )}
-
-    </div>
-  )
-}
-
-
-
-function QuizModal({ quizState, onAnswer, onClose, onFinish }) {
-  const answered = Object.keys(quizState.answers || {}).length
-  const score = quizState.quiz.reduce((sum, question, index) => {
-    return sum + (quizState.answers[index] === question.answerIndex ? 1 : 0)
-  }, 0)
-  const done = quizState.quiz.length > 0 && answered === quizState.quiz.length
-  const difficultyLabels = { easy: "ง่าย", medium: "กลาง", hard: "ท้าทาย" }
-  const sourceLabel = quizState.source === "openai"
-    ? "OpenAI"
-    : quizState.source === "anthropic"
-      ? "Anthropic"
-      : "โหมดสำรอง"
-
-  return createPortal(
-    <div style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,.62)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
-      <div className="card" style={{ maxWidth: 760, maxHeight: "88vh", overflowY: "auto", padding: 22 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", marginBottom: 16 }}>
-          <div>
-            <span className="badge badge-teal">{sourceLabel}</span>
-            <h2 style={{ fontSize: 20, marginTop: 8 }}>Quiz หลังอ่านจบ</h2>
-            <p style={{ fontSize: 12, marginTop: 4 }}>{quizState.item?.book?.title} · {quizState.quiz.length || 20} ข้อคละความยาก</p>
-          </div>
-          <button className="btn btn-outline" style={{ padding: "6px 12px" }} onClick={onClose}>ปิด</button>
-        </div>
-
-        {quizState.loading ? (
-          <div className="empty" style={{ padding: "38px 0" }}>
-            <i className="ti ti-loader-2 spin" style={{ color: "var(--teal)", fontSize: 24, display: "block", marginBottom: 10 }}></i>
-            กำลังสร้างแบบทดสอบจาก AI...
-          </div>
-        ) : (
-          <>
-            <div style={{ display: "grid", gap: 14 }}>
-              {quizState.quiz.map((question, qIndex) => {
-                const selected = quizState.answers[qIndex]
-                const hasAnswered = selected !== undefined
-                return (
-                  <div key={qIndex} className="card" style={{ padding: 14, background: "var(--bg2)", boxShadow: "none" }}>
-                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
-                      <h3 style={{ fontSize: 14, lineHeight: 1.55 }}>{qIndex + 1}. {question.question}</h3>
-                      <span className="tag tag-acc" style={{ flexShrink: 0 }}>{difficultyLabels[question.difficulty] || "กลาง"}</span>
-                    </div>
-                    <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-                      {question.options.map((option, optionIndex) => {
-                        const isCorrect = hasAnswered && optionIndex === question.answerIndex
-                        const isWrong = hasAnswered && selected === optionIndex && selected !== question.answerIndex
-                        return (
-                          <button
-                            key={optionIndex}
-                            className="btn btn-outline"
-                            onClick={() => onAnswer(qIndex, optionIndex)}
-                            style={{
-                              borderRadius: 10,
-                              textAlign: "left",
-                              justifyContent: "flex-start",
-                              background: isCorrect ? "var(--teal-bg)" : isWrong ? "rgba(224,85,85,.12)" : "var(--card)",
-                              color: isWrong ? "#ff8a8a" : "var(--text)",
-                            }}
-                          >
-                            {option}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    {hasAnswered && (
-                      <p style={{ fontSize: 12, marginTop: 10, color: "var(--t2)" }}>{question.explanation}</p>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
-              <strong style={{ fontSize: 14 }}>คะแนนตอนนี้ {score}/{quizState.quiz.length}</strong>
-              <button className="btn btn-teal" disabled={!done} onClick={onFinish}>บันทึกคะแนน</button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>,
-    document.body
-  )
-}
-
 function SavedArticlesPanel({ authState, go, setView }) {
-  const { items: articles, loading: loadingArticles } = useContentCollection("articles", ARTICLES)
-  const { items: bookmarks, loading: loadingBookmarks } = useContentCollection("bookmarks", [])
-
   const uid = authState?.user?.uid;
+  const { items: articles, loading: loadingArticles } = useContentCollection("articles", ARTICLES, null, { live: false })
+  const { items: bookmarks, loading: loadingBookmarks } = useContentCollection("bookmarks", [], uid, { live: false })
 
   const [search, setSearch] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
@@ -1493,10 +599,10 @@ function ProfilePanel({ authState, copied, copyText, go, setView, ctx }) {
 
 
   // 💡 เชื่อมต่อกับคอลเลกชัน history ใน Firestore
-  const { items: rawHistory, loading: loadingHistory } = useContentCollection("history", [])
-  const { items: savedVerses } = useContentCollection("quran_bookmarks", [])
-  const { items: readingSessions } = useContentCollection("reading_sessions", [])
-  const { items: streakRecords, saveItem: saveStreakSettings } = useContentCollection("reading_streaks", [])
+  const { items: rawHistory, loading: loadingHistory } = useContentCollection("history", [], user?.uid, { live: false })
+  const { items: savedVerses } = useUserCollection("quran_bookmarks", user?.uid)
+  const { items: readingSessions } = useContentCollection("reading_sessions", [], user?.uid, { live: false })
+  const { items: streakRecords, saveItem: saveStreakSettings } = useContentCollection("reading_streaks", [], user?.uid, { live: false })
 
   const history = useMemo(() => {
     if (!user?.uid) return [];
@@ -1704,36 +810,36 @@ function ProfilePanel({ authState, copied, copyText, go, setView, ctx }) {
         {subView === "stats" && (
           <div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
-              <div className="card" style={{ padding: 16, display: "flex", gap: 12, alignItems: "center", background: "var(--bg2)" }}>
+              <div className="card card-glass animate-fade-in-up" style={{ padding: 16, display: "flex", gap: 12, alignItems: "center", animationFillMode: "forwards" }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--teal-bg)", color: "var(--teal)", display: "grid", placeItems: "center", fontSize: 18 }}>
-                  <i className="ti ti-file-text"></i>
+                   <i className="ti ti-file-text"></i>
                 </div>
                 <div>
                   <div style={{ fontSize: 11, color: "var(--t3)" }}>บทความที่อ่าน</div>
                   <div style={{ fontSize: 16, fontWeight: 600 }}>{stats.articlesRead} บทความ</div>
                 </div>
               </div>
-              <div className="card" style={{ padding: 16, display: "flex", gap: 12, alignItems: "center", background: "var(--bg2)" }}>
+              <div className="card card-glass animate-fade-in-up" style={{ padding: 16, display: "flex", gap: 12, alignItems: "center", animationDelay: "0.1s", opacity: 0, animationFillMode: "forwards" }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(255, 179, 0, 0.1)", color: "rgb(255, 179, 0)", display: "grid", placeItems: "center", fontSize: 18 }}>
-                  <i className="ti ti-download"></i>
+                   <i className="ti ti-download"></i>
                 </div>
                 <div>
                   <div style={{ fontSize: 11, color: "var(--t3)" }}>โหลดหนังสือ</div>
                   <div style={{ fontSize: 16, fontWeight: 600 }}>{stats.booksDownloaded} เล่ม</div>
                 </div>
               </div>
-              <div className="card" style={{ padding: 16, display: "flex", gap: 12, alignItems: "center", background: "var(--bg2)" }}>
+              <div className="card card-glass animate-fade-in-up" style={{ padding: 16, display: "flex", gap: 12, alignItems: "center", animationDelay: "0.2s", opacity: 0, animationFillMode: "forwards" }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(30, 215, 96, 0.1)", color: "rgb(30, 215, 96)", display: "grid", placeItems: "center", fontSize: 18 }}>
-                  <i className="ti ti-player-play"></i>
+                   <i className="ti ti-player-play"></i>
                 </div>
                 <div>
                   <div style={{ fontSize: 11, color: "var(--t3)" }}>ดู/ฟังมีเดีย</div>
                   <div style={{ fontSize: 16, fontWeight: 600 }}>{stats.mediaWatched} คลิป</div>
                 </div>
               </div>
-              <div className="card" style={{ padding: 16, display: "flex", gap: 12, alignItems: "center", background: "var(--bg2)" }}>
+              <div className="card card-glass animate-fade-in-up" style={{ padding: 16, display: "flex", gap: 12, alignItems: "center", animationDelay: "0.3s", opacity: 0, animationFillMode: "forwards" }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(248, 113, 113, 0.12)", color: "#f87171", display: "grid", placeItems: "center", fontSize: 18 }}>
-                  <i className="ti ti-flame"></i>
+                   <i className="ti ti-flame"></i>
                 </div>
                 <div>
                   <div style={{ fontSize: 11, color: "var(--t3)" }}>streak อ่านจริง</div>
@@ -1887,8 +993,8 @@ function formEmailChanged(nextEmail, currentEmail) {
 const fieldStyle = { display: "grid", gap: 6, marginTop: 12, fontSize: 12, color: "var(--t2)" }
 
 function SavedVersesPanel({ authState, go, setView, setQuranSura, setQuranAyah }) {
-  const { items: savedVerses, loading, deleteItem, saveItem } = useContentCollection("quran_bookmarks", [])
   const uid = authState?.user?.uid;
+  const { items: savedVerses, loading, deleteItem, saveItem } = useUserCollection("quran_bookmarks", uid)
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [editNote, setEditNote] = useState("");
@@ -2020,17 +1126,18 @@ function SavedVersesPanel({ authState, go, setView, setQuranSura, setQuranAyah }
 
                     {/* Verses Container */}
                     <div style={{ padding: 12, background: "var(--card)", borderRadius: 8, marginBottom: 12, border: "0.5px solid var(--br2)" }}>
-                      <div style={{
-                        fontFamily: "'Amiri', serif",
-                        fontSize: 24,
-                        direction: "rtl",
-                        textAlign: "right",
-                        marginBottom: 10,
-                        lineHeight: 1.8,
-                        color: "var(--text)"
-                      }}>
-                        {item.arabicText}
-                      </div>
+                      <div 
+                        style={{
+                          fontFamily: "'Amiri', serif",
+                          fontSize: 24,
+                          direction: "rtl",
+                          textAlign: "right",
+                          marginBottom: 10,
+                          lineHeight: 1.8,
+                          color: "var(--text)"
+                        }}
+                        dangerouslySetInnerHTML={{ __html: item.arabicText }}
+                      />
                       <div style={{ fontSize: 13, color: "var(--t2)", lineHeight: 1.5 }}>
                         {item.translation}
                       </div>
@@ -2060,9 +1167,9 @@ function SavedVersesPanel({ authState, go, setView, setQuranSura, setQuranAyah }
                     ) : (
                       <div style={{
                         background: "rgba(45, 190, 160, 0.05)",
-                        borderLeft: "3px solid var(--teal)",
+                        borderTop: "3px solid var(--teal)",
                         padding: "10px 14px",
-                        borderRadius: "0 8px 8px 0",
+                        borderRadius: "8px",
                         marginTop: 10
                       }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: "var(--teal)", marginBottom: 4 }}>
