@@ -2,6 +2,7 @@ import { Component, useEffect, useState, lazy, Suspense, useRef } from "react"
 import { useTheme } from "./hooks/useTheme.js"
 import { useAuth } from "./hooks/useAuth.js"
 import Nav from "./components/Nav.jsx"
+import { useAudio } from "./context/AudioContext.jsx"
 
 const lazyWithRetry = (componentImport) => {
   return lazy(() =>
@@ -69,6 +70,7 @@ export default function App() {
   const [page, setPage] = useState("home")
   const [ctx, setCtx] = useState(null)
   const [countdownText, setCountdownText] = useState("")
+  const { playingAudio, audioState, autoplayNext, setAutoplayNext, pause, resume, stop } = useAudio()
 
   // Sync server time offset on mount
   useEffect(() => {
@@ -346,6 +348,72 @@ export default function App() {
           </Suspense>
         </PageErrorBoundary>
       </main>
+      {playingAudio && (
+        <div style={{
+          position: "fixed",
+          bottom: 24,
+          right: 24,
+          zIndex: 9999,
+          background: "var(--card)",
+          border: "1.5px solid var(--teal)",
+          borderRadius: 16,
+          boxShadow: "0 10px 30px rgba(13, 148, 136, 0.25)",
+          padding: "12px 18px",
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          animation: "pageFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+          fontFamily: "'Prompt', sans-serif",
+          maxWidth: "calc(100vw - 48px)",
+          boxSizing: "border-box",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              width: 38,
+              height: 38,
+              borderRadius: "50%",
+              background: "var(--teal-bg)",
+              color: "var(--teal)",
+              display: "grid",
+              placeItems: "center",
+              fontSize: 16,
+              animation: audioState === "playing" ? "countdown-pulse 2s infinite" : "none"
+            }}>
+              <i className="ti ti-music"></i>
+            </div>
+            <div>
+              <span style={{ fontSize: 9, color: "var(--t3)", display: "block", textTransform: "uppercase", letterSpacing: 0.5 }}>กำลังฟังเสียงอ่าน 📖</span>
+              <strong style={{ fontSize: 13, color: "var(--text)" }}>
+                ซูเราะฮ์ {playingAudio.suraName} [{playingAudio.sura}:{playingAudio.aya}]
+              </strong>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 11, color: "var(--t2)", userSelect: "none" }}>
+              <input
+                type="checkbox"
+                checked={autoplayNext}
+                onChange={(e) => setAutoplayNext(e.target.checked)}
+                style={{ cursor: "pointer", accentColor: "var(--teal)" }}
+              />
+              <span>เล่นอายะฮ์ถัดไป</span>
+            </label>
+            <div style={{ width: 1, height: 16, background: "var(--br2)", margin: "0 4px" }} />
+            {audioState === "playing" ? (
+              <button className="btn btn-outline btn-sm" onClick={pause} style={{ padding: "4px 8px", borderRadius: 8, display: "grid", placeItems: "center", background: "none", border: "1px solid var(--br)" }}>
+                <i className="ti ti-player-pause" style={{ fontSize: 14 }}></i>
+              </button>
+            ) : (
+              <button className="btn btn-teal btn-sm" onClick={resume} style={{ padding: "4px 8px", borderRadius: 8, display: "grid", placeItems: "center" }}>
+                <i className="ti ti-player-play" style={{ fontSize: 14 }}></i>
+              </button>
+            )}
+            <button className="btn btn-outline btn-sm" onClick={stop} style={{ padding: "4px 8px", borderRadius: 8, color: "var(--red)", borderColor: "rgba(220,38,38,0.2)", display: "grid", placeItems: "center", background: "none" }}>
+              <i className="ti ti-x" style={{ fontSize: 14 }}></i>
+            </button>
+          </div>
+        </div>
+      )}
       <PWAInstallBanner />
     </div>
   )

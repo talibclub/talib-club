@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { createPortal } from "react-dom"
+import { useAudio } from "../context/AudioContext.jsx"
 import { SURA_LIST } from "../data/surahs.js"
 import { getSurahTheme } from "../data/quranThemes.js"
 import { useUserCollection, useUserDoc } from "../lib/contentStore.js"
@@ -447,11 +448,8 @@ export default function Quran({ initialSura, initialAyah, authState }) {
   const [modalNotes, setModalNotes] = useState("")
   const [activeAyahMenu, setActiveAyahMenu] = useState(null)
 
-  // --- Audio Recitation States & Ref ---
-  const [playingAudio, setPlayingAudio] = useState(null) // { sura, aya }
-  const [audioState, setAudioState] = useState("stopped") // "playing" | "paused" | "stopped"
-  const [autoplayNext, setAutoplayNext] = useState(false)
-  const audioRef = useRef(null)
+  // --- Global Audio Recitation Context ---
+  const { playingAudio, audioState, autoplayNext, setAutoplayNext, play, pause, resume, stop } = useAudio()
   const [modalDetails, setModalDetails] = useState({ loading: false, translation: "", tafsir: "", error: null })
 
   // Fetch translation & tafsir dynamically for activeAyahMenu in Mushaf mode
@@ -516,106 +514,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
     return match ? match.tafsir : ""
   }
 
-  // --- Audio Control Functions ---
-  const playVerseAudio = (sura, aya, continueAutoplay = false) => {
-    if (audioRef.current) {
-      audioRef.current.pause()
-    }
-    
-    const suraStr = String(sura).padStart(3, "0")
-    const ayaStr = String(aya).padStart(3, "0")
-    const url = `https://www.everyayah.com/data/Alafasy_128kbps/${suraStr}${ayaStr}.mp3`
-    
-    const audio = new Audio(url)
-    audioRef.current = audio
-    setPlayingAudio({ sura, aya })
-    setAudioState("playing")
-    
-    if (continueAutoplay) {
-      setAutoplayNext(true)
-    } else {
-      setAutoplayNext(false)
-    }
-    
-    audio.play().catch(err => {
-      console.error("Audio playback failed", err)
-      toast.error("ไม่สามารถเล่นเสียงอายะฮ์นี้ได้ชั่วคราว")
-      stopAudio()
-    })
 
-    audio.onerror = (e) => {
-      console.error("Audio failed to load", e)
-      toast.error("การโหลดเสียงอ่านล้มเหลว กรุณาตรวจสอบอินเทอร์เน็ต")
-      
-      if (continueAutoplay || autoplayNext) {
-        const currentList = selectedPage ? pageVerses : verses
-        const currentIndex = currentList.findIndex(item => item.sura === sura && item.aya === aya)
-        if (currentIndex !== -1 && currentIndex < currentList.length - 1) {
-          // Grace period before skipping to the next verse to prevent rapid toast spamming
-          setTimeout(() => {
-            const nextVerse = currentList[currentIndex + 1]
-            playVerseAudio(nextVerse.sura, nextVerse.aya, true)
-          }, 2000)
-        } else {
-          stopAudio()
-        }
-      } else {
-        stopAudio()
-      }
-    }
-    
-    audio.onended = () => {
-      if (continueAutoplay || autoplayNext) {
-        const currentList = selectedPage ? pageVerses : verses
-        const currentIndex = currentList.findIndex(item => item.sura === sura && item.aya === aya)
-        if (currentIndex !== -1 && currentIndex < currentList.length - 1) {
-          const nextVerse = currentList[currentIndex + 1]
-          playVerseAudio(nextVerse.sura, nextVerse.aya, true)
-        } else {
-          stopAudio()
-        }
-      } else {
-        stopAudio()
-      }
-    }
-  }
-
-  const pauseAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause()
-      setAudioState("paused")
-    }
-  }
-
-  const resumeAudio = () => {
-    if (audioRef.current && audioState === "paused") {
-      audioRef.current.play().catch(err => {
-        console.error("Audio resume failed", err)
-        stopAudio()
-      })
-      setAudioState("playing")
-    }
-  }
-
-  const stopAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current = null
-    }
-    setAudioState("stopped")
-    setPlayingAudio(null)
-    setAutoplayNext(false)
-  }
-
-  // Cleanup audio on unmount
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current = null
-      }
-    }
-  }, [])
 
   // Auto scroll to active reciting verse
   useEffect(() => {
@@ -1706,13 +1605,14 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                   className="btn"
                   onClick={() => {
                     if (audioState === "playing" && autoplayNext) {
-                      pauseAudio()
+                      pause()
                     } else if (audioState === "paused" && autoplayNext) {
-                      resumeAudio()
+                      resume()
                     } else {
                       const currentList = selectedPage ? pageVerses : verses
                       if (currentList.length > 0) {
-                        playVerseAudio(currentList[0].sura, currentList[0].aya, true)
+                        setAutoplayNext(true)
+                        play(currentList[0].sura, currentList[0].aya, SURA_LIST.find(s => s.number === currentList[0].sura)?.englishName || "", currentList)
                       }
                     }
                   }}
@@ -2442,11 +2342,12 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                                 onClick={() => {
                                   const isCurrent = playingAudio?.sura === v.sura && playingAudio?.aya === v.aya
                                   if (isCurrent && audioState === "playing") {
-                                    pauseAudio()
+                                    pause()
                                   } else if (isCurrent && audioState === "paused") {
-                                    resumeAudio()
+                                    resume()
                                   } else {
-                                    playVerseAudio(v.sura, v.aya, false)
+                                    const currentList = selectedPage ? pageVerses : verses
+                                    play(v.sura, v.aya, SURA_LIST.find(s => s.number === v.sura)?.englishName || "", currentList)
                                   }
                                 }}
                                 style={{
@@ -2867,11 +2768,12 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                 onClick={() => {
                   const isCurrent = playingAudio?.sura === activeAyahMenu.sura && playingAudio?.aya === activeAyahMenu.aya
                   if (isCurrent && audioState === "playing") {
-                    pauseAudio()
+                    pause()
                   } else if (isCurrent && audioState === "paused") {
-                    resumeAudio()
+                    resume()
                   } else {
-                    playVerseAudio(activeAyahMenu.sura, activeAyahMenu.aya, false)
+                    const currentList = selectedPage ? pageVerses : verses
+                    play(activeAyahMenu.sura, activeAyahMenu.aya, SURA_LIST.find(s => s.number === activeAyahMenu.sura)?.englishName || "", currentList)
                   }
                 }}
                 style={{
@@ -3331,149 +3233,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
         document.querySelector(".app") || document.body
       )}
 
-      {playingAudio && (
-        <div style={{
-          position: "fixed",
-          bottom: 24,
-          left: "50%",
-          transform: "translateX(-50%)",
-          background: "var(--quran-card-bg)",
-          border: "1.5px solid var(--quran-teal)",
-          borderRadius: 24,
-          padding: "12px 24px",
-          display: "flex",
-          alignItems: "center",
-          gap: 20,
-          zIndex: 99999,
-          boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
-          backdropFilter: "blur(8px)",
-          maxWidth: "90vw",
-          width: "max-content",
-          flexWrap: "wrap",
-          justifyContent: "center",
-          animation: "slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)"
-        }}>
-          {/* Verse Info */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{
-              width: 10,
-              height: 10,
-              borderRadius: "50%",
-              background: "var(--quran-teal)",
-              display: "inline-block",
-              animation: audioState === "playing" ? "pulse-highlight 1.5s infinite" : "none"
-            }}></span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--quran-text)" }}>
-              กำลังเล่น: ซูเราะฮ์ {SURA_LIST.find(s => s.number === playingAudio.sura)?.englishName} [{playingAudio.sura}:{playingAudio.aya}]
-            </span>
-          </div>
 
-          {/* Controls */}
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            {/* Previous button */}
-            <button
-              onClick={() => {
-                const currentList = selectedPage ? pageVerses : verses
-                const idx = currentList.findIndex(item => item.sura === playingAudio.sura && item.aya === playingAudio.aya)
-                if (idx > 0) {
-                  const prevVerse = currentList[idx - 1]
-                  playVerseAudio(prevVerse.sura, prevVerse.aya, autoplayNext)
-                }
-              }}
-              disabled={(selectedPage ? pageVerses : verses).findIndex(item => item.sura === playingAudio.sura && item.aya === playingAudio.aya) <= 0}
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--quran-t2)",
-                cursor: "pointer",
-                fontSize: 16,
-                opacity: (selectedPage ? pageVerses : verses).findIndex(item => item.sura === playingAudio.sura && item.aya === playingAudio.aya) <= 0 ? 0.35 : 1
-              }}
-              title="อายะฮ์ก่อนหน้า"
-            >
-              <i className="ti ti-player-skip-back"></i>
-            </button>
-
-            {/* Play/Pause Toggle */}
-            <button
-              onClick={() => {
-                if (audioState === "playing") {
-                  pauseAudio()
-                } else {
-                  resumeAudio()
-                }
-              }}
-              style={{
-                background: "var(--quran-teal)",
-                border: "none",
-                color: "#fff",
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                fontSize: 16,
-                boxShadow: "0 2px 8px rgba(45, 190, 160, 0.3)"
-              }}
-              title={audioState === "playing" ? "ชั่วคราว" : "เล่นต่อ"}
-            >
-              <i className={audioState === "playing" ? "ti ti-player-pause" : "ti ti-player-play"}></i>
-            </button>
-
-            {/* Next button */}
-            <button
-              onClick={() => {
-                const currentList = selectedPage ? pageVerses : verses
-                const idx = currentList.findIndex(item => item.sura === playingAudio.sura && item.aya === playingAudio.aya)
-                if (idx !== -1 && idx < currentList.length - 1) {
-                  const nextVerse = currentList[idx + 1]
-                  playVerseAudio(nextVerse.sura, nextVerse.aya, autoplayNext)
-                }
-              }}
-              disabled={(selectedPage ? pageVerses : verses).findIndex(item => item.sura === playingAudio.sura && item.aya === playingAudio.aya) >= (selectedPage ? pageVerses : verses).length - 1}
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--quran-t2)",
-                cursor: "pointer",
-                fontSize: 16,
-                opacity: (selectedPage ? pageVerses : verses).findIndex(item => item.sura === playingAudio.sura && item.aya === playingAudio.aya) >= (selectedPage ? pageVerses : verses).length - 1 ? 0.35 : 1
-              }}
-              title="อายะฮ์ถัดไป"
-            >
-              <i className="ti ti-player-skip-forward"></i>
-            </button>
-
-            {/* Stop button */}
-            <button
-              onClick={stopAudio}
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--red)",
-                cursor: "pointer",
-                fontSize: 16
-              }}
-              title="หยุดเล่น"
-            >
-              <i className="ti ti-square"></i>
-            </button>
-          </div>
-
-          {/* Autoplay Toggle */}
-          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none", fontSize: 11, color: "var(--quran-text)" }}>
-            <input
-              type="checkbox"
-              checked={autoplayNext}
-              onChange={e => setAutoplayNext(e.target.checked)}
-              style={{ cursor: "pointer", width: 13, height: 13, accentColor: "var(--quran-teal)" }}
-            />
-            <span>เล่นต่อเนื่องอัตโนมัติ</span>
-          </label>
-        </div>
-      )}
     </div>
   )
 }

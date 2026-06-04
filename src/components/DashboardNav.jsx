@@ -48,6 +48,22 @@ export default function DashboardNav({
       bgVar: "rgba(245,158,11,0.1)",
     },
     {
+      icon: "ti ti-crown",
+      label: "ตารางอันดับ (Leaderboard)",
+      desc: "ดูอันดับการรักษาวินัยการอ่านของสมาชิกยอดเยี่ยม",
+      view: "leaderboard",
+      colorVar: "#ec4899",
+      bgVar: "rgba(236,72,153,0.1)",
+    },
+    {
+      icon: "ti ti-feather",
+      label: "สมุดบันทึกข้อคิด (Reflections)",
+      desc: "รวบรวมข้อคิดจากการอ่านหนังสือและอายะฮ์อัลกุรอาน พร้อมการ์ดแบ่งปัน",
+      view: "reflections",
+      colorVar: "#a855f7",
+      bgVar: "rgba(168,85,247,0.1)",
+    },
+    {
       icon: "ti ti-user-circle",
       label: "โปรไฟล์ของฉัน",
       desc: "จัดการข้อมูลบัญชีและรหัสสมาชิก",

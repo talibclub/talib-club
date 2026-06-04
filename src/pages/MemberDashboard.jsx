@@ -4,7 +4,8 @@ import toast from 'react-hot-toast'
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage"
 import { ARTICLES, BOOKS } from "../data/index.js"
 import { useContentCollection, useUserCollection, useUserDoc } from "../lib/contentStore.js"
-import { storage } from "../lib/firebase.js"
+import { storage, db } from "../lib/firebase.js"
+import { collection, query, orderBy, limit, getDocs } from "firebase/firestore"
 import { confirmAction } from "../utils/feedback.jsx"
 import Quran from "./Quran.jsx"
 import DashboardNav from "../components/DashboardNav.jsx"
@@ -197,6 +198,19 @@ export default function MemberDashboard({ authState, go, initialView = "overview
           setQuranAyah={setQuranAyah}
         />
       )}
+      {view === "leaderboard" && (
+        <LeaderboardPanel
+          authState={authState}
+          setView={setView}
+        />
+      )}
+      {view === "reflections" && (
+        <ReflectionsPanel
+          authState={authState}
+          setView={setView}
+          theme={theme}
+        />
+      )}
     </div>
   )
 }
@@ -208,9 +222,66 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
   const { items: shelfItems } = useContentCollection("bookshelf", [], uid, { live: false })
   const { items: savedVerses } = useUserCollection("quran_bookmarks", uid)
   const { item: remoteLastRead } = useUserDoc("quran_last_read", uid, uid ? `${uid}_last_read` : null)
+  const { items: sessionItems } = useContentCollection("reading_sessions", [], uid, { live: false })
+  const { items: streakRecords } = useContentCollection("reading_streaks", [], uid, { live: false })
   
   const userSavedVerses = useMemo(() => savedVerses.filter(item => item.uid === uid), [savedVerses, uid])
   const activeBooks = useMemo(() => shelfItems.filter(item => item.uid === uid && item.status !== "finished"), [shelfItems, uid])
+
+  const sessionCount = useMemo(() => sessionItems.filter(item => item.uid === uid && item.verified).length, [sessionItems, uid])
+  const streakSettings = useMemo(() => streakRecords.find(item => item.uid === uid || item.id === uid), [streakRecords, uid])
+  const finishedCount = useMemo(() => shelfItems.filter(item => item.uid === uid && item.status === "finished").length, [shelfItems, uid])
+  const bookmarkCount = userSavedVerses.length
+  const [sharedCount, setSharedCount] = useState(() => Number(localStorage.getItem("talib_shared_articles_count") || 0))
+
+  useEffect(() => {
+    const handleStorage = () => setSharedCount(Number(localStorage.getItem("talib_shared_articles_count") || 0))
+    window.addEventListener("storage", handleStorage)
+    return () => window.removeEventListener("storage", handleStorage)
+  }, [])
+
+  const achievements = useMemo(() => [
+    {
+      id: "first_step",
+      name: "ผู้เริ่มเดินทาง (First Step)",
+      desc: "สะสมชั่วโมงการอ่านครบ 1 ครั้งแรกสำเร็จ",
+      unlocked: sessionCount >= 1,
+      icon: "ti ti-shoe",
+      color: "#0d9488",
+    },
+    {
+      id: "streak_master",
+      name: "ผู้รักษาวินัย (Streak Master)",
+      desc: "รักษาสถิติการอ่านต่อเนื่องตั้งแต่ 7 วันขึ้นไป",
+      unlocked: (streakSettings?.streakCount || 0) >= 7,
+      icon: "ti ti-flame",
+      color: "#f97316",
+    },
+    {
+      id: "quran_lover",
+      name: "รักอัลกุรอาน (Quran Lover)",
+      desc: "บันทึกข้อคิดอายะฮ์อัลกุรอานครบ 5 อายะฮ์",
+      unlocked: bookmarkCount >= 5,
+      icon: "ti ti-heart",
+      color: "#ec4899",
+    },
+    {
+      id: "bookworm",
+      name: "หนอนหนังสือ (Bookworm)",
+      desc: "อ่านหนังสือบนชั้นวางจบเล่มครบ 3 เล่ม",
+      unlocked: finishedCount >= 3,
+      icon: "ti ti-book",
+      color: "#a855f7",
+    },
+    {
+      id: "wisdom_spreader",
+      name: "ผู้ส่งต่อความรู้ (Wisdom Spreader)",
+      desc: "แชร์บทความความรู้ให้ผู้อื่นอย่างน้อย 1 ครั้ง",
+      unlocked: sharedCount >= 1,
+      icon: "ti ti-share",
+      color: "#3b82f6",
+    }
+  ], [sessionCount, streakSettings?.streakCount, bookmarkCount, finishedCount, sharedCount])
 
   useEffect(() => {
     if (uid && remoteLastRead) {
@@ -267,6 +338,78 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
         activeBooksCount={activeBooks.length} 
         userSavedVersesCount={userSavedVerses.length} 
       />
+
+      {/* Achievements Section */}
+      <div style={{ marginTop: 32, textAlign: "left" }}>
+        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 4, color: "var(--text)", display: "flex", alignItems: "center", gap: 8 }}>
+          <i className="ti ti-award" style={{ color: "var(--teal)", fontSize: 22 }}></i> ความสำเร็จและเหรียญตรา (Achievements)
+        </h2>
+        <p style={{ fontSize: 12, color: "var(--t2)", marginBottom: 18 }}>สะสมชั่วโมงการอ่าน ศึกษาพระพจนารถ และรักษาวินัยการเรียนรู้เพื่อปลดล็อครางวัล</p>
+
+        <div className="grid3" style={{ gap: 16 }}>
+          {achievements.map(badge => (
+            <div
+              key={badge.id}
+              className="card"
+              style={{
+                display: "flex",
+                gap: 14,
+                padding: 16,
+                alignItems: "center",
+                opacity: badge.unlocked ? 1 : 0.6,
+                background: badge.unlocked ? "var(--bg3)" : "rgba(100, 116, 139, 0.04)",
+                border: badge.unlocked ? `1.5px solid ${badge.color}` : "0.5px solid var(--br)",
+                borderRadius: 16,
+                transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                boxShadow: badge.unlocked ? `0 4px 14px ${badge.color}15` : "none",
+                transform: "translateY(0px)",
+                cursor: "default"
+              }}
+              onMouseEnter={(e) => {
+                if (badge.unlocked) {
+                  e.currentTarget.style.transform = "translateY(-4px)"
+                  e.currentTarget.style.boxShadow = `0 8px 24px ${badge.color}25`
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (badge.unlocked) {
+                  e.currentTarget.style.transform = "translateY(0px)"
+                  e.currentTarget.style.boxShadow = `0 4px 14px ${badge.color}15`
+                }
+              }}
+            >
+              <div
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: "50%",
+                  background: badge.unlocked ? badge.color + "15" : "var(--br2)",
+                  color: badge.unlocked ? badge.color : "var(--t3)",
+                  display: "grid",
+                  placeItems: "center",
+                  fontSize: 26,
+                  filter: badge.unlocked ? "none" : "grayscale(100%)",
+                  flexShrink: 0,
+                  transition: "all 0.3s"
+                }}
+              >
+                <i className={badge.icon} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <strong style={{ fontSize: 13, color: badge.unlocked ? "var(--text)" : "var(--t2)" }}>{badge.name}</strong>
+                  {badge.unlocked ? (
+                    <i className="ti ti-circle-check" style={{ color: "var(--teal)", fontSize: 14 }}></i>
+                  ) : (
+                    <i className="ti ti-lock" style={{ color: "var(--t3)", fontSize: 12 }}></i>
+                  )}
+                </div>
+                <p style={{ fontSize: 11, color: "var(--t2)", marginTop: 4, lineHeight: 1.4 }}>{badge.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
@@ -1377,6 +1520,510 @@ function TutorialModal({ onClose, theme }) {
           </button>
         </div>
 
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+// --- Leaderboard Panel ---
+function LeaderboardPanel({ authState, setView }) {
+  const [leaders, setLeaders] = useState([])
+  const [loading, setLoading] = useState(true)
+  const uid = authState?.user?.uid
+
+  useEffect(() => {
+    async function fetchLeaders() {
+      try {
+        setLoading(true)
+        const q = query(
+          collection(db, "content_reading_streaks"),
+          orderBy("streakCount", "desc"),
+          limit(10)
+        )
+        const snapshot = await getDocs(q)
+        const data = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        setLeaders(data)
+      } catch (err) {
+        console.error("Error fetching leaderboard", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchLeaders()
+  }, [])
+
+  const userRank = useMemo(() => {
+    if (!uid || leaders.length === 0) return null
+    const idx = leaders.findIndex(item => item.uid === uid || item.id === uid)
+    if (idx !== -1) return { rank: idx + 1, data: leaders[idx] }
+    return null
+  }, [leaders, uid])
+
+  return (
+    <div style={{ maxWidth: 720, margin: "0 auto", textAlign: "left" }}>
+      <button
+        onClick={() => setView("overview")}
+        className="sec-link"
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 16, background: "none", border: "none", fontFamily: "'Prompt', sans-serif", cursor: "pointer", color: "var(--t2)" }}
+      >
+        <i className="ti ti-arrow-left"></i> กลับหน้าแดชบอร์ด
+      </button>
+
+      <div className="card" style={{ padding: 28, position: "relative", overflow: "hidden" }}>
+        {/* Background gradient hint */}
+        <div style={{
+          position: "absolute",
+          top: 0,
+          right: 0,
+          width: 150,
+          height: 150,
+          background: "radial-gradient(circle, rgba(236,72,153,0.12) 0%, rgba(0,0,0,0) 70%)",
+          pointerEvents: "none"
+        }} />
+
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 28 }}>
+          <div style={{
+            width: 48,
+            height: 48,
+            borderRadius: 14,
+            background: "rgba(236,72,153,0.1)",
+            color: "#ec4899",
+            display: "grid",
+            placeItems: "center",
+            fontSize: 24
+          }}>
+            <i className="ti ti-crown"></i>
+          </div>
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>ตารางอันดับผู้รักษาวินัยการอ่าน</h2>
+            <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 4 }}>สมาชิกรักการอ่านที่มีสถิติ Streak การอ่านหนังสือสะสมต่อเนื่องสูงสุด 10 อันดับแรก</p>
+          </div>
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "40px 0" }}>
+            <i className="ti ti-loader-2 spin" style={{ fontSize: 28, color: "var(--teal)", marginBottom: 8 }}></i>
+            <div style={{ fontSize: 12, color: "var(--t2)" }}>กำลังดึงข้อมูลอันดับจากระบบ...</div>
+          </div>
+        ) : leaders.length === 0 ? (
+          <div className="empty" style={{ padding: "40px 0" }}>
+            ยังไม่มีผู้ติดอันดับในขณะนี้ เริ่มอ่านหนังสือเพื่อสะสม Streak วันนี้กันเลย!
+          </div>
+        ) : (
+          <div>
+            {/* List */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {leaders.map((item, index) => {
+                const isCurrentUser = item.uid === uid || item.id === uid
+                const rank = index + 1
+                let rankBadge = ""
+                let rankStyle = { fontWeight: 600 }
+                if (rank === 1) {
+                  rankBadge = "🥇"
+                  rankStyle = { fontSize: 20 }
+                } else if (rank === 2) {
+                  rankBadge = "🥈"
+                  rankStyle = { fontSize: 20 }
+                } else if (rank === 3) {
+                  rankBadge = "🥉"
+                  rankStyle = { fontSize: 20 }
+                } else {
+                  rankBadge = `#${rank}`
+                  rankStyle = { fontSize: 13, color: "var(--t3)", fontFamily: "monospace" }
+                }
+
+                return (
+                  <div
+                    key={item.id}
+                    className="card"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "14px 20px",
+                      borderRadius: 14,
+                      border: isCurrentUser ? "1.5px solid #ec4899" : "0.5px solid var(--br)",
+                      background: isCurrentUser ? "rgba(236,72,153,0.03)" : "var(--bg3)",
+                      boxShadow: isCurrentUser ? "0 4px 12px rgba(236,72,153,0.08)" : "none"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                      <span style={{ width: 32, textAlign: "center", ...rankStyle }}>
+                        {rankBadge}
+                      </span>
+                      <div>
+                        <strong style={{ fontSize: 14, color: "var(--text)" }}>
+                          {item.displayName || "ผู้ไม่ประสงค์ออกนาม"}
+                        </strong>
+                        {isCurrentUser && (
+                          <span className="badge badge-teal" style={{ marginLeft: 8, fontSize: 10, background: "rgba(236,72,153,0.1)", color: "#ec4899", border: "none" }}>คุณ</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <i className="ti ti-flame" style={{ color: "#f97316", fontSize: 18 }} />
+                      <strong style={{ fontSize: 15, fontFamily: "monospace" }}>{item.streakCount || 0}</strong>
+                      <span style={{ fontSize: 12, color: "var(--t3)" }}>วันต่อเนื่อง</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Current user rank callout if not in top 10 */}
+            {!userRank && uid && (
+              <div
+                className="card"
+                style={{
+                  marginTop: 20,
+                  padding: 16,
+                  borderRadius: 14,
+                  border: "0.5px dashed var(--teal)",
+                  background: "var(--teal-bg)",
+                  textAlign: "center",
+                  fontSize: 13
+                }}
+              >
+                คุณยังไม่ได้สะสม Streak หรือไม่อยู่ใน 10 อันดับแรก มาร่วมท้าทายด้วยการอ่านวันละ 10 นาทีขึ้นไปกันเถอะ! 📚🚀
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// --- Reflections Panel ---
+function ReflectionsPanel({ authState, setView, theme }) {
+  const uid = authState?.user?.uid
+  const { items: books } = useContentCollection("books", BOOKS, null, { live: false })
+  const { items: bookmarkItems, loading: loadingBookmarks } = useUserCollection("quran_bookmarks", uid)
+  const { items: sessionItems, loading: loadingSessions } = useContentCollection("reading_sessions", [], uid, { live: false })
+  const [search, setSearch] = useState("")
+  const [activeExportCard, setActiveExportCard] = useState(null)
+
+  const bookmarkNotes = useMemo(() => {
+    return bookmarkItems
+      .filter(item => item.notes && item.notes.trim())
+      .map(item => ({
+        id: item.id,
+        type: "quran",
+        title: `ซูเราะฮ์ ${item.suraName || item.sura} [${item.sura}:${item.aya}]`,
+        notes: item.notes,
+        arabicText: item.arabicText,
+        translation: item.translation,
+        date: item.createdAt || item.updatedAt,
+        reference: `คัมภีร์อัลกุรอาน ซูเราะฮ์ ${item.suraName || item.sura} อายะฮ์ที่ ${item.aya}`
+      }))
+  }, [bookmarkItems])
+
+  const sessionNotes = useMemo(() => {
+    return sessionItems
+      .filter(item => item.reflection && item.reflection.trim())
+      .map(item => {
+        const book = books.find(b => String(b.id) === String(item.bookId)) || item.customBook || {}
+        return {
+          id: item.id,
+          type: "book",
+          title: book.title || "หนังสือทั่วไป",
+          notes: item.reflection,
+          date: item.completedAt || item.createdAt,
+          reference: `หนังสือ: ${book.title || "ทั่วไป"} (หน้า ${item.startPage || 0} - ${item.endPage || 0})`
+        }
+      })
+  }, [sessionItems, books])
+
+  const allNotes = useMemo(() => {
+    return [...bookmarkNotes, ...sessionNotes].sort((a, b) => {
+      const timeA = a.date ? (typeof a.date.toDate === "function" ? a.date.toDate().getTime() : new Date(a.date).getTime()) : 0
+      const timeB = b.date ? (typeof b.date.toDate === "function" ? b.date.toDate().getTime() : new Date(b.date).getTime()) : 0
+      return timeB - timeA
+    })
+  }, [bookmarkNotes, sessionNotes])
+
+  const filteredNotes = useMemo(() => {
+    if (!search.trim()) return allNotes
+    const q = search.toLowerCase()
+    return allNotes.filter(n =>
+      n.title.toLowerCase().includes(q) ||
+      n.notes.toLowerCase().includes(q) ||
+      (n.translation && n.translation.toLowerCase().includes(q))
+    )
+  }, [allNotes, search])
+
+  const loading = loadingBookmarks || loadingSessions
+
+  if (loading) return <div style={{ textAlign: "center", padding: 40 }}><i className="ti ti-loader-2 spin" style={{ fontSize: 24, color: "var(--teal)" }}></i></div>
+
+  return (
+    <div style={{ maxWidth: 840, margin: "0 auto", textAlign: "left" }}>
+      <button
+        onClick={() => setView("overview")}
+        className="sec-link"
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 16, background: "none", border: "none", fontFamily: "'Prompt', sans-serif", cursor: "pointer", color: "var(--t2)" }}
+      >
+        <i className="ti ti-arrow-left"></i> กลับหน้าแดชบอร์ด
+      </button>
+
+      <div className="card" style={{ padding: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(168,85,247,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <i className="ti ti-feather" style={{ color: "#a855f7", fontSize: 20 }}></i>
+            </div>
+            <div>
+              <h2 style={{ fontSize: 18, margin: 0 }}>สมุดบันทึกข้อคิด (My Reflections)</h2>
+              <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>{filteredNotes.length} รายการ (จดบันทึกจากหนังสือและอัลกุรอาน)</p>
+            </div>
+          </div>
+        </div>
+
+        {allNotes.length === 0 ? (
+          <div className="empty" style={{ padding: "40px 0" }}>
+            คุณยังไม่มีข้อคิดที่บันทึกไว้ เริ่มเขียนบันทึกในห้องอ่านหนังสือ หรือบันทึกข้อคิดในอัลกุรอานเพื่อรวบรวมไว้ที่นี่!
+          </div>
+        ) : (
+          <>
+            <div style={{ position: "relative", marginBottom: 20 }}>
+              <i className="ti ti-search" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 14 }}></i>
+              <input
+                placeholder="ค้นหาตามหัวข้อหรือเนื้อหาบันทึก..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ paddingLeft: 36, width: "100%", height: 38 }}
+              />
+            </div>
+
+            {filteredNotes.length === 0 ? (
+              <div className="empty" style={{ padding: "30px 0" }}>ไม่พบรายการที่ค้นหา</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {filteredNotes.map(note => (
+                  <div key={note.id} className="card" style={{ padding: 20, border: "0.5px solid var(--br)", background: "var(--bg3)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+                      <span className={`badge ${note.type === "quran" ? "badge-teal" : "badge-outline"}`} style={{ fontSize: 11, borderColor: note.type === "quran" ? "transparent" : "rgba(168,85,247,0.4)", color: note.type === "quran" ? "#fff" : "#a855f7" }}>
+                        <i className={`ti ${note.type === "quran" ? "ti-book" : "ti-notebook"}`} style={{ marginRight: 4 }}></i>
+                        {note.title}
+                      </span>
+
+                      <button
+                        className="btn btn-outline"
+                        style={{ padding: "4px 10px", fontSize: 11, display: "flex", alignItems: "center", gap: 4, color: "var(--teal)", borderColor: "var(--teal)" }}
+                        onClick={() => setActiveExportCard(note)}
+                      >
+                        <i className="ti ti-share"></i> ส่งออกการ์ด
+                      </button>
+                    </div>
+
+                    <div style={{ background: "var(--card)", borderLeft: "3.5px solid var(--teal)", padding: "10px 14px", borderRadius: "0 8px 8px 0" }}>
+                      <p style={{ fontSize: 13, color: "var(--text)", margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                        {note.notes}
+                      </p>
+                    </div>
+
+                    {note.type === "quran" && note.translation && (
+                      <div style={{ marginTop: 10, fontSize: 11, color: "var(--t3)", fontStyle: "italic", borderTop: "0.5px dashed var(--br2)", paddingTop: 8 }}>
+                        คำแปลอายะฮ์: {note.translation}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {activeExportCard && (
+        <ExportCardModal
+          note={activeExportCard}
+          theme={theme}
+          onClose={() => setActiveExportCard(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// --- Export Card Modal ---
+function ExportCardModal({ note, onClose, theme }) {
+  const cardRef = useRef(null)
+
+  const handlePrint = () => {
+    const printContent = cardRef.current.innerHTML
+    
+    const win = window.open("", "_blank")
+    win.document.write(`
+      <html>
+        <head>
+          <title>Talib Club Reflection Card</title>
+          <link href="https://fonts.googleapis.com/css2?family=Charm:wght@400;700&family=Prompt:wght@300;400;500;600&family=Amiri&display=swap" rel="stylesheet">
+          <style>
+            body {
+              font-family: 'Prompt', sans-serif;
+              background: #fff;
+              color: #1e293b;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              height: 100vh;
+              margin: 0;
+            }
+            .card-container {
+              background: #fbfbfa;
+              border: 2px solid #bba588;
+              border-radius: 16px;
+              padding: 40px;
+              width: 500px;
+              box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+              text-align: center;
+              position: relative;
+            }
+            .watermark {
+              color: #bba588;
+              font-size: 11px;
+              letter-spacing: 2px;
+              text-transform: uppercase;
+              margin-top: 30px;
+              font-weight: 500;
+            }
+            .quote-text {
+              font-size: 17px;
+              line-height: 1.6;
+              font-style: italic;
+              color: #2c3e50;
+              margin: 20px 0;
+              white-space: pre-wrap;
+            }
+            .ref {
+              font-size: 12px;
+              color: #7f8c8d;
+              font-weight: 500;
+              margin-top: 15px;
+            }
+            .divider {
+              width: 60px;
+              height: 1px;
+              background: #bba588;
+              margin: 15px auto;
+            }
+            .arabic {
+              font-family: 'Amiri', serif;
+              font-size: 26px;
+              direction: rtl;
+              margin-bottom: 12px;
+              color: #0d9488;
+              line-height: 1.6;
+            }
+            @media print {
+              body { height: auto; }
+              .card-container {
+                box-shadow: none;
+                border: 2px solid #bba588;
+                page-break-inside: avoid;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="card-container">
+            ${printContent}
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            }
+          </script>
+        </body>
+      </html>
+    `)
+    win.document.close()
+  }
+
+  const handleCopyText = async () => {
+    const text = `"${note.notes}"\n\n— อ้างอิง: ${note.reference}\n(บันทึกผ่าน Talib Club)`
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success("คัดลอกข้อความบันทึกแล้ว")
+    } catch {
+      toast.error("คัดลอกล้มเหลว")
+    }
+  }
+
+  return createPortal(
+    <div className={`app ${theme || "light"}`} style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.6)",
+      backdropFilter: "blur(4px)",
+      zIndex: 99999,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16
+    }}>
+      <div className="card" style={{
+        maxWidth: 560,
+        width: "100%",
+        padding: 24,
+        background: "var(--card)",
+        border: "0.5px solid var(--br)",
+        borderRadius: 20,
+        boxShadow: "0 20px 40px rgba(0,0,0,0.35)",
+        animation: "pageFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)"
+      }}>
+        {/* Quote Card Area */}
+        <div style={{
+          background: theme === "dark" ? "#1e2022" : "#fcfbf7",
+          border: "2px solid #cbb598",
+          borderRadius: 16,
+          padding: "36px 28px",
+          textAlign: "center",
+          boxShadow: "inset 0 0 20px rgba(0,0,0,0.02)",
+          marginBottom: 20,
+          color: theme === "dark" ? "#e2e8f0" : "#1e293b"
+        }}>
+          {/* We wrap the content we want to copy/print in a div with ref */}
+          <div ref={cardRef}>
+            {note.type === "quran" && note.arabicText && (
+              <div class="arabic" dangerouslySetInnerHTML={{ __html: note.arabicText }} />
+            )}
+
+            <div class="quote-text">
+              "{note.notes}"
+            </div>
+
+            <div class="divider" />
+
+            <div class="ref">
+              {note.reference}
+            </div>
+
+            <div class="watermark">
+              Talib Club · ปลูกฝังนิสัยรักการเรียนรู้
+            </div>
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
+          <button className="btn btn-outline" onClick={onClose} style={{ padding: "8px 16px" }}>
+            ปิดหน้าต่าง
+          </button>
+          <button className="btn btn-outline" onClick={handleCopyText} style={{ padding: "8px 16px", display: "flex", alignItems: "center", gap: 6 }}>
+            <i className="ti ti-copy"></i> คัดลอกข้อความ
+          </button>
+          <button className="btn btn-teal" onClick={handlePrint} style={{ padding: "8px 16px", display: "flex", alignItems: "center", gap: 6 }}>
+            <i className="ti ti-printer"></i> พิมพ์การ์ด / บันทึก PDF
+          </button>
+        </div>
       </div>
     </div>,
     document.body

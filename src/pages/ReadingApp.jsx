@@ -102,6 +102,9 @@ function normalizeStreakSettings(settings, uid) {
     gems: Number(settings?.gems || 0),
     remindersEnabled: settings?.remindersEnabled ?? false,
     reminderTimes,
+    streakCount: Number(settings?.streakCount || 0),
+    bestStreak: Number(settings?.bestStreak || 0),
+    displayName: settings?.displayName || "",
   }
 }
 
@@ -501,6 +504,35 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       applyAutoFreeze()
     }
   }, [uid, loadingSessions, loadingStreaks, streakSettings, readingSessions, streak.todayKey, streak.coveredDays, saveStreakSettings])
+
+  // Sync calculated streak count and user display name to Firestore for leaderboard
+  useEffect(() => {
+    if (!uid || loadingStreaks || loadingSessions || !streakSettings) return
+    const currentStreakCount = streak.current
+    const currentBestStreak = streak.best
+    const userDisplayName = authState?.user?.displayName || authState?.user?.email?.split("@")[0] || "สมาชิก"
+
+    if (
+      streakSettings.streakCount !== currentStreakCount ||
+      streakSettings.bestStreak !== currentBestStreak ||
+      streakSettings.displayName !== userDisplayName
+    ) {
+      const syncStreak = async () => {
+        try {
+          await saveStreakSettings({
+            ...streakSettings,
+            streakCount: currentStreakCount,
+            bestStreak: currentBestStreak,
+            displayName: userDisplayName,
+            updatedAt: safeDateNow()
+          })
+        } catch (err) {
+          console.error("Failed to sync streak count to Firestore", err)
+        }
+      }
+      syncStreak()
+    }
+  }, [uid, loadingStreaks, loadingSessions, streakSettings, streak.current, streak.best, authState?.user?.displayName, authState?.user?.email, saveStreakSettings])
 
   async function protectToday(type) {
     if (!uid) return
