@@ -1333,7 +1333,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
             </div>
 
             {/* Quick Actions Grid */}
-            <div style={{ display: "grid", gridTemplateColumns: mode === "mushaf" && selectedPage ? "1fr 1fr" : "1fr 1fr 1fr", gap: 6 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : (mode === "mushaf" && selectedPage ? "1fr 1fr" : "1fr 1fr 1fr"), gap: 6 }}>
               {/* Surah Dropdown Button */}
               <button
                 onClick={() => {

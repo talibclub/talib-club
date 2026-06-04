@@ -204,6 +204,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   const [isRunning, setIsRunning] = useState(false)
   const timerRef = useRef(null)
   const startTimestampRef = useRef(null)
+  const accumulatedSecondsRef = useRef(0)
 
   // Log Form states
   const [startPage, setStartPage] = useState("")
@@ -644,9 +645,25 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   // --- Stopwatch logic ---
   useEffect(() => {
     if (isRunning) {
-      timerRef.current = setInterval(() => {
-        setSeconds(prev => prev + 1)
-      }, 1000)
+      const tick = () => {
+        const elapsed = Math.floor((Date.now() - startTimestampRef.current) / 1000)
+        setSeconds(accumulatedSecondsRef.current + elapsed)
+      }
+      
+      tick()
+      timerRef.current = setInterval(tick, 1000)
+
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === "visible") {
+          tick()
+        }
+      }
+      document.addEventListener("visibilitychange", handleVisibilityChange)
+
+      return () => {
+        if (timerRef.current) clearInterval(timerRef.current)
+        document.removeEventListener("visibilitychange", handleVisibilityChange)
+      }
     } else {
       if (timerRef.current) clearInterval(timerRef.current)
     }
@@ -668,6 +685,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 
   function startReading(shelfItem) {
     setActiveBook(shelfItem)
+    accumulatedSecondsRef.current = 0
     setSeconds(0)
     setIsRunning(true)
     setStartPage(shelfItem.currentPage || 1)
@@ -678,6 +696,13 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   }
 
   const toggleStopwatch = () => {
+    if (isRunning) {
+      const elapsed = Math.floor((Date.now() - startTimestampRef.current) / 1000)
+      accumulatedSecondsRef.current += elapsed
+      setSeconds(accumulatedSecondsRef.current)
+    } else {
+      startTimestampRef.current = Date.now()
+    }
     setIsRunning(!isRunning)
   }
 
@@ -692,6 +717,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     setIsRunning(false)
     setActiveBook(null)
     setSeconds(0)
+    accumulatedSecondsRef.current = 0
     clearShelfLaunchContext()
   }
 

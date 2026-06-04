@@ -73,11 +73,16 @@ export default function DashboardNav({
 
   return (
     <div className="grid3" style={{ gap: 12 }}>
-      {navItems.map((item) => (
+      {navItems.map((item, index) => (
         <button
           key={item.view}
-          className="card dashboard-card"
+          className="card dashboard-card card-glass animate-fade-in-up"
           onClick={() => handleClick(item.view)}
+          style={{ 
+            animationDelay: `${index * 0.05}s`,
+            opacity: 0, /* start transparent so animation works smoothly */
+            animationFillMode: "forwards"
+          }}
         >
           <div
             style={{
