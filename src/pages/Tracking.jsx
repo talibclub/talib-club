@@ -54,11 +54,6 @@ export default function Tracking({ authState }) {
     }
   }, [authState?.isStaff]);
 
-  useEffect(() => {
-    if (isAdminAuthenticated && view === "home") {
-      setView("admin-dashboard");
-    }
-  }, [isAdminAuthenticated, view]);
 
   // Fetch Data when tabs change
   useEffect(() => {
@@ -506,7 +501,7 @@ export default function Tracking({ authState }) {
                 localStorage.setItem(TRACKING_AUTH_KEY, "password");
                 setView("admin-dashboard");
               } else if (!import.meta.env.VITE_TRACKING_ADMIN_PASSWORD) {
-                await myAlert("ยังไม่ได้ตั้งรหัสแอดมิน (VITE_TRACKING_ADMIN_PASSWORD) และบัญชีนี้ไม่ใช่ staff\n\nล็อกอินด้วยบัญชีสตาฟหรือตั้งค่าใน .env");
+                await myAlert("กรุณาเข้าสู่ระบบ เฉพาะสตาฟเท่านั้น");
               } else {
                 await myAlert("รหัสผ่านไม่ถูกต้อง");
               }

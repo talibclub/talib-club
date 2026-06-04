@@ -49,6 +49,11 @@ const normalizeAyahNumber = (value) => {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
 
+const stripTajweedTags = (html) => {
+  if (!html) return ""
+  return html.replace(/<\/?tajweed[^>]*>/g, "")
+}
+
 export default function Quran({ initialSura, initialAyah, authState }) {
   const [selectedSura, setSelectedSura] = useState(() => normalizeSuraNumber(initialSura))
   const readingAreaRef = useRef(null)
@@ -84,6 +89,14 @@ export default function Quran({ initialSura, initialAyah, authState }) {
   useEffect(() => {
     localStorage.setItem("quran-sidebar-collapsed", sidebarCollapsed)
   }, [sidebarCollapsed])
+
+  useEffect(() => {
+    localStorage.setItem("quran-font-family", quranFont)
+  }, [quranFont])
+
+  useEffect(() => {
+    localStorage.setItem("quran-tajweed-enabled", tajweedEnabled)
+  }, [tajweedEnabled])
 
   useEffect(() => {
     setBenefitsExpanded(false)
@@ -166,31 +179,65 @@ export default function Quran({ initialSura, initialAyah, authState }) {
     setPageLoading(true)
     setPageVerses([])
 
-    // Fetch Arabic text for Mushaf page display
-    fetch(`https://api.alquran.cloud/v1/page/${selectedPage}/quran-simple`)
-      .then(res => res.json())
+    const quranComUrl = `https://api.quran.com/api/v4/quran/verses/uthmani_tajweed?page_number=${selectedPage}`
+    
+    fetch(quranComUrl)
+      .then(res => {
+        if (!res.ok) throw new Error("Quran.com API error")
+        return res.json()
+      })
       .then(data => {
         if (!active) return
-        if (data.code === 200 && data.data?.ayahs) {
-          const ayahs = data.data.ayahs
-          setPageVerses(ayahs.map(aya => ({
-            id: aya.number,
-            sura: aya.surah.number,
-            aya: aya.numberInSurah,
-            arabic_text: aya.text,
-            suraName: aya.surah.englishName
-          })))
-          if (ayahs.length > 0) {
-            setSelectedSura(ayahs[0].surah.number)
-          }
+        if (data.verses && data.verses.length > 0) {
+          const versesMapped = data.verses.map(v => {
+            const parts = v.verse_key.split(":")
+            const suraNum = parseInt(parts[0])
+            const ayaNum = parseInt(parts[1])
+            const suraInfo = SURA_LIST.find(s => s.number === suraNum)
+            return {
+              id: v.id,
+              sura: suraNum,
+              aya: ayaNum,
+              arabic_text: v.text_uthmani_tajweed,
+              arabic_text_tajweed: v.text_uthmani_tajweed,
+              suraName: suraInfo ? suraInfo.englishName : ""
+            }
+          })
+          setPageVerses(versesMapped)
+          setSelectedSura(versesMapped[0].sura)
+          setPageLoading(false)
+        } else {
+          throw new Error("No verses returned")
         }
-        setPageLoading(false)
       })
       .catch(err => {
-        if (!active) return
-        console.error(err)
-        setPageLoading(false)
-        toast.error("ไม่สามารถโหลดข้อมูลหน้าได้")
+        console.warn("Failed to load page from Quran.com API, falling back to AlQuran.cloud", err)
+        fetch(`https://api.alquran.cloud/v1/page/${selectedPage}/quran-simple`)
+          .then(res => res.json())
+          .then(data => {
+            if (!active) return
+            if (data.code === 200 && data.data?.ayahs) {
+              const ayahs = data.data.ayahs
+              setPageVerses(ayahs.map(aya => ({
+                id: aya.number,
+                sura: aya.surah.number,
+                aya: aya.numberInSurah,
+                arabic_text: aya.text,
+                arabic_text_tajweed: aya.text,
+                suraName: aya.surah.englishName
+              })))
+              if (ayahs.length > 0) {
+                setSelectedSura(ayahs[0].surah.number)
+              }
+            }
+            setPageLoading(false)
+          })
+          .catch(fallbackErr => {
+            if (!active) return
+            console.error("Both APIs failed", fallbackErr)
+            setPageLoading(false)
+            toast.error("ไม่สามารถโหลดข้อมูลหน้าได้")
+          })
       })
 
     return () => {
@@ -211,6 +258,13 @@ export default function Quran({ initialSura, initialAyah, authState }) {
 
   const [arabicSize, setArabicSize] = useState(32) // px
   const [thaiSize, setThaiSize] = useState(15) // px
+  const [quranFont, setQuranFont] = useState(() => {
+    return localStorage.getItem("quran-font-family") || "UthmanicHafs"
+  })
+  const [tajweedEnabled, setTajweedEnabled] = useState(() => {
+    return localStorage.getItem("quran-tajweed-enabled") !== "false"
+  })
+  const [showTajweedLegend, setShowTajweedLegend] = useState(false)
 
   const [verses, setVerses] = useState([])
   const [loading, setLoading] = useState(false)
@@ -494,6 +548,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
 
     const transUrl = `https://quranenc.com/api/v1/translation/sura/${translationKey}/${selectedSura}`
     const tafsirUrl = `https://quranenc.com/api/v1/translation/sura/thai_mokhtasar/${selectedSura}`
+    const quranComUrl = `https://api.quran.com/api/v4/quran/verses/uthmani_tajweed?chapter_number=${selectedSura}`
 
     Promise.all([
       fetch(transUrl).then(res => {
@@ -503,18 +558,40 @@ export default function Quran({ initialSura, initialAyah, authState }) {
       fetch(tafsirUrl).then(res => {
         if (!res.ok) throw new Error("ไม่สามารถเชื่อมต่อบทอธิบายความหมายย่อ (Tafsir) ได้")
         return res.json()
-      })
+      }),
+      fetch(quranComUrl)
+        .then(res => {
+          if (!res.ok) throw new Error("Failed to fetch Tajweed from Quran.com")
+          return res.json()
+        })
+        .catch(err => {
+          console.warn("Quran.com Tajweed API failed, falling back to QuranEnc Arabic text", err)
+          return null
+        })
     ])
-      .then(([transData, tafsirData]) => {
+      .then(([transData, tafsirData, tajweedData]) => {
         if (!active) return
 
         const merged = transData.result.map((aya, idx) => {
           const tafsirAya = tafsirData.result[idx] || {}
+          
+          let tajweedText = null
+          if (tajweedData && tajweedData.verses) {
+            const matchingTajweed = tajweedData.verses.find(v => {
+              const parts = v.verse_key.split(":")
+              return parseInt(parts[1]) === parseInt(aya.aya)
+            })
+            if (matchingTajweed) {
+              tajweedText = matchingTajweed.text_uthmani_tajweed
+            }
+          }
+
           return {
             id: aya.id,
             sura: aya.sura,
             aya: aya.aya,
             arabic_text: aya.arabic_text,
+            arabic_text_tajweed: tajweedText || aya.arabic_text,
             translation: aya.translation,
             tafsir: tafsirAya.translation || ""
           }
@@ -568,7 +645,14 @@ export default function Quran({ initialSura, initialAyah, authState }) {
     <div className="quran-container">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;700&display=swap');
         
+        @font-face {
+          font-family: 'UthmanicHafs';
+          src: url('https://verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.woff2') format('woff2');
+          font-display: swap;
+        }
+
         .app, .quran-container {
           --quran-bg: var(--bg);
           --quran-card-bg: var(--card);
@@ -661,17 +745,74 @@ export default function Quran({ initialSura, initialAyah, authState }) {
           border-radius: 4px;
         }
         .arabic-font {
-          font-family: 'Amiri', 'Noto Naskh Arabic', 'Traditional Arabic', serif;
+          font-family: ${quranFont === "UthmanicHafs" ? "'UthmanicHafs', " : quranFont === "Amiri" ? "'Amiri', " : quranFont === "NotoNaskh" ? "'Noto Naskh Arabic', " : ""}'Amiri', 'Noto Naskh Arabic', 'Traditional Arabic', serif;
           direction: rtl;
           text-align: right;
           line-height: 2.6;
           color: var(--quran-text);
         }
         .mushaf-flow {
+          font-family: ${quranFont === "UthmanicHafs" ? "'UthmanicHafs', " : quranFont === "Amiri" ? "'Amiri', " : quranFont === "NotoNaskh" ? "'Noto Naskh Arabic', " : ""}'Amiri', 'Noto Naskh Arabic', 'Traditional Arabic', serif;
           text-align: justify;
           direction: rtl;
           line-height: 2.6;
           color: var(--quran-text);
+        }
+
+        /* Tajweed Color Rules */
+        tajweed {
+          display: inline;
+          color: inherit;
+        }
+        
+        tajweed.ham_wasl,
+        tajweed.slnt,
+        tajweed.laam_shamsiyah,
+        tajweed.idgham_mutajanisayn,
+        tajweed.idgham_mutaqaribayn {
+          color: #a0a0a0 !important;
+        }
+        
+        tajweed.madda_normal {
+          color: #2b78e4 !important;
+        }
+        tajweed.madda_permissible {
+          color: #3d85c6 !important;
+        }
+        tajweed.madda_necessary {
+          color: #0b5394 !important;
+        }
+        tajweed.madda_obligatory {
+          color: #073763 !important;
+        }
+        
+        tajweed.qalaqah {
+          color: #cc0000 !important;
+        }
+        
+        tajweed.ghunnah {
+          color: #e69138 !important;
+        }
+        
+        tajweed.ikhafa {
+          color: #8e7cc3 !important;
+        }
+        tajweed.ikhafa_shafawi {
+          color: #a64d79 !important;
+        }
+        
+        tajweed.idgham_ghunnah {
+          color: #38761d !important;
+        }
+        tajweed.idgham_wo_ghunnah {
+          color: #6aa84f !important;
+        }
+        tajweed.idgham_shafawi {
+          color: #274e13 !important;
+        }
+        
+        tajweed.iqlab {
+          color: #1155cc !important;
         }
         .mode-btn {
           font-family: 'Prompt', sans-serif;
@@ -1144,34 +1285,143 @@ export default function Quran({ initialSura, initialAyah, authState }) {
             </div>
           </div>
         ) : (
-          /* MOBILE SELECT TRIGGER BAR */
-          <div
-            onClick={() => setIsMobileNavOpen(true)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "12px 16px",
-              background: "var(--quran-card-bg)",
-              border: "1px solid var(--quran-br)",
-              borderRadius: "12px",
-              cursor: "pointer",
-              marginBottom: "4px",
-              boxShadow: "0 2px 6px rgba(0,0,0,0.02)"
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <i className="ti ti-book" style={{ color: "var(--quran-teal)", fontSize: 16 }}></i>
-              <div style={{ textAlign: "left" }}>
-                <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--quran-text)" }}>
-                  ซูเราะฮ์ {currentSuraInfo.number}: {currentSuraInfo.englishName}
-                </div>
-                <div style={{ fontSize: "10px", color: "var(--quran-t2)" }}>
-                  {currentSuraInfo.englishNameTranslation} • {currentSuraInfo.numberOfAyahs} อายะฮ์ (แตะเพื่อเลือก/ค้นหา)
-                </div>
+          /* MOBILE QUICK NAVIGATION BAR */
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            padding: "12px",
+            background: "var(--quran-card-bg)",
+            border: "1px solid var(--quran-br)",
+            borderRadius: "14px",
+            marginBottom: "12px",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.03)",
+            textAlign: "left"
+          }}>
+            {/* Current Position Display */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: "11px", color: "var(--quran-teal)", fontWeight: 600, background: "var(--quran-teal-bg)", padding: "2px 8px", borderRadius: 10 }}>
+                  {mode === "mushaf" && selectedPage ? `มุศฮัฟ หน้า ${selectedPage}` : `ซูเราะฮ์ ${currentSuraInfo.englishName}`}
+                </span>
+                <span style={{ fontSize: "10px", color: "var(--quran-t3)" }}>
+                  {mode === "mushaf" && selectedPage ? "อ่านทีละหน้า" : `อายะฮ์ 1 - ${currentSuraInfo.numberOfAyahs}`}
+                </span>
               </div>
+              <button
+                onClick={() => {
+                  setSidebarTab("surah");
+                  setNavMode("surah");
+                  setIsMobileNavOpen(true);
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--quran-teal)",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 3
+                }}
+              >
+                <i className="ti ti-search"></i> ค้นหา/เปลี่ยนซูเราะฮ์
+              </button>
             </div>
-            <i className="ti ti-chevron-down" style={{ color: "var(--quran-t3)", fontSize: 14 }}></i>
+
+            {/* Quick Actions Grid */}
+            <div style={{ display: "grid", gridTemplateColumns: mode === "mushaf" && selectedPage ? "1fr 1fr" : "1fr 1fr 1fr", gap: 6 }}>
+              {/* Surah Dropdown Button */}
+              <button
+                onClick={() => {
+                  setSidebarTab("surah");
+                  setNavMode("surah");
+                  setIsMobileNavOpen(true);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "8px 10px",
+                  fontSize: "11.5px",
+                  fontWeight: 500,
+                  borderRadius: "8px",
+                  border: "0.5px solid var(--quran-br)",
+                  background: "var(--quran-bg)",
+                  color: "var(--quran-text)",
+                  cursor: "pointer",
+                  width: "100%"
+                }}
+              >
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  📖 {currentSuraInfo.number}. {currentSuraInfo.englishName}
+                </span>
+                <i className="ti ti-chevron-down" style={{ fontSize: 9, marginLeft: 4 }}></i>
+              </button>
+
+              {/* Ayah Jump Selector (Only shown if not in page-based Mushaf mode) */}
+              {!(mode === "mushaf" && selectedPage) && (
+                <div style={{ position: "relative", width: "100%" }}>
+                  <select
+                    value={targetScrollAyah || ""}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val) {
+                        setTargetScrollAyah(parseInt(val));
+                      }
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "8px 24px 8px 8px",
+                      fontSize: "11.5px",
+                      fontWeight: 500,
+                      borderRadius: "8px",
+                      border: "0.5px solid var(--quran-br)",
+                      background: "var(--quran-bg)",
+                      color: "var(--quran-text)",
+                      cursor: "pointer",
+                      appearance: "none",
+                      outline: "none"
+                    }}
+                  >
+                    <option value="">🎯 เลือกอายะฮ์...</option>
+                    {Array.from({ length: currentSuraInfo.numberOfAyahs }, (_, i) => i + 1).map(a => (
+                      <option key={a} value={a}>อายะฮ์ที่ {a}</option>
+                    ))}
+                  </select>
+                  <i className="ti ti-chevron-down" style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", fontSize: 9, pointerEvents: "none", color: "var(--quran-t3)" }}></i>
+                </div>
+              )}
+
+              {/* Page Selector Button */}
+              <button
+                onClick={() => {
+                  setSidebarTab("surah");
+                  setNavMode("page");
+                  setIsMobileNavOpen(true);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "8px 10px",
+                  fontSize: "11.5px",
+                  fontWeight: 500,
+                  borderRadius: "8px",
+                  border: "0.5px solid var(--quran-br)",
+                  background: "var(--quran-bg)",
+                  color: "var(--quran-text)",
+                  cursor: "pointer",
+                  width: "100%"
+                }}
+              >
+                <span>
+                  📄 {selectedPage ? `หน้า ${selectedPage}` : "ระบุหน้า..."}
+                </span>
+                <i className="ti ti-chevron-down" style={{ fontSize: 9, marginLeft: 4 }}></i>
+              </button>
+            </div>
           </div>
         )}
 
@@ -1508,7 +1758,135 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                 </div>
               </div>
             )}
+            
+            {/* Font & Tajweed Customization Bar */}
+            <div style={{
+              borderTop: "0.5px solid var(--br2)",
+              paddingTop: 12,
+              display: "flex",
+              flexDirection: isMobile ? "column" : "row",
+              justifyContent: "space-between",
+              alignItems: isMobile ? "stretch" : "center",
+              gap: 12,
+              textAlign: "left"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+                <span style={{ fontSize: 11, color: "var(--t2)", fontWeight: 500, whiteSpace: "nowrap" }}>ฟอนต์อาหรับ:</span>
+                <select
+                  value={quranFont}
+                  onChange={e => setQuranFont(e.target.value)}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: 11,
+                    borderRadius: 8,
+                    border: "0.5px solid var(--quran-br)",
+                    background: "var(--quran-card-bg)",
+                    color: "var(--quran-text)",
+                    cursor: "pointer",
+                    outline: "none"
+                  }}
+                >
+                  <option value="UthmanicHafs">Uthmanic Hafs (แนะนำ - ตามต้นฉบับ)</option>
+                  <option value="Amiri">Amiri (อามิรี)</option>
+                  <option value="NotoNaskh">Noto Naskh Arabic (คลาสสิก)</option>
+                </select>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none" }}>
+                  <input
+                    type="checkbox"
+                    checked={tajweedEnabled}
+                    onChange={e => setTajweedEnabled(e.target.checked)}
+                    style={{ cursor: "pointer", width: 14, height: 14, accentColor: "var(--quran-teal)" }}
+                  />
+                  <span style={{ fontSize: 11, color: "var(--quran-text)", fontWeight: 500 }}>
+                    แสดงสีตัจวีด (ช่วยออกเสียง)
+                  </span>
+                </label>
+
+                {tajweedEnabled && (
+                  <button
+                    onClick={() => setShowTajweedLegend(!showTajweedLegend)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--quran-teal)",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      fontWeight: 500,
+                      padding: 0,
+                      textDecoration: "underline",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4
+                    }}
+                  >
+                    <i className="ti ti-info-circle"></i> คำอธิบายสีตัจวีด
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
+
+          {/* Tajweed Legend Panel */}
+          {tajweedEnabled && showTajweedLegend && (
+            <div className="card" style={{
+              padding: "16px 20px",
+              marginBottom: 20,
+              background: "var(--quran-br2)",
+              borderColor: "var(--quran-br)",
+              textAlign: "left",
+              animation: "slideDown 0.2s ease"
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--quran-text)", display: "flex", alignItems: "center", gap: 6 }}>
+                  <i className="ti ti-book" style={{ color: "var(--quran-teal)" }}></i> คำอธิบายสัญลักษณ์และสีตัจวีด (Tajweed Guide)
+                </span>
+                <button
+                  onClick={() => setShowTajweedLegend(false)}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "var(--quran-t3)", fontSize: 14 }}
+                >
+                  <i className="ti ti-x"></i>
+                </button>
+              </div>
+              
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: "10px 20px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
+                  <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: "50%", background: "#cc0000" }}></span>
+                  <strong style={{ color: "var(--quran-text)" }}>สะท้อนเสียง (Qalqalah):</strong> สีแดง
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
+                  <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: "50%", background: "#e69138" }}></span>
+                  <strong style={{ color: "var(--quran-text)" }}>หน่วงเสียงขึ้นจมูก (Ghunnah):</strong> สีส้ม
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
+                  <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: "50%", background: "#8e7cc3" }}></span>
+                  <strong style={{ color: "var(--quran-text)" }}>ซ่อนเสียง (Ikhfa):</strong> สีม่วง
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
+                  <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: "50%", background: "#38761d" }}></span>
+                  <strong style={{ color: "var(--quran-text)" }}>ควบกล้ำหน่วงเสียง:</strong> สีเขียวเข้ม
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
+                  <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: "50%", background: "#6aa84f" }}></span>
+                  <strong style={{ color: "var(--quran-text)" }}>ควบกล้ำไม่หน่วงเสียง:</strong> สีเขียวอ่อน
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
+                  <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: "50%", background: "#1155cc" }}></span>
+                  <strong style={{ color: "var(--quran-text)" }}>แปลงเสียงเป็น ม.ม้า (Iqlab):</strong> สีน้ำเงินอมฟ้า
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
+                  <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: "50%", background: "#2b78e4" }}></span>
+                  <strong style={{ color: "var(--quran-text)" }}>ยืดเสียงยาว (Madd):</strong> สีฟ้า/น้ำเงิน
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
+                  <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: "50%", background: "#a0a0a0" }}></span>
+                  <strong style={{ color: "var(--quran-text)" }}>อักษรที่ไม่ต้องออกเสียง:</strong> สีเทา
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* LOADING & ERROR STATES */}
           {loading && verses.length === 0 && (
@@ -1636,7 +2014,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                             className="mushaf-flow"
                             style={{
                               fontSize: `${arabicSize}px`,
-                              fontFamily: "'Amiri', serif",
+                              fontFamily: quranFont === "UthmanicHafs" ? "'UthmanicHafs', serif" : quranFont === "Amiri" ? "'Amiri', serif" : "'Noto Naskh Arabic', serif",
                               color: "var(--text)",
                               direction: "rtl",
                               textAlign: "justify",
@@ -1646,9 +2024,14 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                             {pageVerses.length > 0 ? (
                               pageVerses.map(v => {
                                 const isBookmarked = lastRead?.sura === v.sura && lastRead?.aya === v.aya
+                                const rawText = v.arabic_text_tajweed || v.text || v.arabic_text || ""
                                 return (
                                   <span key={v.id}>
-                                    {v.text || v.arabic_text || ""}{" "}
+                                    {tajweedEnabled ? (
+                                      <span dangerouslySetInnerHTML={{ __html: rawText }} />
+                                    ) : (
+                                      <span>{stripTajweedTags(rawText)}</span>
+                                    )}{" "}
                                     <span
                                       onClick={() => {
                                         setActiveAyahMenu({
@@ -1730,7 +2113,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                       className="mushaf-flow"
                       style={{
                         fontSize: `${arabicSize}px`,
-                        fontFamily: "'Amiri', serif",
+                        fontFamily: quranFont === "UthmanicHafs" ? "'UthmanicHafs', serif" : quranFont === "Amiri" ? "'Amiri', serif" : "'Noto Naskh Arabic', serif",
                         color: "var(--text)",
                         direction: "rtl",
                         textAlign: "justify",
@@ -1739,9 +2122,14 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                     >
                       {verses.map(v => {
                         const isBookmarked = lastRead?.sura === v.sura && lastRead?.aya === v.aya
+                        const rawText = v.arabic_text_tajweed || v.arabic_text || ""
                         return (
                           <span key={v.id}>
-                            {v.arabic_text}{" "}
+                            {tajweedEnabled ? (
+                              <span dangerouslySetInnerHTML={{ __html: rawText }} />
+                            ) : (
+                              <span>{stripTajweedTags(rawText)}</span>
+                            )}{" "}
                             <span
                               onClick={() => {
                                 setActiveAyahMenu({
@@ -1853,17 +2241,22 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                             </div>
                           </div>
 
-                          {/* Arabic text */}
-                          <div
-                            className="arabic-font"
-                            style={{
-                              fontSize: `${arabicSize}px`,
-                              color: "var(--text)",
-                              paddingRight: 6
-                            }}
-                          >
-                            {v.arabic_text}
-                          </div>
+                           {/* Arabic text */}
+                           <div
+                             className="arabic-font"
+                             style={{
+                               fontSize: px,
+                               fontFamily: quranFont === "UthmanicHafs" ? "'UthmanicHafs', serif" : quranFont === "Amiri" ? "'Amiri', serif" : "'Noto Naskh Arabic', serif",
+                               color: "var(--text)",
+                               paddingRight: 6
+                             }}
+                           >
+                             {tajweedEnabled ? (
+                               <span dangerouslySetInnerHTML={{ __html: v.arabic_text_tajweed || v.arabic_text }} />
+                             ) : (
+                               <span>{stripTajweedTags(v.arabic_text_tajweed || v.arabic_text)}</span>
+                             )}
+                           </div>
 
                           {/* Thai Translation */}
                           <div
