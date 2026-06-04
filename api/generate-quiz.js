@@ -1,4 +1,4 @@
-const OPENAI_URL = "https://api.openai.com/v1/responses"
+const OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 
 function send(res, status, data) {
@@ -104,15 +104,6 @@ Book:
 ${JSON.stringify(book, null, 2)}`
 }
 
-function extractOpenAIText(data) {
-  if (data.output_text) return data.output_text
-  return (data.output || [])
-    .flatMap(item => item.content || [])
-    .map(part => part.text || "")
-    .join("\n")
-    .trim()
-}
-
 async function generateWithOpenAI(book, apiKey) {
   const response = await fetch(OPENAI_URL, {
     method: "POST",
@@ -122,13 +113,13 @@ async function generateWithOpenAI(book, apiKey) {
     },
     body: JSON.stringify({
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-      input: [
+      messages: [
         { role: "system", content: "You generate concise Thai multiple-choice quizzes as strict JSON." },
         { role: "user", content: quizPrompt(book) },
       ],
-      text: {
-        format: {
-          type: "json_schema",
+      response_format: {
+        type: "json_schema",
+        json_schema: {
           name: "reading_quiz",
           strict: true,
           schema: {
@@ -171,7 +162,8 @@ async function generateWithOpenAI(book, apiKey) {
   }
 
   const data = await response.json()
-  const quiz = normalizeQuiz(JSON.parse(extractOpenAIText(data) || "{}"), book)
+  const content = data.choices?.[0]?.message?.content?.trim() || "{}"
+  const quiz = normalizeQuiz(JSON.parse(content), book)
   return quiz.length ? quiz : null
 }
 

@@ -245,9 +245,20 @@ export default async function handler(req, res) {
 
   const params = method === "GET" ? req.query : parseBody(req)
   const { url } = params
-
   if (!url) {
     return send(res, 400, { error: "Missing article URL" })
+  }
+
+  let parsedUrl
+  try {
+    parsedUrl = new URL(url)
+  } catch (err) {
+    return send(res, 400, { error: "Invalid URL format" })
+  }
+
+  const isAbuiyaad = parsedUrl.hostname === "abuiyaad.com" || parsedUrl.hostname.endsWith(".abuiyaad.com")
+  if (!isAbuiyaad) {
+    return send(res, 400, { error: "Only abuiyaad.com domain is permitted" })
   }
 
   try {

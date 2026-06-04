@@ -1,13 +1,15 @@
 import webpush from 'web-push';
 
-const publicKey = process.env.VITE_VAPID_PUBLIC_KEY || 'BGRh2iJ_qx1nPRYaGYSiJrUhNKiMkh7I4FihzwRCypluVz2-cX2Auell3VAecFGOG-eGTadnBteEmdHs5Zg4c3g';
-const privateKey = process.env.VAPID_PRIVATE_KEY || 'h2WGzNmnwPHTvh1B53bSi3BI-XlyurTFsMCIiM14JdU';
+const publicKey = process.env.VITE_VAPID_PUBLIC_KEY;
+const privateKey = process.env.VAPID_PRIVATE_KEY;
 
-webpush.setVapidDetails(
-  'mailto:contact@talib.club',
-  publicKey,
-  privateKey
-);
+if (publicKey && privateKey) {
+  webpush.setVapidDetails(
+    'mailto:contact@talib.club',
+    publicKey,
+    privateKey
+  );
+}
 
 export default async function handler(req, res) {
   // Support standard Vercel response formatting
@@ -28,6 +30,10 @@ export default async function handler(req, res) {
       };
     }
   };
+
+  if (!publicKey || !privateKey) {
+    return sendResponse(500, { error: 'Push notification service is not configured (missing VAPID keys)' });
+  }
 
   // CORS Headers for Vercel
   if (typeof res.setHeader === 'function') {

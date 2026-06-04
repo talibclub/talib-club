@@ -69,9 +69,9 @@ service cloud.firestore {
     }
 
     match /content_reading_streaks/{docId} {
-      allow read: if signedIn() && (docId == request.auth.uid || resource.data.uid == request.auth.uid);
-      allow create: if signedIn() && (docId == request.auth.uid || request.resource.data.uid == request.auth.uid);
-      allow update, delete: if signedIn() && (docId == request.auth.uid || resource.data.uid == request.auth.uid);
+      allow read: if signedIn() && docId == request.auth.uid;
+      allow create, update: if signedIn() && docId == request.auth.uid && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && docId == request.auth.uid;
     }
 
     match /content_quran_bookmarks/{docId} {
@@ -81,9 +81,9 @@ service cloud.firestore {
     }
 
     match /content_quran_last_read/{docId} {
-      allow read: if signedIn() && (docId == request.auth.uid || resource.data.uid == request.auth.uid);
-      allow create: if signedIn() && (docId == request.auth.uid || request.resource.data.uid == request.auth.uid);
-      allow update, delete: if signedIn() && (docId == request.auth.uid || resource.data.uid == request.auth.uid);
+      allow read: if signedIn() && docId == request.auth.uid + "_last_read";
+      allow create, update: if signedIn() && docId == request.auth.uid + "_last_read" && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && docId == request.auth.uid + "_last_read";
     }
 
     match /content_history/{docId} {

@@ -41,7 +41,8 @@ export default function Tracking({ authState }) {
       script.src = "https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js";
       document.head.appendChild(script);
     }
-    if (canAccessTrackingAdmin(authState) || localStorage.getItem(TRACKING_AUTH_KEY) === "staff") {
+    const savedPassword = sessionStorage.getItem(TRACKING_AUTH_KEY);
+    if (canAccessTrackingAdmin(authState) || (savedPassword && verifyTrackingAdminPassword(savedPassword))) {
       setIsAdminAuthenticated(true);
       setView("admin-dashboard");
     }
@@ -50,7 +51,6 @@ export default function Tracking({ authState }) {
   useEffect(() => {
     if (canAccessTrackingAdmin(authState)) {
       setIsAdminAuthenticated(true);
-      localStorage.setItem(TRACKING_AUTH_KEY, "staff");
     }
   }, [authState?.isStaff]);
 
@@ -515,11 +515,10 @@ export default function Tracking({ authState }) {
             <button className="btn btn-main style-full" style={{ width: "100%", background: "var(--teal)", color: "white" }} onClick={async () => {
               if (canAccessTrackingAdmin(authState)) {
                 setIsAdminAuthenticated(true);
-                localStorage.setItem(TRACKING_AUTH_KEY, "staff");
                 setView("admin-dashboard");
               } else if (verifyTrackingAdminPassword(adminPassword)) {
                 setIsAdminAuthenticated(true);
-                localStorage.setItem(TRACKING_AUTH_KEY, "password");
+                sessionStorage.setItem(TRACKING_AUTH_KEY, adminPassword);
                 setView("admin-dashboard");
               } else if (!import.meta.env.VITE_TRACKING_ADMIN_PASSWORD) {
                 await myAlert("กรุณาเข้าสู่ระบบ เฉพาะสตาฟเท่านั้น");
@@ -549,7 +548,7 @@ export default function Tracking({ authState }) {
                  <p style={{ fontSize: "12px", opacity: 0.8, margin: 0 }}>จัดการข้อมูลแบบครบวงจร</p>
                </div>
             </div>
-            <button onClick={() => { setIsAdminAuthenticated(false); localStorage.removeItem(TRACKING_AUTH_KEY); localStorage.removeItem("talib_admin_auth"); setView("home"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.3)", color: "white", padding: "6px 16px", borderRadius: "20px", cursor: "pointer", fontSize: "13px" }}>ออกจากระบบแอดมิน</button>
+            <button onClick={() => { setIsAdminAuthenticated(false); sessionStorage.removeItem(TRACKING_AUTH_KEY); localStorage.removeItem(TRACKING_AUTH_KEY); localStorage.removeItem("talib_admin_auth"); setView("home"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.3)", color: "white", padding: "6px 16px", borderRadius: "20px", cursor: "pointer", fontSize: "13px" }}>ออกจากระบบแอดมิน</button>
           </div>
 
           {/* Admin Tabs */}

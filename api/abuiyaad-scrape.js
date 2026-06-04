@@ -20,7 +20,8 @@ function textOnly(value = "") {
 function isArticleUrl(url) {
   try {
     const parsed = new URL(url)
-    if (!parsed.hostname.endsWith("abuiyaad.com")) return false
+    const isAbuiyaad = parsed.hostname === "abuiyaad.com" || parsed.hostname.endsWith(".abuiyaad.com")
+    if (!isAbuiyaad) return false
     return /^\/[a-z]\//.test(parsed.pathname)
   } catch {
     return false
@@ -81,7 +82,7 @@ export default async function handler(req, res) {
           })
         }
 
-        const isAbuiyaad = parsed.hostname.endsWith("abuiyaad.com")
+        const isAbuiyaad = parsed.hostname === "abuiyaad.com" || parsed.hostname.endsWith(".abuiyaad.com")
         const isNavigable = parsed.pathname === "/" ||
           /\/(archive|archives|articles|news|reports|categories|tags|category|page|[a-z])\//.test(parsed.pathname)
 
