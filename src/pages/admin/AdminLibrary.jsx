@@ -432,19 +432,32 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
     const file = e.target.files?.[0]
     if (!file) return
 
+    console.log("Starting Library Image Upload: v4 Diagnostic Logger active.");
+    console.log("Original File Name:", file.name, "Size:", file.size, "Type:", file.type);
+
     setUploadingImage(true)
     try {
+      console.log("Compressing image...");
       const compressedFile = await compressImage(file, { maxWidth: 1000, maxHeight: 1000, quality: 0.75 })
+      console.log("Image compression complete. Output Name:", compressedFile.name, "Size:", compressedFile.size);
+      
       const safeName = compressedFile.name.replace(/[^a-zA-Z0-9.-]/g, "_")
       const storageRef = ref(storage, `library_covers/${Date.now()}_${safeName}`)
+      console.log("Uploading bytes to Firebase Storage reference:", storageRef.fullPath);
+      
       await uploadBytes(storageRef, compressedFile)
+      console.log("Firebase upload completed. Retrieving download URL...");
+      
       const url = await getDownloadURL(storageRef)
+      console.log("Success! Cover URL obtained:", url);
+      
       set("coverUrl", url)
       notifySuccess("อัปโหลดรูปภาพปกเรียบร้อยแล้ว")
     } catch (err) {
-      console.error(err)
+      console.error("Diagnostic error caught inside handleUploadImage:", err)
       notifyError("อัปโหลดรูปภาพล้มเหลว")
     } finally {
+      console.log("Finally block executed. Setting uploadingImage back to false.");
       setUploadingImage(false)
     }
   }
