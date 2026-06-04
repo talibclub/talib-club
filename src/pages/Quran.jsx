@@ -55,6 +55,8 @@ const stripTajweedTags = (html) => {
   let cleaned = html.replace(/<\/?tajweed[^>]*>/g, "")
   // Remove any self-closing <span/> artifacts
   cleaned = cleaned.replace(/<span\/>/gi, "")
+  // Strip U+25CC dotted circle
+  cleaned = cleaned.replace(/\u25cc/g, "")
   return cleaned.trim()
 }
 
@@ -64,6 +66,8 @@ const stripAllTags = (html) => {
   let cleaned = html.replace(/<\/?tajweed[^>]*>/g, "")
   cleaned = cleaned.replace(/<span[^>]*class=["']?end["']?[^>]*>.*?<\/span>/gi, "")
   cleaned = cleaned.replace(/<span\/>/gi, "")
+  // Strip U+25CC dotted circle
+  cleaned = cleaned.replace(/\u25cc/g, "")
   return cleaned.trim()
 }
 
@@ -202,12 +206,13 @@ export default function Quran({ initialSura, initialAyah, authState }) {
             const suraNum = parseInt(parts[0])
             const ayaNum = parseInt(parts[1])
             const suraInfo = SURA_LIST.find(s => s.number === suraNum)
+            const cleanText = (v.text_uthmani_tajweed || "").replace(/\u25cc/g, "")
             return {
               id: v.id,
               sura: suraNum,
               aya: ayaNum,
-              arabic_text: v.text_uthmani_tajweed,
-              arabic_text_tajweed: v.text_uthmani_tajweed,
+              arabic_text: cleanText,
+              arabic_text_tajweed: cleanText,
               suraName: suraInfo ? suraInfo.englishName : ""
             }
           })
@@ -226,14 +231,17 @@ export default function Quran({ initialSura, initialAyah, authState }) {
             if (!active) return
             if (data.code === 200 && data.data?.ayahs) {
               const ayahs = data.data.ayahs
-              setPageVerses(ayahs.map(aya => ({
-                id: aya.number,
-                sura: aya.surah.number,
-                aya: aya.numberInSurah,
-                arabic_text: aya.text,
-                arabic_text_tajweed: aya.text,
-                suraName: aya.surah.englishName
-              })))
+              setPageVerses(ayahs.map(aya => {
+                const cleanText = (aya.text || "").replace(/\u25cc/g, "")
+                return {
+                  id: aya.number,
+                  sura: aya.surah.number,
+                  aya: aya.numberInSurah,
+                  arabic_text: cleanText,
+                  arabic_text_tajweed: cleanText,
+                  suraName: aya.surah.englishName
+                }
+              }))
               if (ayahs.length > 0) {
                 setSelectedSura(ayahs[0].surah.number)
               }
@@ -751,8 +759,8 @@ export default function Quran({ initialSura, initialAyah, authState }) {
             id: aya.id,
             sura: aya.sura,
             aya: aya.aya,
-            arabic_text: aya.arabic_text,
-            arabic_text_tajweed: tajweedText || aya.arabic_text,
+            arabic_text: (aya.arabic_text || "").replace(/\u25cc/g, ""),
+            arabic_text_tajweed: (tajweedText || aya.arabic_text || "").replace(/\u25cc/g, ""),
             translation: aya.translation,
             tafsir: tafsirAya.translation || ""
           }
@@ -2176,7 +2184,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                     lineHeight: 1.5,
                     direction: "rtl"
                   }}>
-                    بِسْمِ اللَّهِ الرَّحْمัٰنِ الرَّحِيمِ
+                    بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
                   </div>
                 )}
 
