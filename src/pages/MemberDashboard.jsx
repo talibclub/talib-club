@@ -85,6 +85,58 @@ export default function MemberDashboard({ authState, go, initialView = "overview
 
   return (
     <div className="member-page">
+      {user && !user.emailVerified && (
+        <div className="card" style={{
+          background: "rgba(217, 119, 6, 0.07)",
+          borderColor: "rgba(217, 119, 6, 0.25)",
+          borderStyle: "solid",
+          borderWidth: ".5px",
+          color: "var(--text)",
+          padding: "16px 20px",
+          marginBottom: 20,
+          borderRadius: 12,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 12,
+        }}>
+          <div style={{ display: "flex", alignItems: "start", gap: 10, flex: 1, minWidth: 260 }}>
+            <i className="ti ti-mail-exclamation" style={{ fontSize: 22, color: "#d97706", marginTop: 2 }}></i>
+            <div>
+              <strong style={{ fontSize: 14, display: "block", marginBottom: 2 }}>กรุณายืนยันอีเมลของคุณ ✉️</strong>
+              <span style={{ fontSize: 13, color: "var(--t2)", lineHeight: 1.5 }}>
+                บัญชีของคุณยังไม่ได้ยืนยันความถูกต้องของอีเมล ({user.email}) โปรดตรวจสอบกล่องจดหมายและกดยืนยันตัวตน เพื่อความปลอดภัยในการสะสมประวัติ Streak การอ่าน
+              </span>
+            </div>
+          </div>
+          <button 
+            className="btn"
+            style={{ 
+              background: "#d97706", 
+              borderColor: "#d97706", 
+              color: "#fff",
+              fontSize: 12,
+              padding: "6px 14px",
+              borderRadius: 20,
+              cursor: "pointer",
+            }}
+            onClick={async () => {
+              try {
+                if (authState?.sendCurrentEmailVerification) {
+                  await authState.sendCurrentEmailVerification();
+                  toast.success("ส่งลิงก์ยืนยันตัวตนไปยังอีเมลของคุณอีกครั้งเรียบร้อยแล้ว!");
+                }
+              } catch (err) {
+                console.error(err);
+                toast.error("ไม่สามารถส่งอีเมลยืนยันตัวตนได้ในขณะนี้");
+              }
+            }}
+          >
+            ส่งลิงก์อีกครั้ง
+          </button>
+        </div>
+      )}
       {view === "overview" && (
         <div className="member-hero">
           <div>

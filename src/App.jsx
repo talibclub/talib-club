@@ -40,6 +40,7 @@ import { Toaster } from "react-hot-toast"
 import PWAInstallBanner from "./components/PWAInstallBanner.jsx"
 import "./styles/global.css"
 import { useContentCollection } from "./lib/contentStore.js"
+import { syncServerTime, safeDateNow } from "./utils/time.js"
 
 function getTimeMs(value) {
   if (!value) return 0
@@ -69,6 +70,11 @@ export default function App() {
   const [ctx, setCtx] = useState(null)
   const [countdownText, setCountdownText] = useState("")
 
+  // Sync server time offset on mount
+  useEffect(() => {
+    syncServerTime()
+  }, [])
+
   const uid = authState?.user?.uid
   const { items: readingSessions } = useContentCollection("reading_sessions", [], uid, { live: false })
   const countdownNotifRef = useRef(null)
@@ -79,7 +85,7 @@ export default function App() {
     const interval = setInterval(() => {
       const isNotifEnabled = localStorage.getItem("talib_notif_enabled") === "true"
       if (!isNotifEnabled || typeof Notification === "undefined" || Notification.permission !== "granted") return
-      const now = new Date()
+      const now = new Date(safeDateNow())
       const todayKey = getLocalDayKey(now.getTime())
       const notifTime = localStorage.getItem("talib_notif_time") || "20:00"
       const [prefHour, prefMin] = notifTime.split(":").map(Number)
@@ -101,7 +107,7 @@ export default function App() {
   useEffect(() => {
     if (!uid) return
     const interval = setInterval(() => {
-      const now = new Date()
+      const now = new Date(safeDateNow())
       if (now.getHours() === 23) {
         const todayKey = getLocalDayKey(now.getTime())
         const todaySessions = readingSessions.filter(

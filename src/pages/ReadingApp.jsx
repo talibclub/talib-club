@@ -6,6 +6,7 @@ import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.j
 import { confirmAction } from "../utils/feedback.jsx"
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage"
 import { storage } from "../lib/firebase.js"
+import { safeDateNow } from "../utils/time.js"
 
 // --- Helper Functions ---
 function sanitizeStorageName(name) {
@@ -50,7 +51,7 @@ function addDaysToKey(dayKey, amount) {
 }
 
 function todayKey() {
-  return getLocalDayKey(Date.now())
+  return getLocalDayKey(safeDateNow())
 }
 
 function formatReadingMinutes(seconds) {
@@ -489,7 +490,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
             freezeCredits: Number(streakSettings.freezeCredits || 0) - 1,
             protectedDays: [
               ...streakSettings.protectedDays,
-              { date: yesterdayKey, type: "freeze", usedAt: Date.now() },
+              { date: yesterdayKey, type: "freeze", usedAt: safeDateNow() },
             ],
           })
           toast.success("เมื่อวานนี้คุณไม่ได้เข้าอ่านหนังสือ! ระบบได้ใช้น้ำแข็งช่วยปกป้อง Streak ของคุณอัตโนมัติ 🧊", { duration: 5000 })
@@ -531,7 +532,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       [creditKey]: Number(streakSettings[creditKey] || 0) - 1,
       protectedDays: [
         ...streakSettings.protectedDays,
-        { date: key, type, usedAt: Date.now() },
+        { date: key, type, usedAt: safeDateNow() },
       ],
     })
     toast.success(isLeave ? "บันทึกวันลากิจแล้ว" : "ใช้น้ำแข็งคุ้มครอง streak วันนี้แล้ว")
@@ -567,7 +568,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       note: "",
       totalPages: Number(book.totalPages || 0),
       sourceType: "library",
-      addedAt: Date.now(),
+      addedAt: safeDateNow(),
     })
     setSelectedBookToAdd("")
     toast.success("เพิ่มเข้าชั้นหนังสือแล้ว! พร้อมเปิดห้องอ่านหนังสือ")
@@ -593,7 +594,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 
       if (externalBook.file) {
         const safeName = sanitizeStorageName(externalBook.file.name)
-        const fileRef = ref(storage, `members/${uid}/bookshelf/${Date.now()}-${safeName}`)
+        const fileRef = ref(storage, `members/${uid}/bookshelf/${safeDateNow()}-${safeName}`)
         await uploadBytes(fileRef, externalBook.file, {
           contentType: externalBook.file.type || "application/octet-stream",
           customMetadata: { uid, title },
@@ -630,7 +631,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
         status: "reading",
         progress: 0,
         note: "",
-        addedAt: Date.now(),
+        addedAt: safeDateNow(),
       })
       setExternalBook({ title: "", author: "", fileUrl: "", desc: "", totalPages: "", file: null })
       toast.success("เพิ่มไฟล์นอกเข้าชั้นหนังสือแล้ว! พร้อมเปิดห้องอ่านหนังสือ")
@@ -646,7 +647,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   useEffect(() => {
     if (isRunning) {
       const tick = () => {
-        const elapsed = Math.floor((Date.now() - startTimestampRef.current) / 1000)
+        const elapsed = Math.floor((safeDateNow() - startTimestampRef.current) / 1000)
         setSeconds(accumulatedSecondsRef.current + elapsed)
       }
       
@@ -692,16 +693,16 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     setEndPage("")
     setReflection("")
     setActiveMobileTab("form")
-    startTimestampRef.current = Date.now()
+    startTimestampRef.current = safeDateNow()
   }
 
   const toggleStopwatch = () => {
     if (isRunning) {
-      const elapsed = Math.floor((Date.now() - startTimestampRef.current) / 1000)
+      const elapsed = Math.floor((safeDateNow() - startTimestampRef.current) / 1000)
       accumulatedSecondsRef.current += elapsed
       setSeconds(accumulatedSecondsRef.current)
     } else {
-      startTimestampRef.current = Date.now()
+      startTimestampRef.current = safeDateNow()
     }
     setIsRunning(!isRunning)
   }
@@ -738,7 +739,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     setSaving(true)
     try {
       const payload = {
-        startedAt: startTimestampRef.current || Date.now() - (seconds * 1000),
+        startedAt: startTimestampRef.current || safeDateNow() - (seconds * 1000),
         activeSeconds: seconds,
         inactiveSeconds: 0,
         startPage: start,
@@ -754,7 +755,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
         return
       }
 
-      const sessionId = `${uid}_${activeBook.id}_${Date.now()}`
+      const sessionId = `${uid}_${activeBook.id}_${safeDateNow()}`
       
       await saveReadingSession({
         id: sessionId,
@@ -765,7 +766,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
         sourceType: activeBook.sourceType || "library",
         dayKey: todayKey(),
         startedAt: payload.startedAt,
-        completedAt: Date.now(),
+        completedAt: safeDateNow(),
         activeSeconds: payload.activeSeconds,
         inactiveSeconds: payload.inactiveSeconds,
         startPage: Number(payload.startPage || 0),
@@ -798,7 +799,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
         status: nextProgress >= 100 ? "finished" : "reading",
         totalReadSeconds: Number(activeBook.totalReadSeconds || 0) + seconds,
         verifiedSessions: Number(activeBook.verifiedSessions || 0) + 1,
-        lastReadAt: Date.now(),
+        lastReadAt: safeDateNow(),
         lastVerificationScore: report.score,
       })
 
