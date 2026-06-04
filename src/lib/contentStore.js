@@ -580,16 +580,101 @@ export function useUserDoc(collectionKey, uid, docId, fallback = null) {
   return { item, loading, saveItem, deleteItem, refetch: fetchDoc }
 }
 
+const SETTINGS_CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
+const documentCache = new Map()
+
+function readCachedDocument(collectionName, docId) {
+  const cacheKey = `${collectionName}:${docId}`
+  // Check memory cache
+  const entry = documentCache.get(cacheKey)
+  if (entry) {
+    if (Date.now() - entry.at < SETTINGS_CACHE_TTL_MS) {
+      return entry.data
+    }
+    documentCache.delete(cacheKey)
+  }
+
+  // Check localStorage
+  try {
+    const localData = localStorage.getItem(LOCAL_STORAGE_CACHE_PREFIX + cacheKey)
+    if (localData) {
+      const parsed = JSON.parse(localData)
+      if (Date.now() - parsed.at < SETTINGS_CACHE_TTL_MS) {
+        documentCache.set(cacheKey, { data: parsed.data, at: parsed.at })
+        return parsed.data
+      }
+      localStorage.removeItem(LOCAL_STORAGE_CACHE_PREFIX + cacheKey)
+    }
+  } catch (e) {
+    console.error("Failed to read document from localStorage cache:", e)
+  }
+  return null
+}
+
+function writeCachedDocument(collectionName, docId, data) {
+  const cacheKey = `${collectionName}:${docId}`
+  const now = Date.now()
+  documentCache.set(cacheKey, { data, at: now })
+  try {
+    localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + cacheKey, JSON.stringify({ data, at: now }))
+  } catch (e) {
+    console.error("Failed to write document to localStorage cache:", e)
+  }
+}
+
+export function invalidateDocumentCache(collectionName, docId) {
+  const cacheKey = `${collectionName}:${docId}`
+  documentCache.delete(cacheKey)
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_CACHE_PREFIX + cacheKey)
+  } catch (e) {}
+}
+
 /**
  * Fetch a single public content document (1 read) instead of the whole collection.
+ * Checks the collection cache first to avoid Firestore reads if the list is already loaded.
  */
 export function useContentDoc(collectionKey, docId, fallback = null) {
   const collectionName = CONTENT_COLLECTIONS[collectionKey]
-  const [item, setItem] = useState(fallback)
-  const [loading, setLoading] = useState(Boolean(docId))
+  
+  // Find in collection cache first to avoid Firestore getDoc reads
+  const cachedFromCollection = useMemo(() => {
+    if (!collectionName || !docId) return null
+    // Search the memory cache for any cache key of this collection
+    for (const [key, entry] of collectionCache.entries()) {
+      if (key.includes(`"collectionName":"${collectionName}"`)) {
+        const found = entry.items.find(item => String(item.id) === String(docId))
+        if (found) return found
+      }
+    }
+    // Search localStorage cache
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key && key.startsWith(LOCAL_STORAGE_CACHE_PREFIX) && key.includes(`"collectionName":"${collectionName}"`)) {
+          const localData = localStorage.getItem(key)
+          if (localData) {
+            const parsed = JSON.parse(localData)
+            const found = parsed.items?.find(item => String(item.id) === String(docId))
+            if (found) return found
+          }
+        }
+      }
+    } catch (e) {}
+    return null
+  }, [collectionName, docId])
+
+  const [item, setItem] = useState(() => cachedFromCollection || fallback)
+  const [loading, setLoading] = useState(() => !cachedFromCollection && Boolean(docId))
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    if (cachedFromCollection) {
+      setItem(cachedFromCollection)
+      setLoading(false)
+      return undefined
+    }
+
     if (!collectionName || !docId) {
       setItem(fallback)
       setLoading(false)
@@ -615,22 +700,40 @@ export function useContentDoc(collectionKey, docId, fallback = null) {
         setLoading(false)
       })
     return undefined
-  }, [collectionName, collectionKey, docId, fallback])
+  }, [collectionName, collectionKey, docId, fallback, cachedFromCollection])
 
   return { item, loading, error }
 }
 
 export function useSiteSettings(fallbackSite) {
-  const [site, setSite] = useState(fallbackSite)
-  const [loading, setLoading] = useState(true)
+  const [site, setSite] = useState(() => {
+    const cached = readCachedDocument(SITE_DOC.collection, SITE_DOC.id)
+    return cached ? deepMerge(fallbackSite, cached) : fallbackSite
+  })
+  const [loading, setLoading] = useState(() => {
+    const cached = readCachedDocument(SITE_DOC.collection, SITE_DOC.id)
+    return !cached
+  })
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    const cached = readCachedDocument(SITE_DOC.collection, SITE_DOC.id)
+    if (cached) {
+      setLoading(false)
+      return undefined
+    }
+
     let cancelled = false
     getDoc(doc(db, SITE_DOC.collection, SITE_DOC.id))
       .then(snapshot => {
         if (cancelled) return
-        setSite(snapshot.exists() ? deepMerge(fallbackSite, snapshot.data()) : fallbackSite)
+        if (snapshot.exists()) {
+          const data = snapshot.data()
+          writeCachedDocument(SITE_DOC.collection, SITE_DOC.id, data)
+          setSite(deepMerge(fallbackSite, data))
+        } else {
+          setSite(fallbackSite)
+        }
         setError(null)
         setLoading(false)
       })
@@ -649,22 +752,41 @@ export function useSiteSettings(fallbackSite) {
       ...cleanForFirestore(nextSite),
       updatedAt: serverTimestamp(),
     }, { merge: true })
+    invalidateDocumentCache(SITE_DOC.collection, SITE_DOC.id)
   }
 
   return { site, loading, error, saveSiteSettings }
 }
 
 export function useTaxonomySettings(fallbackTaxonomy) {
-  const [taxonomy, setTaxonomy] = useState(fallbackTaxonomy)
-  const [loading, setLoading] = useState(true)
+  const [taxonomy, setTaxonomy] = useState(() => {
+    const cached = readCachedDocument(TAXONOMY_DOC.collection, TAXONOMY_DOC.id)
+    return cached ? deepMerge(fallbackTaxonomy, cached) : fallbackTaxonomy
+  })
+  const [loading, setLoading] = useState(() => {
+    const cached = readCachedDocument(TAXONOMY_DOC.collection, TAXONOMY_DOC.id)
+    return !cached
+  })
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    const cached = readCachedDocument(TAXONOMY_DOC.collection, TAXONOMY_DOC.id)
+    if (cached) {
+      setLoading(false)
+      return undefined
+    }
+
     let cancelled = false
     getDoc(doc(db, TAXONOMY_DOC.collection, TAXONOMY_DOC.id))
       .then(snapshot => {
         if (cancelled) return
-        setTaxonomy(snapshot.exists() ? deepMerge(fallbackTaxonomy, snapshot.data()) : fallbackTaxonomy)
+        if (snapshot.exists()) {
+          const data = snapshot.data()
+          writeCachedDocument(TAXONOMY_DOC.collection, TAXONOMY_DOC.id, data)
+          setTaxonomy(deepMerge(fallbackTaxonomy, data))
+        } else {
+          setTaxonomy(fallbackTaxonomy)
+        }
         setError(null)
         setLoading(false)
       })
@@ -683,6 +805,7 @@ export function useTaxonomySettings(fallbackTaxonomy) {
       ...cleanForFirestore(nextTaxonomy),
       updatedAt: serverTimestamp(),
     }, { merge: true })
+    invalidateDocumentCache(TAXONOMY_DOC.collection, TAXONOMY_DOC.id)
   }
 
   return { taxonomy, loading, error, saveTaxonomySettings }
