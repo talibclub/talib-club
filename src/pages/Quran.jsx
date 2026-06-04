@@ -2247,7 +2247,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                            <div
                              className="arabic-font"
                              style={{
-                               fontSize: px,
+                               fontSize: `${arabicSize}px`,
                                fontFamily: quranFont === "UthmanicHafs" ? "'UthmanicHafs', serif" : quranFont === "Amiri" ? "'Amiri', serif" : "'Noto Naskh Arabic', serif",
                                color: "var(--text)",
                                paddingRight: 6
