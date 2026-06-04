@@ -29,12 +29,12 @@ export default function ArticleDetail({ item, go, authState }) {
   )
   const { item: remoteArticle, loading: loadingArticles } = useContentDoc("articles", articleId, fallbackArticle)
 
+  const { items: articles } = useContentCollection("articles", ARTICLES, null, { live: false })
   const { items: bookmarks, saveItem: saveBookmark, deleteItem: deleteBookmark } = useContentCollection("bookmarks", [], uid, { live: false })
   const { saveItem: saveHistory } = useContentCollection("history", [], uid, { live: false })
 
   const hasIncrementedView = useRef(null)
   const hasSavedHistory = useRef(null)
-  const [seriesArticles, setSeriesArticles] = useState([])
 
   const displayItem = useMemo(() => {
     const fromFilters = item?.fromFilters
@@ -45,29 +45,15 @@ export default function ArticleDetail({ item, go, authState }) {
     return null
   }, [item, remoteArticle])
 
-  useEffect(() => {
+  const seriesArticles = useMemo(() => {
     if (displayItem?.type !== "series" || !displayItem?.seriesId) {
-      setSeriesArticles([])
-      return undefined
+      return []
     }
-    let cancelled = false
     const seriesId = String(displayItem.seriesId).toLowerCase()
-    const q = query(
-      collection(db, CONTENT_COLLECTIONS.articles),
-      where("seriesId", "==", displayItem.seriesId)
-    )
-    getDocs(q)
-      .then(snapshot => {
-        if (cancelled) return
-        const episodes = snapshot.docs
-          .map(d => ({ ...d.data(), id: d.data().id ?? d.id }))
-          .filter(a => !a.deleted && String(a.type).toLowerCase() === "series" && String(a.seriesId).toLowerCase() === seriesId)
-          .sort((a, b) => (a.part || 0) - (b.part || 0))
-        setSeriesArticles(episodes)
-      })
-      .catch(err => console.error("Cannot load series episodes", err))
-    return () => { cancelled = true }
-  }, [displayItem?.type, displayItem?.seriesId])
+    return articles
+      .filter(a => !a.deleted && String(a.type).toLowerCase() === "series" && String(a.seriesId).toLowerCase() === seriesId)
+      .sort((a, b) => (a.part || 0) - (b.part || 0))
+  }, [articles, displayItem?.type, displayItem?.seriesId])
 
   const seriesName = useMemo(() => {
     if (displayItem?.seriesId) {
