@@ -175,7 +175,7 @@ function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
     } catch (err) {
       console.error(err)
     }
-  }, [lastReadPos, uid])
+  }, [remoteLastRead, uid])
 
   return (
     <div>
