@@ -148,6 +148,40 @@ Return ONLY a valid JSON object with the "translations" array, no markdown block
   return JSON.parse(jsonText)
 }
 
+async function translateWithGemini(elements, apiKey) {
+  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash"
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{
+          text: `${translationPrompt(elements)}\n\nReturn the output as a valid JSON object containing the translations array. Do not wrap in markdown code blocks.`
+        }]
+      }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.1
+      }
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error("Gemini translate error:", response.status, errorText)
+    throw new Error(`Gemini error: ${response.status} - ${errorText}`)
+  }
+
+  const data = await response.json()
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "{}"
+  const jsonText = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim()
+  return JSON.parse(jsonText)
+}
+
 export default async function handler(req, res) {
   const method = req.method || req.httpMethod
   if (method === "OPTIONS") return send(res, 200, { ok: true })
@@ -208,7 +242,7 @@ export default async function handler(req, res) {
         translationResult = await translateWithOpenAI(elements, process.env.OPENAI_API_KEY)
         source = "openai"
       } catch (err) {
-        console.error("OpenAI translation failed, trying Anthropic:", err)
+        console.error("OpenAI translation failed, trying Anthropic/Gemini:", err)
       }
     }
 
@@ -217,7 +251,16 @@ export default async function handler(req, res) {
         translationResult = await translateWithAnthropic(elements, process.env.ANTHROPIC_API_KEY)
         source = "anthropic"
       } catch (err) {
-        console.error("Anthropic translation failed:", err)
+        console.error("Anthropic translation failed, trying Gemini:", err)
+      }
+    }
+
+    if (!translationResult && process.env.GEMINI_API_KEY) {
+      try {
+        translationResult = await translateWithGemini(elements, process.env.GEMINI_API_KEY)
+        source = "gemini"
+      } catch (err) {
+        console.error("Gemini translation failed:", err)
       }
     }
 
