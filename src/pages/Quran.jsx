@@ -68,6 +68,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
     return localStorage.getItem("quran-sidebar-collapsed") === "true"
   })
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
+  const [showMobileSettings, setShowMobileSettings] = useState(false)
   const [benefitsExpanded, setBenefitsExpanded] = useState(false)
   const [showObjective, setShowObjective] = useState(false)
   const [scrollPercent, setScrollPercent] = useState(0)
@@ -1310,26 +1311,48 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                   {mode === "mushaf" && selectedPage ? "อ่านทีละหน้า" : `อายะฮ์ 1 - ${currentSuraInfo.numberOfAyahs}`}
                 </span>
               </div>
-              <button
-                onClick={() => {
-                  setSidebarTab("surah");
-                  setNavMode("surah");
-                  setIsMobileNavOpen(true);
-                }}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--quran-teal)",
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 3
-                }}
-              >
-                <i className="ti ti-search"></i> ค้นหา/เปลี่ยนซูเราะฮ์
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  onClick={() => {
+                    setSidebarTab("surah");
+                    setNavMode("surah");
+                    setIsMobileNavOpen(true);
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--quran-teal)",
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 3
+                  }}
+                >
+                  <i className="ti ti-search"></i> ค้นหา
+                </button>
+                <button
+                  onClick={() => setShowMobileSettings(!showMobileSettings)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: showMobileSettings ? "var(--quran-teal)" : "var(--quran-t3)",
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 3,
+                    padding: "3px 8px",
+                    borderRadius: "6px",
+                    backgroundColor: showMobileSettings ? "rgba(45, 190, 160, 0.1)" : "transparent",
+                    transition: "all 0.2s"
+                  }}
+                >
+                  <i className="ti ti-settings"></i> ตั้งค่า
+                </button>
+              </div>
             </div>
 
             {/* Quick Actions Grid */}
@@ -1488,7 +1511,8 @@ export default function Quran({ initialSura, initialAyah, authState }) {
           )}
 
           {/* CONTROLS CARD */}
-          <div className="card" style={{ padding: isMobile ? "14px" : "16px 20px", marginBottom: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+          {(!isMobile || showMobileSettings) && (
+            <div className="card" style={{ padding: isMobile ? "14px" : "16px 20px", marginBottom: 20, display: "flex", flexDirection: "column", gap: 14 }}>
             {isMobile ? (
               // MOBILE LAYOUT
               <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
@@ -1830,6 +1854,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
               </div>
             </div>
           </div>
+          )}
 
           {/* Tajweed Legend Panel */}
           {tajweedEnabled && showTajweedLegend && (
@@ -2027,12 +2052,13 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                               pageVerses.map(v => {
                                 const isBookmarked = lastRead?.sura === v.sura && lastRead?.aya === v.aya
                                 const rawText = v.arabic_text_tajweed || v.text || v.arabic_text || ""
+                                const cleanedText = rawText.replace(/<span[^>]*class=["']?end["']?[^>]*>.*?<\/span>/gi, "")
                                 return (
                                   <span key={v.id}>
                                     {tajweedEnabled ? (
-                                      <span dangerouslySetInnerHTML={{ __html: rawText }} />
+                                      <span dangerouslySetInnerHTML={{ __html: cleanedText }} />
                                     ) : (
-                                      <span>{stripTajweedTags(rawText)}</span>
+                                      <span dangerouslySetInnerHTML={{ __html: stripTajweedTags(cleanedText) }} />
                                     )}{" "}
                                     <span
                                       onClick={() => {
@@ -2044,27 +2070,19 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                                         })
                                       }}
                                       style={{
-                                        fontFamily: "sans-serif",
-                                        fontSize: `${Math.round(arabicSize * 0.5)}px`,
-                                        color: isBookmarked ? "#fff" : "var(--teal)",
-                                        backgroundColor: isBookmarked ? "var(--teal)" : "transparent",
-                                        fontWeight: "bold",
-                                        margin: "0 4px",
-                                        display: "inline-flex",
-                                        width: `${Math.round(arabicSize * 0.95)}px`,
-                                        height: `${Math.round(arabicSize * 0.95)}px`,
-                                        border: "1.5px solid var(--teal)",
-                                        borderRadius: "50%",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        direction: "ltr",
+                                        fontFamily: quranFont === "UthmanicHafs" ? "'UthmanicHafs', serif" : quranFont === "Amiri" ? "'Amiri', serif" : "'Noto Naskh Arabic', serif",
+                                        fontSize: `${arabicSize}px`,
+                                        color: isBookmarked ? "var(--teal)" : "var(--t3)",
                                         cursor: "pointer",
-                                        boxShadow: isBookmarked ? "0 0 10px rgba(45, 190, 160, 0.6)" : "none",
+                                        userSelect: "none",
+                                        margin: "0 6px",
+                                        display: "inline-block",
+                                        textShadow: isBookmarked ? "0 0 8px rgba(45, 190, 160, 0.5)" : "none",
                                         transition: "all 0.2s ease"
                                       }}
                                       title={`คั่นหน้าการอ่าน [${v.sura}:${v.aya}]`}
                                     >
-                                      {getArabicNumber(v.aya)}
+                                      {`\u06dd${getArabicNumber(v.aya)}`}
                                     </span>{" "}
                                   </span>
                                 )
@@ -2125,12 +2143,13 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                       {verses.map(v => {
                         const isBookmarked = lastRead?.sura === v.sura && lastRead?.aya === v.aya
                         const rawText = v.arabic_text_tajweed || v.arabic_text || ""
+                        const cleanedText = rawText.replace(/<span[^>]*class=["']?end["']?[^>]*>.*?<\/span>/gi, "")
                         return (
                           <span key={v.id}>
                             {tajweedEnabled ? (
-                              <span dangerouslySetInnerHTML={{ __html: rawText }} />
+                              <span dangerouslySetInnerHTML={{ __html: cleanedText }} />
                             ) : (
-                              <span>{stripTajweedTags(rawText)}</span>
+                              <span dangerouslySetInnerHTML={{ __html: stripTajweedTags(cleanedText) }} />
                             )}{" "}
                             <span
                               onClick={() => {
@@ -2142,27 +2161,19 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                                 })
                               }}
                               style={{
-                                fontFamily: "sans-serif",
-                                fontSize: `${Math.round(arabicSize * 0.5)}px`,
-                                color: isBookmarked ? "#fff" : "var(--teal)",
-                                backgroundColor: isBookmarked ? "var(--teal)" : "transparent",
-                                fontWeight: "bold",
-                                margin: "0 4px",
-                                display: "inline-flex",
-                                width: `${Math.round(arabicSize * 0.95)}px`,
-                                height: `${Math.round(arabicSize * 0.95)}px`,
-                                border: "1.5px solid var(--teal)",
-                                borderRadius: "50%",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                direction: "ltr",
+                                fontFamily: quranFont === "UthmanicHafs" ? "'UthmanicHafs', serif" : quranFont === "Amiri" ? "'Amiri', serif" : "'Noto Naskh Arabic', serif",
+                                fontSize: `${arabicSize}px`,
+                                color: isBookmarked ? "var(--teal)" : "var(--t3)",
                                 cursor: "pointer",
-                                boxShadow: isBookmarked ? "0 0 10px rgba(45, 190, 160, 0.6)" : "none",
+                                userSelect: "none",
+                                margin: "0 6px",
+                                display: "inline-block",
+                                textShadow: isBookmarked ? "0 0 8px rgba(45, 190, 160, 0.5)" : "none",
                                 transition: "all 0.2s ease"
                               }}
                               title={`คั่นหน้าการอ่าน [${v.sura}:${v.aya}]`}
                             >
-                              {getArabicNumber(v.aya)}
+                              {`\u06dd${getArabicNumber(v.aya)}`}
                             </span>{" "}
                           </span>
                         )
