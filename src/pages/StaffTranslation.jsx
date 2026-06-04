@@ -652,7 +652,7 @@ export default function StaffTranslation({ go }) {
                     รับงาน
                   </button>
                 )}
-                {item.assignee && item.status !== STATUS.completed && (
+                {item.assignee && item.assignee === myName && item.status !== STATUS.completed && (
                   <button className="btn btn-outline" style={{ padding: "5px 12px", fontSize: "12px", height: "30px", color: "#ef4444", borderColor: "rgba(239,68,68,0.2)", background: "rgba(239,68,68,0.02)", display: "inline-flex", alignItems: "center" }}
                     onClick={() => unclaimItem(item)}>
                     ยกเลิกรับงาน
@@ -687,12 +687,34 @@ export default function StaffTranslation({ go }) {
                     <i className="ti ti-eye" /> ดู/แก้ไขคำแปล
                   </button>
                 ) : item.status === STATUS.progress ? (
-                  <button 
-                    className="btn translation-btn-progress" 
-                    onClick={() => openWorkspace(item)}
-                  >
-                    <i className="ti ti-pencil" /> แปลต่อ/ตรวจทาน
-                  </button>
+                  item.assignee === myName ? (
+                    <button 
+                      className="btn translation-btn-progress" 
+                      onClick={() => openWorkspace(item)}
+                    >
+                      <i className="ti ti-pencil" /> แปลต่อ/ตรวจทาน
+                    </button>
+                  ) : (
+                    <button 
+                      className="btn" 
+                      disabled 
+                      style={{ 
+                        padding: "5px 12px", 
+                        fontSize: "12px", 
+                        height: "30px", 
+                        background: "var(--br2)", 
+                        color: "var(--t3)", 
+                        border: "none", 
+                        cursor: "not-allowed",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px"
+                      }}
+                      title={`งานนี้กำลังแปลโดย ${item.assignee}`}
+                    >
+                      <i className="ti ti-lock" /> อยู่ระหว่างแปล
+                    </button>
+                  )
                 ) : (
                   <button 
                     className="btn translation-btn-pending" 
