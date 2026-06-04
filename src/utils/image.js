@@ -19,51 +19,61 @@ export function compressImage(file, { maxWidth = 1000, maxHeight = 1000, quality
     reader.onload = (event) => {
       const img = new Image();
       img.onload = () => {
-        const canvas = document.createElement("canvas");
-        let width = img.width;
-        let height = img.height;
+        try {
+          const canvas = document.createElement("canvas");
+          let width = img.width;
+          let height = img.height;
 
-        // Calculate new dimensions preserving aspect ratio
-        if (width > height) {
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          return resolve(file);
-        }
-        ctx.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              // Extract original base filename without extension
-              const lastDotIndex = file.name.lastIndexOf(".");
-              const baseName = lastDotIndex !== -1 ? file.name.substring(0, lastDotIndex) : file.name;
-              
-              const compressedFile = new File([blob], `${baseName}_compressed.jpg`, {
-                type: "image/jpeg",
-                lastModified: Date.now(),
-              });
-              resolve(compressedFile);
-            } else {
-              resolve(file); // Fallback to original
+          // Calculate new dimensions preserving aspect ratio
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
             }
-          },
-          "image/jpeg",
-          quality
-        );
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            return resolve(file);
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              try {
+                if (blob) {
+                  // Extract original base filename without extension
+                  const lastDotIndex = file.name.lastIndexOf(".");
+                  const baseName = lastDotIndex !== -1 ? file.name.substring(0, lastDotIndex) : file.name;
+                  
+                  const compressedFile = new File([blob], `${baseName}_compressed.jpg`, {
+                    type: "image/jpeg",
+                    lastModified: Date.now(),
+                  });
+                  resolve(compressedFile);
+                } else {
+                  resolve(file); // Fallback to original
+                }
+              } catch (blobErr) {
+                console.error("Error in toBlob callback:", blobErr);
+                resolve(file);
+              }
+            },
+            "image/jpeg",
+            quality
+          );
+        } catch (loadErr) {
+          console.error("Error in img.onload:", loadErr);
+          resolve(file);
+        }
       };
       img.onerror = () => resolve(file); // Fallback to original
       img.src = event.target.result;
