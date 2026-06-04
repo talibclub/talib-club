@@ -16,10 +16,8 @@ export function compressImage(file, { maxWidth = 1000, maxHeight = 1000, quality
     }
 
     const reader = new FileReader();
-    reader.readAsDataURL(file);
     reader.onload = (event) => {
       const img = new Image();
-      img.src = event.target.result;
       img.onload = () => {
         const canvas = document.createElement("canvas");
         let width = img.width;
@@ -68,7 +66,9 @@ export function compressImage(file, { maxWidth = 1000, maxHeight = 1000, quality
         );
       };
       img.onerror = () => resolve(file); // Fallback to original
+      img.src = event.target.result;
     };
-    reader.onerror = () => resolve(file); // Fallback to original
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
   });
 }

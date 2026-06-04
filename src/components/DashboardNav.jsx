@@ -76,13 +76,8 @@ export default function DashboardNav({
       {navItems.map((item, index) => (
         <button
           key={item.view}
-          className="card dashboard-card card-glass animate-fade-in-up"
+          className="card dashboard-card"
           onClick={() => handleClick(item.view)}
-          style={{ 
-            animationDelay: `${index * 0.05}s`,
-            opacity: 0, /* start transparent so animation works smoothly */
-            animationFillMode: "forwards"
-          }}
         >
           <div
             style={{

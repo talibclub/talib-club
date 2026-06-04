@@ -810,7 +810,7 @@ function ProfilePanel({ authState, copied, copyText, go, setView, ctx }) {
         {subView === "stats" && (
           <div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
-              <div className="card card-glass animate-fade-in-up" style={{ padding: 16, display: "flex", gap: 12, alignItems: "center", animationFillMode: "forwards" }}>
+              <div className="card" style={{ padding: 16, display: "flex", gap: 12, alignItems: "center", background: "var(--bg2)" }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--teal-bg)", color: "var(--teal)", display: "grid", placeItems: "center", fontSize: 18 }}>
                    <i className="ti ti-file-text"></i>
                 </div>
@@ -819,7 +819,7 @@ function ProfilePanel({ authState, copied, copyText, go, setView, ctx }) {
                   <div style={{ fontSize: 16, fontWeight: 600 }}>{stats.articlesRead} บทความ</div>
                 </div>
               </div>
-              <div className="card card-glass animate-fade-in-up" style={{ padding: 16, display: "flex", gap: 12, alignItems: "center", animationDelay: "0.1s", opacity: 0, animationFillMode: "forwards" }}>
+              <div className="card" style={{ padding: 16, display: "flex", gap: 12, alignItems: "center", background: "var(--bg2)" }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(255, 179, 0, 0.1)", color: "rgb(255, 179, 0)", display: "grid", placeItems: "center", fontSize: 18 }}>
                    <i className="ti ti-download"></i>
                 </div>
@@ -828,7 +828,7 @@ function ProfilePanel({ authState, copied, copyText, go, setView, ctx }) {
                   <div style={{ fontSize: 16, fontWeight: 600 }}>{stats.booksDownloaded} เล่ม</div>
                 </div>
               </div>
-              <div className="card card-glass animate-fade-in-up" style={{ padding: 16, display: "flex", gap: 12, alignItems: "center", animationDelay: "0.2s", opacity: 0, animationFillMode: "forwards" }}>
+              <div className="card" style={{ padding: 16, display: "flex", gap: 12, alignItems: "center", background: "var(--bg2)" }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(30, 215, 96, 0.1)", color: "rgb(30, 215, 96)", display: "grid", placeItems: "center", fontSize: 18 }}>
                    <i className="ti ti-player-play"></i>
                 </div>
@@ -837,7 +837,7 @@ function ProfilePanel({ authState, copied, copyText, go, setView, ctx }) {
                   <div style={{ fontSize: 16, fontWeight: 600 }}>{stats.mediaWatched} คลิป</div>
                 </div>
               </div>
-              <div className="card card-glass animate-fade-in-up" style={{ padding: 16, display: "flex", gap: 12, alignItems: "center", animationDelay: "0.3s", opacity: 0, animationFillMode: "forwards" }}>
+              <div className="card" style={{ padding: 16, display: "flex", gap: 12, alignItems: "center", background: "var(--bg2)" }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(248, 113, 113, 0.12)", color: "#f87171", display: "grid", placeItems: "center", fontSize: 18 }}>
                    <i className="ti ti-flame"></i>
                 </div>
