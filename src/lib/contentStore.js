@@ -168,6 +168,52 @@ function writeCachedCollection(key, items) {
   }
 }
 
+function readLocalStorageCacheEntry(key) {
+  try {
+    const localData = localStorage.getItem(LOCAL_STORAGE_CACHE_PREFIX + key)
+    if (localData) {
+      return JSON.parse(localData)
+    }
+  } catch (e) {
+    console.error("Failed to read raw localStorage cache:", e)
+  }
+  return null
+}
+
+let cachedMetadata = null
+let cachedMetadataAt = 0
+const METADATA_TTL_MS = 60 * 1000 // 1 minute
+
+async function fetchContentMetadata() {
+  if (cachedMetadata && (Date.now() - cachedMetadataAt < METADATA_TTL_MS)) {
+    return cachedMetadata
+  }
+  try {
+    const snap = await getDoc(doc(db, "content_settings", "metadata"))
+    if (snap.exists()) {
+      cachedMetadata = snap.data()
+    } else {
+      cachedMetadata = {}
+    }
+    cachedMetadataAt = Date.now()
+  } catch (e) {
+    console.warn("Could not fetch content metadata", e)
+    cachedMetadata = cachedMetadata || {}
+  }
+  return cachedMetadata
+}
+
+async function updateCollectionMetadata(collectionName) {
+  try {
+    await setDoc(doc(db, "content_settings", "metadata"), {
+      [collectionName]: Date.now(),
+      updatedAt: serverTimestamp(),
+    }, { merge: true })
+  } catch (e) {
+    console.warn("Could not update collection metadata timestamp", e)
+  }
+}
+
 export function invalidateContentCache(collectionName = null) {
   if (!collectionName) {
     collectionCache.clear()
@@ -249,45 +295,90 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
 
     setLoading(true)
 
-    const q = buildCollectionQuery(collectionName, {
-      uid,
-      isUserSpecific,
-      orderByField,
-      orderDirection,
-      limitCount,
-    })
+    let active = true
 
-    const applySnapshot = snapshot => {
-      const next = mapSnapshotDocs(snapshot)
-      if (!live) writeCachedCollection(cacheKey, next)
-      setRemoteItems(next)
-      setError(null)
-      setLoading(false)
+    const loadData = async () => {
+      try {
+        const q = buildCollectionQuery(collectionName, {
+          uid,
+          isUserSpecific,
+          orderByField,
+          orderDirection,
+          limitCount,
+        })
+
+        // Check metadata-based cache first
+        if (!live && PUBLIC_COLLECTIONS.includes(collectionName)) {
+          const localEntry = readLocalStorageCacheEntry(cacheKey)
+          if (localEntry) {
+            const serverMeta = await fetchContentMetadata()
+            const serverLastUpdate = serverMeta[collectionName] || 0
+            if (serverLastUpdate > 0 && localEntry.at >= serverLastUpdate) {
+              if (active) {
+                // Populate memory cache so future calls use it instantly
+                collectionCache.set(cacheKey, { items: localEntry.items, at: localEntry.at })
+                setRemoteItems(localEntry.items)
+                setError(null)
+                setLoading(false)
+              }
+              return
+            }
+          }
+        }
+
+        const snapshot = await getDocs(q)
+        if (!active) return
+
+        const next = mapSnapshotDocs(snapshot)
+        if (!live) writeCachedCollection(cacheKey, next)
+        setRemoteItems(next)
+        setError(null)
+        setLoading(false)
+      } catch (err) {
+        if (!active) return
+        console.error(`Cannot load ${collectionName}`, err)
+        setError(err)
+        setRemoteItems(null)
+        setLoading(false)
+      }
     }
 
     if (live) {
+      const q = buildCollectionQuery(collectionName, {
+        uid,
+        isUserSpecific,
+        orderByField,
+        orderDirection,
+        limitCount,
+      })
       const unsubscribe = onSnapshot(
         q,
-        applySnapshot,
+        snapshot => {
+          if (!active) return
+          const next = mapSnapshotDocs(snapshot)
+          setRemoteItems(next)
+          setError(null)
+          setLoading(false)
+        },
         err => {
+          if (!active) return
           console.error(`Cannot load ${collectionName}`, err)
           setError(err)
           setRemoteItems(null)
           setLoading(false)
         }
       )
-      return unsubscribe
+      return () => {
+        active = false
+        unsubscribe()
+      }
     }
 
-    getDocs(q)
-      .then(applySnapshot)
-      .catch(err => {
-        console.error(`Cannot load ${collectionName} (one-time)`, err)
-        setError(err)
-        setRemoteItems(null)
-        setLoading(false)
-      })
-    return undefined
+    loadData()
+
+    return () => {
+      active = false
+    }
   }, [collectionName, name, uid, isUserSpecific, limitCount, orderByField, orderDirection, live])
 
   const serializedFallback = JSON.stringify(fallbackItems)
@@ -317,6 +408,7 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
     }
     await setDoc(doc(db, collectionName, id), payload, { merge: true })
     invalidateContentCache(collectionName)
+    await updateCollectionMetadata(collectionName)
   }, [collectionName, isUserSpecific, uid])
 
   const deleteItem = useCallback(async (id) => {
@@ -326,6 +418,7 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
       updatedAt: serverTimestamp(),
     }, { merge: true })
     invalidateContentCache(collectionName)
+    await updateCollectionMetadata(collectionName)
   }, [collectionName])
 
   return {
@@ -358,6 +451,7 @@ export async function saveContentItem(name, item, uid = null) {
   }
   await setDoc(doc(db, collectionName, id), payload, { merge: true })
   invalidateContentCache(collectionName)
+  await updateCollectionMetadata(collectionName)
 }
 
 export async function deleteContentItem(name, id) {
@@ -370,6 +464,7 @@ export async function deleteContentItem(name, id) {
     updatedAt: serverTimestamp(),
   }, { merge: true })
   invalidateContentCache(collectionName)
+  await updateCollectionMetadata(collectionName)
 }
 
 export function useCollectionCount(name) {
