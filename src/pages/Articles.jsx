@@ -4,6 +4,7 @@ import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.j
 import { clampPage } from "../utils/pagination.js"
 import PaginationBar from "../components/PaginationBar.jsx"
 import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
+import ImageWithFallback from "../components/ImageWithFallback.jsx"
 
 export default function Articles({ go, authState, ctx }) {
   const { items: articles, loading, error, isUsingFallback } = useContentCollection("articles", ARTICLES, null, { live: false })
@@ -190,7 +191,7 @@ export default function Articles({ go, authState, ctx }) {
               <div key={a.id} className="card" style={{ cursor: "pointer", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between" }} onClick={() => viewArticle(a)}>
                 {a.coverUrl ? (
                   <div style={{ width: "100%", height: 160, overflow: "hidden", borderBottom: ".5px solid var(--br2)" }}>
-                    <img src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <ImageWithFallback src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   </div>
                 ) : (
                   <div style={{ width: "100%", height: 160, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: ".5px solid var(--br2)" }}>
@@ -304,7 +305,7 @@ export default function Articles({ go, authState, ctx }) {
                     <div key={a.id} className="card" style={{ cursor: "pointer", overflow: "hidden", display: "flex", flexDirection: "column" }} onClick={() => viewArticle(a)}>
                       {a.coverUrl ? (
                         <div style={{ width: "100%", height: 160, overflow: "hidden", borderBottom: ".5px solid var(--br2)" }}>
-                          <img src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          <ImageWithFallback src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                         </div>
                       ) : (
                         <div style={{ width: "100%", height: 160, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: ".5px solid var(--br2)" }}>
@@ -396,7 +397,7 @@ export default function Articles({ go, authState, ctx }) {
                               <div key={a.id} className="card" style={{ cursor: "pointer", overflow: "hidden", display: "flex", flexDirection: "column" }} onClick={() => viewArticle(a)}>
                                 {a.coverUrl ? (
                                   <div style={{ width: "100%", height: 160, overflow: "hidden", borderBottom: ".5px solid var(--br2)" }}>
-                                    <img src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                    <ImageWithFallback src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                                   </div>
                                 ) : (
                                   <div style={{ width: "100%", height: 160, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: ".5px solid var(--br2)" }}>
@@ -434,7 +435,7 @@ export default function Articles({ go, authState, ctx }) {
                           <div key={a.id} className="card" style={{ cursor: "pointer", overflow: "hidden", display: "flex", flexDirection: "column" }} onClick={() => viewArticle(a)}>
                             {a.coverUrl ? (
                               <div style={{ width: "100%", height: 160, overflow: "hidden", borderBottom: ".5px solid var(--br2)" }}>
-                                <img src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                <ImageWithFallback src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                               </div>
                             ) : (
                               <div style={{ width: "100%", height: 160, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: ".5px solid var(--br2)" }}>

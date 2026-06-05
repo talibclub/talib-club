@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { ARTICLES, BOOKS, MEDIA, SITE } from "../data/index.js"
 import { useContentCollection, useSiteSettings, useCollectionCount } from "../lib/contentStore.js"
+import ImageWithFallback from "../components/ImageWithFallback.jsx"
 
 const QURAN_DUAS = [
   { sura: 1, aya: 6 },
@@ -209,14 +210,12 @@ export default function Home({ go }) {
         {loadingArticles ? (
           <div className="grid-art">
             {[1, 2, 3].map(i => (
-              <div key={i} className="card" style={{ padding: 16, height: 280, display: "flex", flexDirection: "column", justifyContent: "space-between", opacity: 0.6 }}>
-                <div style={{ width: "100%", height: 140, background: "var(--bg3)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <i className="ti ti-loader-2 spin" style={{ fontSize: 24, color: "var(--teal)" }}></i>
-                </div>
+              <div key={i} className="card" style={{ padding: 16, height: 280, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                <div className="skeleton-shimmer" style={{ width: "100%", height: 140, borderRadius: 8 }}></div>
                 <div style={{ flex: 1, marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ height: 14, background: "var(--bg3)", width: "40%", borderRadius: 4 }}></div>
-                  <div style={{ height: 18, background: "var(--bg3)", width: "90%", borderRadius: 4 }}></div>
-                  <div style={{ height: 14, background: "var(--bg3)", width: "70%", borderRadius: 4 }}></div>
+                  <div className="skeleton-shimmer" style={{ height: 14, width: "40%", borderRadius: 4 }}></div>
+                  <div className="skeleton-shimmer" style={{ height: 18, width: "90%", borderRadius: 4 }}></div>
+                  <div className="skeleton-shimmer" style={{ height: 14, width: "70%", borderRadius: 4 }}></div>
                 </div>
               </div>
             ))}
@@ -228,7 +227,7 @@ export default function Home({ go }) {
                 onClick={() => go("article", a)}>
                 {a.coverUrl ? (
                   <div style={{ width: "100%", height: 140, overflow: "hidden", borderBottom: ".5px solid var(--br2)" }}>
-                    <img src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <ImageWithFallback src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   </div>
                 ) : (
                   <div style={{ width: "100%", height: 140, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: ".5px solid var(--br2)" }}>
@@ -270,13 +269,11 @@ export default function Home({ go }) {
           {loadingMedia ? (
             <div className="flex-col">
               {[1, 2, 3].map(i => (
-                <div key={i} className="card" style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 10, opacity: 0.6 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--bg3)", display: "grid", placeItems: "center", flexShrink: 0 }}>
-                    <i className="ti ti-loader-2 spin" style={{ fontSize: 14, color: "var(--teal)" }}></i>
-                  </div>
+                <div key={i} className="card" style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+                  <div className="skeleton-shimmer" style={{ width: 32, height: 32, borderRadius: "50%", flexShrink: 0 }}></div>
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-                    <div style={{ height: 12, background: "var(--bg3)", width: "70%", borderRadius: 4 }}></div>
-                    <div style={{ height: 10, background: "var(--bg3)", width: "40%", borderRadius: 4 }}></div>
+                    <div className="skeleton-shimmer" style={{ height: 12, width: "70%", borderRadius: 4 }}></div>
+                    <div className="skeleton-shimmer" style={{ height: 10, width: "40%", borderRadius: 4 }}></div>
                   </div>
                 </div>
               ))}
@@ -316,15 +313,11 @@ export default function Home({ go }) {
           {loadingBooks ? (
             <div className="flex-col">
               {[1, 2, 3, 4].map(i => (
-                <div key={i} className="card" style={{ padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, opacity: 0.6 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
-                    <div style={{ width: 24, height: 24, borderRadius: 4, background: "var(--bg3)", display: "grid", placeItems: "center" }}>
-                      <i className="ti ti-loader-2 spin" style={{ fontSize: 12, color: "var(--teal)" }}></i>
-                    </div>
-                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-                      <div style={{ height: 12, background: "var(--bg3)", width: "60%", borderRadius: 4 }}></div>
-                      <div style={{ height: 10, background: "var(--bg3)", width: "30%", borderRadius: 4 }}></div>
-                    </div>
+                <div key={i} className="card" style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+                  <div className="skeleton-shimmer" style={{ width: 24, height: 24, borderRadius: 4, flexShrink: 0 }}></div>
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div className="skeleton-shimmer" style={{ height: 12, width: "60%", borderRadius: 4 }}></div>
+                    <div className="skeleton-shimmer" style={{ height: 10, width: "30%", borderRadius: 4 }}></div>
                   </div>
                 </div>
               ))}

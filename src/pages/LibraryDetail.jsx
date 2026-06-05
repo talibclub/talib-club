@@ -3,6 +3,7 @@ import toast from "react-hot-toast"
 import { BOOKS } from "../data/index.js"
 import { useContentCollection, useContentDoc, saveContentItem } from "../lib/contentStore.js"
 import { bumpContentMetric } from "../utils/contentMetrics.js"
+import ImageWithFallback from "../components/ImageWithFallback.jsx"
 
 function getDirectUrl(url) {
   if (!url) return ""
@@ -129,9 +130,10 @@ export default function LibraryDetail({ item, go, authState }) {
 
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 32 }}>
         {displayItem.coverUrl ? (
-          <img 
+          <ImageWithFallback 
             src={getDirectUrl(displayItem.coverUrl)} 
             alt={displayItem.title} 
+            fallbackEmoji="📚"
             style={{ maxWidth: 320, width: "100%", borderRadius: 12, boxShadow: "0 14px 30px rgba(0,0,0,0.15)", objectFit: "cover", border: ".5px solid var(--br2)" }} 
           />
         ) : (

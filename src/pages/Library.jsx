@@ -6,6 +6,7 @@ import { bumpContentMetric } from "../utils/contentMetrics.js"
 import { clampPage } from "../utils/pagination.js"
 import PaginationBar from "../components/PaginationBar.jsx"
 import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
+import ImageWithFallback from "../components/ImageWithFallback.jsx"
 
 // ฟังก์ชันดึงรูปปก
 function getDirectUrl(url) {
@@ -272,7 +273,7 @@ export default function Library({ go, authState, ctx }) {
               >
                 <div style={{ width: 90, flexShrink: 0 }}>
                   {b.coverUrl ? (
-                    <img src={getDirectUrl(b.coverUrl)} alt={b.title} style={{ width: "100%", borderRadius: 6, objectFit: "cover", aspectRatio: "3/4", border: ".5px solid var(--br2)", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }} />
+                    <ImageWithFallback src={getDirectUrl(b.coverUrl)} alt={b.title} fallbackEmoji="📚" style={{ width: "100%", borderRadius: 6, objectFit: "cover", aspectRatio: "3/4", border: ".5px solid var(--br2)", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }} />
                   ) : (
                     <div style={{ width: "100%", aspectRatio: "3/4", borderRadius: 6, background: "var(--acc2)", display: "flex", alignItems: "center", justifyContent: "center", border: ".5px solid var(--br2)" }}>
                       <i className={`ti ${b.type === "วารสาร" ? "ti-news" : b.type === "PDF" ? "ti-file-text" : "ti-book"}`} style={{ fontSize: 24, color: "var(--acc)" }}></i>

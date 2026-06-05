@@ -4,6 +4,7 @@ import { useContentCollection, useTaxonomySettings, useSiteSettings } from "../l
 import { clampPage } from "../utils/pagination.js"
 import PaginationBar from "../components/PaginationBar.jsx"
 import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
+import ImageWithFallback from "../components/ImageWithFallback.jsx"
 
 export default function Media({ go, ctx }) {
   const { items: media, loading, error, isUsingFallback } = useContentCollection("media", MEDIA, null, { live: false })
@@ -188,14 +189,12 @@ export default function Media({ go, ctx }) {
           {loading ? (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))", gap: 14 }}>
               {[1, 2, 3, 4, 5, 6].map(i => (
-                <div key={i} className="card" style={{ padding: 16, height: 260, display: "flex", flexDirection: "column", gap: 12, opacity: 0.6 }}>
-                  <div style={{ width: "100%", height: 130, background: "var(--bg3)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <i className="ti ti-loader-2 spin" style={{ fontSize: 24, color: "var(--teal)" }}></i>
-                  </div>
+                <div key={i} className="card" style={{ padding: 16, height: 260, display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div className="skeleton-shimmer" style={{ width: "100%", height: 130, borderRadius: 8 }}></div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <div style={{ height: 14, background: "var(--bg3)", width: "40%", borderRadius: 4 }}></div>
-                    <div style={{ height: 16, background: "var(--bg3)", width: "90%", borderRadius: 4 }}></div>
-                    <div style={{ height: 12, background: "var(--bg3)", width: "60%", borderRadius: 4 }}></div>
+                    <div className="skeleton-shimmer" style={{ height: 14, width: "40%", borderRadius: 4 }}></div>
+                    <div className="skeleton-shimmer" style={{ height: 16, width: "90%", borderRadius: 4 }}></div>
+                    <div className="skeleton-shimmer" style={{ height: 12, width: "60%", borderRadius: 4 }}></div>
                   </div>
                 </div>
               ))}
@@ -269,13 +268,11 @@ export default function Media({ go, ctx }) {
           {loading ? (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
               {[1, 2, 3, 4, 5, 6].map(i => (
-                <div key={i} className="card" style={{ padding: 16, height: 220, display: "flex", flexDirection: "column", gap: 12, opacity: 0.6 }}>
-                  <div style={{ width: "100%", height: 120, background: "var(--bg3)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <i className="ti ti-loader-2 spin" style={{ fontSize: 24, color: "var(--teal)" }}></i>
-                  </div>
+                <div key={i} className="card" style={{ padding: 16, height: 220, display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div className="skeleton-shimmer" style={{ width: "100%", height: 120, borderRadius: 8 }}></div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <div style={{ height: 14, background: "var(--bg3)", width: "90%", borderRadius: 4 }}></div>
-                    <div style={{ height: 12, background: "var(--bg3)", width: "50%", borderRadius: 4 }}></div>
+                    <div className="skeleton-shimmer" style={{ height: 14, width: "90%", borderRadius: 4 }}></div>
+                    <div className="skeleton-shimmer" style={{ height: 12, width: "50%", borderRadius: 4 }}></div>
                   </div>
                 </div>
               ))}
@@ -302,7 +299,7 @@ export default function Media({ go, ctx }) {
                   >
                     <div style={{ height: 150, background: "var(--acc2)", position: "relative" }}>
                       {thumbUrl ? (
-                        <img src={thumbUrl} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        <ImageWithFallback src={thumbUrl} alt={item.title} fallbackEmoji="🎬" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       ) : (
                         <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
                           <i className={`ti ${item.type === "youtube" ? "ti-brand-youtube" : item.type === "spotify" ? "ti-brand-spotify" : "ti-video"}`} style={{ fontSize: 40, color: "var(--t3)" }}></i>

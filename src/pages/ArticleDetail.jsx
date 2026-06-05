@@ -5,6 +5,7 @@ import { useContentCollection, useContentDoc, CONTENT_COLLECTIONS, saveContentIt
 import { collection, getDocs, query, where, serverTimestamp, limit } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
 import { bumpContentMetric } from "../utils/contentMetrics.js"
+import ImageWithFallback from "../components/ImageWithFallback.jsx"
 
 const READER_DEFAULTS = { size: "md", tone: "3" }
 const READER_STORAGE_KEY = "talibReaderPrefs"
@@ -268,7 +269,7 @@ export default function ArticleDetail({ item, go, authState }) {
 
       {displayItem.coverUrl && (
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 28, width: "100%" }}>
-          <img 
+          <ImageWithFallback 
             src={displayItem.coverUrl} 
             alt={displayItem.title} 
             style={{ maxWidth: "100%", maxHeight: 420, borderRadius: 12, boxShadow: "0 10px 25px rgba(0,0,0,0.1)", objectFit: "contain", border: ".5px solid var(--br2)" }} 
