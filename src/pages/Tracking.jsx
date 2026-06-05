@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { collection, getDocs, writeBatch, doc, updateDoc, deleteDoc, Timestamp, query, where, or } from "firebase/firestore";
+import { collection, getDocs, writeBatch, doc, updateDoc, deleteDoc, Timestamp, query, where, or, limit } from "firebase/firestore";
 import { trackingDb as db } from "../lib/trackingFirebase.js";
 import { canAccessTrackingAdmin, verifyTrackingAdminPassword } from "../utils/trackingAuth.js";
 
@@ -159,7 +159,8 @@ export default function Tracking({ authState }) {
           or(
             where("fullName", "==", qClean),
             where("phone", "==", qPhone)
-          )
+          ),
+          limit(5)
         );
       } else {
         q = query(
@@ -168,7 +169,8 @@ export default function Tracking({ authState }) {
             where("fullName", "==", qClean),
             where("phone", "==", qPhone),
             where("trackingNumber", "==", qTrack)
-          )
+          ),
+          limit(5)
         );
       }
 

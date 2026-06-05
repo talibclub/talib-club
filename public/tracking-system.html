@@ -1005,7 +1005,7 @@ select.input-field option { background: #1a1a22; color: var(--text); }
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, doc, getDocs, writeBatch, updateDoc, deleteDoc, Timestamp, query, where, or }
+import { getFirestore, collection, doc, getDocs, writeBatch, updateDoc, deleteDoc, Timestamp, query, where, or, limit }
   from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // Expose functions to global scope for inline event handlers
@@ -2547,7 +2547,8 @@ async function doRecipientSearch() {
       or(
         where("fullName", "==", qClean),
         where("phone", "==", qPhone)
-      )
+      ),
+      limit(5)
     );
     const snap = await getDocs(targetQ);
     const found = [];
@@ -2743,7 +2744,8 @@ async function doSearch() {
         where("fullName", "==", qClean),
         where("phone", "==", qPhone),
         where("trackingNumber", "==", qTrack)
-      )
+      ),
+      limit(5)
     );
     const snap = await getDocs(targetQ);
     const found = [];

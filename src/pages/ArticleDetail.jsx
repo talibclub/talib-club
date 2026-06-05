@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useRef } from "react"
 import toast from "react-hot-toast"
 import { ARTICLES, SERIES } from "../data/index.js"
 import { useContentCollection, useContentDoc, CONTENT_COLLECTIONS, saveContentItem } from "../lib/contentStore.js"
-import { collection, getDocs, query, where, serverTimestamp } from "firebase/firestore"
+import { collection, getDocs, query, where, serverTimestamp, limit } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
 import { bumpContentMetric } from "../utils/contentMetrics.js"
 
@@ -29,7 +29,8 @@ export default function ArticleDetail({ item, go, authState }) {
   )
   const { item: remoteArticle, loading: loadingArticles } = useContentDoc("articles", articleId, fallbackArticle)
 
-  const { items: articles } = useContentCollection("articles", ARTICLES, null, { live: false })
+  const [relatedArticles, setRelatedArticles] = useState([])
+  const [seriesArticles, setSeriesArticles] = useState([])
   const { items: bookmarks, saveItem: saveBookmark, deleteItem: deleteBookmark } = useContentCollection("bookmarks", [], uid, { live: false })
 
   const hasIncrementedView = useRef(null)
@@ -44,15 +45,59 @@ export default function ArticleDetail({ item, go, authState }) {
     return null
   }, [item, remoteArticle])
 
-  const seriesArticles = useMemo(() => {
-    if (displayItem?.type !== "series" || !displayItem?.seriesId) {
-      return []
+  useEffect(() => {
+    if (!displayItem) return
+
+    // 1. Fetch related articles
+    const relatedQ = query(
+      collection(db, "content_articles"),
+      where("category", "==", displayItem.category),
+      limit(4)
+    )
+    getDocs(relatedQ)
+      .then(snap => {
+        const docs = snap.docs
+          .map(d => ({ ...d.data(), id: d.id }))
+          .filter(a => String(a.id) !== String(displayItem.id) && !a.deleted)
+          .slice(0, 3)
+        setRelatedArticles(docs)
+      })
+      .catch(err => {
+        console.error("Failed to load related articles from Firebase", err)
+        // Fallback to static articles
+        const staticRelated = ARTICLES.filter(
+          a => String(a.id) !== String(displayItem.id) && String(a.category || "").toLowerCase() === String(displayItem.category || "").toLowerCase()
+        ).slice(0, 3)
+        setRelatedArticles(staticRelated)
+      })
+
+    // 2. Fetch series articles if applicable
+    if (displayItem.type === "series" && displayItem.seriesId) {
+      const seriesQ = query(
+        collection(db, "content_articles"),
+        where("type", "==", "series"),
+        where("seriesId", "==", displayItem.seriesId)
+      )
+      getDocs(seriesQ)
+        .then(snap => {
+          const docs = snap.docs
+            .map(d => ({ ...d.data(), id: d.id }))
+            .filter(a => !a.deleted)
+            .sort((a, b) => (a.part || 0) - (b.part || 0))
+          setSeriesArticles(docs)
+        })
+        .catch(err => {
+          console.error("Failed to load series articles from Firebase", err)
+          // Fallback to static articles
+          const staticSeries = ARTICLES.filter(
+            a => !a.deleted && String(a.type).toLowerCase() === "series" && String(a.seriesId || "").toLowerCase() === String(displayItem.seriesId).toLowerCase()
+          ).sort((a, b) => (a.part || 0) - (b.part || 0))
+          setSeriesArticles(staticSeries)
+        })
+    } else {
+      setSeriesArticles([])
     }
-    const seriesId = String(displayItem.seriesId).toLowerCase()
-    return articles
-      .filter(a => !a.deleted && String(a.type).toLowerCase() === "series" && String(a.seriesId).toLowerCase() === seriesId)
-      .sort((a, b) => (a.part || 0) - (b.part || 0))
-  }, [articles, displayItem?.type, displayItem?.seriesId])
+  }, [displayItem])
 
   const seriesName = useMemo(() => {
     if (displayItem?.seriesId) {
@@ -173,10 +218,7 @@ export default function ArticleDetail({ item, go, authState }) {
     return <p key={index}>{para}</p>;
   });
 
-  const related = articles.filter(a =>
-    a.id !== displayItem.id &&
-    String(a.category || "").toLowerCase() === String(displayItem.category || "").toLowerCase()
-  ).slice(0, 3)
+  const related = relatedArticles
   const readerClass = `article-body reader-size-${readerPrefs.size} reader-tone-${readerPrefs.tone}`
 
   return (

@@ -94,12 +94,14 @@ service cloud.firestore {
 
     // --- Logistics Tracking Collections ---
     match /records/{docId} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if isStaff() || (request.query.limit != null && request.query.limit <= 5);
       allow write: if isStaff();
     }
 
     match /recipients/{docId} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if isStaff() || (request.query.limit != null && request.query.limit <= 5);
       allow write: if isStaff();
     }
   }
