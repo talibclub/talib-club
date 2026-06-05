@@ -79,6 +79,10 @@ export default function App() {
     syncServerTime()
   }, [])
 
+  useEffect(() => {
+    window.__isStaff = authState?.isStaff;
+  }, [authState?.isStaff])
+
   const uid = authState?.user?.uid
   const { items: readingSessions } = useContentCollection("reading_sessions", [], uid, { limit: 20, orderByField: "completedAt", orderDirection: "desc", live: false })
   const countdownNotifRef = useRef(null)

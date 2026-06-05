@@ -7,7 +7,24 @@ service cloud.firestore {
 
     function isStaff() {
       return signedIn()
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "staff";
+        && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "staff" ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+            request.auth.token.email == "islamofwhite@gmail.com");
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+            request.auth.token.email == "islamofwhite@gmail.com");
+    }
+
+    function isOwner() {
+      return signedIn()
+        && request.auth.token.email == "islamofwhite@gmail.com";
+    }
+
+    function isOwnerOrAdmin() {
+      return isOwner() || isAdmin();
     }
 
     // --- Users Collection Rules ---
@@ -16,11 +33,11 @@ service cloud.firestore {
       allow create: if signedIn() 
         && request.auth.uid == userId
         && (!("role" in request.resource.data) || request.resource.data.role == "member");
-      allow update: if isStaff()
+      allow update: if isOwnerOrAdmin()
         || (signedIn()
           && request.auth.uid == userId
-          && request.resource.data.role == resource.data.role);
-      allow delete: if isStaff();
+          && (!("role" in request.resource.data) || request.resource.data.role == resource.data.role));
+      allow delete: if isOwner();
     }
 
     // --- Public Content Collections ---
@@ -92,16 +109,30 @@ service cloud.firestore {
       allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
 
+    // --- Staff Portal Collections ---
+    match /submissions/{docId} {
+      allow read, write: if isStaff();
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /translation_abuiyaad/{docId} {
+      allow read, write: if isStaff();
+    }
+
     // --- Logistics Tracking Collections ---
     match /records/{docId} {
       allow get: if true;
-      allow list: if isStaff() || (request.query.limit != null && request.query.limit <= 5);
+      allow list: if isStaff() || (request.query.limit != null && request.query.limit <= 5 && request.query.filters.size() > 0);
       allow write: if isStaff();
     }
 
     match /recipients/{docId} {
       allow get: if true;
-      allow list: if isStaff() || (request.query.limit != null && request.query.limit <= 5);
+      allow list: if isStaff() || (request.query.limit != null && request.query.limit <= 5 && request.query.filters.size() > 0);
       allow write: if isStaff();
     }
   }

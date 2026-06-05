@@ -34,8 +34,9 @@ export default function StaffMembers({ authState, go }) {
     targetRole: ""
   })
 
-  const currentUser = localStorage.getItem("talib_user") || authState?.user?.name || authState?.user?.displayName || ""
-  const isSuperAdmin = profile?.role === "admin" || currentUser === "อนันดา" || currentUser === "ฟาดิล" || currentUser === "Usman Manu"
+  const currentUser = authState?.profile?.displayName || authState?.user?.displayName || localStorage.getItem("talib_user") || ""
+  const secureUserForAdminCheck = authState?.profile?.displayName || authState?.user?.displayName || ""
+  const isSuperAdmin = profile?.role === "admin" || (secureUserForAdminCheck && ["อนันดา", "ฟาดิล", "Usman Manu"].includes(secureUserForAdminCheck)) || authState?.user?.email === "islamofwhite@gmail.com"
 
   // Fetch users on mount
   useEffect(() => {

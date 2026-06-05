@@ -1281,7 +1281,7 @@ initSystem();
 window.addEventListener('DOMContentLoaded', () => {
   // Same-origin iframe enforcement for security
   try {
-    if (window.self === window.top || parent.location.origin !== window.location.origin) {
+    if (window.self === window.top || parent.location.origin !== window.location.origin || !parent.__isStaff) {
       window.location.href = "/";
       return;
     }
