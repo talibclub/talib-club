@@ -66,8 +66,8 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
   } = usePWA(authState?.user, authState?.isStaff)
 
   const uid = authState?.user?.uid
-  const { items: articles } = useContentCollection("articles", ARTICLES, null, { limit: 1, orderByField: "createdAt", orderDirection: "desc", live: false })
-  const { items: books } = useContentCollection("books", BOOKS, null, { limit: 1, orderByField: "createdAt", orderDirection: "desc", live: false })
+  const { items: articles } = useContentCollection("articles", ARTICLES, null, { limit: 1, orderByField: "updatedAt", orderDirection: "desc", live: false })
+  const { items: books } = useContentCollection("books", BOOKS, null, { limit: 1, orderByField: "updatedAt", orderDirection: "desc", live: false })
   const readingSessions = readingSessionsProp ?? []
   const { items: streakRecords } = useContentCollection("reading_streaks", [], uid, { live: false })
 
