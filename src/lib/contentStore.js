@@ -117,6 +117,7 @@ const PUBLIC_CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
 const PUBLIC_COLLECTIONS = ["content_articles", "content_books", "content_media", "content_scholars"]
 const LOCAL_STORAGE_CACHE_PREFIX = "talib_cache_"
 const collectionCache = new Map()
+const countCache = new Map()
 
 function getQueryCacheKey(collectionName, uid, limitCount, orderByField, orderDirection) {
   return JSON.stringify({ collectionName, uid: uid || null, limitCount, orderByField, orderDirection })
@@ -217,6 +218,7 @@ async function updateCollectionMetadata(collectionName) {
 export function invalidateContentCache(collectionName = null) {
   if (!collectionName) {
     collectionCache.clear()
+    countCache.clear()
     try {
       for (const key of Object.keys(localStorage)) {
         if (key.startsWith(LOCAL_STORAGE_CACHE_PREFIX)) {
@@ -231,6 +233,15 @@ export function invalidateContentCache(collectionName = null) {
       collectionCache.delete(key)
       try {
         localStorage.removeItem(LOCAL_STORAGE_CACHE_PREFIX + key)
+      } catch (e) {}
+    }
+  }
+  // Clear count cache for this collection
+  for (const [key, val] of Object.entries(CONTENT_COLLECTIONS)) {
+    if (val === collectionName) {
+      countCache.delete(`count_${key}`)
+      try {
+        localStorage.removeItem(LOCAL_STORAGE_CACHE_PREFIX + `count_${key}`)
       } catch (e) {}
     }
   }
@@ -467,27 +478,66 @@ export async function deleteContentItem(name, id) {
   await updateCollectionMetadata(collectionName)
 }
 
+const COUNT_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes memory
+const COUNT_LOCAL_STORAGE_TTL_MS = 30 * 60 * 1000 // 30 minutes localStorage
+
 export function useCollectionCount(name) {
-  const [count, setCount] = useState(0)
-  const [loading, setLoading] = useState(true)
   const collectionName = CONTENT_COLLECTIONS[name]
+  const cacheKey = `count_${name}`
+
+  const getCachedValue = () => {
+    // 1. Check memory cache
+    const memEntry = countCache.get(cacheKey)
+    if (memEntry && (Date.now() - memEntry.at < COUNT_CACHE_TTL_MS)) {
+      return memEntry.count
+    }
+    // 2. Check localStorage cache
+    try {
+      const localData = localStorage.getItem(LOCAL_STORAGE_CACHE_PREFIX + cacheKey)
+      if (localData) {
+        const parsed = JSON.parse(localData)
+        if (Date.now() - parsed.at < COUNT_LOCAL_STORAGE_TTL_MS) {
+          countCache.set(cacheKey, { count: parsed.count, at: parsed.at })
+          return parsed.count
+        }
+      }
+    } catch (e) {}
+    return null
+  }
+
+  const [count, setCount] = useState(() => getCachedValue() ?? 0)
+  const [loading, setLoading] = useState(() => getCachedValue() === null)
 
   useEffect(() => {
     if (!collectionName) {
       setLoading(false)
       return
     }
+
+    const cachedVal = getCachedValue()
+    if (cachedVal !== null) {
+      setCount(cachedVal)
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     getCountFromServer(collection(db, collectionName))
       .then(snapshot => {
-        setCount(snapshot.data().count)
+        const cnt = snapshot.data().count
+        const now = Date.now()
+        countCache.set(cacheKey, { count: cnt, at: now })
+        try {
+          localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + cacheKey, JSON.stringify({ count: cnt, at: now }))
+        } catch (e) {}
+        setCount(cnt)
         setLoading(false)
       })
       .catch(err => {
         console.error(`Error counting ${collectionName}:`, err)
         setLoading(false)
       })
-  }, [collectionName])
+  }, [collectionName, name])
 
   return { count, loading }
 }
