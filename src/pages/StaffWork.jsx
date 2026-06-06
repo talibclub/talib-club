@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from "react"
 import { createPortal } from "react-dom"
-import { 
-  collection, onSnapshot, query, updateDoc, doc, 
+import {
+  collection, query, updateDoc, doc, getDocs, getDoc,
   serverTimestamp, addDoc, deleteDoc, setDoc, orderBy 
 } from "firebase/firestore"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
@@ -98,32 +98,69 @@ export default function StaffWork({ authState, go }) {
   const isAdmin = authState?.profile?.role === "admin" || (secureUserForAdminCheck && ADMIN_TEAM.includes(secureUserForAdminCheck)) || authState?.user?.email === "islamofwhite@gmail.com"
 
   // ━━━ FETCH DATA ━━━
+  // Use getDocs + periodic polling instead of onSnapshot to reduce Firebase reads
+  // Polling every 10 seconds should give near real-time feel without excessive reads
   useEffect(() => {
     setLoading(true)
+    let pollInterval = null
+    let isMounted = true
 
-    const qSubs = query(collection(db, "submissions"), orderBy("createdAt", "desc"))
-    const unsubSubs = onSnapshot(qSubs, (snap) => {
-      setSubs(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-      setLoading(false)
-    }, (err) => {
-      console.error("Fetch sub error:", err)
-      notifyError("โหลดข้อมูลงานล้มเหลว")
-      setLoading(false)
-    })
-
-    const unsubStaff = onSnapshot(doc(db, "settings", "staff"), (docSnap) => {
-      if (docSnap.exists() && docSnap.data().members) setStaffTeam(docSnap.data().members)
-    })
-
-    const unsubMag = onSnapshot(doc(db, "settings", "magazine"), (docSnap) => {
-      if (docSnap.exists() && docSnap.data().queue) {
-        setMagazineQueue(docSnap.data().queue)
-      } else {
-        setMagazineQueue(DEFAULT_MAGAZINE)
+    const fetchData = async () => {
+      try {
+        const qSubs = query(collection(db, "submissions"), orderBy("createdAt", "desc"))
+        const snap = await getDocs(qSubs)
+        if (isMounted) {
+          setSubs(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+        }
+      } catch (err) {
+        if (isMounted) {
+          console.error("Fetch sub error:", err)
+          notifyError("โหลดข้อมูลงานล้มเหลว")
+        }
       }
+    }
+
+    const fetchSettings = async () => {
+      try {
+        const staffSnap = await getDoc(doc(db, "settings", "staff"))
+        if (isMounted && staffSnap.exists() && staffSnap.data().members) {
+          setStaffTeam(staffSnap.data().members)
+        }
+      } catch (err) {
+        console.error("Fetch staff settings error:", err)
+      }
+
+      try {
+        const magSnap = await getDoc(doc(db, "settings", "magazine"))
+        if (isMounted) {
+          if (magSnap.exists() && magSnap.data().queue) {
+            setMagazineQueue(magSnap.data().queue)
+          } else {
+            setMagazineQueue(DEFAULT_MAGAZINE)
+          }
+        }
+      } catch (err) {
+        console.error("Fetch magazine settings error:", err)
+      }
+    }
+
+    // Initial load
+    Promise.all([fetchData(), fetchSettings()]).then(() => {
+      if (isMounted) setLoading(false)
     })
 
-    return () => { unsubSubs(); unsubStaff(); unsubMag(); }
+    // Poll every 10 seconds for updates
+    pollInterval = setInterval(() => {
+      if (isMounted) {
+        fetchData()
+        fetchSettings()
+      }
+    }, 10000)
+
+    return () => {
+      isMounted = false
+      if (pollInterval) clearInterval(pollInterval)
+    }
   }, [])
 
   // ━━━ ออโต้แจ้งเตือนคิววารสารทุกต้นเดือน ━━━

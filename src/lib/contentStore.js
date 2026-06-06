@@ -136,6 +136,9 @@ const LOCAL_STORAGE_CACHE_PREFIX = "talib_cache_"
 const collectionCache = new Map()
 const countCache = new Map()
 
+// Deduplication map for in-flight requests to prevent simultaneous identical queries
+const inFlightRequests = new Map()
+
 function getQueryCacheKey(collectionName, uid, limitCount, orderByField, orderDirection) {
   return JSON.stringify({ collectionName, uid: uid || null, limitCount, orderByField, orderDirection })
 }
@@ -296,6 +299,7 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
   const [remoteItems, setRemoteItems] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [refetchTrigger, setRefetchTrigger] = useState(0)
   const collectionName = CONTENT_COLLECTIONS[name]
   const isUserSpecific = USER_SPECIFIC_COLLECTIONS.includes(name)
 
@@ -313,7 +317,8 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
     }
 
     const cacheKey = getQueryCacheKey(collectionName, uid, limitCount, orderByField, orderDirection)
-    const cached = !live ? readCachedCollection(cacheKey) : null
+    // Skip cache if refetch was triggered (check again for fresh data)
+    const cached = !live && refetchTrigger === 0 ? readCachedCollection(cacheKey) : null
     if (cached) {
       setRemoteItems(cached)
       setError(null)
@@ -354,7 +359,24 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
           }
         }
 
-        const snapshot = await getDocs(q)
+        // Request deduplication: if same query is in-flight, wait for it
+        if (inFlightRequests.has(cacheKey)) {
+          const inFlight = await inFlightRequests.get(cacheKey)
+          if (active) {
+            setRemoteItems(inFlight)
+            setError(null)
+            setLoading(false)
+          }
+          return
+        }
+
+        // Fetch and dedup
+        const fetchPromise = getDocs(q)
+        inFlightRequests.set(cacheKey, fetchPromise)
+
+        const snapshot = await fetchPromise
+        inFlightRequests.delete(cacheKey)
+        
         if (!active) return
 
         const next = mapSnapshotDocs(snapshot)
@@ -364,6 +386,7 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
         setLoading(false)
       } catch (err) {
         if (!active) return
+        inFlightRequests.delete(cacheKey)
         console.error(`Cannot load ${collectionName}`, err)
         setError(err)
         setRemoteItems(null)
@@ -407,7 +430,7 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
     return () => {
       active = false
     }
-  }, [collectionName, name, uid, isUserSpecific, limitCount, orderByField, orderDirection, live])
+  }, [collectionName, name, uid, isUserSpecific, limitCount, orderByField, orderDirection, live, refetchTrigger])
 
   const serializedFallback = JSON.stringify(fallbackItems)
   const stableFallbackItems = useMemo(() => fallbackItems, [serializedFallback])
@@ -437,6 +460,8 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
     await setDoc(doc(db, collectionName, id), payload, { merge: true })
     invalidateContentCache(collectionName)
     await updateCollectionMetadata(collectionName)
+    // Trigger refetch to display updated data immediately
+    setRefetchTrigger(t => t + 1)
   }, [collectionName, isUserSpecific, uid])
 
   const deleteItem = useCallback(async (id) => {
@@ -447,6 +472,8 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
     }, { merge: true })
     invalidateContentCache(collectionName)
     await updateCollectionMetadata(collectionName)
+    // Trigger refetch to remove deleted item from list immediately
+    setRefetchTrigger(t => t + 1)
   }, [collectionName])
 
   return {
