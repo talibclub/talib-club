@@ -190,7 +190,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   const [activeMobileTab, setActiveMobileTab] = useState("form") // "preview" or "form" for mobile split layout, default to form first
   const [showTutorial, setShowTutorial] = useState(false)
   const [readingTab, setReadingTab] = useState("reading") // "reading" | "finished" | "stats"
-  
+
   // External Upload States
   const [addMode, setAddMode] = useState("library")
   const [externalBook, setExternalBook] = useState({
@@ -202,7 +202,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     file: null,
   })
   const [uploadingExternal, setUploadingExternal] = useState(false)
-  
+
   // Stopwatch states
   const [seconds, setSeconds] = useState(0)
   const [isRunning, setIsRunning] = useState(false)
@@ -268,13 +268,13 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     const userShelf = shelfItems.filter(item => item.uid === uid)
     const finished = userShelf.filter(item => item.status === "finished").length
     const reading = userShelf.filter(item => item.status === "reading" || !item.status).length
-    
+
     const progressSum = userShelf.reduce((sum, item) => sum + Number(item.progress || 0), 0)
     const avgProgress = userShelf.length ? Math.round(progressSum / userShelf.length) : 0
-    
+
     const verifiedSessions = userShelf.reduce((sum, item) => sum + Number(item.verifiedSessions || 0), 0)
     const totalSeconds = userShelf.reduce((sum, item) => sum + Number(item.totalReadSeconds || 0), 0)
-    
+
     return {
       reading,
       finished,
@@ -304,18 +304,18 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       const key = addDaysToKey(streak.todayKey, -i)
       const dateObj = new Date(`${key}T00:00:00`)
       const name = dayNames[dateObj.getDay()]
-      
+
       const daySessions = readingSessions.filter(
         item => item.uid === uid && item.verified && (item.dayKey || getLocalDayKey(item.completedAt)) === key
       )
       const secs = daySessions.reduce((sum, item) => sum + Number(item.activeSeconds || 0), 0)
       const minutes = Math.round(secs / 60)
       const metGoal = secs >= DAILY_READING_GOAL_MINUTES * 60
-      
+
       const protection = streakSettings.protectedDays.find(
         p => (p.date || p.dayKey || getLocalDayKey(p.createdAt || p.usedAt)) === key
       )
-      
+
       list.push({
         key,
         name,
@@ -392,28 +392,28 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     const isM1 = missionId === "m1"
     const isM2 = missionId === "m2"
     const isM3 = missionId === "m3"
-    
+
     const todayClaims = streakSettings.claimedMissions?.[streak.todayKey] || {}
     if (todayClaims[missionId]) {
       toast.success("คุณรับรางวัลภารกิจนี้ไปแล้ว")
       return
     }
-    
+
     let completed = false
     if (isM1) completed = todaySeconds >= 600
     if (isM2) completed = todaySessions.some(s => s.reflection && s.reflection.length >= 100)
     if (isM3) completed = todayQuizPassed
-    
+
     if (!completed) {
       toast.error("ภารกิจยังไม่เสร็จสมบูรณ์")
       return
     }
-    
+
     let gemsReward = 0
     if (isM1) gemsReward = 5
     else if (isM2) gemsReward = 8
     else if (isM3) gemsReward = 10
-    
+
     const nextClaimed = {
       ...streakSettings.claimedMissions,
       [streak.todayKey]: {
@@ -421,13 +421,13 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
         [missionId]: true
       }
     }
-    
+
     await saveStreakSettings({
       ...streakSettings,
       gems: Number(streakSettings.gems || 0) + gemsReward,
       claimedMissions: nextClaimed
     })
-    
+
     toast.success(`สำเร็จ! รับรางวัล +${gemsReward} 💎`)
   }
 
@@ -436,12 +436,12 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     const isFreeze = itemType === "freeze"
     const cost = isFreeze ? 50 : 80
     const currentGems = Number(streakSettings.gems || 0)
-    
+
     if (currentGems < cost) {
       toast.error("เพชรของคุณไม่เพียงพอ")
       return
     }
-    
+
     if (isFreeze) {
       if (streakSettings.freezeCredits >= 2) {
         toast.error("คุณมีน้ำแข็งเต็มจำนวนจำกัดแล้ว (สูงสุด 2 ชิ้น)")
@@ -702,7 +702,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
         const elapsed = Math.floor((safeDateNow() - startTimestampRef.current) / 1000)
         setSeconds(accumulatedSecondsRef.current + elapsed)
       }
-      
+
       tick()
       timerRef.current = setInterval(tick, 1000)
 
@@ -778,7 +778,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     if (!activeBook) return
     const start = parseInt(startPage, 10)
     const end = parseInt(endPage, 10)
-    
+
     if (isNaN(start) || isNaN(end) || end < start) {
       toast.error("กรุณาใส่หน้าเริ่มต้นและสิ้นสุดให้ถูกต้อง")
       return
@@ -787,7 +787,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       toast.error("คุณพึ่งจะเริ่มอ่านเอง! กรุณารอจับเวลาอย่างน้อย 10 วินาที")
       return
     }
-    
+
     setSaving(true)
     try {
       const payload = {
@@ -798,9 +798,9 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
         endPage: end,
         reflection: reflection.trim()
       }
-      
+
       const report = calculateVerificationReport(payload)
-      
+
       if (!report.verified) {
         toast.error(`เซสชันนี้ยังไม่ผ่านเกณฑ์ทบทวนความรู้ (${report.score}/100) ลองอ่านสะสมเวลาต่อ หรือเพิ่มบันทึกข้อคิดสะท้อนธรรมยาวขึ้นอีกนิด (อย่างน้อย 20 ตัวอักษร)`)
         setSaving(false)
@@ -808,7 +808,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       }
 
       const sessionId = `${uid}_${activeBook.id}_${safeDateNow()}`
-      
+
       await saveReadingSession({
         id: sessionId,
         uid,
@@ -840,10 +840,10 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       })
 
       const nextProgress = getProgressFromSession(activeBook, end, report.pagesRead)
-      
+
       const cleanItem = { ...activeBook }
       delete cleanItem.book
-      
+
       await saveShelfItem({
         ...cleanItem,
         progress: nextProgress,
@@ -926,9 +926,9 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 
         {/* Mobile Tabs navigation (rendered only on mobile) */}
         <div style={{ display: "none", gap: 8, marginBottom: 12, borderBottom: "1.5px solid var(--br2)", paddingBottom: 2 }} className="mobile-tabs-container">
-          <button 
+          <button
             type="button"
-            onClick={() => setActiveMobileTab("preview")} 
+            onClick={() => setActiveMobileTab("preview")}
             style={{
               flex: 1,
               padding: "10px 14px",
@@ -951,9 +951,9 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
             <i className="ti ti-book" style={{ fontSize: 15 }}></i>
             อ่านหนังสือเต็มจอ
           </button>
-          <button 
+          <button
             type="button"
-            onClick={() => setActiveMobileTab("form")} 
+            onClick={() => setActiveMobileTab("form")}
             style={{
               flex: 1,
               padding: "10px 14px",
@@ -980,7 +980,8 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 
         {/* Workspace Split */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 2.2fr", gap: 18, flex: 1, minHeight: 0 }} className="reader-split">
-          <style dangerouslySetInnerHTML={{__html: `
+          <style dangerouslySetInnerHTML={{
+            __html: `
             @media (max-width: 900px) {
               .mobile-tabs-container {
                 display: flex !important;
@@ -1033,17 +1034,17 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
               fontSize: 12
             }}>
               <span style={{ fontSize: 10, fontWeight: 600, color: "var(--t3)", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 2 }}>เกณฑ์การยืนยันเซสชัน</span>
-              
+
               <div style={{ display: "flex", alignItems: "center", gap: 8, color: seconds >= MIN_VERIFIED_SECONDS ? "var(--teal)" : "var(--t3)", transition: "color 0.2s" }}>
                 <i className={`ti ${seconds >= MIN_VERIFIED_SECONDS ? "ti-circle-check" : "ti-circle"}`} style={{ fontSize: 14, color: seconds >= MIN_VERIFIED_SECONDS ? "var(--teal)" : "var(--t3)" }}></i>
                 <span>เวลาอ่านอย่างน้อย 3 นาที (ขณะนี้: {displayTimer})</span>
               </div>
-              
+
               <div style={{ display: "flex", alignItems: "center", gap: 8, color: (endPage && Number(endPage) >= Number(startPage)) ? "var(--teal)" : "var(--t3)", transition: "color 0.2s" }}>
                 <i className={`ti ${(endPage && Number(endPage) >= Number(startPage)) ? "ti-circle-check" : "ti-circle"}`} style={{ fontSize: 14, color: (endPage && Number(endPage) >= Number(startPage)) ? "var(--teal)" : "var(--t3)" }}></i>
                 <span>ระบุหน้าที่อ่านถึง (หน้า {startPage} ถึง {endPage || "?"})</span>
               </div>
-              
+
               <div style={{ display: "flex", alignItems: "center", gap: 8, color: reflection.trim().length >= MIN_REFLECTION_CHARS ? "var(--teal)" : "var(--t3)", transition: "color 0.2s" }}>
                 <i className={`ti ${reflection.trim().length >= MIN_REFLECTION_CHARS ? "ti-circle-check" : "ti-circle"}`} style={{ fontSize: 14, color: reflection.trim().length >= MIN_REFLECTION_CHARS ? "var(--teal)" : "var(--t3)" }}></i>
                 <span>บันทึกข้อคิด {MIN_REFLECTION_CHARS} ตัวอักษรขึ้นไป ({reflection.trim().length}/{MIN_REFLECTION_CHARS})</span>
@@ -1053,21 +1054,21 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <label style={{ display: "grid", gap: 4 }}>
                 <span style={{ fontSize: 11, color: "var(--t2)" }}>หน้าเริ่มต้น *</span>
-                <input 
-                  type="number" 
-                  value={startPage} 
-                  onChange={e => setStartPage(e.target.value)} 
-                  style={{ fontSize: 13, padding: "8px 10px" }} 
+                <input
+                  type="number"
+                  value={startPage}
+                  onChange={e => setStartPage(e.target.value)}
+                  style={{ fontSize: 13, padding: "8px 10px" }}
                 />
               </label>
               <label style={{ display: "grid", gap: 4 }}>
                 <span style={{ fontSize: 11, color: "var(--t2)" }}>อ่านถึงหน้า *</span>
-                <input 
-                  type="number" 
-                  placeholder="เช่น 12" 
-                  value={endPage} 
-                  onChange={e => setEndPage(e.target.value)} 
-                  style={{ fontSize: 13, padding: "8px 10px" }} 
+                <input
+                  type="number"
+                  placeholder="เช่น 12"
+                  value={endPage}
+                  onChange={e => setEndPage(e.target.value)}
+                  style={{ fontSize: 13, padding: "8px 10px" }}
                 />
               </label>
             </div>
@@ -1079,19 +1080,19 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
                   {reflection.length}/{MIN_REFLECTION_CHARS} อักษร
                 </span>
               </div>
-              <textarea 
-                value={reflection} 
-                onChange={e => setReflection(e.target.value)} 
-                rows={5} 
-                placeholder="วันนี้ได้ข้อคิดสะกิดใจเรื่องอะไรบ้างจากการอ่านหัวข้อนี้? พิมพ์ข้อเขียนสั้นๆ (อย่างน้อย 20 ตัวอักษรเพื่อรับสถิติยืนยัน)" 
+              <textarea
+                value={reflection}
+                onChange={e => setReflection(e.target.value)}
+                rows={5}
+                placeholder="วันนี้ได้ข้อคิดสะกิดใจเรื่องอะไรบ้างจากการอ่านหัวข้อนี้? พิมพ์ข้อเขียนสั้นๆ (อย่างน้อย 20 ตัวอักษรเพื่อรับสถิติยืนยัน)"
                 style={{ fontSize: 12, padding: 10, lineHeight: 1.5 }}
               />
             </label>
 
-            <button 
-              onClick={saveReadingProgress} 
+            <button
+              onClick={saveReadingProgress}
               disabled={saving || seconds < MIN_VERIFIED_SECONDS || reflection.length < MIN_REFLECTION_CHARS || !endPage || Number(endPage) < Number(startPage)}
-              className="btn btn-teal" 
+              className="btn btn-teal"
               style={{ width: "100%", marginTop: "auto", padding: "10px 0", fontSize: 13 }}
             >
               {saving ? "กำลังบันทึก..." : "บันทึกความคืบหน้า"}
@@ -1101,9 +1102,9 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
           {/* Right Panel: Embedded Google Preview Viewer */}
           <div className="reader-preview" style={{ borderRadius: 16, overflow: "hidden", border: "1px solid var(--br2)", background: "var(--bg2)", height: "100%" }}>
             {activeBook.book.fileUrl ? (
-              <iframe 
-                src={getPreviewUrl(activeBook.book.fileUrl)} 
-                style={{ width: "100%", height: "100%", border: "none" }} 
+              <iframe
+                src={getPreviewUrl(activeBook.book.fileUrl)}
+                style={{ width: "100%", height: "100%", border: "none" }}
                 title="Book Preview"
                 allow="autoplay"
               ></iframe>
@@ -1124,8 +1125,8 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   const hasConfiguredNotif = !!notifEnabled || !!streakSettings?.remindersEnabled;
 
   const renderNotificationSettings = (highlighted) => (
-    <div className="card" style={{ 
-      padding: 18, 
+    <div className="card" style={{
+      padding: 18,
       marginBottom: 0,
       border: highlighted ? "2px solid var(--teal)" : undefined,
       boxShadow: highlighted ? "0 4px 20px rgba(13, 148, 136, 0.15)" : undefined,
@@ -1220,7 +1221,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
         {streakSettings.remindersEnabled && (
           <div style={{ display: "grid", gap: 10, padding: 12, background: "var(--bg2)", borderRadius: 10, border: "0.5px solid var(--br)", marginTop: 2 }}>
             <div style={{ fontSize: 11, fontWeight: 500, color: "var(--t2)" }}>ตั้งเตือนเวลาอื่น ๆ:</div>
-            
+
             {streakSettings.reminderTimes.length === 0 ? (
               <div style={{ fontSize: 11, color: "var(--t3)" }}>ยังไม่มีเวลาแจ้งเตือนที่ตั้งค่าไว้</div>
             ) : (
@@ -1229,9 +1230,9 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
                   <div key={timeStr} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--teal-bg)", border: "0.5px solid var(--teal)", color: "var(--teal)", padding: "3px 8px", borderRadius: 12, fontSize: 11 }}>
                     <i className="ti ti-alarm" style={{ fontSize: 10 }}></i>
                     <span>{timeStr}</span>
-                    <button 
-                      type="button" 
-                      onClick={() => handleRemoveReminderTime(timeStr)} 
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveReminderTime(timeStr)}
                       style={{ background: "none", border: "none", color: "red", cursor: "pointer", display: "grid", placeItems: "center", padding: 0 }}
                     >
                       <i className="ti ti-x" style={{ fontSize: 11 }}></i>
@@ -1242,15 +1243,15 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
             )}
 
             <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}>
-              <input 
-                type="time" 
-                id="new-reader-reminder-time" 
-                defaultValue="20:00" 
+              <input
+                type="time"
+                id="new-reader-reminder-time"
+                defaultValue="20:00"
                 style={{ flex: 1, padding: "4px 8px", fontSize: 12, background: "var(--card)", border: "0.5px solid var(--br)", color: "var(--text)", borderRadius: 6, height: 28 }}
               />
-              <button 
-                type="button" 
-                className="btn btn-teal" 
+              <button
+                type="button"
+                className="btn btn-teal"
                 style={{ padding: "0 10px", fontSize: 11, height: 28, borderRadius: 6 }}
                 onClick={() => {
                   const input = document.getElementById("new-reader-reminder-time")
@@ -1294,7 +1295,8 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
         </div>
       </div>
 
-      <style dangerouslySetInnerHTML={{__html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         .reader-grid-layout {
           display: grid;
           grid-template-columns: 1.55fr 1fr;
@@ -1316,31 +1318,31 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
           <div style={{ marginBottom: 8 }}>
             {/* Tab navigation */}
             <div style={{ display: "flex", gap: 6, marginBottom: 16, borderBottom: "1px solid var(--br2)", paddingBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
-              <button 
-                onClick={() => setReadingTab("reading")} 
+              <button
+                onClick={() => setReadingTab("reading")}
                 className={`reader-btn ${readingTab === "reading" ? "on" : ""}`}
                 style={{ fontSize: 11, padding: "5px 12px", border: "none", cursor: "pointer", borderRadius: 20 }}
               >
                 กำลังอ่าน ({myActiveBooks.length})
               </button>
-              <button 
-                onClick={() => setReadingTab("finished")} 
+              <button
+                onClick={() => setReadingTab("finished")}
                 className={`reader-btn ${readingTab === "finished" ? "on" : ""}`}
                 style={{ fontSize: 11, padding: "5px 12px", border: "none", cursor: "pointer", borderRadius: 20 }}
               >
                 อ่านจบแล้ว ({myFinishedBooks.length})
               </button>
-              <button 
-                onClick={() => setReadingTab("stats")} 
+              <button
+                onClick={() => setReadingTab("stats")}
                 className={`reader-btn ${readingTab === "stats" ? "on" : ""}`}
                 style={{ fontSize: 11, padding: "5px 12px", border: "none", cursor: "pointer", borderRadius: 20 }}
               >
                 สถิติสะสม 📊
               </button>
 
-              <button 
-                onClick={() => setShowAddForm(!showAddForm)} 
-                className="btn btn-outline" 
+              <button
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="btn btn-outline"
                 style={{ fontSize: 11, padding: "6px 14px", borderRadius: 20, marginLeft: "auto" }}
               >
                 <i className={`ti ${showAddForm ? "ti-minus" : "ti-plus"}`}></i> {showAddForm ? "ปิดช่องเพิ่มหนังสือ" : "เพิ่มหนังสือเข้าชั้น"}
@@ -1350,15 +1352,15 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
             {showAddForm && (
               <div className="card" style={{ padding: 18, background: "var(--bg2)", border: "1.5px solid var(--br2)", borderRadius: 12, marginBottom: 16, animation: "pageFadeIn 0.2s ease-out" }}>
                 <div className="reader-control" style={{ marginBottom: 12, display: "flex", gap: 4, width: "fit-content" }}>
-                  <button 
-                    className={`reader-btn ${addMode === "library" ? "on" : ""}`} 
+                  <button
+                    className={`reader-btn ${addMode === "library" ? "on" : ""}`}
                     onClick={() => setAddMode("library")}
                     style={{ fontSize: 11, padding: "5px 12px", border: "none", cursor: "pointer", borderRadius: 20 }}
                   >
                     เลือกจากคลังของเว็บ
                   </button>
-                  <button 
-                    className={`reader-btn ${addMode === "external" ? "on" : ""}`} 
+                  <button
+                    className={`reader-btn ${addMode === "external" ? "on" : ""}`}
                     onClick={() => setAddMode("external")}
                     style={{ fontSize: 11, padding: "5px 12px", border: "none", cursor: "pointer", borderRadius: 20 }}
                   >
@@ -1368,9 +1370,9 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 
                 {addMode === "library" ? (
                   <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                    <select 
-                      value={selectedBookToAdd} 
-                      onChange={event => setSelectedBookToAdd(event.target.value)} 
+                    <select
+                      value={selectedBookToAdd}
+                      onChange={event => setSelectedBookToAdd(event.target.value)}
                       style={{ fontSize: 12, padding: "8px 10px", flex: 1, minWidth: 200 }}
                     >
                       <option value="">-- เลือกหนังสือจากคลัง --</option>
@@ -1378,10 +1380,10 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
                         <option key={book.id} value={book.id}>{book.title} ({book.author})</option>
                       ))}
                     </select>
-                    <button 
-                      onClick={() => { addNewBookToShelf(); setShowAddForm(false); }} 
+                    <button
+                      onClick={() => { addNewBookToShelf(); setShowAddForm(false); }}
                       disabled={!selectedBookToAdd}
-                      className="btn btn-teal" 
+                      className="btn btn-teal"
                       style={{ padding: "8px 20px", fontSize: 12 }}
                     >
                       เพิ่มเข้าชั้นหนังสือ
@@ -1390,60 +1392,77 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                      <input 
-                        value={externalBook.title} 
-                        onChange={event => setExternalBook(prev => ({ ...prev, title: event.target.value }))} 
-                        placeholder="ชื่อหนังสือหรือไฟล์ *" 
+                      <input
+                        value={externalBook.title}
+                        onChange={event => setExternalBook(prev => ({ ...prev, title: event.target.value }))}
+                        placeholder="ชื่อหนังสือหรือไฟล์ *"
                         style={{ fontSize: 12, padding: "8px 10px" }}
                       />
-                      <input 
-                        value={externalBook.author} 
-                        onChange={event => setExternalBook(prev => ({ ...prev, author: event.target.value }))} 
-                        placeholder="ผู้เขียน/แหล่งที่มา (ไม่บังคับ)" 
+                      <input
+                        value={externalBook.author}
+                        onChange={event => setExternalBook(prev => ({ ...prev, author: event.target.value }))}
+                        placeholder="ผู้เขียน/แหล่งที่มา (ไม่บังคับ)"
                         style={{ fontSize: 12, padding: "8px 10px" }}
                       />
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 10 }}>
-                      <input 
-                        value={externalBook.fileUrl} 
-                        onChange={event => setExternalBook(prev => ({ ...prev, fileUrl: event.target.value }))} 
-                        placeholder="ลิงก์ PDF / Google Drive / URL อ่านออนไลน์" 
+                      <input
+                        value={externalBook.fileUrl}
+                        onChange={event => setExternalBook(prev => ({ ...prev, fileUrl: event.target.value }))}
+                        placeholder="ลิงก์ PDF / Google Drive / URL อ่านออนไลน์"
                         style={{ fontSize: 12, padding: "8px 10px" }}
                       />
-                      <input 
-                        type="number" 
-                        min="0" 
-                        value={externalBook.totalPages} 
-                        onChange={event => setExternalBook(prev => ({ ...prev, totalPages: event.target.value }))} 
-                        placeholder="จำนวนหน้าทั้งหมด" 
+                      <input
+                        type="number"
+                        min="0"
+                        value={externalBook.totalPages}
+                        onChange={event => setExternalBook(prev => ({ ...prev, totalPages: event.target.value }))}
+                        placeholder="จำนวนหน้าทั้งหมด"
                         style={{ fontSize: 12, padding: "8px 10px" }}
                       />
                     </div>
-                    <textarea 
-                      value={externalBook.desc} 
-                      onChange={event => setExternalBook(prev => ({ ...prev, desc: event.target.value }))} 
-                      placeholder="คำอธิบายหรือจดบันทึกเป้าหมายสั้น ๆ สำหรับหนังสือเล่มนี้..." 
-                      style={{ fontSize: 12, padding: "8px 10px", minHeight: 60 }} 
+                    <textarea
+                      value={externalBook.desc}
+                      onChange={event => setExternalBook(prev => ({ ...prev, desc: event.target.value }))}
+                      placeholder="คำอธิบายหรือจดบันทึกเป้าหมายสั้น ๆ สำหรับหนังสือเล่มนี้..."
+                      style={{ fontSize: 12, padding: "8px 10px", minHeight: 60 }}
                     />
-                    
-                    <label className="bookshelf-file-input" style={{ 
-                      display: "flex", alignItems: "center", gap: 10, minHeight: 44, 
-                      border: "1px dashed var(--br)", borderRadius: 10, background: "var(--card)", 
-                      padding: "10px 12px", color: "var(--t2)", fontSize: 12, cursor: "pointer" 
+
+                    <label className="bookshelf-file-input" style={{
+                      display: "flex", alignItems: "center", gap: 10, minHeight: 44,
+                      border: "1px dashed var(--br)", borderRadius: 10, background: "var(--card)",
+                      padding: "10px 12px", color: "var(--t2)", fontSize: 12, cursor: "pointer"
                     }}>
                       <i className="ti ti-upload" style={{ color: "var(--teal)", fontSize: 18 }}></i>
                       <span>{externalBook.file ? externalBook.file.name : "หรือคลิกอัปโหลดไฟล์ PDF จากเครื่อง (จำกัด 20MB)"}</span>
-                      <input 
-                        type="file" 
-                        accept=".pdf,.epub,.doc,.docx,.txt" 
-                        onChange={event => setExternalBook(prev => ({ ...prev, file: event.target.files?.[0] || null }))} 
+                      <input
+                        type="file"
+                        accept=".pdf,.epub,.doc,.docx,.txt"
+                        onChange={event => {
+                          const file = event.target.files?.[0];
+                          if (!file) {
+                            setExternalBook(prev => ({ ...prev, file: null }));
+                            return;
+                          }
+
+                          // 🟢 ดักจับขนาดไฟล์ไม่เกิน 20MB (20 * 1024 * 1024 = 20,971,520 bytes)
+                          const MAX_FILE_SIZE = 20 * 1024 * 1024;
+                          if (file.size > MAX_FILE_SIZE) {
+                            toast.error("ขนาดไฟล์ใหญ่เกินไป (จำกัดไม่เกิน 20MB)");
+                            event.target.value = ""; // เคลียร์ค่า input เพื่อให้เลือกไฟล์ใหม่ได้
+                            return;
+                          }
+
+                          // ถ้าไฟล์ขนาดผ่านเกณฑ์ ค่อยบันทึกลง State
+                          setExternalBook(prev => ({ ...prev, file }));
+                        }}
                         style={{ display: "none" }}
                       />
                     </label>
-                    
-                    <button 
-                      className="btn btn-teal" 
-                      onClick={async () => { await addExternalBook(); setShowAddForm(false); }} 
+
+                    <button
+                      className="btn btn-teal"
+                      onClick={async () => { await addExternalBook(); setShowAddForm(false); }}
                       disabled={uploadingExternal}
                       style={{ width: "100%", padding: "10px", fontSize: 12 }}
                     >
@@ -1473,7 +1492,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
                         </div>
                         <strong style={{ fontSize: 13, color: "var(--text)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.4 }}>{item.book.title}</strong>
                         <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 4, marginBottom: 12 }}>{item.book.author}</div>
-                        
+
                         {/* Progress bar */}
                         <div style={{ marginBottom: 12 }}>
                           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--t2)", marginBottom: 4 }}>
@@ -1487,16 +1506,16 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
                       </div>
 
                       <div style={{ display: "flex", gap: 6 }}>
-                        <button 
-                          onClick={() => startReading(item)} 
-                          className="btn btn-teal" 
+                        <button
+                          onClick={() => startReading(item)}
+                          className="btn btn-teal"
                           style={{ flex: 1, padding: "6px 0", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}
                         >
                           <i className="ti ti-device-desktop"></i> เปิดห้องอ่าน (จับเวลา)
                         </button>
-                        <button 
-                          onClick={() => removeShelfItem(item.id)} 
-                          className="btn btn-outline" 
+                        <button
+                          onClick={() => removeShelfItem(item.id)}
+                          className="btn btn-outline"
                           style={{ padding: "6px 10px", fontSize: 11, color: "#e05555", borderColor: "rgba(224,85,85,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}
                           title="ลบหนังสือออกจากชั้น"
                         >
@@ -1527,7 +1546,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
                         </div>
                         <strong style={{ fontSize: 13, color: "var(--text)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.4 }}>{item.book.title}</strong>
                         <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 4, marginBottom: 12 }}>{item.book.author}</div>
-                        
+
                         <div style={{ marginBottom: 12 }}>
                           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--t2)", marginBottom: 4 }}>
                             <span>ความคืบหน้า</span>
@@ -1556,9 +1575,9 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
                           >
                             <i className="ti ti-help"></i> ทำแบบทดสอบ
                           </button>
-                          <button 
-                            onClick={() => removeShelfItem(item.id)} 
-                            className="btn btn-outline" 
+                          <button
+                            onClick={() => removeShelfItem(item.id)}
+                            className="btn btn-outline"
                             style={{ flex: 1, padding: "6px 0", fontSize: 11, color: "#e05555", borderColor: "rgba(224,85,85,0.3)", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}
                           >
                             <i className="ti ti-trash"></i> ลบ
@@ -1633,7 +1652,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
             </div>
 
             <div style={{ fontSize: 11, color: "var(--t2)" }}>
-              เป้าหมายวันนี้ {formatReadingMinutes(todaySeconds)}/{DAILY_READING_GOAL_MINUTES} นาที 
+              เป้าหมายวันนี้ {formatReadingMinutes(todaySeconds)}/{DAILY_READING_GOAL_MINUTES} นาที
               {streak.todayVerified ? " (สำเร็จแล้ววันนี้! 🔥)" : ""}
             </div>
             <div className="streak-progress" style={{ height: 6, background: "var(--bg3)", borderRadius: 3, overflow: "hidden", marginTop: 2 }}>
@@ -1769,7 +1788,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <MissionRow 
+              <MissionRow
                 title="1. นักอ่านผู้ทุ่มเท"
                 desc="สะสมเวลาอ่านหนังสือให้ครบ 10 นาทีในวันนี้"
                 progress={todaySeconds}
@@ -1780,7 +1799,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
                 onClaim={() => claimMission("m1")}
               />
 
-              <MissionRow 
+              <MissionRow
                 title="2. บันทึกธรรมสะกิดใจ"
                 desc="บันทึกบันทึกการอ่านและเขียนข้อคิดที่มีความยาว 100 ตัวอักษรขึ้นไปในเซสชันเดียวกันวันนี้"
                 progress={todaySessions.reduce((max, s) => Math.max(max, s.reflection?.length || 0), 0)}
@@ -1791,7 +1810,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
                 onClaim={() => claimMission("m2")}
               />
 
-              <MissionRow 
+              <MissionRow
                 title="3. สอบควิซหนังสือ"
                 desc="ทำแบบทดสอบ (Quiz) หนังสือใดๆ บนชั้นหนังสือ และสอบผ่านได้คะแนน 12/20 ข้อขึ้นไปวันนี้"
                 progress={todayQuizPassed ? 1 : 0}
@@ -1824,27 +1843,27 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 function MissionRow({ title, desc, progress, target, formatProgress, rewardText, claimed, onClaim }) {
   const completed = progress >= target
   const percent = Math.min(100, Math.round((progress / target) * 100))
-  
-  const containerBg = claimed 
-    ? "rgba(45, 190, 160, 0.04)" 
-    : completed 
-      ? "rgba(45, 190, 160, 0.08)" 
+
+  const containerBg = claimed
+    ? "rgba(45, 190, 160, 0.04)"
+    : completed
+      ? "rgba(45, 190, 160, 0.08)"
       : "var(--bg2)"
-  const borderColor = claimed 
-    ? "rgba(45, 190, 160, 0.15)" 
-    : completed 
-      ? "rgba(45, 190, 160, 0.35)" 
+  const borderColor = claimed
+    ? "rgba(45, 190, 160, 0.15)"
+    : completed
+      ? "rgba(45, 190, 160, 0.35)"
       : "var(--br)"
-  
+
   return (
-    <div style={{ 
-      padding: "10px 12px", 
-      background: containerBg, 
+    <div style={{
+      padding: "10px 12px",
+      background: containerBg,
       border: `1px solid ${borderColor}`,
-      borderRadius: 12, 
-      display: "flex", 
-      alignItems: "center", 
-      justifyContent: "space-between", 
+      borderRadius: 12,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
       gap: 12,
       flexWrap: "wrap",
       textAlign: "left",
@@ -1867,21 +1886,21 @@ function MissionRow({ title, desc, progress, target, formatProgress, rewardText,
           </span>
         </div>
       </div>
-      
+
       <div>
         {claimed ? (
           <button className="btn btn-outline" disabled style={{ padding: "4px 8px", fontSize: 10, opacity: 0.6, cursor: "not-allowed", color: "var(--teal)", borderColor: "rgba(45, 190, 160, 0.2)" }}>
             <i className="ti ti-check" style={{ marginRight: 2 }}></i>รับแล้ว
           </button>
         ) : (
-          <button 
+          <button
             onClick={onClaim}
             disabled={!completed}
             className={`btn ${completed ? "btn-teal" : "btn-outline"}`}
-            style={{ 
-              padding: "4px 10px", 
-              fontSize: 10, 
-              opacity: completed ? 1 : 0.6, 
+            style={{
+              padding: "4px 10px",
+              fontSize: 10,
+              opacity: completed ? 1 : 0.6,
               cursor: completed ? "pointer" : "not-allowed",
               boxShadow: completed ? "0 4px 10px rgba(45,190,160,0.15)" : "none"
             }}
@@ -2038,7 +2057,7 @@ function QuizModal({ shelfItem, onClose, onSaveScore, theme, user }) {
   const [selectedOption, setSelectedOption] = useState(null)
   const [showExplanation, setShowExplanation] = useState(false)
   const [completed, setCompleted] = useState(false)
-  
+
   const book = shelfItem.book || shelfItem.customBook || {}
 
   useEffect(() => {
@@ -2168,7 +2187,7 @@ function QuizModal({ shelfItem, onClose, onSaveScore, theme, user }) {
                   </div>
                   <h4 style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", margin: "0 0 8px" }}>{book.title}</h4>
                   <p style={{ fontSize: 12, color: "var(--t3)", margin: "0 0 16px" }}>ผู้เขียน: {book.author || "ไม่ระบุ"}</p>
-                  
+
                   <div style={{ background: "var(--bg3)", padding: 16, borderRadius: 16, textAlign: "left", fontSize: 13, lineHeight: 1.6, color: "var(--t2)", marginBottom: 20 }}>
                     <h5 style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 600, color: "var(--text)" }}>คำแนะนำก่อนทำแบบทดสอบ:</h5>
                     <ul style={{ paddingLeft: 20, margin: 0 }}>
@@ -2277,7 +2296,7 @@ function QuizModal({ shelfItem, onClose, onSaveScore, theme, user }) {
                   <div style={{ width: 72, height: 72, borderRadius: "50%", background: correctAnswersCount >= 12 ? "rgba(45, 190, 160, 0.12)" : "rgba(224, 85, 85, 0.1)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
                     <i className={`ti ${correctAnswersCount >= 12 ? "ti-circle-check-filled" : "ti-circle-x-filled"}`} style={{ color: correctAnswersCount >= 12 ? "var(--teal)" : "#e05555", fontSize: 44 }}></i>
                   </div>
-                  
+
                   <h4 style={{ fontSize: 18, fontWeight: 600, color: "var(--text)", margin: "0 0 6px" }}>
                     {correctAnswersCount >= 12 ? "สอบผ่านเกณฑ์ทบทวนความรู้! 🎉" : "คะแนนยังไม่ผ่านเกณฑ์"}
                   </h4>
@@ -2285,7 +2304,7 @@ function QuizModal({ shelfItem, onClose, onSaveScore, theme, user }) {
                     {correctAnswersCount} / 20 คะแนน
                   </p>
                   <p style={{ fontSize: 13, color: "var(--t2)", margin: "0 0 20px", lineHeight: 1.5 }}>
-                    {correctAnswersCount >= 12 
+                    {correctAnswersCount >= 12
                       ? "ยอดเยี่ยมมากครับ! คุณจดจำและทำความเข้าใจหนังสือเรื่องนี้ได้ดีมาก ได้ทบทวนบทเรียนและทำภารกิจสำเร็จ"
                       : "พยายามอีกนิดครับ! ลองอ่านทวนบทเรียนในหนังสือหรือสมุดข้อคิด จากนั้นเข้ามาเริ่มทำแบบทดสอบใหม่อีกครั้งนะ"
                     }

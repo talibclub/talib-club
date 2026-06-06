@@ -6,6 +6,7 @@ import { getSurahTheme } from "../data/quranThemes.js"
 import { useUserCollection, useUserDoc } from "../lib/contentStore.js"
 import toast from "react-hot-toast"
 import { confirmAction } from "../utils/feedback.jsx"
+import DOMPurify from "dompurify"
 
 const JUZ_STARTS = [
   { juz: 1, sura: 1, ayah: 1, label: "ยุซอ์ที่ 1 (ซูเราะฮ์ 1:1)" },
@@ -208,7 +209,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
     setPageVerses([])
 
     const quranComUrl = `https://api.quran.com/api/v4/quran/verses/uthmani_tajweed?page_number=${selectedPage}`
-    
+
     fetch(quranComUrl)
       .then(res => {
         if (!res.ok) throw new Error("Quran.com API error")
@@ -344,7 +345,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
 
   const updateLastRead = async (suraNum, ayahNum) => {
     const isAlreadyBookmarked = lastRead?.sura === suraNum && lastRead?.aya === ayahNum
-    
+
     if (isAlreadyBookmarked) {
       // Rollback state first before async delete
       const prevLastRead = lastRead
@@ -567,7 +568,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
         // Clean up from dedup map when complete
         inFlightModalRequests.current.delete(dedupeKey)
       })
-    
+
     return () => { active = false }
   }, [activeAyahMenu, translationKey, verses])
 
@@ -748,7 +749,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
 
         const merged = transData.result.map((aya, idx) => {
           const tafsirAya = tafsirData.result[idx] || {}
-          
+
           let tajweedText = null
           if (tajweedData && tajweedData.verses) {
             const matchingTajweed = tajweedData.verses.find(v => {
@@ -1760,124 +1761,81 @@ export default function Quran({ initialSura, initialAyah, authState }) {
           {/* CONTROLS CARD */}
           {(!isMobile || showMobileSettings) && (
             <div className="card" style={{ padding: isMobile ? "14px" : "16px 20px", marginBottom: 20, display: "flex", flexDirection: "column", gap: 14 }}>
-            {isMobile ? (
-              // MOBILE LAYOUT
-              <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
-                {/* Mode Segmented Control */}
-                <div style={{ display: "flex", background: "var(--quran-br2)", padding: 3, borderRadius: 10, width: "100%", border: "0.5px solid var(--quran-br2)" }}>
-                  <button
-                    className={`mode-btn ${mode === "translation" ? "active" : ""}`}
-                    onClick={() => setMode("translation")}
-                    style={{
-                      flex: 1,
-                      padding: "8px 4px",
-                      borderRadius: 8,
-                      border: "none",
-                      background: mode === "translation" ? "var(--quran-teal)" : "transparent",
-                      color: mode === "translation" ? "#fff" : "var(--quran-t2)",
-                      fontSize: "11px",
-                      fontWeight: mode === "translation" ? 500 : 400,
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      textAlign: "center",
-                      whiteSpace: "normal", // FIXED OVERFLOW 
-                      wordBreak: "keep-all",
-                      lineHeight: 1.3
-                    }}
-                  >
-                    แปลทีละอายะฮ์
-                  </button>
-                  <button
-                    className={`mode-btn ${mode === "tafsir" ? "active" : ""}`}
-                    onClick={() => setMode("tafsir")}
-                    style={{
-                      flex: 1,
-                      padding: "8px 4px",
-                      borderRadius: 8,
-                      border: "none",
-                      background: mode === "tafsir" ? "var(--quran-teal)" : "transparent",
-                      color: mode === "tafsir" ? "#fff" : "var(--quran-t2)",
-                      fontSize: "11px",
-                      fontWeight: mode === "tafsir" ? 500 : 400,
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      textAlign: "center",
-                      whiteSpace: "normal", // FIXED OVERFLOW 
-                      wordBreak: "keep-all",
-                      lineHeight: 1.3
-                    }}
-                  >
-                    คำแปล + ตัฟซีร
-                  </button>
-                  <button
-                    className={`mode-btn ${mode === "mushaf" ? "active" : ""}`}
-                    onClick={() => setMode("mushaf")}
-                    style={{
-                      flex: 1,
-                      padding: "8px 4px",
-                      borderRadius: 8,
-                      border: "none",
-                      background: mode === "mushaf" ? "var(--quran-teal)" : "transparent",
-                      color: mode === "mushaf" ? "#fff" : "var(--quran-t2)",
-                      fontSize: "11px",
-                      fontWeight: mode === "mushaf" ? 500 : 400,
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      textAlign: "center",
-                      whiteSpace: "normal", // FIXED OVERFLOW 
-                      wordBreak: "keep-all",
-                      lineHeight: 1.3
-                    }}
-                  >
-                    มุศฮัฟล้วน
-                  </button>
-                </div>
-
-                {/* Sizer Stepper Grid */}
-                <div style={{ display: "grid", gridTemplateColumns: mode === "mushaf" ? "1fr" : "1fr 1fr", gap: 6, width: "100%" }}>
-                  <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    background: "var(--quran-br2)",
-                    padding: "6px 12px",
-                    borderRadius: 10,
-                    border: "0.5px solid var(--quran-br)",
-                    flex: 1
-                  }}>
-                    <span style={{ fontSize: 11, fontWeight: 500, color: "var(--quran-t2)" }}>อาหรับ</span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <button
-                        className="size-btn"
-                        onClick={() => setArabicSize(prev => Math.max(prev - 2, 20))}
-                        title="ย่อขนาดอักษรอาหรับ"
-                        style={{
-                          width: 24, height: 24, borderRadius: "50%", border: "none",
-                          background: "var(--quran-card-bg)", color: "var(--quran-text)",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
-                        }}
-                      >
-                        <i className="ti ti-minus" style={{ fontSize: 10 }}></i>
-                      </button>
-                      <span style={{ fontSize: 12, width: 20, textAlign: "center", fontWeight: 600 }}>{arabicSize}</span>
-                      <button
-                        className="size-btn"
-                        onClick={() => setArabicSize(prev => Math.min(prev + 2, 52))}
-                        title="ขยายขนาดอักษรอาหรับ"
-                        style={{
-                          width: 24, height: 24, borderRadius: "50%", border: "none",
-                          background: "var(--quran-card-bg)", color: "var(--quran-text)",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
-                        }}
-                      >
-                        <i className="ti ti-plus" style={{ fontSize: 10 }}></i>
-                      </button>
-                    </div>
+              {isMobile ? (
+                // MOBILE LAYOUT
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
+                  {/* Mode Segmented Control */}
+                  <div style={{ display: "flex", background: "var(--quran-br2)", padding: 3, borderRadius: 10, width: "100%", border: "0.5px solid var(--quran-br2)" }}>
+                    <button
+                      className={`mode-btn ${mode === "translation" ? "active" : ""}`}
+                      onClick={() => setMode("translation")}
+                      style={{
+                        flex: 1,
+                        padding: "8px 4px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: mode === "translation" ? "var(--quran-teal)" : "transparent",
+                        color: mode === "translation" ? "#fff" : "var(--quran-t2)",
+                        fontSize: "11px",
+                        fontWeight: mode === "translation" ? 500 : 400,
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        textAlign: "center",
+                        whiteSpace: "normal", // FIXED OVERFLOW 
+                        wordBreak: "keep-all",
+                        lineHeight: 1.3
+                      }}
+                    >
+                      แปลทีละอายะฮ์
+                    </button>
+                    <button
+                      className={`mode-btn ${mode === "tafsir" ? "active" : ""}`}
+                      onClick={() => setMode("tafsir")}
+                      style={{
+                        flex: 1,
+                        padding: "8px 4px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: mode === "tafsir" ? "var(--quran-teal)" : "transparent",
+                        color: mode === "tafsir" ? "#fff" : "var(--quran-t2)",
+                        fontSize: "11px",
+                        fontWeight: mode === "tafsir" ? 500 : 400,
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        textAlign: "center",
+                        whiteSpace: "normal", // FIXED OVERFLOW 
+                        wordBreak: "keep-all",
+                        lineHeight: 1.3
+                      }}
+                    >
+                      คำแปล + ตัฟซีร
+                    </button>
+                    <button
+                      className={`mode-btn ${mode === "mushaf" ? "active" : ""}`}
+                      onClick={() => setMode("mushaf")}
+                      style={{
+                        flex: 1,
+                        padding: "8px 4px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: mode === "mushaf" ? "var(--quran-teal)" : "transparent",
+                        color: mode === "mushaf" ? "#fff" : "var(--quran-t2)",
+                        fontSize: "11px",
+                        fontWeight: mode === "mushaf" ? 500 : 400,
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        textAlign: "center",
+                        whiteSpace: "normal", // FIXED OVERFLOW 
+                        wordBreak: "keep-all",
+                        lineHeight: 1.3
+                      }}
+                    >
+                      มุศฮัฟล้วน
+                    </button>
                   </div>
 
-                  {mode !== "mushaf" && (
+                  {/* Sizer Stepper Grid */}
+                  <div style={{ display: "grid", gridTemplateColumns: mode === "mushaf" ? "1fr" : "1fr 1fr", gap: 6, width: "100%" }}>
                     <div style={{
                       display: "flex",
                       alignItems: "center",
@@ -1888,12 +1846,12 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                       border: "0.5px solid var(--quran-br)",
                       flex: 1
                     }}>
-                      <span style={{ fontSize: 11, fontWeight: 500, color: "var(--quran-t2)" }}>ภาษาไทย</span>
+                      <span style={{ fontSize: 11, fontWeight: 500, color: "var(--quran-t2)" }}>อาหรับ</span>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <button
                           className="size-btn"
-                          onClick={() => setThaiSize(prev => Math.max(prev - 1, 12))}
-                          title="ย่อขนาดอักษรไทย"
+                          onClick={() => setArabicSize(prev => Math.max(prev - 2, 20))}
+                          title="ย่อขนาดอักษรอาหรับ"
                           style={{
                             width: 24, height: 24, borderRadius: "50%", border: "none",
                             background: "var(--quran-card-bg)", color: "var(--quran-text)",
@@ -1903,11 +1861,11 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                         >
                           <i className="ti ti-minus" style={{ fontSize: 10 }}></i>
                         </button>
-                        <span style={{ fontSize: 12, width: 20, textAlign: "center", fontWeight: 600 }}>{thaiSize}</span>
+                        <span style={{ fontSize: 12, width: 20, textAlign: "center", fontWeight: 600 }}>{arabicSize}</span>
                         <button
                           className="size-btn"
-                          onClick={() => setThaiSize(prev => Math.min(prev + 1, 26))}
-                          title="ขยายขนาดอักษรไทย"
+                          onClick={() => setArabicSize(prev => Math.min(prev + 2, 52))}
+                          title="ขยายขนาดอักษรอาหรับ"
                           style={{
                             width: 24, height: 24, borderRadius: "50%", border: "none",
                             background: "var(--quran-card-bg)", color: "var(--quran-text)",
@@ -1919,167 +1877,210 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                         </button>
                       </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              // DESKTOP/TABLET LAYOUT
-              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                {/* Mode Select Buttons */}
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button
-                    className={`mode-btn ${mode === "translation" ? "active" : ""}`}
-                    onClick={() => setMode("translation")}
-                  >
-                    แปลทีละอายะฮ์
-                  </button>
-                  <button
-                    className={`mode-btn ${mode === "tafsir" ? "active" : ""}`}
-                    onClick={() => setMode("tafsir")}
-                  >
-                    คำแปล + ตัฟซีรย่อ
-                  </button>
-                  <button
-                    className={`mode-btn ${mode === "mushaf" ? "active" : ""}`}
-                    onClick={() => setMode("mushaf")}
-                  >
-                    มุศฮัฟ (ภาษาอาหรับล้วน)
-                  </button>
-                </div>
 
-                {/* Font Resizing Controls */}
-                <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 11, color: "var(--quran-t2)" }}>อาหรับ:</span>
-                    <button className="size-btn" onClick={() => setArabicSize(prev => Math.max(prev - 2, 20))} title="ย่อขนาดอักษรอาหรับ"><i className="ti ti-minus"></i></button>
-                    <span style={{ fontSize: 11, width: 22, textAlign: "center", fontWeight: 500 }}>{arabicSize}</span>
-                    <button className="size-btn" onClick={() => setArabicSize(prev => Math.min(prev + 2, 52))} title="ขยายขนาดอักษรอาหรับ"><i className="ti ti-plus"></i></button>
+                    {mode !== "mushaf" && (
+                      <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        background: "var(--quran-br2)",
+                        padding: "6px 12px",
+                        borderRadius: 10,
+                        border: "0.5px solid var(--quran-br)",
+                        flex: 1
+                      }}>
+                        <span style={{ fontSize: 11, fontWeight: 500, color: "var(--quran-t2)" }}>ภาษาไทย</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <button
+                            className="size-btn"
+                            onClick={() => setThaiSize(prev => Math.max(prev - 1, 12))}
+                            title="ย่อขนาดอักษรไทย"
+                            style={{
+                              width: 24, height: 24, borderRadius: "50%", border: "none",
+                              background: "var(--quran-card-bg)", color: "var(--quran-text)",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
+                            }}
+                          >
+                            <i className="ti ti-minus" style={{ fontSize: 10 }}></i>
+                          </button>
+                          <span style={{ fontSize: 12, width: 20, textAlign: "center", fontWeight: 600 }}>{thaiSize}</span>
+                          <button
+                            className="size-btn"
+                            onClick={() => setThaiSize(prev => Math.min(prev + 1, 26))}
+                            title="ขยายขนาดอักษรไทย"
+                            style={{
+                              width: 24, height: 24, borderRadius: "50%", border: "none",
+                              background: "var(--quran-card-bg)", color: "var(--quran-text)",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
+                            }}
+                          >
+                            <i className="ti ti-plus" style={{ fontSize: 10 }}></i>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  {mode !== "mushaf" && (
+                </div>
+              ) : (
+                // DESKTOP/TABLET LAYOUT
+                <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                  {/* Mode Select Buttons */}
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      className={`mode-btn ${mode === "translation" ? "active" : ""}`}
+                      onClick={() => setMode("translation")}
+                    >
+                      แปลทีละอายะฮ์
+                    </button>
+                    <button
+                      className={`mode-btn ${mode === "tafsir" ? "active" : ""}`}
+                      onClick={() => setMode("tafsir")}
+                    >
+                      คำแปล + ตัฟซีรย่อ
+                    </button>
+                    <button
+                      className={`mode-btn ${mode === "mushaf" ? "active" : ""}`}
+                      onClick={() => setMode("mushaf")}
+                    >
+                      มุศฮัฟ (ภาษาอาหรับล้วน)
+                    </button>
+                  </div>
+
+                  {/* Font Resizing Controls */}
+                  <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: 11, color: "var(--quran-t2)" }}>ภาษาไทย:</span>
-                      <button className="size-btn" onClick={() => setThaiSize(prev => Math.max(prev - 1, 12))} title="ย่อขนาดอักษรไทย"><i className="ti ti-minus"></i></button>
-                      <span style={{ fontSize: 11, width: 22, textAlign: "center", fontWeight: 500 }}>{thaiSize}</span>
-                      <button className="size-btn" onClick={() => setThaiSize(prev => Math.min(prev + 1, 26))} title="ขยายขนาดอักษรไทย"><i className="ti ti-plus"></i></button>
+                      <span style={{ fontSize: 11, color: "var(--quran-t2)" }}>อาหรับ:</span>
+                      <button className="size-btn" onClick={() => setArabicSize(prev => Math.max(prev - 2, 20))} title="ย่อขนาดอักษรอาหรับ"><i className="ti ti-minus"></i></button>
+                      <span style={{ fontSize: 11, width: 22, textAlign: "center", fontWeight: 500 }}>{arabicSize}</span>
+                      <button className="size-btn" onClick={() => setArabicSize(prev => Math.min(prev + 2, 52))} title="ขยายขนาดอักษรอาหรับ"><i className="ti ti-plus"></i></button>
                     </div>
-                  )}
+                    {mode !== "mushaf" && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 11, color: "var(--quran-t2)" }}>ภาษาไทย:</span>
+                        <button className="size-btn" onClick={() => setThaiSize(prev => Math.max(prev - 1, 12))} title="ย่อขนาดอักษรไทย"><i className="ti ti-minus"></i></button>
+                        <span style={{ fontSize: 11, width: 22, textAlign: "center", fontWeight: 500 }}>{thaiSize}</span>
+                        <button className="size-btn" onClick={() => setThaiSize(prev => Math.min(prev + 1, 26))} title="ขยายขนาดอักษรไทย"><i className="ti ti-plus"></i></button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Mushaf Page-by-page Toggle */}
-            {mode === "mushaf" && (
-              <div style={{ borderTop: "0.5px solid var(--br2)", paddingTop: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", textAlign: "left" }}>
-                <span style={{ fontSize: 11, color: "var(--t2)", fontWeight: 500 }}>รูปแบบการจัดหน้ามุศฮัฟ:</span>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button
-                    className={`mode-btn ${!selectedPage ? "active" : ""}`}
-                    onClick={() => setSelectedPage(null)}
-                    style={{ fontSize: 10, padding: "4px 10px", borderRadius: 12 }}
-                  >
-                    อ่านทีละซูเราะฮ์
-                  </button>
-                  <button
-                    className={`mode-btn ${selectedPage ? "active" : ""}`}
-                    onClick={() => setSelectedPage(1)}
-                    style={{ fontSize: 10, padding: "4px 10px", borderRadius: 12 }}
-                  >
-                    อ่านทีละหน้า (1 - 604)
-                  </button>
+              {/* Mushaf Page-by-page Toggle */}
+              {mode === "mushaf" && (
+                <div style={{ borderTop: "0.5px solid var(--br2)", paddingTop: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", textAlign: "left" }}>
+                  <span style={{ fontSize: 11, color: "var(--t2)", fontWeight: 500 }}>รูปแบบการจัดหน้ามุศฮัฟ:</span>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      className={`mode-btn ${!selectedPage ? "active" : ""}`}
+                      onClick={() => setSelectedPage(null)}
+                      style={{ fontSize: 10, padding: "4px 10px", borderRadius: 12 }}
+                    >
+                      อ่านทีละซูเราะฮ์
+                    </button>
+                    <button
+                      className={`mode-btn ${selectedPage ? "active" : ""}`}
+                      onClick={() => setSelectedPage(1)}
+                      style={{ fontSize: 10, padding: "4px 10px", borderRadius: 12 }}
+                    >
+                      อ่านทีละหน้า (1 - 604)
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Translation Selection (Hidden in Mushaf mode) */}
-            {mode !== "mushaf" && (
+              {/* Translation Selection (Hidden in Mushaf mode) */}
+              {mode !== "mushaf" && (
+                <div style={{
+                  borderTop: "0.5px solid var(--br2)",
+                  paddingTop: 12,
+                  display: "flex",
+                  flexDirection: isMobile ? "column" : "row",
+                  alignItems: isMobile ? "flex-start" : "center",
+                  gap: isMobile ? 6 : 10
+                }}>
+                  <span style={{ fontSize: 11, color: "var(--t2)", fontWeight: 500, flexShrink: 0 }}>สำนวนแปลความหมายไทย:</span>
+                  <div style={{ position: "relative", width: "100%", maxWidth: "100%" }}>
+                    <select
+                      value={translationKey}
+                      onChange={e => setTranslationKey(e.target.value)}
+                      style={{
+                        width: "100%",
+                        height: 38,
+                        padding: "0 36px 0 12px",
+                        borderRadius: 8,
+                        border: "0.5px solid var(--br)",
+                        fontSize: 12,
+                        fontFamily: "'Prompt', sans-serif",
+                        background: "var(--inp)",
+                        color: "var(--text)",
+                        appearance: "none",
+                        WebkitAppearance: "none",
+                        cursor: "pointer",
+                        outline: "none",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden"
+                      }}
+                    >
+                      <option value="thai_complex">สำนวนแปลความหมาย คิงฟะฮัด (King Fahd Complex)</option>
+                      <option value="thai_rwwad">สำนวนแปลความหมาย ศูนย์ Rowwad Translation Center</option>
+                    </select>
+                    <i className="ti ti-chevron-down" style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "var(--quran-teal)", fontSize: 13, pointerEvents: "none" }}></i>
+                  </div>
+                </div>
+              )}
+
+              {/* Font & Tajweed Customization Bar */}
               <div style={{
                 borderTop: "0.5px solid var(--br2)",
                 paddingTop: 12,
                 display: "flex",
                 flexDirection: isMobile ? "column" : "row",
-                alignItems: isMobile ? "flex-start" : "center",
-                gap: isMobile ? 6 : 10
+                justifyContent: "space-between",
+                alignItems: isMobile ? "stretch" : "center",
+                gap: 12,
+                textAlign: "left"
               }}>
-                <span style={{ fontSize: 11, color: "var(--t2)", fontWeight: 500, flexShrink: 0 }}>สำนวนแปลความหมายไทย:</span>
-                <div style={{ position: "relative", width: "100%", maxWidth: "100%" }}>
-                  <select
-                    value={translationKey}
-                    onChange={e => setTranslationKey(e.target.value)}
-                    style={{
-                      width: "100%",
-                      height: 38,
-                      padding: "0 36px 0 12px",
-                      borderRadius: 8,
-                      border: "0.5px solid var(--br)",
-                      fontSize: 12,
-                      fontFamily: "'Prompt', sans-serif",
-                      background: "var(--inp)",
-                      color: "var(--text)",
-                      appearance: "none",
-                      WebkitAppearance: "none",
-                      cursor: "pointer",
-                      outline: "none",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden"
-                    }}
-                  >
-                    <option value="thai_complex">สำนวนแปลความหมาย คิงฟะฮัด (King Fahd Complex)</option>
-                    <option value="thai_rwwad">สำนวนแปลความหมาย ศูนย์ Rowwad Translation Center</option>
-                  </select>
-                  <i className="ti ti-chevron-down" style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "var(--quran-teal)", fontSize: 13, pointerEvents: "none" }}></i>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none" }}>
+                    <input
+                      type="checkbox"
+                      checked={tajweedEnabled}
+                      onChange={e => setTajweedEnabled(e.target.checked)}
+                      style={{ cursor: "pointer", width: 14, height: 14, accentColor: "var(--quran-teal)" }}
+                    />
+                    <span style={{ fontSize: 11, color: "var(--quran-text)", fontWeight: 500 }}>
+                      แสดงสีตัจวีด (ช่วยออกเสียง)
+                    </span>
+                  </label>
+
+                  {tajweedEnabled && (
+                    <button
+                      onClick={() => setShowTajweedLegend(!showTajweedLegend)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "var(--quran-teal)",
+                        cursor: "pointer",
+                        fontSize: 11,
+                        fontWeight: 500,
+                        padding: 0,
+                        textDecoration: "underline",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4
+                      }}
+                    >
+                      <i className="ti ti-info-circle"></i> คำอธิบายสีตัจวีด
+                    </button>
+                  )}
                 </div>
               </div>
-            )}
-            
-            {/* Font & Tajweed Customization Bar */}
-            <div style={{
-              borderTop: "0.5px solid var(--br2)",
-              paddingTop: 12,
-              display: "flex",
-              flexDirection: isMobile ? "column" : "row",
-              justifyContent: "space-between",
-              alignItems: isMobile ? "stretch" : "center",
-              gap: 12,
-              textAlign: "left"
-            }}>
-
-              <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none" }}>
-                  <input
-                    type="checkbox"
-                    checked={tajweedEnabled}
-                    onChange={e => setTajweedEnabled(e.target.checked)}
-                    style={{ cursor: "pointer", width: 14, height: 14, accentColor: "var(--quran-teal)" }}
-                  />
-                  <span style={{ fontSize: 11, color: "var(--quran-text)", fontWeight: 500 }}>
-                    แสดงสีตัจวีด (ช่วยออกเสียง)
-                  </span>
-                </label>
-
-                {tajweedEnabled && (
-                  <button
-                    onClick={() => setShowTajweedLegend(!showTajweedLegend)}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "var(--quran-teal)",
-                      cursor: "pointer",
-                      fontSize: 11,
-                      fontWeight: 500,
-                      padding: 0,
-                      textDecoration: "underline",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4
-                    }}
-                  >
-                    <i className="ti ti-info-circle"></i> คำอธิบายสีตัจวีด
-                  </button>
-                )}
-              </div>
             </div>
-          </div>
           )}
 
           {/* Tajweed Legend Panel */}
@@ -2103,7 +2104,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                   <i className="ti ti-x"></i>
                 </button>
               </div>
-              
+
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: "10px 20px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
                   <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: "50%", background: "#cc0000" }}></span>
@@ -2282,7 +2283,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                                 const displayHtml = tajweedEnabled ? rawText : stripTajweedTags(rawText)
                                 const isActive = Number(playingAudio?.sura) === Number(v.sura) && Number(playingAudio?.aya) === Number(v.aya)
                                 return (
-                                  <span 
+                                  <span
                                     key={v.id}
                                     id={`mushaf-ayah-${v.sura}-${v.aya}`}
                                     className={isBookmarked ? "mushaf-ayah-bookmarked" : ""}
@@ -2302,7 +2303,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                                     }}
                                     title={`แตะเพื่อดูคำแปลและคั่นหน้า [${v.sura}:${v.aya}]`}
                                   >
-                                    <span dangerouslySetInnerHTML={{ __html: displayHtml }} />{" "}
+                                    <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(displayHtml) }} />{" "}
                                   </span>
                                 )
                               })
@@ -2366,7 +2367,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                         const displayHtml = tajweedEnabled ? rawText : stripTajweedTags(rawText)
                         const isActive = Number(playingAudio?.sura) === Number(v.sura) && Number(playingAudio?.aya) === Number(v.aya)
                         return (
-                          <span 
+                          <span
                             key={v.id}
                             id={`mushaf-ayah-${v.sura}-${v.aya}`}
                             className={isBookmarked ? "mushaf-ayah-bookmarked" : ""}
@@ -2386,7 +2387,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                             }}
                             title={`แตะเพื่อดูคำแปลและคั่นหน้า [${v.sura}:${v.aya}]`}
                           >
-                            <span dangerouslySetInnerHTML={{ __html: displayHtml }} />{" "}
+                            <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(displayHtml) }} />{" "}
                           </span>
                         )
                       })}
@@ -2502,22 +2503,22 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                             </div>
                           </div>
 
-                           {/* Arabic text */}
-                           <div
-                             className="arabic-font"
-                             style={{
-                               fontSize: `${arabicSize}px`,
-                               fontFamily: quranFont === "UthmanicHafs" ? "'UthmanicHafs', serif" : quranFont === "Amiri" ? "'Amiri', serif" : "'Noto Naskh Arabic', serif",
-                               color: "var(--text)",
-                               paddingRight: 6
-                             }}
-                           >
-                             {tajweedEnabled ? (
-                               <span dangerouslySetInnerHTML={{ __html: v.arabic_text_tajweed || v.arabic_text }} />
-                             ) : (
-                               <span dangerouslySetInnerHTML={{ __html: stripTajweedTags(v.arabic_text_tajweed || v.arabic_text) }} />
-                             )}
-                           </div>
+                          {/* Arabic text */}
+                          <div
+                            className="arabic-font"
+                            style={{
+                              fontSize: `${arabicSize}px`,
+                              fontFamily: quranFont === "UthmanicHafs" ? "'UthmanicHafs', serif" : quranFont === "Amiri" ? "'Amiri', serif" : "'Noto Naskh Arabic', serif",
+                              color: "var(--text)",
+                              paddingRight: 6
+                            }}
+                          >
+                            {tajweedEnabled ? (
+                              <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(v.arabic_text_tajweed || v.arabic_text) }} />
+                            ) : (
+                              <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(stripTajweedTags(v.arabic_text_tajweed || v.arabic_text)) }} />
+                            )}
+                          </div>
 
                           {/* Thai Translation */}
                           <div
@@ -2821,19 +2822,19 @@ export default function Quran({ initialSura, initialAyah, authState }) {
               <span style={{ fontSize: 12, color: "var(--quran-t2)", fontWeight: 600, fontFamily: "'Prompt', sans-serif" }}>
                 ซูเราะฮ์ {SURA_LIST.find(s => Number(s.number) === Number(activeAyahMenu.sura))?.englishName} อายะฮ์ที่ {activeAyahMenu.aya}
               </span>
-              <button 
-                onClick={() => setActiveAyahMenu(null)} 
+              <button
+                onClick={() => setActiveAyahMenu(null)}
                 style={{ background: "none", border: "none", color: "var(--quran-t3)", cursor: "pointer", fontSize: 16 }}
               >
                 <i className="ti ti-x"></i>
               </button>
             </div>
 
-            <div style={{ 
-              padding: 12, 
-              background: "var(--quran-bg)", 
-              borderRadius: 8, 
-              border: "0.5px solid var(--quran-br2)", 
+            <div style={{
+              padding: 12,
+              background: "var(--quran-bg)",
+              borderRadius: 8,
+              border: "0.5px solid var(--quran-br2)",
               textAlign: "right",
               fontFamily: quranFont === "UthmanicHafs" ? "'UthmanicHafs', serif" : quranFont === "Amiri" ? "'Amiri', serif" : "'Noto Naskh Arabic', serif",
               fontSize: 22,
@@ -2901,12 +2902,12 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                     {modalDetails.translation}
                   </div>
                   {modalDetails.tafsir && (
-                    <div style={{ 
-                      fontSize: 12, 
-                      lineHeight: 1.5, 
-                      color: "var(--t2)", 
-                      background: "var(--quran-acc2)", 
-                      padding: 10, 
+                    <div style={{
+                      fontSize: 12,
+                      lineHeight: 1.5,
+                      color: "var(--t2)",
+                      background: "var(--quran-acc2)",
+                      padding: 10,
                       borderRadius: 6,
                       borderLeft: "2.5px solid var(--quran-teal)"
                     }}>
@@ -2922,12 +2923,12 @@ export default function Quran({ initialSura, initialAyah, authState }) {
               {/* คั่นหน้า / ยกเลิกคั่นหน้า */}
               <button
                 className="btn btn-teal"
-                style={{ 
-                  width: "100%", 
-                  fontSize: 12, 
-                  display: "flex", 
-                  alignItems: "center", 
-                  justifyContent: "center", 
+                style={{
+                  width: "100%",
+                  fontSize: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   gap: 8,
                   padding: "10px 0"
                 }}
@@ -2943,12 +2944,12 @@ export default function Quran({ initialSura, initialAyah, authState }) {
               {/* บันทึกข้อคิด */}
               <button
                 className="btn btn-outline"
-                style={{ 
-                  width: "100%", 
-                  fontSize: 12, 
-                  display: "flex", 
-                  alignItems: "center", 
-                  justifyContent: "center", 
+                style={{
+                  width: "100%",
+                  fontSize: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   gap: 8,
                   padding: "10px 0",
                   borderColor: "var(--quran-br)"
@@ -2990,7 +2991,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
           alignItems: "flex-end",
           justifyContent: "center"
         }}
-        onClick={() => setIsMobileNavOpen(false)}
+          onClick={() => setIsMobileNavOpen(false)}
         >
           <div
             style={{

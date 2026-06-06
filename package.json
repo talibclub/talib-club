@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "dompurify": "^3.4.8",
     "firebase": "^10.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
