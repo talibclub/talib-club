@@ -638,7 +638,7 @@ function readQuranBookmarksSession(uid) {
   try {
     const raw = sessionStorage.getItem(`talib_quran_bookmarks_${uid}`)
     return raw ? JSON.parse(raw) : []
-  } catch {
+  } catch (e) {
     return []
   }
 }
@@ -647,7 +647,7 @@ function writeQuranBookmarksSession(uid, items) {
   if (!uid) return
   try {
     sessionStorage.setItem(`talib_quran_bookmarks_${uid}`, JSON.stringify(items))
-  } catch {
+  } catch (e) {
     /* ignore quota errors */
   }
 }
