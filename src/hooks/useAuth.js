@@ -85,12 +85,12 @@ export function useAuth() {
           const email = currentUser.email || ""
           const displayName = currentUser.displayName || snapData.displayName || ""
           const photoURL = currentUser.photoURL || snapData.photoURL || ""
-          
-          const hasChanged = 
+
+          const hasChanged =
             snapData.email !== email ||
             snapData.displayName !== displayName ||
             snapData.photoURL !== photoURL
-          
+
           if (hasChanged) {
             // Only write if data truly changed
             await setDoc(ref, {
@@ -106,9 +106,6 @@ export function useAuth() {
             email,
             displayName,
             photoURL,
-            displayName: nextProfileData.displayName,
-            email: nextProfileData.email,
-            photoURL: nextProfileData.photoURL,
           })
         } else {
           const nextProfile = {
