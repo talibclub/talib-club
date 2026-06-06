@@ -7,7 +7,7 @@ import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
 
 export default function Media({ go, ctx }) {
-  const { items: media, loading, error, isUsingFallback } = useContentCollection("media", MEDIA, null, { live: false, limit: 100, orderByField: "createdAt", orderDirection: "desc" })
+  const { items: media, loading, error, isUsingFallback } = useContentCollection("media", MEDIA, null, { live: false, limit: 200 })
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   const { site } = useSiteSettings(SITE)
 
