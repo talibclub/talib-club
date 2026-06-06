@@ -6,7 +6,7 @@ import {
 } from "firebase/firestore"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { toast } from "react-hot-toast"
-import { db } from "../lib/firebase.js"
+import { db, app } from "../lib/firebase.js"
 import { triggerPushNotification } from "../utils/pushNotifications.js"
 import { Z } from "../utils/ui.js"
 
@@ -91,19 +91,35 @@ export default function StaffWork({ authState, go }) {
   const [postingForm, setPostingForm] = useState({ scheduleDate: "", platforms: [], postLink: "" })
 
   const fileInputRef = useRef(null)
+  const notifiedMonthRef = useRef(null) // Track if notification already sent this month
   
-  // ⚡️ แก้ปัญหาการดึงชื่อ: ลองรับจากหลายทาง (จาก Firebase profile/user เป็นหลักเพื่อความปลอดภัย)
-  const currentUser = authState?.profile?.displayName || authState?.user?.displayName || localStorage.getItem("talib_user") || "อุสมาน"
-  const secureUserForAdminCheck = authState?.profile?.displayName || authState?.user?.displayName || ""
-  const isAdmin = authState?.profile?.role === "admin" || (secureUserForAdminCheck && ADMIN_TEAM.includes(secureUserForAdminCheck)) || authState?.user?.email === "islamofwhite@gmail.com"
+  // Security: Require authenticated user with uid, never fall back to localStorage
+  const uid = authState?.user?.uid
+  const currentUser = authState?.profile?.displayName || authState?.user?.displayName || ""
+  const isAdmin = authState?.profile?.role === "admin" || authState?.user?.email === "islamofwhite@gmail.com" || (currentUser && ADMIN_TEAM.includes(currentUser))
+
+  // Redirect if not authenticated
+  if (!uid || !currentUser) {
+    return (
+      <div style={{ padding: 20, textAlign: "center" }}>
+        <p>กรุณาเข้าสู่ระบบเพื่อเข้าถึงหน้านี้</p>
+      </div>
+    )
+  }
 
   // ━━━ FETCH DATA ━━━
+  const [pollError, setPollError] = useState(null)
+  const [failureCount, setFailureCount] = useState(0)
+  
   // Use getDocs + periodic polling instead of onSnapshot to reduce Firebase reads
   // Polling every 10 seconds should give near real-time feel without excessive reads
   useEffect(() => {
     setLoading(true)
+    setPollError(null)
+    setFailureCount(0)
     let pollInterval = null
     let isMounted = true
+    let pollBackoffDelay = 10000 // Start with 10 seconds
 
     const fetchData = async () => {
       try {
@@ -111,11 +127,17 @@ export default function StaffWork({ authState, go }) {
         const snap = await getDocs(qSubs)
         if (isMounted) {
           setSubs(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+          setPollError(null)
+          setFailureCount(0)
+          pollBackoffDelay = 10000 // Reset backoff on success
         }
       } catch (err) {
         if (isMounted) {
           console.error("Fetch sub error:", err)
-          notifyError("โหลดข้อมูลงานล้มเหลว")
+          setFailureCount(prev => prev + 1)
+          setPollError("ไม่สามารถดึงข้อมูลงานได้ - กำลังลองใหม่...")
+          // Exponential backoff: 10s, 20s, 40s max 60s
+          pollBackoffDelay = Math.min(10000 * Math.pow(2, failureCount), 60000)
         }
       }
     }
@@ -147,48 +169,70 @@ export default function StaffWork({ authState, go }) {
     // Initial load
     Promise.all([fetchData(), fetchSettings()]).then(() => {
       if (isMounted) setLoading(false)
+    }).catch(err => {
+      if (isMounted) {
+        console.error("Initial fetch error:", err)
+        setLoading(false)
+      }
     })
 
-    // Poll every 10 seconds for updates
-    pollInterval = setInterval(() => {
-      if (isMounted) {
+    // Schedule first poll after initial load
+    let nextPollDelay = pollBackoffDelay
+    const schedulePoll = () => {
+      if (!isMounted) return
+      pollInterval = setTimeout(() => {
+        if (!isMounted) return
         fetchData()
         fetchSettings()
-      }
-    }, 10000)
+        // Reschedule next poll with current backoff
+        nextPollDelay = pollBackoffDelay
+        schedulePoll()
+      }, nextPollDelay)
+    }
+    
+    schedulePoll()
 
     return () => {
       isMounted = false
-      if (pollInterval) clearInterval(pollInterval)
+      if (pollInterval) clearTimeout(pollInterval)
     }
   }, [])
 
   // ━━━ ออโต้แจ้งเตือนคิววารสารทุกต้นเดือน ━━━
+  // Only check once per month using useRef to avoid duplicate notifications
   useEffect(() => {
-    if (!isAdmin || magazineQueue.length === 0) return;
+    if (!isAdmin || magazineQueue.length === 0) return
 
     const checkMonthlyQueue = async () => {
-      const now = new Date();
-      const currentMonthIndex = now.getMonth();
-      const yearMonthKey = `mag_notified_${now.getFullYear()}_${currentMonthIndex}`;
+      const now = new Date()
+      const currentMonthIndex = now.getMonth()
+      const currentYear = now.getFullYear()
+      const currentMonth = `${currentYear}-${currentMonthIndex}`
 
-      // ถ้ายังไม่เคยแจ้งเตือนในเดือนนี้ ให้ส่งเข้า Telegram ทันที
-      if (!localStorage.getItem(yearMonthKey)) {
-        const currentQueue = magazineQueue[currentMonthIndex];
-        if (currentQueue && currentQueue.user) {
-          await sendBotNotification(`📚 [แจ้งเตือนคิววารสาร]\nเข้าสู่เดือน ${currentQueue.month} แล้ว!\n\nรับผิดชอบวารสารหลักเดือนนี้คือ: 🌟 ${currentQueue.user} 🌟\n\nเตรียมตัววางแผนงานได้เลยครับ 🚀`);
+      // Skip if we already notified this month (stored in useRef to persist across renders)
+      if (notifiedMonthRef.current === currentMonth) return
+
+      const currentQueue = magazineQueue[currentMonthIndex]
+      if (currentQueue && currentQueue.user) {
+        try {
+          await sendBotNotification(`📚 [แจ้งเตือนคิววารสาร]\nเข้าสู่เดือน ${currentQueue.month} แล้ว!\n\nรับผิดชอบวารสารหลักเดือนนี้คือ: 🌟 ${currentQueue.user} 🌟\n\nเตรียมตัววางแผนงานได้เลยครับ 🚀`)
           await triggerPushNotification(
             "📚 แจ้งเตือนคิววารสารประจำเดือน",
             `เข้าสู่เดือน ${currentQueue.month} แล้ว! ผู้รับผิดชอบหลักคือ ${currentQueue.user}`,
             "/staff-work",
             { isStaffOnly: true }
-          );
-          localStorage.setItem(yearMonthKey, "true");
+          )
+          // Mark this month as notified to prevent duplicate alerts
+          notifiedMonthRef.current = currentMonth
+        } catch (err) {
+          console.error("Failed to send monthly notification:", err)
         }
       }
     }
-    checkMonthlyQueue();
-  }, [magazineQueue, isAdmin])
+
+    checkMonthlyQueue()
+    // Run once on mount and when magazine queue is initially loaded, not on every update
+  }, [isAdmin])
 
   const filteredSubs = useMemo(() => {
     return subs.filter(s => {
@@ -278,7 +322,7 @@ export default function StaffWork({ authState, go }) {
     
     try {
       const fileLinks = []
-      const storage = getStorage(db.app)
+      const storage = getStorage(app)
       if (form.files && form.files.length > 0) {
         for (const file of form.files) {
           const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")

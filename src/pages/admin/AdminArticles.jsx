@@ -4,8 +4,8 @@ import { useContentCollection, useTaxonomySettings } from "../../lib/contentStor
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
 import ContentStatusBanner from "../../components/ContentStatusBanner.jsx"
 import { clampPage } from "../../utils/pagination.js"
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage"
-import { storage } from "../../lib/firebase.js"
+import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage"
+import { storage, app } from "../../lib/firebase.js"
 import { compressImage } from "../../utils/image.js"
 
 const EMPTY = {
@@ -474,7 +474,8 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
       console.log("Image compression complete. Output Name:", compressedFile.name, "Size:", compressedFile.size);
       
       const safeName = compressedFile.name.replace(/[^a-zA-Z0-9.-]/g, "_")
-      const storageRef = ref(storage, `article_covers/${Date.now()}_${safeName}`)
+      const usedStorage = storage || getStorage(app)
+      const storageRef = ref(usedStorage, `article_covers/${Date.now()}_${safeName}`)
       console.log("Uploading bytes to Firebase Storage reference:", storageRef.fullPath);
       
       await uploadBytes(storageRef, compressedFile)

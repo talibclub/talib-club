@@ -2,8 +2,8 @@ import { useState, useEffect } from "react"
 import { BOOKS, DEFAULT_TAXONOMY } from "../../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage"
-import { storage } from "../../lib/firebase.js"
+import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage"
+import { storage, app } from "../../lib/firebase.js"
 import { compressImage } from "../../utils/image.js"
 import ContentStatusBanner from "../../components/ContentStatusBanner.jsx"
 import { clampPage } from "../../utils/pagination.js"
@@ -442,7 +442,8 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
       console.log("Image compression complete. Output Name:", compressedFile.name, "Size:", compressedFile.size);
       
       const safeName = compressedFile.name.replace(/[^a-zA-Z0-9.-]/g, "_")
-      const storageRef = ref(storage, `library_covers/${Date.now()}_${safeName}`)
+      const usedStorage = storage || getStorage(app)
+      const storageRef = ref(usedStorage, `library_covers/${Date.now()}_${safeName}`)
       console.log("Uploading bytes to Firebase Storage reference:", storageRef.fullPath);
       
       await uploadBytes(storageRef, compressedFile)

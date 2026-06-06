@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { collection, query, where, getCountFromServer, getDocs, limit } from "firebase/firestore"
 import { db } from "../../lib/firebase.js"
 import { useUserDoc } from "../../lib/contentStore.js"
@@ -19,48 +19,54 @@ export default function Overview({ authState, go, setView, onOpenQuran, onOpenSa
   const [streakCount, setStreakCount] = useState(0)
   const [loadingCounts, setLoadingCounts] = useState(true)
 
-  useEffect(() => {
-    if (!uid) return
+  // Memoize fetch function to prevent duplicate queries on re-render
+  const fetchOverviewData = useCallback(async (userId) => {
+    if (!userId) return
     setLoadingCounts(true)
     
-    const fetchOverviewData = async () => {
-      try {
-        const [
-          activeBooksSnap,
-          finishedBooksSnap,
-          bookmarkSnap,
-          sessionSnap,
-          streakSnap,
-        ] = await Promise.all([
-          getCountFromServer(query(collection(db, "content_bookshelf"), where("uid", "==", uid), where("status", "!=", "finished"))),
-          getCountFromServer(query(collection(db, "content_bookshelf"), where("uid", "==", uid), where("status", "==", "finished"))),
-          getCountFromServer(query(collection(db, "content_quran_bookmarks"), where("uid", "==", uid))),
-          getCountFromServer(query(collection(db, "content_reading_sessions"), where("uid", "==", uid), where("verified", "==", true))),
-          getDocs(query(collection(db, "content_reading_streaks"), where("uid", "==", uid), limit(1))),
-        ])
-        
-        let streakVal = 0
-        if (!streakSnap.empty) {
-          streakVal = streakSnap.docs[0].data()?.streakCount || 0
-        }
-        
-        setCounts({
-          activeBooks: activeBooksSnap.data().count,
-          finishedBooks: finishedBooksSnap.data().count,
-          bookmarkCount: bookmarkSnap.data().count,
-          sessionCount: sessionSnap.data().count,
-        })
-        setStreakCount(streakVal)
-      } catch (err) {
-        if (import.meta.env.DEV) {
-          console.error("Failed to load overview counts:", err)
-        }
-      } finally {
-        setLoadingCounts(false)
+    try {
+      const [
+        activeBooksSnap,
+        finishedBooksSnap,
+        bookmarkSnap,
+        sessionSnap,
+        streakSnap,
+      ] = await Promise.all([
+        getCountFromServer(query(collection(db, "content_bookshelf"), where("uid", "==", userId), where("status", "!=", "finished"))),
+        getCountFromServer(query(collection(db, "content_bookshelf"), where("uid", "==", userId), where("status", "==", "finished"))),
+        getCountFromServer(query(collection(db, "content_quran_bookmarks"), where("uid", "==", userId))),
+        getCountFromServer(query(collection(db, "content_reading_sessions"), where("uid", "==", userId), where("verified", "==", true))),
+        getDocs(query(collection(db, "content_reading_streaks"), where("uid", "==", userId), limit(1))),
+      ])
+      
+      let streakVal = 0
+      if (!streakSnap.empty) {
+        streakVal = streakSnap.docs[0].data()?.streakCount || 0
       }
+      
+      setCounts({
+        activeBooks: activeBooksSnap.data().count,
+        finishedBooks: finishedBooksSnap.data().count,
+        bookmarkCount: bookmarkSnap.data().count,
+        sessionCount: sessionSnap.data().count,
+      })
+      setStreakCount(streakVal)
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error("Failed to load overview counts:", err)
+      }
+    } finally {
+      setLoadingCounts(false)
     }
-    fetchOverviewData()
-  }, [uid])
+  }, [])
+
+  useEffect(() => {
+    if (!uid) {
+      setLoadingCounts(false)
+      return
+    }
+    fetchOverviewData(uid)
+  }, [uid, fetchOverviewData])
 
   const sessionCount = counts.sessionCount
   const streakSettings = { streakCount }

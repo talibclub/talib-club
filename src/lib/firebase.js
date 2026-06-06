@@ -26,7 +26,7 @@ const webFirebaseConfig = {
 const hasWebFirebase = Boolean(webFirebaseConfig.apiKey && webFirebaseConfig.projectId && webFirebaseConfig.appId)
 const firebaseConfig = webFirebaseConfig
 
-const app = getApps().find(item => item.name === "talib-web")
+export const app = getApps().find(item => item.name === "talib-web")
   || initializeApp(firebaseConfig, "talib-web")
 
 export const auth = getAuth(app)

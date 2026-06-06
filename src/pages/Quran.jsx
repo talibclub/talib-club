@@ -306,6 +306,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const cache = useRef({}) // Cache fetches
+  const inFlightModalRequests = useRef(new Map()) // Deduplication for modal fetches
 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
 
@@ -345,6 +346,8 @@ export default function Quran({ initialSura, initialAyah, authState }) {
     const isAlreadyBookmarked = lastRead?.sura === suraNum && lastRead?.aya === ayahNum
     
     if (isAlreadyBookmarked) {
+      // Rollback state first before async delete
+      const prevLastRead = lastRead
       setLastRead(null)
       localStorage.removeItem("quran-last-read")
       if (uid) {
@@ -352,7 +355,10 @@ export default function Quran({ initialSura, initialAyah, authState }) {
           await deleteLastRead(`${uid}_last_read`)
           toast.success("ยกเลิกการคั่นหน้าแล้ว")
         } catch (err) {
+          // Restore state on failure
           console.error("Failed to delete last read", err)
+          setLastRead(prevLastRead)
+          localStorage.setItem("quran-last-read", JSON.stringify(prevLastRead))
           toast.error("ยกเลิกคั่นหน้าไม่สำเร็จ")
         }
       } else {
@@ -372,19 +378,25 @@ export default function Quran({ initialSura, initialAyah, authState }) {
       updatedAt: new Date().toISOString()
     }
 
-    setLastRead(newItem)
-    localStorage.setItem("quran-last-read", JSON.stringify(newItem))
-
-    if (uid) {
-      try {
-        await saveLastRead(newItem)
-        toast.success(`คั่นหน้าการอ่านที่ อายะฮ์ [${suraNum}:${ayahNum}] เรียบร้อย 📖`)
-      } catch (err) {
-        console.error("Failed to save last read to Firestore", err)
-        toast.error("บันทึกการคั่นหน้าไม่สำเร็จ")
-      }
-    } else {
+    // For non-logged-in users, save locally only
+    if (!uid) {
+      setLastRead(newItem)
+      localStorage.setItem("quran-last-read", JSON.stringify(newItem))
       toast.success(`คั่นหน้าการอ่านที่ อายะฮ์ [${suraNum}:${ayahNum}] เรียบร้อย 📖`)
+      return
+    }
+
+    // For logged-in users, save to Firebase first before updating state
+    try {
+      await saveLastRead(newItem)
+      // Only update state after Firebase save succeeds
+      setLastRead(newItem)
+      localStorage.setItem("quran-last-read", JSON.stringify(newItem))
+      toast.success(`คั่นหน้าการอ่านที่ อายะฮ์ [${suraNum}:${ayahNum}] เรียบร้อย 📖`)
+    } catch (err) {
+      console.error("Failed to save last read to Firestore", err)
+      toast.error("บันทึกการคั่นหน้าไม่สำเร็จ")
+      // State not updated on failure, user sees old value
     }
   }
 
@@ -455,7 +467,10 @@ export default function Quran({ initialSura, initialAyah, authState }) {
   const [modalDetails, setModalDetails] = useState({ loading: false, translation: "", tafsir: "", error: null })
 
   // Fetch translation & tafsir dynamically for activeAyahMenu in Mushaf mode
+  // Deduplicate simultaneous requests for the same ayah
   useEffect(() => {
+    let active = true
+
     if (!activeAyahMenu) {
       setModalDetails({ loading: false, translation: "", tafsir: "", error: null })
       return
@@ -464,18 +479,57 @@ export default function Quran({ initialSura, initialAyah, authState }) {
     const { sura, aya } = activeAyahMenu
     const match = verses.find(item => item.sura === sura && item.aya === aya)
     if (match && match.translation && match.tafsir) {
-      setModalDetails({
-        loading: false,
-        translation: match.translation,
-        tafsir: match.tafsir,
-        error: null
-      })
+      if (active) {
+        setModalDetails({
+          loading: false,
+          translation: match.translation,
+          tafsir: match.tafsir,
+          error: null
+        })
+      }
       return
     }
 
-    setModalDetails({ loading: true, translation: "", tafsir: "", error: null })
+    if (active) {
+      setModalDetails({ loading: true, translation: "", tafsir: "", error: null })
+    }
 
-    Promise.all([
+    // Deduplication key for modal requests
+    const dedupeKey = `modal_${translationKey}_${sura}_${aya}`
+
+    // Check if this request is already in flight
+    const inFlightRequest = inFlightModalRequests.current.get(dedupeKey)
+    if (inFlightRequest) {
+      // Return the existing promise instead of creating a new one
+      inFlightRequest
+        .then(([transData, tafsirData]) => {
+          if (!active) return
+          setModalDetails({
+            loading: false,
+            translation: transData.result?.translation || "",
+            tafsir: tafsirData.result?.translation || "",
+            error: null
+          })
+        })
+        .catch(err => {
+          if (!active) return
+          console.error("Failed to fetch modal details (deduped)", err)
+          setModalDetails({
+            loading: false,
+            translation: "",
+            tafsir: "",
+            error: "ไม่สามารถโหลดข้อมูลคำแปลและตัฟซีรได้"
+          })
+        })
+        .finally(() => {
+          // Clean up from dedup map when complete
+          inFlightModalRequests.current.delete(dedupeKey)
+        })
+      return
+    }
+
+    // Create new request
+    const fetchPromise = Promise.all([
       fetch(`https://quranenc.com/api/v1/translation/aya/${translationKey}/${sura}/${aya}`).then(res => {
         if (!res.ok) throw new Error("Failed to load translation")
         return res.json()
@@ -485,7 +539,13 @@ export default function Quran({ initialSura, initialAyah, authState }) {
         return res.json()
       })
     ])
+
+    // Store in flight request
+    inFlightModalRequests.current.set(dedupeKey, fetchPromise)
+
+    fetchPromise
       .then(([transData, tafsirData]) => {
+        if (!active) return
         setModalDetails({
           loading: false,
           translation: transData.result?.translation || "",
@@ -494,6 +554,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
         })
       })
       .catch(err => {
+        if (!active) return
         console.error("Failed to fetch modal details", err)
         setModalDetails({
           loading: false,
@@ -502,6 +563,12 @@ export default function Quran({ initialSura, initialAyah, authState }) {
           error: "ไม่สามารถโหลดข้อมูลคำแปลและตัฟซีรได้"
         })
       })
+      .finally(() => {
+        // Clean up from dedup map when complete
+        inFlightModalRequests.current.delete(dedupeKey)
+      })
+    
+    return () => { active = false }
   }, [activeAyahMenu, translationKey, verses])
 
   const getVerseTranslation = (suraNum, ayaNum) => {
@@ -1378,7 +1445,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                     <div className="quran-sidebar card" style={{ padding: 0, display: "flex", flexDirection: "column", overflowY: "auto", minHeight: 0 }}>
                       <div style={{ display: "flex", flexDirection: "column" }}>
                         {searchResults.length > 0 && (
-                          <div style={{ padding: "10px 12px", fontSize: 11, fontWeight: 500, borderBottom: "0.5px solid var(--quran-br)", background: "var(--quran-teal-bg)", color: "var(--quran-teal)", textAlign: "left" }}>
+                          <div style={{ padding: "10px 14px", fontSize: 11, fontWeight: 500, borderBottom: "0.5px solid var(--quran-br)", background: "var(--quran-teal-bg)", color: "var(--quran-teal)", textAlign: "left", borderRadius: "6px 6px 0 0" }}>
                             พบคำสำคัญนี้ {searchResults.length} ครั้งในคัมภีร์
                           </div>
                         )}
@@ -1398,7 +1465,10 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                               <div
                                 key={`${match.surah.number}_${match.numberInSurah}_${i}`}
                                 className="search-result-item"
-                                onClick={() => handleSelectSearchResult(match)}
+                                onClick={() => {
+                                  handleSelectSearchResult(match)
+                                  setIsMobileNavOpen(false)
+                                }}
                                 style={{ padding: "12px", borderBottom: "0.5px solid var(--quran-br)" }}
                               >
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
@@ -1409,7 +1479,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                                     [{match.surah.number}:{match.numberInSurah}]
                                   </span>
                                 </div>
-                                <div style={{ fontSize: 11, color: "var(--quran-text)", lineHeight: 1.45 }}>
+                                <div style={{ fontSize: 11, color: "var(--quran-text)", lineHeight: 1.45, textAlign: "left" }}>
                                   {highlightText(match.text, keywordQuery)}
                                 </div>
                               </div>
@@ -1417,7 +1487,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                           })
                         ) : (
                           <div style={{ padding: 24, textAlign: "center", fontSize: 11, color: "var(--quran-t3)" }}>
-                            {searchHasRun ? "ไม่พบคำสำคัญนี้ในพระคัมภีร์" : "พิมพ์คำค้นหาเพื่อเริ่มค้นหาความหมาย"}
+                            {searchHasRun ? "ไม่พบคำสำคัญนี้" : "พิมพ์คำค้นหาเพื่อเริ่มค้นหาอายะฮ์"}
                           </div>
                         )}
                       </div>
@@ -2310,7 +2380,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                               setActiveAyahMenu({
                                 sura: v.sura,
                                 aya: v.aya,
-                                arabicText: v.arabic_text || "",
+                                arabicText: v.text || v.arabic_text || "",
                                 verse: v
                               })
                             }}

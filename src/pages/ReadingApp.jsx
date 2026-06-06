@@ -4,8 +4,8 @@ import toast from "react-hot-toast"
 import { BOOKS, DEFAULT_TAXONOMY } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 import { confirmAction } from "../utils/feedback.jsx"
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage"
-import { storage } from "../lib/firebase.js"
+import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage"
+import { storage, app } from "../lib/firebase.js"
 import { safeDateNow } from "../utils/time.js"
 
 // --- Helper Functions ---
@@ -645,7 +645,8 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 
       if (externalBook.file) {
         const safeName = sanitizeStorageName(externalBook.file.name)
-        const fileRef = ref(storage, `members/${uid}/bookshelf/${safeDateNow()}-${safeName}`)
+        const usedStorage = storage || getStorage(app)
+        const fileRef = ref(usedStorage, `members/${uid}/bookshelf/${safeDateNow()}-${safeName}`)
         await uploadBytes(fileRef, externalBook.file, {
           contentType: externalBook.file.type || "application/octet-stream",
           customMetadata: { uid, title },

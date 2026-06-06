@@ -139,8 +139,21 @@ const countCache = new Map()
 // Deduplication map for in-flight requests to prevent simultaneous identical queries
 const inFlightRequests = new Map()
 
+// Stable JSON stringification with sorted keys to ensure consistent cache keys
+function stableStringify(obj) {
+  if (obj === null) return "null"
+  if (typeof obj !== "object" || Array.isArray(obj)) return JSON.stringify(obj)
+  
+  const sorted = {}
+  const keys = Object.keys(obj).sort()
+  for (const key of keys) {
+    sorted[key] = obj[key]
+  }
+  return JSON.stringify(sorted)
+}
+
 function getQueryCacheKey(collectionName, uid, limitCount, orderByField, orderDirection) {
-  return JSON.stringify({ collectionName, uid: uid || null, limitCount, orderByField, orderDirection })
+  return stableStringify({ collectionName, uid: uid || null, limitCount, orderByField, orderDirection })
 }
 
 function readCachedCollection(key) {
@@ -235,7 +248,7 @@ async function updateCollectionMetadata(collectionName) {
   }
 }
 
-export function invalidateContentCache(collectionName = null) {
+export async function invalidateContentCache(collectionName = null) {
   if (!collectionName) {
     collectionCache.clear()
     countCache.clear()
@@ -246,6 +259,9 @@ export function invalidateContentCache(collectionName = null) {
         }
       }
     } catch (e) {}
+    // Invalidate metadata cache for full invalidation
+    cachedMetadata = null
+    cachedMetadataAt = 0
     return
   }
   for (const key of [...collectionCache.keys()]) {
@@ -361,37 +377,48 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
 
         // Request deduplication: if same query is in-flight, wait for it
         if (inFlightRequests.has(cacheKey)) {
-          const inFlight = await inFlightRequests.get(cacheKey)
-          if (active) {
-            setRemoteItems(inFlight)
-            setError(null)
-            setLoading(false)
+          try {
+            const next = await inFlightRequests.get(cacheKey)
+            if (active) {
+              setRemoteItems(next)
+              setError(null)
+              setLoading(false)
+            }
+          } catch (err) {
+            if (active) {
+              setError(err)
+              setRemoteItems(null)
+              setLoading(false)
+            }
           }
           return
         }
 
-        // Fetch and dedup
+        // Fetch and dedup: store Promise that resolves to data, not snapshot
         const fetchPromise = getDocs(q)
+          .then(snapshot => {
+            const next = mapSnapshotDocs(snapshot)
+            if (!live) writeCachedCollection(cacheKey, next)
+            return next
+          })
         inFlightRequests.set(cacheKey, fetchPromise)
 
-        const snapshot = await fetchPromise
-        inFlightRequests.delete(cacheKey)
-        
-        if (!active) return
+        try {
+          const next = await fetchPromise
+          inFlightRequests.delete(cacheKey)
+          if (!active) return
 
-        const next = mapSnapshotDocs(snapshot)
-        if (!live) writeCachedCollection(cacheKey, next)
-        setRemoteItems(next)
-        setError(null)
-        setLoading(false)
-      } catch (err) {
-        if (!active) return
-        inFlightRequests.delete(cacheKey)
-        console.error(`Cannot load ${collectionName}`, err)
-        setError(err)
-        setRemoteItems(null)
-        setLoading(false)
-      }
+          setRemoteItems(next)
+          setError(null)
+          setLoading(false)
+        } catch (err) {
+          inFlightRequests.delete(cacheKey)
+          if (!active) return
+          console.error(`Cannot load ${collectionName}`, err)
+          setError(err)
+          setRemoteItems(null)
+          setLoading(false)
+        }
     }
 
     if (live) {
@@ -458,7 +485,8 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
       payload.createdAt = serverTimestamp()
     }
     await setDoc(doc(db, collectionName, id), payload, { merge: true })
-    invalidateContentCache(collectionName)
+    // Await cache invalidation before triggering refetch
+    await invalidateContentCache(collectionName)
     await updateCollectionMetadata(collectionName)
     // Trigger refetch to display updated data immediately
     setRefetchTrigger(t => t + 1)
@@ -470,7 +498,8 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
       deleted: true,
       updatedAt: serverTimestamp(),
     }, { merge: true })
-    invalidateContentCache(collectionName)
+    // Await cache invalidation before triggering refetch
+    await invalidateContentCache(collectionName)
     await updateCollectionMetadata(collectionName)
     // Trigger refetch to remove deleted item from list immediately
     setRefetchTrigger(t => t + 1)

@@ -81,23 +81,31 @@ export function useAuth() {
         const snap = await getDoc(ref)
         if (snap.exists()) {
           const snapData = snap.data()
-          const nextProfileData = {
-            email: currentUser.email || "",
-            displayName: currentUser.displayName || snapData.displayName || "",
-            photoURL: currentUser.photoURL || snapData.photoURL || "",
-            updatedAt: serverTimestamp(),
-          }
-          if (
-            snapData.email !== nextProfileData.email ||
-            snapData.displayName !== nextProfileData.displayName ||
-            snapData.photoURL !== nextProfileData.photoURL
-          ) {
-            setDoc(ref, nextProfileData, { merge: true }).catch(e => console.error("Sync profile to firestore failed", e))
+          // Only update if auth data actually changed, not every render
+          const email = currentUser.email || ""
+          const displayName = currentUser.displayName || snapData.displayName || ""
+          const photoURL = currentUser.photoURL || snapData.photoURL || ""
+          
+          const hasChanged = 
+            snapData.email !== email ||
+            snapData.displayName !== displayName ||
+            snapData.photoURL !== photoURL
+          
+          if (hasChanged) {
+            // Only write if data truly changed
+            await setDoc(ref, {
+              email,
+              displayName,
+              photoURL,
+              updatedAt: serverTimestamp(),
+            }, { merge: true }).catch(e => console.error("Sync profile to firestore failed", e))
           }
           setProfile({
             ...DEFAULT_PROFILE,
             ...snapData,
-            ...nextProfileData,
+            email,
+            displayName,
+            photoURL,
             displayName: nextProfileData.displayName,
             email: nextProfileData.email,
             photoURL: nextProfileData.photoURL,
