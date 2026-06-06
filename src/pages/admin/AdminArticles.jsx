@@ -475,19 +475,23 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
       
       const safeName = compressedFile.name.replace(/[^a-zA-Z0-9.-]/g, "_")
       const usedStorage = storage || getStorage(app)
-      const storageRef = ref(usedStorage, `article_covers/${Date.now()}_${safeName}`)
-      console.log("Uploading bytes to Firebase Storage reference:", storageRef.fullPath);
-      
-      await uploadBytes(storageRef, compressedFile)
+      let storageRef = null
+      try {
+        storageRef = ref(usedStorage, `article_covers/${Date.now()}_${safeName}`)
+        console.log("Uploading bytes to Firebase Storage reference:", storageRef.fullPath);
+        await uploadBytes(storageRef, compressedFile)
+      } catch (uploadErr) {
+        console.error("Upload error (storageRef):", uploadErr?.code || "-", uploadErr?.message || uploadErr, "ref:", storageRef?.fullPath)
+        throw uploadErr
+      }
+
       console.log("Firebase upload completed. Retrieving download URL...");
-      
       const url = await getDownloadURL(storageRef)
       console.log("Success! Cover URL obtained:", url);
-      
       set("coverUrl", url)
       notifySuccess("อัปโหลดรูปภาพปกเรียบร้อยแล้ว")
     } catch (err) {
-      console.error("Diagnostic error caught inside handleUploadImage:", err)
+      console.error("Diagnostic error caught inside handleUploadImage:", err?.code || "-", err?.message || err)
       notifyError("อัปโหลดรูปภาพล้มเหลว")
     } finally {
       console.log("Finally block executed. Setting uploadingImage back to false.");

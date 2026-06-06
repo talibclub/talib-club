@@ -325,11 +325,17 @@ export default function StaffWork({ authState, go }) {
       const storage = getStorage(app)
       if (form.files && form.files.length > 0) {
         for (const file of form.files) {
-          const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
-          const storageRef = ref(storage, `staff_submissions/${Date.now()}_${safeName}`)
-          await uploadBytes(storageRef, file)
-          const url = await getDownloadURL(storageRef)
-          fileLinks.push({ name: file.name, url })
+            const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
+            let storageRef = null
+            try {
+              storageRef = ref(storage, `staff_submissions/${Date.now()}_${safeName}`)
+              await uploadBytes(storageRef, file)
+            } catch (uploadErr) {
+              console.error("Staff submission upload error:", uploadErr?.code || "-", uploadErr?.message || uploadErr, "ref:", storageRef?.fullPath)
+              throw uploadErr
+            }
+            const url = await getDownloadURL(storageRef)
+            fileLinks.push({ name: file.name, url })
         }
       }
 
