@@ -56,7 +56,7 @@ export default function ArticleDetail({ item, go, authState }) {
     try {
       const cached = sessionStorage.getItem(cacheKeyRelated)
       if (cached) cachedRelatedData = JSON.parse(cached)
-    } catch (e) {}
+    } catch (e) { }
 
     if (cachedRelatedData) {
       const docs = cachedRelatedData
@@ -66,7 +66,7 @@ export default function ArticleDetail({ item, go, authState }) {
     } else {
       const relatedQ = query(
         collection(db, "content_articles"),
-        where("category", "==", displayItem.category),
+        where("category", "==", displayItem.category || ""),
         limit(4)
       )
       getDocs(relatedQ)
@@ -74,7 +74,7 @@ export default function ArticleDetail({ item, go, authState }) {
           const docs = snap.docs.map(d => ({ ...d.data(), id: d.id }))
           try {
             sessionStorage.setItem(cacheKeyRelated, JSON.stringify(docs))
-          } catch (e) {}
+          } catch (e) { }
           const filtered = docs
             .filter(a => String(a.id) !== String(displayItem.id) && !a.deleted)
             .slice(0, 3)
@@ -97,7 +97,7 @@ export default function ArticleDetail({ item, go, authState }) {
       try {
         const cached = sessionStorage.getItem(cacheKeySeries)
         if (cached) cachedSeriesData = JSON.parse(cached)
-      } catch (e) {}
+      } catch (e) { }
 
       if (cachedSeriesData) {
         const docs = cachedSeriesData
@@ -115,7 +115,7 @@ export default function ArticleDetail({ item, go, authState }) {
             const docs = snap.docs.map(d => ({ ...d.data(), id: d.id }))
             try {
               sessionStorage.setItem(cacheKeySeries, JSON.stringify(docs))
-            } catch (e) {}
+            } catch (e) { }
             const sorted = docs
               .filter(a => !a.deleted)
               .sort((a, b) => (a.part || 0) - (b.part || 0))
@@ -182,7 +182,7 @@ export default function ArticleDetail({ item, go, authState }) {
   }, [readerPrefs])
 
   // --- ระบบเช็คสถานะการบันทึกจาก Firestore (อิงตาม UID) ---
-  
+
   const savedList = useMemo(() => {
     if (!uid) return [];
     return bookmarks.filter(b => b.uid === uid).map(b => String(b.articleId));
@@ -196,10 +196,10 @@ export default function ArticleDetail({ item, go, authState }) {
       go("auth");
       return;
     }
-    
+
     // สร้าง ID เฉพาะ: uid + articleId
-    const bookmarkId = `${uid}_${displayItem.id}`; 
-    
+    const bookmarkId = `${uid}_${displayItem.id}`;
+
     try {
       if (isSaved) {
         await deleteBookmark(bookmarkId); // ใช้ฟังก์ชัน deleteBookmark จาก useContentCollection
@@ -232,7 +232,7 @@ export default function ArticleDetail({ item, go, authState }) {
   const handlePrint = () => window.print();
 
   if (loadingArticles && !displayItem) {
-    return <div className="article-page" style={{textAlign: "center", padding: "100px 0"}}><i className="ti ti-loader-2 spin" style={{fontSize:32, color:"var(--teal)"}}></i></div>
+    return <div className="article-page" style={{ textAlign: "center", padding: "100px 0" }}><i className="ti ti-loader-2 spin" style={{ fontSize: 32, color: "var(--teal)" }}></i></div>
   }
   if (!displayItem) return null
 
@@ -278,7 +278,7 @@ export default function ArticleDetail({ item, go, authState }) {
           {displayItem.type === "specific" && displayItem.seriesName && <span className="tag tag-acc">{displayItem.seriesName}</span>}
         </div>
         <h1 className="article-title">{displayItem.title}</h1>
-        
+
         <div style={{ display: "flex", gap: 16, color: "var(--t3)", fontSize: 12, fontWeight: 300, flexWrap: "wrap", marginTop: 12 }}>
           <span><i className="ti ti-user" style={{ marginRight: 4, fontSize: 13 }}></i>{displayItem.author}</span>
           <span><i className="ti ti-calendar" style={{ marginRight: 4, fontSize: 13 }}></i>{displayItem.date}</span>
@@ -297,17 +297,17 @@ export default function ArticleDetail({ item, go, authState }) {
           <i className="ti ti-printer" style={{ marginRight: 6, fontSize: 14 }}></i> ปริ้น / PDF
         </button>
         <button onClick={toggleSave} className={`btn ${isSaved ? "btn-teal" : "btn-outline"}`} style={{ fontSize: 12, flex: "1 1 100px", padding: "8px 0" }}>
-          <i className={`ti ${isSaved ? "ti-bookmark-filled" : "ti-bookmark"}`} style={{ marginRight: 6, fontSize: 14 }}></i> 
+          <i className={`ti ${isSaved ? "ti-bookmark-filled" : "ti-bookmark"}`} style={{ marginRight: 6, fontSize: 14 }}></i>
           {isSaved ? "บันทึกแล้ว" : "บันทึกไว้อ่าน"}
         </button>
       </div>
 
       {displayItem.coverUrl && (
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 28, width: "100%" }}>
-          <ImageWithFallback 
-            src={displayItem.coverUrl} 
-            alt={displayItem.title} 
-            style={{ maxWidth: "100%", maxHeight: 420, borderRadius: 12, boxShadow: "0 10px 25px rgba(0,0,0,0.1)", objectFit: "contain", border: ".5px solid var(--br2)" }} 
+          <ImageWithFallback
+            src={displayItem.coverUrl}
+            alt={displayItem.title}
+            style={{ maxWidth: "100%", maxHeight: 420, borderRadius: 12, boxShadow: "0 10px 25px rgba(0,0,0,0.1)", objectFit: "contain", border: ".5px solid var(--br2)" }}
           />
         </div>
       )}
@@ -357,9 +357,9 @@ export default function ArticleDetail({ item, go, authState }) {
       {(prevEpisode || nextEpisode) && (
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginTop: 40, flexWrap: "wrap" }}>
           {prevEpisode ? (
-            <button 
-              onClick={() => go("article", { ...prevEpisode, fromFilters: item?.fromFilters })} 
-              className="btn btn-outline" 
+            <button
+              onClick={() => go("article", { ...prevEpisode, fromFilters: item?.fromFilters })}
+              className="btn btn-outline"
               style={{ flex: 1, minWidth: 200, display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", textDecoration: "none", color: "var(--text)", textAlign: "left", justifyContent: "flex-start" }}
             >
               <i className="ti ti-arrow-left" style={{ color: "var(--teal)" }}></i>
@@ -371,9 +371,9 @@ export default function ArticleDetail({ item, go, authState }) {
           ) : <div style={{ flex: 1 }} />}
 
           {nextEpisode ? (
-            <button 
-              onClick={() => go("article", { ...nextEpisode, fromFilters: item?.fromFilters })} 
-              className="btn btn-outline" 
+            <button
+              onClick={() => go("article", { ...nextEpisode, fromFilters: item?.fromFilters })}
+              className="btn btn-outline"
               style={{ flex: 1, minWidth: 200, display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", textDecoration: "none", color: "var(--text)", textAlign: "right", justifyContent: "flex-end" }}
             >
               <div style={{ minWidth: 0 }}>
@@ -400,10 +400,10 @@ export default function ArticleDetail({ item, go, authState }) {
                   key={a.id}
                   onClick={() => go("article", { ...a, fromFilters: item?.fromFilters })}
                   className={`btn ${isCurrent ? 'btn-teal' : 'btn-outline'}`}
-                  style={{ 
-                    justifyContent: "flex-start", 
-                    fontSize: 12, 
-                    padding: "8px 12px", 
+                  style={{
+                    justifyContent: "flex-start",
+                    fontSize: 12,
+                    padding: "8px 12px",
                     textAlign: "left",
                     fontWeight: isCurrent ? 600 : 300,
                     whiteSpace: "nowrap",
