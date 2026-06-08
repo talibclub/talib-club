@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { DEFAULT_TAXONOMY, MEDIA } from "../../data/index.js"
-import { useContentCollection, useTaxonomySettings } from "../../lib/contentStore.js"
+import { useContentCollection, useTaxonomySettings, bulkDeleteItems, bulkSaveItems } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
 import ContentStatusBanner from "../../components/ContentStatusBanner.jsx"
 import { clampPage } from "../../utils/pagination.js"
@@ -132,12 +132,17 @@ export default function AdminMedia() {
     const ok = await confirmAction({ title: `ยืนยันการลบ ${selected.length} รายการ?`, message: "ข้อมูลที่ถูกเลือกรวมถึงเนื้อหาทั้งหมดจะถูกลบและไม่สามารถกู้คืนได้", confirmText: "ยืนยันการลบ", danger: true })
     if (!ok) return
     setBusy(true)
+    const toDelete = [...selected]
     try {
-      await Promise.all(selected.map(id => deleteItem(id)))
+      const { deleted, failed } = await bulkDeleteItems("media", toDelete)
       setSelected([])
-      notifySuccess(`ลบ ${selected.length} รายการเรียบร้อยแล้ว`)
+      if (failed === 0) {
+        notifySuccess(`ลบ ${deleted} รายการเรียบร้อยแล้ว`)
+      } else {
+        notifyError(`ลบสำเร็จ ${deleted} รายการ แต่ล้มเหลว ${failed} รายการ — กรุณาตรวจสิทธิ์ Firestore`)
+      }
     } catch (err) {
-      notifyError("เกิดข้อผิดพลาดในการลบข้อมูลบางส่วน")
+      notifyError("เกิดข้อผิดพลาดในการลบข้อมูล")
     } finally {
       setBusy(false)
     }
@@ -155,44 +160,34 @@ export default function AdminMedia() {
     
     setBusy(true)
     try {
-      let updatedCount = 0;
-      await Promise.all(selected.map(async (id) => {
+      const updatedItems = selected.map(id => {
         const original = items.find(m => String(m.id) === String(id))
-        if (!original) return
-        
+        if (!original) return null
         const next = { ...original }
-        if (bulkType) {
-          next.type = bulkType
-        }
-        if (bulkChannel !== undefined && bulkChannel !== "") {
-          next.channel = bulkChannel
-        }
+        if (bulkType) next.type = bulkType
+        if (bulkChannel !== undefined && bulkChannel !== "") next.channel = bulkChannel
         if (bulkPlaylist) {
-          if (bulkPlaylist === "__none__") {
-            next.series = ""
-          } else {
-            next.series = bulkPlaylist
-          }
+          next.series = bulkPlaylist === "__none__" ? "" : bulkPlaylist
         }
-        if (bulkDate) {
-          next.date = bulkDate
-        }
-        
-        await saveItem(next)
-        updatedCount++
-      }))
-      
+        if (bulkDate) next.date = bulkDate
+        return next
+      }).filter(Boolean)
+
+      const { saved, failed } = await bulkSaveItems("media", updatedItems)
       setBulkType("")
       setBulkChannel("")
       setBulkPlaylist("")
       setBulkIsNewPlaylist(false)
       setBulkDate("")
       setSelected([])
-      
-      notifySuccess(`อัปเดตข้อมูลมีเดีย ${updatedCount} รายการเรียบร้อยแล้ว`)
+      if (failed === 0) {
+        notifySuccess(`อัปเดตข้อมูลมีเดีย ${saved} รายการเรียบร้อยแล้ว`)
+      } else {
+        notifyError(`อัปเดตสำเร็จ ${saved} รายการ แต่ล้มเหลว ${failed} รายการ`)
+      }
     } catch (err) {
       console.error(err)
-      notifyError("เกิดข้อผิดพลาดในการอัปเดตข้อมูลบางส่วน")
+      notifyError("เกิดข้อผิดพลาดในการอัปเดตข้อมูล")
     } finally {
       setBusy(false)
     }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { ARTICLES, DEFAULT_TAXONOMY } from "../../data/index.js"
-import { useContentCollection, useTaxonomySettings } from "../../lib/contentStore.js"
+import { useContentCollection, useTaxonomySettings, bulkDeleteItems, bulkSaveItems } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
 import ContentStatusBanner from "../../components/ContentStatusBanner.jsx"
 import { clampPage } from "../../utils/pagination.js"
@@ -181,15 +181,12 @@ export default function AdminArticles() {
 
     setBusy(true)
     try {
-      let updatedCount = 0;
-      await Promise.all(selected.map(async (id) => {
+      const updatedItems = selected.map(id => {
         const original = items.find(a => String(a.id) === String(id))
-        if (!original) return
-
+        if (!original) return null
         const next = { ...original }
         if (bulkType) {
           next.type = bulkType
-          // เช็คประเภทซีรีส์ให้ยืดหยุ่นขึ้น
           if (isSeriesType(bulkType)) {
             next.seriesId = bulkSeries || original.seriesId || ""
           } else {
@@ -197,31 +194,28 @@ export default function AdminArticles() {
             next.part = null
           }
         }
-        if (bulkCategory) {
-          next.category = bulkCategory
-        }
-        if (bulkAuthor !== undefined && bulkAuthor !== "") {
-          next.author = bulkAuthor
-        }
-        if (bulkDate) {
-          next.date = bulkDate
-        }
+        if (bulkCategory) next.category = bulkCategory
+        if (bulkAuthor !== undefined && bulkAuthor !== "") next.author = bulkAuthor
+        if (bulkDate) next.date = bulkDate
+        delete next.readTime
+        return next
+      }).filter(Boolean)
 
-        await saveItem(next)
-        updatedCount++
-      }))
-
+      const { saved, failed } = await bulkSaveItems("articles", updatedItems)
       setBulkType("")
       setBulkCategory("")
       setBulkSeries("")
       setBulkAuthor("")
       setBulkDate("")
       setSelected([])
-
-      notifySuccess(`อัปเดตข้อมูลบทความ ${updatedCount} รายการเรียบร้อยแล้ว`)
+      if (failed === 0) {
+        notifySuccess(`อัปเดตข้อมูลบทความ ${saved} รายการเรียบร้อยแล้ว`)
+      } else {
+        notifyError(`อัปเดตสำเร็จ ${saved} รายการ แต่ล้มเหลว ${failed} รายการ`)
+      }
     } catch (err) {
       console.error(err)
-      notifyError("เกิดข้อผิดพลาดในการอัปเดตข้อมูลบางส่วน")
+      notifyError("เกิดข้อผิดพลาดในการอัปเดตข้อมูล")
     } finally {
       setBusy(false)
     }
