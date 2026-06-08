@@ -262,8 +262,10 @@ export default function Quran({ initialSura, initialAyah, authState }) {
               if (ayahs.length > 0) {
                 setSelectedSura(ayahs[0].surah.number)
               }
+              setPageLoading(false)
+            } else {
+              setPageLoading(false)
             }
-            setPageLoading(false)
           })
           .catch(fallbackErr => {
             if (!active) return

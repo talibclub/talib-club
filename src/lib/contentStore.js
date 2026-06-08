@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { collection, doc, getDoc, getDocs, onSnapshot, serverTimestamp, setDoc, query, where, limit, orderBy, getCountFromServer } from "firebase/firestore"
+import { collection, doc, getDoc, getDocs, onSnapshot, serverTimestamp, setDoc, writeBatch, query, where, limit, orderBy, getCountFromServer } from "firebase/firestore"
 import { db } from "./firebase.js"
 
 export const CONTENT_COLLECTIONS = {
@@ -649,6 +649,118 @@ export async function deleteContentItem(name, id) {
     }
   }
   await updateCollectionMetadata(collectionName)
+}
+
+/**
+ * Bulk-delete multiple items in a single Firestore writeBatch (max 500 per batch).
+ * Returns { deleted: number, failed: number } for partial-failure reporting.
+ */
+export async function bulkDeleteItems(name, ids) {
+  const collectionName = CONTENT_COLLECTIONS[name]
+  if (!collectionName) throw new Error(`Unknown content collection: ${name}`)
+  if (!ids || ids.length === 0) return { deleted: 0, failed: 0 }
+
+  const BATCH_LIMIT = 500
+  let deleted = 0
+  let failed = 0
+  const now = serverTimestamp()
+
+  // Process in chunks of 500 (Firestore writeBatch limit)
+  for (let i = 0; i < ids.length; i += BATCH_LIMIT) {
+    const chunk = ids.slice(i, i + BATCH_LIMIT)
+    const batch = writeBatch(db)
+    chunk.forEach(id => {
+      batch.set(doc(db, collectionName, String(id)), {
+        id: String(id),
+        deleted: true,
+        updatedAt: now,
+      }, { merge: true })
+    })
+    try {
+      await batch.commit()
+      deleted += chunk.length
+    } catch (err) {
+      console.error(`bulkDeleteItems: batch failed for chunk starting at index ${i}`, err)
+      failed += chunk.length
+    }
+  }
+
+  // Update local cache optimistically for all successfully marked IDs
+  for (const [key, entry] of collectionCache.entries()) {
+    if (key.includes(`"collectionName":"${collectionName}"`)) {
+      const idsSet = new Set(ids.map(String))
+      const newItems = entry.items.map(d => idsSet.has(String(d.id)) ? { ...d, deleted: true } : d)
+      collectionCache.set(key, { ...entry, items: newItems })
+      if (PUBLIC_COLLECTIONS.includes(collectionName)) {
+        try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: newItems, at: Date.now() })) } catch (e) { }
+      }
+    }
+  }
+
+  if (deleted > 0) await updateCollectionMetadata(collectionName)
+  return { deleted, failed }
+}
+
+/**
+ * Bulk-save multiple items in a single Firestore writeBatch (max 500 per batch).
+ * Returns { saved: number, failed: number } for partial-failure reporting.
+ */
+export async function bulkSaveItems(name, items, uid = null) {
+  const collectionName = CONTENT_COLLECTIONS[name]
+  if (!collectionName) throw new Error(`Unknown content collection: ${name}`)
+  if (!items || items.length === 0) return { saved: 0, failed: 0 }
+
+  const isUserSpecific = USER_SPECIFIC_COLLECTIONS.includes(name)
+  const BATCH_LIMIT = 500
+  let saved = 0
+  let failed = 0
+  const now = serverTimestamp()
+  const payloads = items.map(item => {
+    const id = String(item.id || crypto.randomUUID())
+    const payload = {
+      ...cleanForFirestore(item),
+      id,
+      deleted: false,
+      updatedAt: now,
+    }
+    if (isUserSpecific && uid && !payload.uid) payload.uid = uid
+    if (!payload.createdAt && !item.createdAt) payload.createdAt = now
+    return payload
+  })
+
+  for (let i = 0; i < payloads.length; i += BATCH_LIMIT) {
+    const chunk = payloads.slice(i, i + BATCH_LIMIT)
+    const batch = writeBatch(db)
+    chunk.forEach(payload => {
+      batch.set(doc(db, collectionName, payload.id), payload, { merge: true })
+    })
+    try {
+      await batch.commit()
+      saved += chunk.length
+    } catch (err) {
+      console.error(`bulkSaveItems: batch failed for chunk starting at index ${i}`, err)
+      failed += chunk.length
+    }
+  }
+
+  // Update local cache optimistically
+  for (const [key, entry] of collectionCache.entries()) {
+    if (key.includes(`"collectionName":"${collectionName}"`)) {
+      let newItems = [...entry.items]
+      payloads.forEach(payload => {
+        const idx = newItems.findIndex(d => String(d.id) === payload.id)
+        if (idx >= 0) newItems[idx] = { ...newItems[idx], ...payload }
+        else newItems = [payload, ...newItems]
+      })
+      collectionCache.set(key, { ...entry, items: newItems })
+      if (PUBLIC_COLLECTIONS.includes(collectionName)) {
+        try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: newItems, at: Date.now() })) } catch (e) { }
+      }
+    }
+  }
+
+  if (saved > 0) await updateCollectionMetadata(collectionName)
+  return { saved, failed }
 }
 
 const COUNT_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes memory
