@@ -29,10 +29,11 @@ export default function ArticleDetail({ item, go, authState }) {
     [articleId]
   )
   const { item: remoteArticle, loading: loadingArticles } = useContentDoc("articles", articleId, fallbackArticle)
+  const bookmarksQueryOptions = useMemo(() => ({ live: false }), [])
 
   const [relatedArticles, setRelatedArticles] = useState([])
   const [seriesArticles, setSeriesArticles] = useState([])
-  const { items: bookmarks, saveItem: saveBookmark, deleteItem: deleteBookmark } = useContentCollection("bookmarks", [], uid, { live: false })
+  const { items: bookmarks, saveItem: saveBookmark, deleteItem: deleteBookmark } = useContentCollection("bookmarks", [], uid, bookmarksQueryOptions)
 
   const hasIncrementedView = useRef(null)
   const hasSavedHistory = useRef(null)

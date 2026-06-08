@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react"
 import { createPortal } from "react-dom"
 import { 
-  collection, getDocs, doc, updateDoc, query, where, limit, getCountFromServer 
+  collection, getDocs, getDoc, doc, updateDoc, query, where, limit, getCountFromServer
 } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
 import { toast } from "react-hot-toast"
@@ -80,15 +80,27 @@ export default function StaffMembers({ authState, go }) {
 
       // 1. Fetch reading streak settings
       let streakData = { streakCount: 0, bestStreak: 0, gems: 0 }
-      const streakSnap = await getDocs(query(collection(db, "content_reading_streaks"), where("uid", "==", uid), limit(1)))
-      if (!streakSnap.empty) {
-        const d = streakSnap.docs[0].data()
+      const streakDoc = await getDoc(doc(db, "content_reading_streaks", uid))
+      if (streakDoc.exists()) {
+        const d = streakDoc.data()
         streakData = {
           streakCount: d.streakCount || 0,
           bestStreak: d.bestStreak || 0,
           gems: d.gems || 0,
           freezeCredits: d.freezeCredits ?? 0,
           leaveCredits: d.leaveCredits ?? 0
+        }
+      } else {
+        const legacySnap = await getDocs(query(collection(db, "content_reading_streaks"), where("uid", "==", uid), limit(1)))
+        if (!legacySnap.empty) {
+          const d = legacySnap.docs[0].data()
+          streakData = {
+            streakCount: d.streakCount || 0,
+            bestStreak: d.bestStreak || 0,
+            gems: d.gems || 0,
+            freezeCredits: d.freezeCredits ?? 0,
+            leaveCredits: d.leaveCredits ?? 0
+          }
         }
       }
 

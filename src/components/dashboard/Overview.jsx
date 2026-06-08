@@ -1,12 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from "react"
-import { collection, query, where, getCountFromServer, getDocs, limit } from "firebase/firestore"
+import { collection, query, where, getCountFromServer } from "firebase/firestore"
 import { db } from "../../lib/firebase.js"
 import { useUserDoc } from "../../lib/contentStore.js"
 import DashboardNav from "../DashboardNav.jsx"
 
 // Module-level cache to persist data across unmount/remount when switching tabs in Dashboard
 let cachedOverviewCounts = null
-let cachedOverviewStreak = 0
 let cachedOverviewTimestamp = 0
 let cachedOverviewUid = null
 const OVERVIEW_CACHE_TTL = 60 * 1000 // 1 minute
@@ -16,6 +15,7 @@ export default function Overview({ authState, go, setView, onOpenQuran, onOpenSa
 
   const uid = authState?.user?.uid
   const { item: remoteLastRead } = useUserDoc("quran_last_read", uid, uid ? `${uid}_last_read` : null)
+  const { item: remoteStreak } = useUserDoc("reading_streaks", uid, uid, null)
 
   const [counts, setCounts] = useState({
     activeBooks: 0,
@@ -23,7 +23,6 @@ export default function Overview({ authState, go, setView, onOpenQuran, onOpenSa
     bookmarkCount: 0,
     sessionCount: 0,
   })
-  const [streakCount, setStreakCount] = useState(0)
   const [loadingCounts, setLoadingCounts] = useState(true)
 
   // Memoize fetch function to prevent duplicate queries on re-render
@@ -37,7 +36,6 @@ export default function Overview({ authState, go, setView, onOpenQuran, onOpenSa
       now - cachedOverviewTimestamp < OVERVIEW_CACHE_TTL
     ) {
       setCounts(cachedOverviewCounts)
-      setStreakCount(cachedOverviewStreak)
       setLoadingCounts(false)
       return
     }
@@ -50,19 +48,12 @@ export default function Overview({ authState, go, setView, onOpenQuran, onOpenSa
         finishedBooksSnap,
         bookmarkSnap,
         sessionSnap,
-        streakSnap,
       ] = await Promise.all([
         getCountFromServer(query(collection(db, "content_bookshelf"), where("uid", "==", userId), where("status", "!=", "finished"))),
         getCountFromServer(query(collection(db, "content_bookshelf"), where("uid", "==", userId), where("status", "==", "finished"))),
         getCountFromServer(query(collection(db, "content_quran_bookmarks"), where("uid", "==", userId))),
         getCountFromServer(query(collection(db, "content_reading_sessions"), where("uid", "==", userId), where("verified", "==", true))),
-        getDocs(query(collection(db, "content_reading_streaks"), where("uid", "==", userId), limit(1))),
       ])
-      
-      let streakVal = 0
-      if (!streakSnap.empty) {
-        streakVal = streakSnap.docs[0].data()?.streakCount || 0
-      }
       
       const newCounts = {
         activeBooks: activeBooksSnap.data().count,
@@ -73,12 +64,10 @@ export default function Overview({ authState, go, setView, onOpenQuran, onOpenSa
 
       // Update cache
       cachedOverviewCounts = newCounts
-      cachedOverviewStreak = streakVal
       cachedOverviewTimestamp = now
       cachedOverviewUid = userId
       
       setCounts(newCounts)
-      setStreakCount(streakVal)
     } catch (err) {
       if (import.meta.env.DEV) {
         console.error("Failed to load overview counts:", err)
@@ -96,8 +85,8 @@ export default function Overview({ authState, go, setView, onOpenQuran, onOpenSa
     fetchOverviewData(uid)
   }, [uid, fetchOverviewData])
 
+  const streakCount = Number(remoteStreak?.streakCount || 0)
   const sessionCount = counts.sessionCount
-  const streakSettings = { streakCount }
   const finishedCount = counts.finishedBooks
   const bookmarkCount = counts.bookmarkCount
   const activeBooksCount = counts.activeBooks

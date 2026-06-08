@@ -985,10 +985,12 @@ export function useUserCollection(name, uid) {
  */
 export function useUserDoc(collectionKey, uid, docId, fallback = null) {
   const collectionName = CONTENT_COLLECTIONS[collectionKey]
+  const serializedFallback = JSON.stringify(fallback)
+  const stableFallback = useMemo(() => fallback, [serializedFallback])
   const [item, setItem] = useState(() => {
-    if (!collectionName || !uid || !docId) return fallback
+    if (!collectionName || !uid || !docId) return stableFallback
     const cached = readCachedUserDocument(collectionName, docId)
-    return cached !== null ? cached : fallback
+    return cached !== null ? cached : stableFallback
   })
   const [loading, setLoading] = useState(() => {
     if (!collectionName || !uid || !docId) return false
@@ -998,7 +1000,7 @@ export function useUserDoc(collectionKey, uid, docId, fallback = null) {
 
   const fetchDoc = useCallback(async () => {
     if (!collectionName || !uid || !docId) {
-      setItem(fallback)
+      setItem(stableFallback)
       setLoading(false)
       return
     }
@@ -1019,16 +1021,32 @@ export function useUserDoc(collectionKey, uid, docId, fallback = null) {
         writeCachedUserDocument(collectionName, docId, docData)
         setItem(docData)
       } else {
+        if (collectionKey === "reading_streaks") {
+          const legacySnap = await getDocs(
+            query(
+              collection(db, collectionName),
+              where("uid", "==", uid),
+              limit(1)
+            )
+          )
+          if (!legacySnap.empty) {
+            const data = legacySnap.docs[0].data()
+            const docData = { ...data, id: data.id ?? legacySnap.docs[0].id }
+            writeCachedUserDocument(collectionName, docId, docData)
+            setItem(docData)
+            return
+          }
+        }
         writeCachedUserDocument(collectionName, docId, null)
         setItem(null)
       }
     } catch (err) {
       console.error(`useUserDoc fetch error (${collectionKey}/${docId}):`, err)
-      setItem(fallback)
+      setItem(stableFallback)
     } finally {
       setLoading(false)
     }
-  }, [collectionName, collectionKey, uid, docId, fallback])
+  }, [collectionName, collectionKey, uid, docId, stableFallback])
 
   useEffect(() => {
     fetchDoc()
@@ -1122,6 +1140,8 @@ export function invalidateDocumentCache(collectionName, docId) {
  */
 export function useContentDoc(collectionKey, docId, fallback = null) {
   const collectionName = CONTENT_COLLECTIONS[collectionKey]
+  const serializedFallback = JSON.stringify(fallback)
+  const stableFallback = useMemo(() => fallback, [serializedFallback])
 
   // Find in collection cache first to avoid Firestore getDoc reads
   const cachedFromCollection = useMemo(() => {
@@ -1150,7 +1170,7 @@ export function useContentDoc(collectionKey, docId, fallback = null) {
     return null
   }, [collectionName, docId])
 
-  const [item, setItem] = useState(() => cachedFromCollection || fallback)
+  const [item, setItem] = useState(() => cachedFromCollection || stableFallback)
   const [loading, setLoading] = useState(() => !cachedFromCollection && Boolean(docId))
   const [error, setError] = useState(null)
 
@@ -1162,7 +1182,7 @@ export function useContentDoc(collectionKey, docId, fallback = null) {
     }
 
     if (!collectionName || !docId) {
-      setItem(fallback)
+      setItem(stableFallback)
       setLoading(false)
       return undefined
     }
@@ -1174,7 +1194,7 @@ export function useContentDoc(collectionKey, docId, fallback = null) {
           const data = snapshot.data()
           setItem({ ...data, id: data.id ?? snapshot.id })
         } else {
-          setItem(fallback)
+          setItem(stableFallback)
         }
         setError(null)
         setLoading(false)
@@ -1182,11 +1202,11 @@ export function useContentDoc(collectionKey, docId, fallback = null) {
       .catch(err => {
         console.error(`Cannot load ${collectionName}/${docId}`, err)
         setError(err)
-        setItem(fallback)
+        setItem(stableFallback)
         setLoading(false)
       })
     return undefined
-  }, [collectionName, collectionKey, docId, fallback, cachedFromCollection])
+  }, [collectionName, collectionKey, docId, stableFallback, cachedFromCollection])
 
   return { item, loading, error }
 }

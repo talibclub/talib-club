@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react"
 import toast from 'react-hot-toast'
 import { db } from "../../lib/firebase.js"
 import { collection, query, where, getCountFromServer } from "firebase/firestore"
-import { useContentCollection, useUserCollection } from "../../lib/contentStore.js"
+import { useContentCollection, useUserCollection, useUserDoc } from "../../lib/contentStore.js"
 import { initials, parseHistoryTargetId, normalizeStreakSettings, fieldStyle } from "./dashboardUtils.js"
 
 export default function ProfilePanel({ authState, copied, copyText, go, setView, ctx }) {
@@ -27,8 +27,9 @@ export default function ProfilePanel({ authState, copied, copyText, go, setView,
   })
   const [busy, setBusy] = useState("")
 
-  const { items: rawHistory } = useContentCollection("history", [], user?.uid, { limit: 10, orderByField: "timestamp", orderDirection: "desc", live: false })
-  const { items: streakRecords, saveItem: saveStreakSettings } = useContentCollection("reading_streaks", [], user?.uid, { live: false })
+  const historyQueryOptions = useMemo(() => ({ limit: 10, orderByField: "timestamp", orderDirection: "desc", live: false }), [])
+  const { items: rawHistory } = useContentCollection("history", [], user?.uid, historyQueryOptions)
+  const { item: streakRecord, saveItem: saveStreakSettings } = useUserDoc("reading_streaks", user?.uid, user?.uid, null)
 
   const history = useMemo(() => {
     if (!user?.uid) return [];
@@ -88,23 +89,21 @@ export default function ProfilePanel({ authState, copied, copyText, go, setView,
 
   const userSettings = useMemo(() => {
     if (!user?.uid) return null
-    const found = streakRecords.find(item => item.uid === user.uid || item.id === user.uid)
-    return normalizeStreakSettings(found, user.uid)
-  }, [streakRecords, user?.uid])
+    return normalizeStreakSettings(streakRecord, user.uid)
+  }, [streakRecord, user?.uid])
 
   const stats = useMemo(() => {
-    const userStreakRecord = streakRecords.find(item => item.uid === user?.uid || item.id === user?.uid)
     return {
       articlesRead: dbStats.articlesRead,
       booksDownloaded: dbStats.booksDownloaded,
       mediaWatched: dbStats.mediaWatched,
       streak: {
-        current: userStreakRecord?.streakCount || 0
+        current: streakRecord?.streakCount || 0
       },
       verifiedSessions: dbStats.verifiedSessions,
       readingMinutes: 0
     };
-  }, [dbStats, streakRecords, user?.uid])
+  }, [dbStats, streakRecord, user?.uid])
 
   const handleHistoryClick = (h) => {
     const targetId = h.itemId || parseHistoryTargetId(h) || h.id;

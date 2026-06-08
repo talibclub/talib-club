@@ -7,7 +7,8 @@ import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
 
 export default function Articles({ go, authState, ctx }) {
-  const { items: articles, loading, error, isUsingFallback } = useContentCollection("articles", ARTICLES, null, { live: false, limit: 200 })
+  const articlesQueryOptions = useMemo(() => ({ live: false, limit: 200 }), [])
+  const { items: articles, loading, error, isUsingFallback } = useContentCollection("articles", ARTICLES, null, articlesQueryOptions)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
 
   const cat = ctx?.cat || "all"

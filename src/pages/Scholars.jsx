@@ -26,7 +26,8 @@ const mapEraValue = (val) => {
 }
 
 export default function Scholars() {
-  const { items: scholars, loading } = useContentCollection("scholars", SCHOLARS, null, { live: false })
+  const scholarsQueryOptions = useMemo(() => ({ live: false }), [])
+  const { items: scholars, loading } = useContentCollection("scholars", SCHOLARS, null, scholarsQueryOptions)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   
   const [search, setSearch] = useState("")

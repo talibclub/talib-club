@@ -5,8 +5,9 @@ import { CATEGORY_MAP, TYPE_MAP, getSavedMonthString, getArticleMonthString } fr
 
 export default function SavedArticlesPanel({ authState, go, setView }) {
   const uid = authState?.user?.uid;
-  const { items: articles, loading: loadingArticles } = useContentCollection("articles", ARTICLES, null, { live: false })
-  const { items: bookmarks, loading: loadingBookmarks } = useContentCollection("bookmarks", [], uid, { live: false })
+  const readOnlyQueryOptions = useMemo(() => ({ live: false }), [])
+  const { items: articles, loading: loadingArticles } = useContentCollection("articles", ARTICLES, null, readOnlyQueryOptions)
+  const { items: bookmarks, loading: loadingBookmarks } = useContentCollection("bookmarks", [], uid, readOnlyQueryOptions)
 
   const [search, setSearch] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")

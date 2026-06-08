@@ -7,9 +7,10 @@ import { BOOKS } from "../../data/index.js"
 
 export default function ReflectionsPanel({ authState, setView, theme }) {
   const uid = authState?.user?.uid
-  const { items: books } = useContentCollection("books", BOOKS, null, { live: false })
+  const readOnlyQueryOptions = useMemo(() => ({ live: false }), [])
+  const { items: books } = useContentCollection("books", BOOKS, null, readOnlyQueryOptions)
   const { items: bookmarkItems, loading: loadingBookmarks, saveItem: saveBookmark } = useUserCollection("quran_bookmarks", uid)
-  const { items: sessionItems, loading: loadingSessions, saveItem: saveSession } = useContentCollection("reading_sessions", [], uid, { live: false })
+  const { items: sessionItems, loading: loadingSessions, saveItem: saveSession } = useContentCollection("reading_sessions", [], uid, readOnlyQueryOptions)
   const [search, setSearch] = useState("")
   const [activeExportCard, setActiveExportCard] = useState(null)
   const [editingNote, setEditingNote] = useState(null)

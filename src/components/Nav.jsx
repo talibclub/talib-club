@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useMemo } from "react"
 import { SITE } from "../data/index.js"
 import toast from "react-hot-toast"
 import { confirmAction } from "../utils/feedback.jsx"
-import { useContentCollection, invalidateContentCache } from "../lib/contentStore.js"
+import { useContentCollection, useUserDoc, invalidateContentCache } from "../lib/contentStore.js"
 import { ARTICLES, BOOKS } from "../data/index.js"
 import { usePWA } from "../hooks/usePWA.js"
 
@@ -66,16 +66,16 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
   } = usePWA(authState?.user, authState?.isStaff)
 
   const uid = authState?.user?.uid
-  const { items: articles } = useContentCollection("articles", ARTICLES, null, { limit: 1, orderByField: "updatedAt", orderDirection: "desc", live: false })
-  const { items: books } = useContentCollection("books", BOOKS, null, { limit: 1, orderByField: "updatedAt", orderDirection: "desc", live: false })
+  const latestContentQueryOptions = useMemo(() => ({ limit: 1, orderByField: "updatedAt", orderDirection: "desc", live: false }), [])
+  const { items: articles } = useContentCollection("articles", ARTICLES, null, latestContentQueryOptions)
+  const { items: books } = useContentCollection("books", BOOKS, null, latestContentQueryOptions)
   const readingSessions = readingSessionsProp ?? []
-  const { items: streakRecords } = useContentCollection("reading_streaks", [], uid, { live: false })
+  const { item: streakRecord } = useUserDoc("reading_streaks", uid, uid, null)
 
   const userSettings = useMemo(() => {
-    if (!uid || !streakRecords) return null
-    const found = streakRecords.find(item => item.uid === uid || item.id === uid)
-    return normalizeStreakSettings(found, uid)
-  }, [streakRecords, uid])
+    if (!uid) return null
+    return normalizeStreakSettings(streakRecord, uid)
+  }, [streakRecord, uid])
 
   const hasReadToday = useMemo(() => {
     if (!uid || !readingSessions) return false

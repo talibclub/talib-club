@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react"
 import { createPortal } from "react-dom"
 import toast from "react-hot-toast"
 import { BOOKS, DEFAULT_TAXONOMY } from "../data/index.js"
-import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
+import { useContentCollection, useTaxonomySettings, useUserDoc } from "../lib/contentStore.js"
 import { confirmAction } from "../utils/feedback.jsx"
 import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage"
 import { storage, app } from "../lib/firebase.js"
@@ -179,10 +179,11 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     delete next.shelfItemId
     go("reader", Object.keys(next).length ? next : null, { replace: true, noScroll: true })
   }
-  const { items: books } = useContentCollection("books", BOOKS, null, { live: false })
-  const { items: shelfItems, saveItem: saveShelfItem, deleteItem: deleteShelfItem } = useContentCollection("bookshelf", [], uid, { live: false })
-  const { items: readingSessions, loading: loadingSessions, saveItem: saveReadingSession } = useContentCollection("reading_sessions", [], uid, { live: false })
-  const { items: streakRecords, loading: loadingStreaks, saveItem: saveStreakSettings } = useContentCollection("reading_streaks", [], uid, { live: false })
+  const readOnlyQueryOptions = useMemo(() => ({ live: false }), [])
+  const { items: books } = useContentCollection("books", BOOKS, null, readOnlyQueryOptions)
+  const { items: shelfItems, saveItem: saveShelfItem, deleteItem: deleteShelfItem } = useContentCollection("bookshelf", [], uid, readOnlyQueryOptions)
+  const { items: readingSessions, loading: loadingSessions, saveItem: saveReadingSession } = useContentCollection("reading_sessions", [], uid, readOnlyQueryOptions)
+  const { item: streakRecord, loading: loadingStreaks, saveItem: saveStreakSettings } = useUserDoc("reading_streaks", uid, uid, null)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
 
   // Reading Mode State
@@ -227,8 +228,8 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 
   // --- Normalized Streak & Sessions ---
   const streakSettings = useMemo(() => {
-    return normalizeStreakSettings(streakRecords.find(item => item.uid === uid || item.id === uid), uid)
-  }, [streakRecords, uid])
+    return normalizeStreakSettings(streakRecord, uid)
+  }, [streakRecord, uid])
 
   const streak = useMemo(() => {
     const verifiedDays = readingSessions

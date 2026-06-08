@@ -7,7 +7,7 @@
     "dev": "node ./scripts/vite-runner.mjs dev",
     "build": "node ./scripts/vite-runner.mjs build",
     "preview": "node ./scripts/vite-runner.mjs preview",
-    "test": "vitest run"
+    "test": "node ./scripts/run-tests.mjs"
   },
   "dependencies": {
     "dompurify": "^3.4.8",

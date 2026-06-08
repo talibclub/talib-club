@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { ARTICLES, BOOKS, MEDIA, SITE } from "../data/index.js"
 import { useContentCollection, useSiteSettings, useCollectionCount } from "../lib/contentStore.js"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
@@ -57,9 +57,10 @@ const SURAH_NAMES = {
 export default function Home({ go }) {
   // ไม่ใช้ orderByField เพราะ records เก่าบางตัวอาจไม่มี updatedAt
   // ให้ byNewest() ใน contentStore จัดเรียงให้แทน
-  const { items: articles, loading: loadingArticles } = useContentCollection("articles", ARTICLES, null, { live: false })
-  const { items: books, loading: loadingBooks } = useContentCollection("books", BOOKS, null, { live: false })
-  const { items: media, loading: loadingMedia } = useContentCollection("media", MEDIA, null, { live: false })
+  const readOnlyQueryOptions = useMemo(() => ({ live: false }), [])
+  const { items: articles, loading: loadingArticles } = useContentCollection("articles", ARTICLES, null, readOnlyQueryOptions)
+  const { items: books, loading: loadingBooks } = useContentCollection("books", BOOKS, null, readOnlyQueryOptions)
+  const { items: media, loading: loadingMedia } = useContentCollection("media", MEDIA, null, readOnlyQueryOptions)
   const { count: scholarCount } = useCollectionCount("scholars")
   const { count: articleCount } = useCollectionCount("articles")
   const { count: bookCount } = useCollectionCount("books")

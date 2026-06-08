@@ -1,4 +1,4 @@
-import { Component, useEffect, useState, lazy, Suspense, useRef } from "react"
+import { Component, useEffect, useState, lazy, Suspense, useRef, useMemo } from "react"
 import { useTheme } from "./hooks/useTheme.js"
 import { useAuth } from "./hooks/useAuth.js"
 import Nav from "./components/Nav.jsx"
@@ -84,7 +84,8 @@ export default function App() {
   }, [authState?.isStaff])
 
   const uid = authState?.user?.uid
-  const { items: readingSessions } = useContentCollection("reading_sessions", [], uid, { limit: 20, orderByField: "completedAt", orderDirection: "desc", live: false })
+  const readingSessionsQueryOptions = useMemo(() => ({ limit: 20, orderByField: "completedAt", orderDirection: "desc", live: false }), [])
+  const { items: readingSessions } = useContentCollection("reading_sessions", [], uid, readingSessionsQueryOptions)
   const countdownNotifRef = useRef(null)
 
   // --- Preferred Time Notification (60s interval, gated by user toggle) ---
