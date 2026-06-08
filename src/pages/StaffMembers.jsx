@@ -7,6 +7,12 @@ import { db } from "../lib/firebase.js"
 import { toast } from "react-hot-toast"
 import { Z } from "../utils/ui.js"
 
+const USERS_CACHE_TTL = 60 * 1000
+const USER_STATS_CACHE_TTL = 60 * 1000
+let cachedUsersList = null
+let cachedUsersListAt = 0
+const cachedUserStatsMap = new Map()
+
 // Helper function to format timestamp/date
 const formatDate = (dateValue) => {
   if (!dateValue) return "-"
@@ -44,10 +50,19 @@ export default function StaffMembers({ authState, go }) {
   }, [])
 
   const fetchUsers = async () => {
+    const now = Date.now()
+    if (cachedUsersList && now - cachedUsersListAt < USERS_CACHE_TTL) {
+      setUsers(cachedUsersList)
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     try {
       const snap = await getDocs(collection(db, "users"))
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      cachedUsersList = list
+      cachedUsersListAt = now
       setUsers(list)
     } catch (err) {
       console.error("Failed to fetch users:", err)
@@ -77,6 +92,11 @@ export default function StaffMembers({ authState, go }) {
 
     try {
       const uid = member.id || member.uid
+      const cached = cachedUserStatsMap.get(uid)
+      if (cached && Date.now() - cached.at < USER_STATS_CACHE_TTL) {
+        setUserStats(cached.data)
+        return
+      }
 
       // 1. Fetch reading streak settings
       let streakData = { streakCount: 0, bestStreak: 0, gems: 0 }
@@ -138,11 +158,16 @@ export default function StaffMembers({ authState, go }) {
 
       const quranBookmarksCount = quranBookmarksSnap.data().count
 
-      setUserStats({
+      const statsData = {
         streak: streakData,
         bookshelf: bookshelfData,
         sessions: sessionsData,
         quranBookmarksCount
+      }
+      setUserStats(statsData)
+      cachedUserStatsMap.set(uid, {
+        at: Date.now(),
+        data: statsData
       })
     } catch (err) {
       console.error("Failed to load user stats:", err)

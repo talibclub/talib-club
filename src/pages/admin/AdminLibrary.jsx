@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { BOOKS, DEFAULT_TAXONOMY } from "../../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
@@ -22,7 +22,8 @@ const EMPTY = {
 }
 
 export default function AdminLibrary() {
-  const { items, loading, error, saveItem, deleteItem, isUsingFallback } = useContentCollection("books", BOOKS)
+  const adminQueryOptions = useMemo(() => ({ live: false }), [])
+  const { items, loading, error, saveItem, deleteItem, isUsingFallback } = useContentCollection("books", BOOKS, null, adminQueryOptions)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   
   const [editing, setEdit] = useState(null)

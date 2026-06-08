@@ -86,6 +86,7 @@ export default function Overview({ authState, go, setView, onOpenQuran, onOpenSa
   }, [uid, fetchOverviewData])
 
   const streakCount = Number(remoteStreak?.streakCount || 0)
+  const streakSettings = { streakCount }
   const sessionCount = counts.sessionCount
   const finishedCount = counts.finishedBooks
   const bookmarkCount = counts.bookmarkCount

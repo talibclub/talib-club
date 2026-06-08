@@ -5,6 +5,9 @@ import { notifyError, notifySuccess } from "../../utils/feedback.jsx"
 import { db } from "../../lib/firebase.js"
 import { collection, doc, setDoc, getDocs, serverTimestamp } from "firebase/firestore"
 
+const SEED_EXISTING_IDS_TTL = 5 * 60 * 1000
+const seedExistingIdsCache = new Map()
+
 // Helper to clean undefined values recursively for Firestore
 function cleanObject(value) {
   if (Array.isArray(value)) return value.map(cleanObject)
@@ -127,13 +130,20 @@ export default function AdminSite() {
 
         let existingIds = new Set()
         if (!forceOverwrite) {
-          addLog(`กำลังตรวจสอบข้อมูลที่มีอยู่เดิมบน Firebase...`)
-          try {
-            const snap = await getDocs(collection(db, col.colName))
-            snap.forEach(docSnap => existingIds.add(String(docSnap.id)))
-            addLog(`พบข้อมูลใน Firebase แล้ว ${existingIds.size} รายการ (จะทำการข้ามการอัปโหลด)`)
-          } catch (e) {
-            addLog(`ไม่สามารถตรวจสอบข้อมูลเดิมได้: ${e.message} จะอัปโหลดข้อมูลทั้งหมดแทน`)
+          const cached = seedExistingIdsCache.get(col.colName)
+          if (cached && Date.now() - cached.at < SEED_EXISTING_IDS_TTL) {
+            existingIds = new Set(cached.ids)
+            addLog(`ใช้ข้อมูลที่เคยตรวจสอบไว้แล้ว ${existingIds.size} รายการ (ข้ามการอ่านซ้ำ)`)
+          } else {
+            addLog(`กำลังตรวจสอบข้อมูลที่มีอยู่เดิมบน Firebase...`)
+            try {
+              const snap = await getDocs(collection(db, col.colName))
+              snap.forEach(docSnap => existingIds.add(String(docSnap.id)))
+              seedExistingIdsCache.set(col.colName, { at: Date.now(), ids: [...existingIds] })
+              addLog(`พบข้อมูลใน Firebase แล้ว ${existingIds.size} รายการ (จะทำการข้ามการอัปโหลด)`)
+            } catch (e) {
+              addLog(`ไม่สามารถตรวจสอบข้อมูลเดิมได้: ${e.message} จะอัปโหลดข้อมูลทั้งหมดแทน`)
+            }
           }
         }
 

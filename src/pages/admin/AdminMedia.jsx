@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { DEFAULT_TAXONOMY, MEDIA } from "../../data/index.js"
 import { useContentCollection, useTaxonomySettings, bulkDeleteItems, bulkSaveItems } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
@@ -18,7 +18,8 @@ const EMPTY = {
 }
 
 export default function AdminMedia() {
-  const { items, loading, error, saveItem, deleteItem, isUsingFallback } = useContentCollection("media", MEDIA)
+  const adminQueryOptions = useMemo(() => ({ live: false }), [])
+  const { items, loading, error, saveItem, deleteItem, isUsingFallback } = useContentCollection("media", MEDIA, null, adminQueryOptions)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   
   const [editing, setEdit] = useState(null)

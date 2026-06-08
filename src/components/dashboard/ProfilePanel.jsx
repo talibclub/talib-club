@@ -5,6 +5,9 @@ import { collection, query, where, getCountFromServer } from "firebase/firestore
 import { useContentCollection, useUserCollection, useUserDoc } from "../../lib/contentStore.js"
 import { initials, parseHistoryTargetId, normalizeStreakSettings, fieldStyle } from "./dashboardUtils.js"
 
+const PROFILE_STATS_CACHE_TTL = 60 * 1000
+const profileStatsCache = new Map()
+
 export default function ProfilePanel({ authState, copied, copyText, go, setView, ctx }) {
   const user = authState?.user
   const profile = authState?.profile || {}
@@ -46,6 +49,15 @@ export default function ProfilePanel({ authState, copied, copyText, go, setView,
 
   useEffect(() => {
     if (!user?.uid) return
+
+    const cacheKey = user.uid
+    const cached = profileStatsCache.get(cacheKey)
+    if (cached && Date.now() - cached.at < PROFILE_STATS_CACHE_TTL) {
+      setDbStats(cached.data)
+      setLoadingDbStats(false)
+      return
+    }
+
     setLoadingDbStats(true)
 
     const fetchDbStats = async () => {
@@ -62,6 +74,15 @@ export default function ProfilePanel({ authState, copied, copyText, go, setView,
           booksDownloaded: bookSnap.data().count,
           mediaWatched: mediaSnap.data().count,
           verifiedSessions: sessionSnap.data().count,
+        })
+        profileStatsCache.set(cacheKey, {
+          at: Date.now(),
+          data: {
+            articlesRead: artSnap.data().count,
+            booksDownloaded: bookSnap.data().count,
+            mediaWatched: mediaSnap.data().count,
+            verifiedSessions: sessionSnap.data().count,
+          }
         })
       } catch (err) {
         if (import.meta.env.DEV) {

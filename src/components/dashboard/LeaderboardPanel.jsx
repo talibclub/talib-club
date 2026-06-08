@@ -2,6 +2,10 @@ import { useState, useEffect, useMemo } from "react"
 import { db } from "../../lib/firebase.js"
 import { collection, query, orderBy, limit, getDocs } from "firebase/firestore"
 
+let cachedLeaders = null
+let cachedLeadersAt = 0
+const LEADERBOARD_CACHE_TTL = 60 * 1000
+
 export default function LeaderboardPanel({ authState, setView }) {
   const [leaders, setLeaders] = useState([])
   const [loading, setLoading] = useState(true)
@@ -9,6 +13,13 @@ export default function LeaderboardPanel({ authState, setView }) {
 
   useEffect(() => {
     async function fetchLeaders() {
+      const now = Date.now()
+      if (cachedLeaders && now - cachedLeadersAt < LEADERBOARD_CACHE_TTL) {
+        setLeaders(cachedLeaders)
+        setLoading(false)
+        return
+      }
+
       try {
         setLoading(true)
         const q = query(
@@ -21,6 +32,8 @@ export default function LeaderboardPanel({ authState, setView }) {
           id: doc.id,
           ...doc.data()
         }))
+        cachedLeaders = data
+        cachedLeadersAt = now
         setLeaders(data)
       } catch (err) {
         if (import.meta.env.DEV) {
