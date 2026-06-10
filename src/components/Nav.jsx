@@ -19,12 +19,14 @@ function getLocalDayKey(value) {
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value
   const ms = getTimeMs(value)
   if (!ms) return ""
-  const date = new Date(ms)
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-")
+  const d = new Date(ms)
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
+  return formatter.format(d)
 }
 
 function normalizeStreakSettings(settings, uid) {

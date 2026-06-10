@@ -69,6 +69,27 @@ function getLocalDayKey(value) {
   return formatter.format(d)
 }
 
+const urlToPage = {
+  "": "home",
+  "articles": "articles",
+  "article": "article",
+  "library": "library",
+  "library-detail": "library-detail",
+  "media": "media",
+  "media-detail": "media-detail",
+  "scholars": "scholars",
+  "quran": "quran",
+  "tracking-system": "tracking",
+  "auth": "auth",
+  "member": "member",
+  "staff": "staff",
+  "staff-work": "staff-work",
+  "staff-translation": "staff-translation",
+  "admin": "admin",
+  "donate": "donate",
+  "reader": "reader",
+}
+
 export default function App() {
   const { theme, setTheme } = useTheme()
   const authState = useAuth()
@@ -176,26 +197,6 @@ export default function App() {
     return () => clearInterval(interval)
   }, [uid, readingSessions])
 
-  const urlToPage = {
-    "": "home",
-    "articles": "articles",
-    "article": "article",
-    "library": "library",
-    "library-detail": "library-detail",
-    "media": "media",
-    "media-detail": "media-detail",
-    "scholars": "scholars",
-    "quran": "quran",
-    "tracking-system": "tracking",
-    "auth": "auth",
-    "member": "member",
-    "staff": "staff",
-    "staff-work": "staff-work",
-    "staff-translation": "staff-translation",
-    "admin": "admin",
-    "donate": "donate",
-    "reader": "reader",
-  }
 
   useEffect(() => {
     window.sessionStorage.removeItem("chunk-reload");
