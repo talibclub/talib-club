@@ -1,4 +1,5 @@
 import { Component, useEffect, useState, lazy, Suspense, useRef, useMemo } from "react"
+import { useNavigate, useLocation, useSearchParams, Routes, Route, Navigate } from "react-router-dom"
 import { useTheme } from "./hooks/useTheme.js"
 import { useAuth } from "./hooks/useAuth.js"
 import Nav from "./components/Nav.jsx"
@@ -58,19 +59,38 @@ function getLocalDayKey(value) {
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value
   const ms = getTimeMs(value)
   if (!ms) return ""
-  const date = new Date(ms)
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-")
+  const d = new Date(ms)
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
+  return formatter.format(d)
 }
 
 export default function App() {
   const { theme, setTheme } = useTheme()
   const authState = useAuth()
-  const [page, setPage] = useState("home")
-  const [ctx, setCtx] = useState(null)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+
+  const page = useMemo(() => {
+    const path = location.pathname.replace(/^\//, "")
+    return urlToPage[path] || "home"
+  }, [location.pathname])
+
+  const ctx = useMemo(() => {
+    if (location.state && location.state.ctx) {
+      return location.state.ctx
+    }
+    const parsed = {}
+    for (const [key, val] of searchParams.entries()) {
+      parsed[key] = val
+    }
+    return Object.keys(parsed).length > 0 ? parsed : null
+  }, [location.state, searchParams])
   const [countdownText, setCountdownText] = useState("")
   const { playingAudio, audioState, autoplayNext, setAutoplayNext, pause, resume, stop } = useAudio()
 
@@ -178,54 +198,10 @@ export default function App() {
   }
 
   useEffect(() => {
-    const handlePopstate = (event) => {
-      if (event && event.state && event.state.page) {
-        setPage(event.state.page)
-        setCtx(event.state.ctx || null)
-      } else {
-        const path = window.location.pathname.replace(/^\//, "")
-        const mapped = urlToPage[path] || "home"
-        setPage(mapped)
-        
-        // Restore context from query parameters on browser history navigation
-        const params = new URLSearchParams(window.location.search)
-        const parsedCtx = {}
-        for (const [key, val] of params.entries()) {
-          parsedCtx[key] = val
-        }
-        setCtx(Object.keys(parsedCtx).length > 0 ? parsedCtx : null)
-      }
-    }
-
-    const initialPath = window.location.pathname.replace(/^\//, "")
-    const initialPage = urlToPage[initialPath] || "home"
-    
-    // Restore context from query parameters on initial page load
-    const params = new URLSearchParams(window.location.search)
-    const initialCtx = {}
-    for (const [key, val] of params.entries()) {
-      initialCtx[key] = val
-    }
-    const finalCtx = Object.keys(initialCtx).length > 0 ? initialCtx : null
-
-    window.history.replaceState({ page: initialPage, ctx: finalCtx }, "", window.location.pathname + window.location.search)
-    setPage(initialPage)
-    setCtx(finalCtx)
-
     window.sessionStorage.removeItem("chunk-reload");
-
-    window.addEventListener("popstate", handlePopstate)
-    return () => window.removeEventListener("popstate", handlePopstate)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const go = (p, data = null, options = {}) => {
-    setPage(p)
-    setCtx(data)
-    if (!options.noScroll) {
-      window.scrollTo(0, 0)
-    }
-    
     let urlPath = "/";
     if (p === "tracking") {
       urlPath = "/tracking-system";
@@ -233,11 +209,9 @@ export default function App() {
       urlPath = "/" + p;
     }
     
-    // Embed context parameters automatically into the URL query string
     if (data) {
       const qParams = new URLSearchParams()
       if (["article", "library-detail", "media-detail"].includes(p) && data.id) {
-        // For detail pages, only serialize 'id' to keep URLs clean, short, and shareable!
         qParams.set("id", String(data.id))
       } else {
         Object.entries(data).forEach(([key, val]) => {
@@ -253,9 +227,12 @@ export default function App() {
     }
     
     if (options.replace) {
-      window.history.replaceState({ page: p, ctx: data }, "", urlPath);
+      navigate(urlPath, { replace: true, state: { ctx: data } });
     } else {
-      window.history.pushState({ page: p, ctx: data }, "", urlPath);
+      navigate(urlPath, { state: { ctx: data } });
+    }
+    if (!options.noScroll) {
+      window.scrollTo(0, 0)
     }
   }
 
@@ -301,62 +278,64 @@ export default function App() {
       <main className={`${page === "quran" || page === "member" ? "wide" : ""} fade-in-active`} key={page}>
         <PageErrorBoundary resetKey={`${page}:${JSON.stringify(ctx || {})}`} go={go}>
           <Suspense fallback={<LoadingState />}>
-            {page === "home" && <Home go={go} />}
-            {page === "articles" && <Articles go={go} authState={authState} ctx={ctx} />}      
-            {page === "article" && <ArticleDetail item={ctx} go={go} authState={authState} />}
-            {page === "library" && <Library go={go} authState={authState} ctx={ctx} />}
-            {page === "library-detail" && (
-              <RequireLogin authState={authState} go={go}>
-                <LibraryDetail item={ctx} go={go} authState={authState} />
-              </RequireLogin>
-            )}
-            {page === "media" && <Media go={go} ctx={ctx} />}
-            {page === "media-detail" && <MediaDetail item={ctx} go={go} authState={authState} />}
-            {page === "scholars" && <Scholars />}
-            {page === "quran" && (
-              <RequireLogin authState={authState} go={go}>
-                <MemberDashboard authState={authState} go={go} initialView="quran" ctx={ctx} />
-              </RequireLogin>
-            )}
-            {page === "tracking" && <Tracking authState={authState} />}
-            {page === "auth" && <Auth authState={authState} go={go} />}
-            
-            {page === "member" && (
-              <RequireLogin authState={authState} go={go}>
-                <MemberDashboard authState={authState} go={go} initialView={ctx?.view} ctx={ctx} theme={theme} />
-              </RequireLogin>
-            )}
-            {page === "staff" && (
-              <RequireLogin authState={authState} go={go}>
-                <StaffDashboard authState={authState} go={go} />
-              </RequireLogin>
-            )}
-            {page === "staff-work" && (
-              <RequireStaff authState={authState} go={go}>
-                <StaffWork authState={authState} go={go} />
-              </RequireStaff>
-            )}
-            {page === "staff-translation" && (
-              <RequireStaff authState={authState} go={go}>
-                <StaffTranslation authState={authState} go={go} />
-              </RequireStaff>
-            )}
-            {page === "staff-members" && (
-              <RequireOwner authState={authState} go={go}>
-                <StaffMembers authState={authState} go={go} />
-              </RequireOwner>
-            )}
-            {page === "admin" && (
-              <RequireStaff authState={authState} go={go}>
-                <Admin go={go} authState={authState} initialTab={ctx?.tab} />
-              </RequireStaff>
-            )}
-            {page === "donate" && <Donation />}
-            {page === "reader" && (
-              <RequireLogin authState={authState} go={go}>
-                <ReadingApp authState={authState} go={go} ctx={ctx} theme={theme} />
-              </RequireLogin>
-            )}
+            <Routes>
+              <Route path="/" element={<Home go={go} />} />
+              <Route path="/articles" element={<Articles go={go} authState={authState} ctx={ctx} />} />
+              <Route path="/article" element={<ArticleDetail item={ctx} go={go} authState={authState} />} />
+              <Route path="/library" element={<Library go={go} authState={authState} ctx={ctx} />} />
+              <Route path="/library-detail" element={
+                <RequireLogin authState={authState}>
+                  <LibraryDetail item={ctx} go={go} authState={authState} />
+                </RequireLogin>
+              } />
+              <Route path="/media" element={<Media go={go} ctx={ctx} />} />
+              <Route path="/media-detail" element={<MediaDetail item={ctx} go={go} authState={authState} />} />
+              <Route path="/scholars" element={<Scholars />} />
+              <Route path="/quran" element={
+                <RequireLogin authState={authState}>
+                  <MemberDashboard authState={authState} go={go} initialView="quran" ctx={ctx} />
+                </RequireLogin>
+              } />
+              <Route path="/tracking-system" element={<Tracking authState={authState} />} />
+              <Route path="/auth" element={<Auth authState={authState} go={go} />} />
+              <Route path="/member" element={
+                <RequireLogin authState={authState}>
+                  <MemberDashboard authState={authState} go={go} initialView={ctx?.view} ctx={ctx} theme={theme} />
+                </RequireLogin>
+              } />
+              <Route path="/staff" element={
+                <RequireLogin authState={authState}>
+                  <StaffDashboard authState={authState} go={go} />
+                </RequireLogin>
+              } />
+              <Route path="/staff-work" element={
+                <RequireStaff authState={authState}>
+                  <StaffWork authState={authState} go={go} />
+                </RequireStaff>
+              } />
+              <Route path="/staff-translation" element={
+                <RequireStaff authState={authState}>
+                  <StaffTranslation authState={authState} go={go} />
+                </RequireStaff>
+              } />
+              <Route path="/staff-members" element={
+                <RequireOwner authState={authState}>
+                  <StaffMembers authState={authState} go={go} />
+                </RequireOwner>
+              } />
+              <Route path="/admin" element={
+                <RequireStaff authState={authState}>
+                  <Admin go={go} authState={authState} initialTab={ctx?.tab} />
+                </RequireStaff>
+              } />
+              <Route path="/donate" element={<Donation />} />
+              <Route path="/reader" element={
+                <RequireLogin authState={authState}>
+                  <ReadingApp authState={authState} go={go} ctx={ctx} theme={theme} />
+                </RequireLogin>
+              } />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
           </Suspense>
         </PageErrorBoundary>
       </main>
@@ -474,16 +453,25 @@ class PageErrorBoundary extends Component {
   }
 }
 
-function RequireLogin({ authState, go, children }) {
+function RequireLogin({ authState, children }) {
+  const location = useLocation()
   if (authState.loading) return <LoadingState />
-  if (!authState.user) return <Auth authState={authState} go={go} />
+  if (!authState.user) {
+    const fullPath = location.pathname + location.search
+    return <Navigate to="/auth" replace state={{ from: fullPath }} />
+  }
   return children
 }
 
-function RequireOwner({ authState, go, children }) {
+function RequireOwner({ authState, children }) {
+  const location = useLocation()
   if (authState.loading) return <LoadingState />
-  if (!authState.user) return <Auth authState={authState} go={go} />
+  if (!authState.user) {
+    const fullPath = location.pathname + location.search
+    return <Navigate to="/auth" replace state={{ from: fullPath }} />
+  }
   if (authState.user.email !== "islamofwhite@gmail.com") {
+    const navigate = useNavigate()
     return (
       <div className="card" style={{ maxWidth: 520, margin: "44px auto", padding: 24, textAlign: "center" }}>
         <i className="ti ti-lock" style={{ fontSize: 28, color: "var(--red)", marginBottom: 10 }}></i>
@@ -491,7 +479,7 @@ function RequireOwner({ authState, go, children }) {
         <p style={{ marginBottom: 16 }}>
           บัญชีของคุณ ({authState.user.email}) ไม่มีสิทธิ์เข้าถึงส่วนนี้ มีเพียงเจ้าของระบบเท่านั้นที่เข้าถึงได้
         </p>
-        <button className="btn btn-teal" onClick={() => go("home")}>
+        <button className="btn btn-teal" onClick={() => navigate("/")}>
           กลับหน้าหลัก
         </button>
       </div>
@@ -500,10 +488,14 @@ function RequireOwner({ authState, go, children }) {
   return children
 }
 
-function RequireStaff({ authState, go, children }) {
+function RequireStaff({ authState, children }) {
+  const location = useLocation()
   if (authState.loading) return <LoadingState />
-  if (!authState.user) return <Auth authState={authState} go={go} />
-  if (!authState.isStaff) return <UnauthorizedState go={go} />
+  if (!authState.user) {
+    const fullPath = location.pathname + location.search
+    return <Navigate to="/auth" replace state={{ from: fullPath }} />
+  }
+  if (!authState.isStaff) return <UnauthorizedState />
   return children
 }
 
@@ -516,7 +508,8 @@ function LoadingState() {
   )
 }
 
-function UnauthorizedState({ go }) {
+function UnauthorizedState() {
+  const navigate = useNavigate()
   return (
     <div className="card" style={{ maxWidth: 520, margin: "44px auto", padding: 24, textAlign: "center" }}>
       <i className="ti ti-shield-lock" style={{ fontSize: 28, color: "var(--teal)", marginBottom: 10 }}></i>
@@ -525,10 +518,10 @@ function UnauthorizedState({ go }) {
         บัญชีของคุณยังไม่มีสิทธิ์เข้าถึงส่วนนี้ หากต้องการใช้งานพื้นที่ staff หรือ admin ให้ใช้บัญชีที่กำหนดสิทธิ์ไว้ก่อน
       </p>
       <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
-        <button className="btn btn-teal" onClick={() => go("home")}>
+        <button className="btn btn-teal" onClick={() => navigate("/")}>
           <i className="ti ti-home" style={{ marginRight: 6 }}></i>กลับหน้าหลัก
         </button>
-        <button className="btn btn-outline" onClick={() => go("member", { view: "overview" })}>
+        <button className="btn btn-outline" onClick={() => navigate("/member?view=overview")}>
           <i className="ti ti-layout-dashboard" style={{ marginRight: 6 }}></i>ไปแดชบอร์ดสมาชิก
         </button>
       </div>

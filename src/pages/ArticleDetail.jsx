@@ -202,14 +202,14 @@ export default function ArticleDetail({ item, go, authState }) {
 
     try {
       if (isSaved) {
-        await deleteBookmark(bookmarkId); // ใช้ฟังก์ชัน deleteBookmark จาก useContentCollection
+        deleteBookmark(bookmarkId);
         toast.success("ยกเลิกการบันทึกแล้ว");
       } else {
-        await saveBookmark({
+        saveBookmark({
           id: bookmarkId,
           uid: uid,
           articleId: String(displayItem.id),
-          savedAt: serverTimestamp()
+          savedAt: new Date()
         });
         toast.success("บันทึกบทความแล้ว!");
       }

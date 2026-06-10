@@ -1,11 +1,16 @@
 import { useState, useEffect } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
 
 export default function Auth({ authState, go }) {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const redirectTarget = location.state?.from || "/member"
+
   useEffect(() => {
     if (authState?.user) {
-      go("member")
+      navigate(redirectTarget, { replace: true })
     }
-  }, [authState?.user, go])
+  }, [authState?.user, redirectTarget, navigate])
 
   const [mode, setMode] = useState("login")
   const [displayName, setDisplayName] = useState("")
@@ -43,7 +48,7 @@ export default function Auth({ authState, go }) {
         await authState.login(cleanEmail, password)
       }
       setStatus("")
-      go("member")
+      navigate(redirectTarget, { replace: true })
     } catch (err) {
       console.error(err)
       setStatus("")
@@ -60,7 +65,7 @@ export default function Auth({ authState, go }) {
       const res = await authState.loginWithGoogle()
       if (!res?.redirecting) {
         setStatus("")
-        go("member")
+        navigate(redirectTarget, { replace: true })
       }
     } catch (err) {
       console.error(err)

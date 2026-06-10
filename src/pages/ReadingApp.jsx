@@ -2052,6 +2052,7 @@ function QuizModal({ shelfItem, onClose, onSaveScore, theme, user }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [questions, setQuestions] = useState([])
+  const [quizSource, setQuizSource] = useState("ai")
   const [started, setStarted] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState([])
@@ -2079,6 +2080,7 @@ function QuizModal({ shelfItem, onClose, onSaveScore, theme, user }) {
         const data = await res.json()
         if (data.error) throw new Error(data.error)
         setQuestions(data.quiz || [])
+        setQuizSource(data.source || "ai")
       } catch (err) {
         console.error("Failed to load quiz", err)
         setError("ไม่สามารถโหลดข้อสอบได้ กรุณาลองใหม่อีกครั้ง")
@@ -2183,6 +2185,24 @@ function QuizModal({ shelfItem, onClose, onSaveScore, theme, user }) {
             <>
               {!started && !completed && (
                 <div style={{ textAlign: "center", padding: "10px 0" }}>
+                  {quizSource === "fallback" && (
+                    <div style={{
+                      background: "rgba(245,158,11,0.08)",
+                      border: "1px solid rgba(245,158,11,0.2)",
+                      borderRadius: 12,
+                      padding: "10px 14px",
+                      fontSize: 12,
+                      color: "#d97706",
+                      marginBottom: 16,
+                      textAlign: "left",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8
+                    }}>
+                      <i className="ti ti-alert-triangle" style={{ fontSize: 16 }}></i>
+                      <span><strong>โหมดทบทวนทั่วไป (Practice Mode):</strong> ระบบกำลังจำลองแบบทดสอบพื้นฐานเนื่องจาก AI คีย์ไม่พร้อมใช้งาน</span>
+                    </div>
+                  )}
                   <div style={{ width: 64, height: 64, borderRadius: 16, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
                     <i className="ti ti-award" style={{ color: "var(--teal)", fontSize: 32 }}></i>
                   </div>

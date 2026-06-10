@@ -213,6 +213,11 @@ function writeCachedCollection(key, items) {
   } catch (e) {
     console.error("Failed to write to localStorage cache:", e)
   }
+
+  // Write to IndexedDB for offline access
+  setOfflineItem('collections', key, { items, at: now }).catch(e => {
+    console.error("Failed to write collection to IndexedDB", e)
+  })
 }
 
 function readLocalStorageCacheEntry(key) {
@@ -369,6 +374,36 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
           orderDirection,
           limitCount,
         })
+
+        // Check IndexedDB cache first
+        if (!live) {
+          try {
+            const offlineEntry = await getOfflineItem('collections', cacheKey)
+            if (offlineEntry) {
+              let isValid = true
+              if (PUBLIC_COLLECTIONS.includes(collectionName)) {
+                try {
+                  const serverMeta = await fetchContentMetadata()
+                  const serverLastUpdate = serverMeta[collectionName] || 0
+                  if (serverLastUpdate > 0 && offlineEntry.at < serverLastUpdate) {
+                    isValid = false
+                  }
+                } catch (metaErr) {
+                  console.log("[contentStore] Failed to fetch server metadata, using offline cache fallback.", metaErr)
+                }
+              }
+              if (isValid && active) {
+                collectionCache.set(cacheKey, { items: offlineEntry.items, at: offlineEntry.at })
+                setRemoteItems(offlineEntry.items)
+                setError(null)
+                setLoading(false)
+                return
+              }
+            }
+          } catch (dbErr) {
+            console.warn("[contentStore] IndexedDB read failed", dbErr)
+          }
+        }
 
         // Check metadata-based cache first
         if (!live && PUBLIC_COLLECTIONS.includes(collectionName)) {
@@ -953,28 +988,30 @@ export function useUserCollection(name, uid) {
     if (!payload.createdAt && !item.createdAt) {
       payload.createdAt = serverTimestamp()
     }
-    await setDoc(doc(db, collectionName, id), payload, { merge: true })
-    invalidateUserCollectionCache(collectionName, uid)
+    // Optimistic Update
     setItems(prev => {
       const idx = prev.findIndex(d => String(d.id) === id)
-      const next = { ...payload, id }
+      const next = { ...payload, id, savedAt: new Date() }
       const merged = idx >= 0 ? prev.map((d, i) => i === idx ? next : d) : [...prev, next]
       if (isQuranBookmarks) writeQuranBookmarksSession(uid, merged)
       return merged
     })
+    await setDoc(doc(db, collectionName, id), payload, { merge: true })
+    invalidateUserCollectionCache(collectionName, uid)
   }, [collectionName, uid, isQuranBookmarks])
 
   const deleteItem = useCallback(async (id) => {
     if (!collectionName) return
-    await setDoc(doc(db, collectionName, String(id)), {
-      id: String(id), deleted: true, updatedAt: serverTimestamp()
-    }, { merge: true })
-    invalidateUserCollectionCache(collectionName, uid)
+    // Optimistic Update
     setItems(prev => {
       const merged = prev.filter(d => String(d.id) !== String(id))
       if (isQuranBookmarks) writeQuranBookmarksSession(uid, merged)
       return merged
     })
+    await setDoc(doc(db, collectionName, String(id)), {
+      id: String(id), deleted: true, updatedAt: serverTimestamp()
+    }, { merge: true })
+    invalidateUserCollectionCache(collectionName, uid)
   }, [collectionName, uid, isQuranBookmarks])
 
   return { items, loading, saveItem, deleteItem, refetch: fetchItems }
