@@ -62,8 +62,13 @@ export default function AdminLibrary() {
   })
 
   const sorted = [...filtered].sort((a, b) => {
-    const yearA = Number(a.year) || 0
-    const yearB = Number(b.year) || 0
+    const normalizeYear = (yr) => {
+      let y = Number(yr) || 0
+      if (y > 2400) y -= 543
+      return y
+    }
+    const yearA = normalizeYear(a.year)
+    const yearB = normalizeYear(b.year)
     if (sortOrder === "newest") {
       if (yearA !== yearB) return yearB - yearA
       const getMs = (val) => {

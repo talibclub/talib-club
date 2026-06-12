@@ -271,6 +271,12 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://talib.club/article?id=4714acce-f9b1-421c-9d59-1000a2288708</loc>
+    <lastmod>2026-06-12</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://talib.club/article?id=48</loc>
     <lastmod>2026-06-08</lastmod>
     <changefreq>weekly</changefreq>
@@ -938,7 +944,7 @@
   </url>
   <url>
     <loc>https://talib.club/article?id=80</loc>
-    <lastmod>2026-06-11</lastmod>
+    <lastmod>2026-06-12</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -962,12 +968,6 @@
   </url>
   <url>
     <loc>https://talib.club/article?id=85</loc>
-    <lastmod>2026-06-08</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://talib.club/article?id=86</loc>
     <lastmod>2026-06-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>

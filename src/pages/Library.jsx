@@ -113,8 +113,13 @@ export default function Library({ go, authState, ctx }) {
           return issueB - issueA
         }
       }
-      const yearA = Number(a.year) || 0
-      const yearB = Number(b.year) || 0
+      const normalizeYear = (yr) => {
+        let y = Number(yr) || 0
+        if (y > 2400) y -= 543
+        return y
+      }
+      const yearA = normalizeYear(a.year)
+      const yearB = normalizeYear(b.year)
       if (sortBy === "oldest") {
         if (yearA !== yearB) return yearA - yearB
         
