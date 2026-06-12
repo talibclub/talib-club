@@ -48,6 +48,12 @@ export default function ArticleDetail({ item, go, authState }) {
   }, [item, remoteArticle])
 
   useEffect(() => {
+    if (displayItem?.title) {
+      document.title = `${displayItem.title} | Talib Club`
+    }
+  }, [displayItem])
+
+  useEffect(() => {
     if (!displayItem) return
 
     // 1. Fetch related articles (Check sessionStorage cache first)
