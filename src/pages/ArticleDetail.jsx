@@ -245,17 +245,19 @@ export default function ArticleDetail({ item, go, authState }) {
   // ระบบแกะข้อความสร้างสารบัญอัตโนมัติ
   const toc = [];
   const parsedBody = (displayItem.body || "").split("\n\n").map((para, index) => {
-    if (para.startsWith("## ")) {
-      const title = para.replace("## ", "");
-      const id = `toc-${index}`;
-      toc.push({ id, title, level: 2 });
-      return <h2 key={index} id={id} style={{ marginTop: 36, marginBottom: 16, fontSize: 22, color: "var(--teal)" }}>{title}</h2>;
-    }
-    if (para.startsWith("### ")) {
-      const title = para.replace("### ", "");
+    const matchH3 = para.match(/^###([^#].*)$/);
+    if (matchH3) {
+      const title = matchH3[1].trim();
       const id = `toc-${index}`;
       toc.push({ id, title, level: 3 });
       return <h3 key={index} id={id} style={{ marginTop: 24, marginBottom: 12, fontSize: 18 }}>{title}</h3>;
+    }
+    const matchH2 = para.match(/^##([^#].*)$/);
+    if (matchH2) {
+      const title = matchH2[1].trim();
+      const id = `toc-${index}`;
+      toc.push({ id, title, level: 2 });
+      return <h2 key={index} id={id} style={{ marginTop: 36, marginBottom: 16, fontSize: 22, color: "var(--teal)" }}>{title}</h2>;
     }
     return <p key={index}>{para}</p>;
   });
