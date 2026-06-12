@@ -244,23 +244,54 @@ export default function ArticleDetail({ item, go, authState }) {
 
   // ระบบแกะข้อความสร้างสารบัญอัตโนมัติ
   const toc = [];
-  const parsedBody = (displayItem.body || "").split("\n\n").map((para, index) => {
-    const matchH3 = para.match(/^###([^#].*)$/);
+  const parsedBody = [];
+  let currentParagraphLines = [];
+
+  const flushParagraph = (keyIndex) => {
+    if (currentParagraphLines.length > 0) {
+      parsedBody.push(
+        <p key={`p-${keyIndex}`}>
+          {currentParagraphLines.map((line, idx) => (
+            <span key={idx}>
+              {line}
+              {idx < currentParagraphLines.length - 1 && <br />}
+            </span>
+          ))}
+        </p>
+      );
+      currentParagraphLines = [];
+    }
+  };
+
+  const lines = (displayItem.body || "").split(/\r?\n/);
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    const matchH3 = trimmed.match(/^###([^#].*)$/);
     if (matchH3) {
+      flushParagraph(index);
       const title = matchH3[1].trim();
       const id = `toc-${index}`;
       toc.push({ id, title, level: 3 });
-      return <h3 key={index} id={id} style={{ marginTop: 24, marginBottom: 12, fontSize: 18 }}>{title}</h3>;
+      parsedBody.push(<h3 key={`h3-${index}`} id={id} style={{ marginTop: 24, marginBottom: 12, fontSize: 18 }}>{title}</h3>);
+      return;
     }
-    const matchH2 = para.match(/^##([^#].*)$/);
+    const matchH2 = trimmed.match(/^##([^#].*)$/);
     if (matchH2) {
+      flushParagraph(index);
       const title = matchH2[1].trim();
       const id = `toc-${index}`;
       toc.push({ id, title, level: 2 });
-      return <h2 key={index} id={id} style={{ marginTop: 36, marginBottom: 16, fontSize: 22, color: "var(--teal)" }}>{title}</h2>;
+      parsedBody.push(<h2 key={`h2-${index}`} id={id} style={{ marginTop: 36, marginBottom: 16, fontSize: 22, color: "var(--teal)" }}>{title}</h2>);
+      return;
     }
-    return <p key={index}>{para}</p>;
+
+    if (trimmed === "") {
+      flushParagraph(index);
+    } else {
+      currentParagraphLines.push(line);
+    }
   });
+  flushParagraph(lines.length);
 
   const related = relatedArticles
   const readerClass = `article-body reader-size-${readerPrefs.size} reader-tone-${readerPrefs.tone}`
@@ -350,7 +381,6 @@ export default function ArticleDetail({ item, go, authState }) {
         </div>
       )}
 
-      <div className="article-excerpt"><p>{displayItem.excerpt}</p></div>
       <div className={readerClass} style={{ scrollBehavior: "smooth" }}>{parsedBody}</div>
 
       {displayItem.tags && displayItem.tags.length > 0 && (
