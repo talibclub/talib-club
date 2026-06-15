@@ -241,7 +241,7 @@ async function translateWithGemini(elements, apiKey) {
 async function verifyFirebaseIdToken(idToken) {
   const apiKey = process.env.VITE_WEB_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || "AIzaSyC8HoWaAu0XWy3he_pMxqUIWwREDPdeUpg"
   try {
-    const url = `https://identitytoolkit.googleapis.com/v1/getAccountInfo?key=${apiKey}`
+    const url = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`
     const response = await fetch(url, {
       method: "POST",
       headers: { 
