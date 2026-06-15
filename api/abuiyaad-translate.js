@@ -244,15 +244,23 @@ async function verifyFirebaseIdToken(idToken) {
     const url = `https://identitytoolkit.googleapis.com/v1/getAccountInfo?key=${apiKey}`
     const response = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { 
+        "content-type": "application/json",
+        "referer": "https://talib.club/",
+        "origin": "https://talib.club"
+      },
       body: JSON.stringify({ idToken })
     })
-    if (!response.ok) return null
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("Token verification failed with status:", response.status, errText);
+      throw new Error(`Token API Error ${response.status}: ${errText}`);
+    }
     const data = await response.json()
     return data.users?.[0]?.localId || null
   } catch (err) {
     console.error("Token verification failed", err)
-    return null
+    throw err
   }
 }
 
@@ -277,7 +285,13 @@ export default async function handler(req, res) {
     return send(res, 401, { error: "Unauthorized: Missing authentication token" })
   }
 
-  const uid = await verifyFirebaseIdToken(idToken)
+  let uid;
+  try {
+    uid = await verifyFirebaseIdToken(idToken);
+  } catch (err) {
+    return send(res, 401, { error: `Unauthorized: Token error. ${err.message}` });
+  }
+
   if (!uid) {
     return send(res, 401, { error: "Unauthorized: Invalid authentication token" })
   }

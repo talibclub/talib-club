@@ -166,7 +166,14 @@ export default function StaffTranslation({ go }) {
         },
         body: JSON.stringify({ url: activeWorkspaceItem.url }),
       })
-      if (!res.ok) throw new Error(`HTTP Error Status ${res.status}`)
+      if (!res.ok) {
+        let errMessage = `HTTP Error Status ${res.status}`;
+        try {
+          const errData = await res.json();
+          if (errData.error) errMessage += ` - ${errData.error}`;
+        } catch { /* ignore parse error */ }
+        throw new Error(errMessage);
+      }
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       
