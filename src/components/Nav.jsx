@@ -362,8 +362,10 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
     }
   }, [])
 
-  function nav(id, data = null) {
-    go(id, data)
+  function nav(id, data = null, isLink = false) {
+    if (!isLink) {
+      go(id, data)
+    }
     setMenuOpen(false)
     setAccountOpen(false)
     setNotificationOpen(false)
@@ -574,12 +576,12 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
             borderRight: "1px solid var(--br2)", boxShadow: "5px 0 15px rgba(0,0,0,0.1)",
           }}>
             {NAV_LINKS.map(l => (
-              <Link key={l.id} to={getPagePath(l.id)} onClick={() => nav(l.id)} style={mobileButtonStyle(page, l.id)}>
+              <Link key={l.id} to={getPagePath(l.id)} onClick={() => nav(l.id, null, true)} style={mobileButtonStyle(page, l.id)}>
                 <i className={`ti ${l.icon}`} style={{ marginRight: 15 }}></i>
                 {l.label}
               </Link>
             ))}
-             <Link to={getPagePath(authState?.user ? "member" : "auth")} onClick={() => nav(authState?.user ? "member" : "auth")} style={mobileButtonStyle(page, authState?.user ? "member" : "auth")}>
+             <Link to={getPagePath(authState?.user ? "member" : "auth")} onClick={() => nav(authState?.user ? "member" : "auth", null, true)} style={mobileButtonStyle(page, authState?.user ? "member" : "auth")}>
               <i className={`ti ${authState?.user ? "ti-user-circle" : "ti-login"}`} style={{ marginRight: 15 }}></i>
               {authState?.user ? "บัญชีของฉัน" : "เข้าสู่ระบบ"}
             </Link>
@@ -654,7 +656,7 @@ function DropdownItem({ icon, label, to, onClick, danger }) {
 
 function DesktopNavButton({ item, page, nav }) {
   return (
-    <Link to={getPagePath(item.id)} onClick={() => nav(item.id)} style={{
+    <Link to={getPagePath(item.id)} onClick={() => { nav(item.id, null, true) }} style={{
       background: page === item.id ? "var(--bg2)" : "transparent",
       border: "none", cursor: "pointer", padding: "6px 12px",
       borderRadius: 8, fontSize: 13,
