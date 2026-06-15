@@ -1,4 +1,4 @@
-const OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+const OPENAI_URL = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1/chat/completions"
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 
 function send(res, status, data) {
