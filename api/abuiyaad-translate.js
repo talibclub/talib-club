@@ -148,9 +148,8 @@ Return ONLY a valid JSON object with the "translations" array, no markdown block
   return JSON.parse(jsonText)
 }
 
-async function translateWithGemini(elements, apiKey) {
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash"
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+async function translateWithGemini(elements, apiKey, modelName = "gemini-2.5-flash") {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
 
   const response = await fetch(url, {
     method: "POST",
@@ -378,12 +377,24 @@ export default async function handler(req, res) {
     }
 
     if (!translationResult && geminiKey) {
-      try {
-        translationResult = await translateWithGemini(elements, geminiKey)
-        source = "gemini"
-      } catch (err) {
-        lastError = err.message;
-        console.error("Gemini translation failed:", err)
+      const geminiModels = [
+        process.env.GEMINI_MODEL || "gemini-2.5-flash",
+        "gemini-3.5-flash",
+        "gemini-2.5-pro",
+        "gemini-2.0-flash"
+      ];
+
+      for (const model of geminiModels) {
+        try {
+          translationResult = await translateWithGemini(elements, geminiKey, model)
+          source = "gemini"
+          lastError = null; // Clear error on success
+          console.log(`Successfully translated using ${model}`);
+          break; // Stop looping when successful
+        } catch (err) {
+          lastError = err.message;
+          console.warn(`Gemini (${model}) translation failed:`, err.message)
+        }
       }
     }
 
