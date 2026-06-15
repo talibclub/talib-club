@@ -313,23 +313,33 @@ export default function StaffTranslation({ go }) {
         {/* Print Stylesheet */}
         <style>{`
           @media print {
-            body * {
-              visibility: hidden !important;
+            html, body, #root, .app, main, .translation-page {
+              height: auto !important;
+              min-height: auto !important;
+              max-height: none !important;
+              overflow: visible !important;
+              display: block !important;
+              position: static !important;
             }
-            #print-area, #print-area * {
-              visibility: visible !important;
+            body {
+              background: #fff !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              color: #000 !important;
+            }
+            nav, .countdown-banner, .no-print {
+              display: none !important;
             }
             #print-area {
-              position: absolute !important;
-              left: 0 !important;
-              top: 0 !important;
-              width: 100% !important;
-              color: #000 !important;
-              background: #fff !important;
               display: block !important;
+              position: relative !important;
+              width: 100% !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              page-break-after: auto;
             }
-            .no-print {
-              display: none !important;
+            #print-area * {
+              visibility: visible !important;
             }
           }
         `}</style>
