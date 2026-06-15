@@ -123,8 +123,9 @@ export default function StaffTranslation({ go }) {
     try {
       const snap = await getDocs(collection(db, COLLECTION))
       setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    } catch {
-      notifyError("โหลดฐานข้อมูลงานแปลไม่สำเร็จ")
+    } catch (err) {
+      console.error("Failed to load translation items:", err)
+      notifyError("โหลดฐานข้อมูลงานแปลไม่สำเร็จ: " + (err.message || err))
     } finally {
       setLoading(false)
     }
@@ -242,8 +243,9 @@ export default function StaffTranslation({ go }) {
       delete localPatch.claimedAt
       setItems(prev => prev.map(r => r.id === item.id ? { ...r, ...localPatch } : r))
       return true
-    } catch {
-      notifyError("อัปเดตไม่สำเร็จ")
+    } catch (err) {
+      console.error("Failed to update translation item:", err)
+      notifyError("อัปเดตไม่สำเร็จ: " + (err.message || err))
       return false
     }
   }
