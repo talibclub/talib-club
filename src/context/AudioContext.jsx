@@ -1,7 +1,7 @@
-import { createContext, useContext, useState, useRef, useEffect } from "react"
+import { createContext, useContext, useState, useRef, useEffect, useCallback, useMemo } from "react"
 import toast from "react-hot-toast"
 
-const AudioContext = createContext(null)
+const AppAudioContext = createContext(null)
 
 export function AudioProvider({ children }) {
   const [playingAudio, setPlayingAudio] = useState(null) // { sura, aya, suraName }
@@ -15,7 +15,30 @@ export function AudioProvider({ children }) {
     autoplayNextRef.current = autoplayNext
   }, [autoplayNext])
 
-  const play = (sura, aya, suraName, playlist = []) => {
+  const stop = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.onended = null
+      audioRef.current.onerror = null
+      audioRef.current = null
+    }
+    setAudioState("stopped")
+    setPlayingAudio(null)
+  }, [])
+
+  const handleNext = useCallback((sura, aya, suraName) => {
+    const list = playlistRef.current
+    const currentIndex = list.findIndex(item => Number(item.sura) === Number(sura) && Number(item.aya) === Number(aya))
+    if (currentIndex !== -1 && currentIndex < list.length - 1) {
+      const nextVerse = list[currentIndex + 1]
+      // eslint-disable-next-line no-use-before-define
+      play(nextVerse.sura, nextVerse.aya, suraName, list)
+    } else {
+      stop()
+    }
+  }, [stop]) // play is hoisted
+
+  const play = useCallback((sura, aya, suraName, playlist = []) => {
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current.onended = null
@@ -56,27 +79,16 @@ export function AudioProvider({ children }) {
         stop()
       }
     }
-  }
+  }, [handleNext, stop])
 
-  const handleNext = (sura, aya, suraName) => {
-    const list = playlistRef.current
-    const currentIndex = list.findIndex(item => Number(item.sura) === Number(sura) && Number(item.aya) === Number(aya))
-    if (currentIndex !== -1 && currentIndex < list.length - 1) {
-      const nextVerse = list[currentIndex + 1]
-      play(nextVerse.sura, nextVerse.aya, suraName, list)
-    } else {
-      stop()
-    }
-  }
-
-  const pause = () => {
+  const pause = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause()
       setAudioState("paused")
     }
-  }
+  }, [])
 
-  const resume = () => {
+  const resume = useCallback(() => {
     if (audioRef.current && audioState === "paused") {
       audioRef.current.play().catch(err => {
         console.error("Audio resume failed", err)
@@ -84,18 +96,7 @@ export function AudioProvider({ children }) {
       })
       setAudioState("playing")
     }
-  }
-
-  const stop = () => {
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current.onended = null
-      audioRef.current.onerror = null
-      audioRef.current = null
-    }
-    setAudioState("stopped")
-    setPlayingAudio(null)
-  }
+  }, [audioState, stop])
 
   useEffect(() => {
     return () => {
@@ -103,28 +104,31 @@ export function AudioProvider({ children }) {
         audioRef.current.pause()
         audioRef.current.onended = null
         audioRef.current.onerror = null
+        audioRef.current = null
       }
     }
   }, [])
 
+  const contextValue = useMemo(() => ({
+    playingAudio,
+    audioState,
+    autoplayNext,
+    setAutoplayNext,
+    play,
+    pause,
+    resume,
+    stop
+  }), [playingAudio, audioState, autoplayNext, play, pause, resume, stop])
+
   return (
-    <AudioContext.Provider value={{
-      playingAudio,
-      audioState,
-      autoplayNext,
-      setAutoplayNext,
-      play,
-      pause,
-      resume,
-      stop
-    }}>
+    <AppAudioContext.Provider value={contextValue}>
       {children}
-    </AudioContext.Provider>
+    </AppAudioContext.Provider>
   )
 }
 
 export function useAudio() {
-  const context = useContext(AudioContext)
+  const context = useContext(AppAudioContext)
   if (!context) {
     throw new Error("useAudio must be used within an AudioProvider")
   }

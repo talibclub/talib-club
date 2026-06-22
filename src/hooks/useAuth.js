@@ -68,7 +68,9 @@ export function useAuth() {
       })
       .catch(err => console.error("Cannot finish Google redirect", err))
 
+    let activeSeq = 0
     return onAuthStateChanged(auth, async currentUser => {
+      const currentSeq = ++activeSeq
       setUser(currentUser)
       if (!currentUser) {
         setProfile(null)
@@ -79,6 +81,8 @@ export function useAuth() {
       try {
         const ref = doc(db, "users", currentUser.uid)
         const snap = await getDoc(ref)
+        if (currentSeq !== activeSeq) return
+
         if (snap.exists()) {
           const snapData = snap.data()
           // Only update if auth data actually changed, not every render
@@ -100,6 +104,7 @@ export function useAuth() {
               updatedAt: serverTimestamp(),
             }, { merge: true }).catch(e => console.error("Sync profile to firestore failed", e))
           }
+          if (currentSeq !== activeSeq) return
           setProfile({
             ...DEFAULT_PROFILE,
             ...snapData,
@@ -115,10 +120,12 @@ export function useAuth() {
             createdAt: serverTimestamp(),
           }
           await setDoc(ref, nextProfile)
+          if (currentSeq !== activeSeq) return
           setProfile(nextProfile)
         }
       } catch (err) {
         console.error("Cannot load user profile", err)
+        if (currentSeq !== activeSeq) return
         setProfile({ ...DEFAULT_PROFILE, email: currentUser.email || "" })
       }
       setLoading(false)

@@ -24,7 +24,10 @@ function getDB() {
       }
     }
     request.onsuccess = (e) => resolve(e.target.result)
-    request.onerror = (e) => reject(e.target.error)
+    request.onerror = (e) => {
+      dbPromise = null
+      reject(e.target.error)
+    }
   })
   return dbPromise
 }

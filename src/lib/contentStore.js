@@ -543,15 +543,18 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
     }
 
     // 🟢 Optimistic Update: อัปเดต State ที่หน้าจอก่อนทันทีโดยไม่ต้องดึงข้อมูลใหม่
+    const localPayload = { ...payload, updatedAt: Date.now() }
+    if (localPayload.createdAt) localPayload.createdAt = Date.now()
+
     setRemoteItems(prev => {
       const list = prev || []
       const idx = list.findIndex(d => String(d.id) === id)
       if (idx >= 0) {
         const next = [...list]
-        next[idx] = { ...next[idx], ...payload }
+        next[idx] = { ...next[idx], ...localPayload }
         return next
       }
-      return [payload, ...list]
+      return [localPayload, ...list]
     })
 
     // 🟢 อัปเดตใน Cache ด้วย เพื่อให้หน้าที่ใช้ข้อมูลเดียวกันไม่ต้องดึงใหม่
@@ -559,8 +562,8 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
       if (key.includes(`"collectionName":"${collectionName}"`)) {
         const idx = entry.items.findIndex(d => String(d.id) === id)
         const newItems = idx >= 0
-          ? entry.items.map(d => String(d.id) === id ? { ...d, ...payload } : d)
-          : [payload, ...entry.items]
+          ? entry.items.map(d => String(d.id) === id ? { ...d, ...localPayload } : d)
+          : [localPayload, ...entry.items]
         collectionCache.set(key, { ...entry, items: newItems })
         if (PUBLIC_COLLECTIONS.includes(collectionName)) {
           try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: newItems, at: Date.now() })) } catch (e) { }
@@ -1286,8 +1289,10 @@ export function useSiteSettings(fallbackSite) {
         setError(err)
         setLoading(false)
       })
+      })
     return () => { cancelled = true }
-  }, [fallbackSite])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(fallbackSite)])
 
   async function saveSiteSettings(nextSite) {
     await setDoc(doc(db, SITE_DOC.collection, SITE_DOC.id), {
@@ -1339,8 +1344,10 @@ export function useTaxonomySettings(fallbackTaxonomy) {
         setError(err)
         setLoading(false)
       })
+      })
     return () => { cancelled = true }
-  }, [fallbackTaxonomy])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(fallbackTaxonomy)])
 
   async function saveTaxonomySettings(nextTaxonomy) {
     await setDoc(doc(db, TAXONOMY_DOC.collection, TAXONOMY_DOC.id), {

@@ -9,9 +9,12 @@ import {
 export function usePWA(user = null, isStaff = false) {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isInstallable, setIsInstallable] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(
-    window.matchMedia('(display-mode: standalone)').matches || navigator.standalone || false
-  );
+  const [isInstalled, setIsInstalled] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone || false;
+    }
+    return false;
+  });
   
   const [pushState, setPushState] = useState({
     supported: false,
