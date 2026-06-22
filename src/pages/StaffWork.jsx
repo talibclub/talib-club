@@ -9,7 +9,8 @@ import { toast } from "react-hot-toast"
 import { db, app } from "../lib/firebase.js"
 import { triggerPushNotification } from "../utils/pushNotifications.js"
 import { Z } from "../utils/ui.js"
-
+import StaffTasks from "../components/dashboard/StaffTasks.jsx"
+import StaffCalendar from "../components/dashboard/StaffCalendar.jsx"
 
 // ฟังก์ชันแจ้งเตือนด้วย Toast
 const notifySuccess = (msg) => toast.success(msg)
@@ -511,9 +512,11 @@ export default function StaffWork({ authState, go }) {
       </div>
 
       {/* ━━━ TABS NAVIGATION ━━━ */}
-      <div className="staff-tabs" style={{ marginBottom: "24px" }}>
+      <div className="staff-tabs" style={{ marginBottom: "24px", flexWrap: "wrap" }}>
         <button className={`pill ${tab === "dashboard" ? "on" : ""}`} onClick={() => setTab("dashboard")}>📊 แดชบอร์ดติดตามงาน</button>
         <button className={`pill ${tab === "submit" ? "on" : ""}`} onClick={() => setTab("submit")}>📤 โยนไฟล์ส่งงาน</button>
+        <button className={`pill ${tab === "tasks" ? "on" : ""}`} onClick={() => setTab("tasks")}>📋 มอบหมายงาน</button>
+        <button className={`pill ${tab === "calendar" ? "on" : ""}`} onClick={() => setTab("calendar")}>📅 ปฏิทินลงโพสต์</button>
         <button className={`pill ${tab === "magazine" ? "on" : ""}`} onClick={() => setTab("magazine")}>📚 คิววารสาร</button>
         {isAdmin && <button className={`pill ${tab === "admin" ? "on" : ""}`} onClick={() => setTab("admin")}>⚙️ ตั้งค่าระบบ</button>}
       </div>
@@ -748,6 +751,16 @@ export default function StaffWork({ authState, go }) {
               </div>
             </form>
           </div>
+        )}
+
+        {/* ━━━ TAB: TASKS ━━━ */}
+        {tab === "tasks" && (
+          <StaffTasks currentUser={currentUser} staffTeam={staffTeam} />
+        )}
+
+        {/* ━━━ TAB: CALENDAR ━━━ */}
+        {tab === "calendar" && (
+          <StaffCalendar currentUser={currentUser} staffTeam={staffTeam} />
         )}
 
         {/* ━━━ TAB: MAGAZINE ━━━ */}
