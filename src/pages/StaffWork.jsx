@@ -755,12 +755,12 @@ export default function StaffWork({ authState, go }) {
 
         {/* ━━━ TAB: TASKS ━━━ */}
         {tab === "tasks" && (
-          <StaffTasks currentUser={currentUser} staffTeam={staffTeam} />
+          <StaffTasks currentUser={currentUser} staffTeam={staffTeam} sendBotNotification={sendBotNotification} />
         )}
 
         {/* ━━━ TAB: CALENDAR ━━━ */}
         {tab === "calendar" && (
-          <StaffCalendar currentUser={currentUser} staffTeam={staffTeam} />
+          <StaffCalendar currentUser={currentUser} staffTeam={staffTeam} sendBotNotification={sendBotNotification} />
         )}
 
         {/* ━━━ TAB: MAGAZINE ━━━ */}

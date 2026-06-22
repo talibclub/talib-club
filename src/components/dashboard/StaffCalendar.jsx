@@ -3,11 +3,12 @@ import { collection, query, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp,
 import { toast } from "react-hot-toast"
 import { db } from "../../lib/firebase.js"
 import { triggerPushNotification } from "../../utils/pushNotifications.js"
+import { confirmAction } from "../../utils/feedback.jsx"
 
 const notifySuccess = (msg) => toast.success(msg)
 const notifyError = (msg) => toast.error(msg)
 
-export default function StaffCalendar({ currentUser, staffTeam }) {
+export default function StaffCalendar({ currentUser, staffTeam, sendBotNotification }) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
@@ -74,6 +75,9 @@ export default function StaffCalendar({ currentUser, staffTeam }) {
           "/staff-work",
           { isStaffOnly: true }
         )
+        if (sendBotNotification) {
+          sendBotNotification(`📅 มีแผนงานใหม่ลงปฏิทิน: ${form.title}\nวันที่: ${dateStr}\nช่องทาง: ${form.platforms.join(", ")}\nผู้รับผิดชอบ: ${form.assignee}`);
+        }
       }
       setSelectedDate(null)
     } catch (err) {
@@ -83,7 +87,13 @@ export default function StaffCalendar({ currentUser, staffTeam }) {
   }
 
   const handleDeleteEvent = async (id) => {
-    if (confirm("ต้องการลบแผนงานนี้ใช่หรือไม่?")) {
+    const ok = await confirmAction({
+      title: "ยืนยันการลบแผนงาน",
+      message: "ต้องการลบแผนงานนี้ใช่หรือไม่?",
+      confirmText: "ลบ",
+      danger: true
+    })
+    if (ok) {
       await deleteDoc(doc(db, "content_calendar", id))
       notifySuccess("ลบแผนงานแล้ว")
       setSelectedDate(null)

@@ -4,11 +4,12 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { toast } from "react-hot-toast"
 import { db, app } from "../../lib/firebase.js"
 import { triggerPushNotification } from "../../utils/pushNotifications.js"
+import { confirmAction } from "../../utils/feedback.jsx"
 
 const notifySuccess = (msg) => toast.success(msg)
 const notifyError = (msg) => toast.error(msg)
 
-export default function StaffTasks({ currentUser, staffTeam }) {
+export default function StaffTasks({ currentUser, staffTeam, sendBotNotification }) {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [myTasksOnly, setMyTasksOnly] = useState(false)
@@ -85,6 +86,10 @@ export default function StaffTasks({ currentUser, staffTeam }) {
         { isStaffOnly: true } 
       )
       
+      if (sendBotNotification) {
+        sendBotNotification(`📋 มีงานใหม่มอบหมายให้: ${form.assignee}\nเรื่อง: ${form.title}\nสั่งโดย: ${currentUser}`);
+      }
+      
       setForm({ title: "", description: "", assignee: "", dueDate: "", files: [] })
       setShowForm(false)
     } catch (err) {
@@ -131,7 +136,13 @@ export default function StaffTasks({ currentUser, staffTeam }) {
   }
 
   const handleDeleteTask = async (id) => {
-    if (confirm("ต้องการลบงานนี้ใช่หรือไม่?")) {
+    const ok = await confirmAction({
+      title: "ยืนยันการลบงาน",
+      message: "ต้องการลบงานนี้ใช่หรือไม่? (ลบแล้วไม่สามารถกู้คืนได้)",
+      confirmText: "ลบทิ้ง",
+      danger: true
+    })
+    if (ok) {
       await deleteDoc(doc(db, "staff_tasks", id))
       notifySuccess("ลบงานแล้ว")
     }
