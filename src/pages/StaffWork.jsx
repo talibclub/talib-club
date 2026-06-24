@@ -36,15 +36,27 @@ const DEFAULT_MAGAZINE = [
 // ━━━ TELEGRAM (ตั้งใน .env — ดู .env.example) ━━━
 const TELEGRAM_BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || ""
 const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID || ""
+const TELEGRAM_TOPIC_ID = import.meta.env.VITE_TELEGRAM_TOPIC_ID || "" // สำหรับกลุ่มที่มี Topics
 
 const sendBotNotification = async (message) => {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+  
+  const payload = {
+    chat_id: TELEGRAM_CHAT_ID,
+    text: message,
+    parse_mode: "HTML"
+  };
+
+  if (TELEGRAM_TOPIC_ID) {
+    payload.message_thread_id = TELEGRAM_TOPIC_ID;
+  }
+
   try {
     await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message })
+      body: JSON.stringify(payload)
     })
   } catch (e) {
     console.error("Telegram error:", e)
