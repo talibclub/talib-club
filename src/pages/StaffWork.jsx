@@ -584,27 +584,13 @@ export default function StaffWork({ authState, go }) {
                               <div style={{ display: "flex", gap: 6, borderLeft: "1px solid var(--border)", paddingLeft: 8, marginLeft: 2 }}>
                                 <button 
                                   type="button"
-                                  onClick={async (e) => {
+                                  onClick={(e) => {
                                     e.preventDefault();
-                                    try {
-                                      const loadingToast = toast.loading(`กำลังดึงไฟล์ ${file.name}...`);
-                                      const response = await fetch(file.url);
-                                      const blob = await response.blob();
-                                      const url = window.URL.createObjectURL(blob);
-                                      const a = document.createElement('a');
-                                      a.style.display = 'none';
-                                      a.href = url;
-                                      a.download = file.name;
-                                      document.body.appendChild(a);
-                                      a.click();
-                                      window.URL.revokeObjectURL(url);
-                                      toast.dismiss(loadingToast);
-                                    } catch (err) {
-                                      window.open(file.url, '_blank');
-                                    }
+                                    // สำหรับไฟล์ขนาดใหญ่ การใช้ fetch จะช้ามากและค้าง ให้เปิดแท็บใหม่แทน
+                                    window.open(file.url, '_blank');
                                   }}
                                   style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: 2, color: "var(--teal)" }}
-                                  title="ดาวน์โหลดไฟล์"
+                                  title="ดาวน์โหลดไฟล์ (หรือเปิดดู)"
                                 >
                                   ⬇️
                                 </button>
@@ -889,6 +875,55 @@ export default function StaffWork({ authState, go }) {
         )}
 
       </div>
+      {/* Preview Modal */}
+      {previewModal.open && previewModal.file && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+          background: "rgba(0,0,0,0.85)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20
+        }}>
+          <div style={{ background: "var(--card)", padding: 24, borderRadius: 16, maxWidth: 800, width: "100%", position: "relative", boxShadow: "0 20px 40px rgba(0,0,0,0.3)" }}>
+            <button 
+              onClick={() => setPreviewModal({ open: false, file: null })}
+              style={{ position: "absolute", top: 16, right: 16, background: "var(--bg2)", color: "var(--text)", border: "none", width: 36, height: 36, borderRadius: "50%", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              <i className="ti ti-x"></i>
+            </button>
+            <h3 style={{ marginBottom: 16, color: "var(--text)", paddingRight: 40 }}>พรีวิวไฟล์: <span style={{ color: "var(--teal)", fontWeight: "normal" }}>{previewModal.file.name}</span></h3>
+            
+            <div style={{ background: "#000", borderRadius: 8, overflow: "hidden", display: "flex", justifyContent: "center", alignItems: "center", minHeight: 200, border: "1px solid var(--border)" }}>
+              {previewModal.file.name.match(/\.(mp4|webm|ogg|mov)$/i) ? (
+                <video src={previewModal.file.url} controls autoPlay style={{ maxWidth: "100%", maxHeight: "60vh" }} />
+              ) : previewModal.file.name.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                <img src={previewModal.file.url} alt="preview" style={{ maxWidth: "100%", maxHeight: "60vh", objectFit: "contain" }} />
+              ) : (
+                <div style={{ color: "#fff", padding: 40, textAlign: "center" }}>
+                  <i className="ti ti-file" style={{ fontSize: 48, marginBottom: 16, opacity: 0.5 }}></i>
+                  <p>ไม่สามารถพรีวิวไฟล์นามสกุลนี้ได้</p>
+                </div>
+              )}
+            </div>
+            
+            {previewModal.file.name.match(/\.(mp4|webm|ogg|mov)$/i) && (
+              <div style={{ marginTop: 16, padding: "12px 16px", background: "rgba(255, 165, 0, 0.1)", borderLeft: "4px solid orange", borderRadius: 4 }}>
+                <p style={{ fontSize: 13, color: "var(--t2)", margin: 0, display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <i className="ti ti-info-circle" style={{ color: "orange", fontSize: 18, marginTop: 2 }}></i>
+                  <span>
+                    <strong>หมายเหตุ:</strong> หากวิดีโอแสดงผลเป็นจอดำ (เล่นได้แค่เสียง) เกิดจากเบราว์เซอร์ไม่รองรับการถอดรหัสวิดีโอนี้ (มักพบในไฟล์ที่อัดจากมือถือ) <br/>
+                    กรุณากดปุ่ม <strong>"ดาวน์โหลดไฟล์"</strong> เพื่อนำไปเปิดรับชมด้วยโปรแกรมในคอมพิวเตอร์แทนครับ
+                  </span>
+                </p>
+              </div>
+            )}
+
+            <div style={{ marginTop: 20, textAlign: "center", display: "flex", justifyContent: "center", gap: 12 }}>
+              <button onClick={() => window.open(previewModal.file.url, '_blank')} className="btn btn-teal">
+                <i className="ti ti-download"></i> ดาวน์โหลดไฟล์ต้นฉบับ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
