@@ -102,6 +102,7 @@ export default function StaffWork({ authState, go }) {
   const [feedback, setFeedback] = useState("")
   const [postingId, setPostingId] = useState(null)
   const [postingForm, setPostingForm] = useState({ scheduleDate: "", platforms: [], postLink: "" })
+  const [previewModal, setPreviewModal] = useState({ open: false, file: null })
 
   const fileInputRef = useRef(null)
   const notifiedMonthRef = useRef(null) // Track if notification already sent this month
