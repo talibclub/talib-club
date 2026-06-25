@@ -339,17 +339,51 @@ export default function StaffWork({ authState, go }) {
       const storage = getStorage(app)
       if (form.files && form.files.length > 0) {
         for (const file of form.files) {
-            const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
-            let storageRef = null
-            try {
-              storageRef = ref(storage, `staff_submissions/${Date.now()}_${safeName}`)
-              await uploadBytes(storageRef, file)
-            } catch (uploadErr) {
-              console.error("Staff submission upload error:", uploadErr?.code || "-", uploadErr?.message || uploadErr, "ref:", storageRef?.fullPath)
-              throw uploadErr
+            const isVideo = file.type.startsWith("video/") || file.name.match(/\.(mp4|mov|webm|avi|mkv|ogg)$/i)
+            
+            if (isVideo) {
+               // อัปโหลดวิดีโอเข้า Cloudinary
+               const formData = new FormData()
+               formData.append("file", file)
+               formData.append("upload_preset", "talib_videos")
+               
+               try {
+                 const res = await fetch("https://api.cloudinary.com/v1_1/dldqlklcf/video/upload", {
+                   method: "POST",
+                   body: formData
+                 })
+                 const data = await res.json()
+                 if (data.secure_url) {
+                    // บังคับเปลี่ยนนามสกุลเป็น .mp4 เพื่อให้ Cloudinary แปลงไฟล์ (Transcode) แก้ปัญหาจอดำทันที
+                    const secureUrl = data.secure_url
+                    const extIndex = secureUrl.lastIndexOf('.')
+                    let optimizedUrl = secureUrl
+                    if (extIndex !== -1) {
+                       optimizedUrl = secureUrl.substring(0, extIndex) + ".mp4"
+                    }
+                    fileLinks.push({ name: file.name, url: optimizedUrl, source: "cloudinary" })
+                 } else {
+                    throw new Error("Cloudinary upload failed: " + JSON.stringify(data))
+                 }
+               } catch (uploadErr) {
+                 console.error("Cloudinary upload error:", uploadErr)
+                 throw uploadErr
+               }
+
+            } else {
+               // อัปโหลดไฟล์ทั่วไป (รูป, เอกสาร) เข้า Firebase Storage ปกติ
+               const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
+               let storageRef = null
+               try {
+                 storageRef = ref(storage, `staff_submissions/${Date.now()}_${safeName}`)
+                 await uploadBytes(storageRef, file)
+                 const url = await getDownloadURL(storageRef)
+                 fileLinks.push({ name: file.name, url, source: "firebase" })
+               } catch (uploadErr) {
+                 console.error("Staff submission upload error:", uploadErr?.code || "-", uploadErr?.message || uploadErr, "ref:", storageRef?.fullPath)
+                 throw uploadErr
+               }
             }
-            const url = await getDownloadURL(storageRef)
-            fileLinks.push({ name: file.name, url })
         }
       }
 
