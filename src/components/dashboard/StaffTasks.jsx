@@ -60,11 +60,41 @@ export default function StaffTasks({ currentUser, staffTeam, sendBotNotification
       const storage = getStorage(app)
       if (form.files && form.files.length > 0) {
         for (const file of form.files) {
-          const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
-          const storageRef = ref(storage, `staff_tasks/${Date.now()}_${safeName}`)
-          await uploadBytes(storageRef, file)
-          const url = await getDownloadURL(storageRef)
-          fileLinks.push({ name: file.name, url })
+          const isVideo = file.type.startsWith("video/") || file.name.match(/\.(mp4|mov|webm|avi|mkv|ogg)$/i)
+          
+          if (isVideo) {
+             const formData = new FormData()
+             formData.append("file", file)
+             formData.append("upload_preset", "talib_videos")
+             
+             try {
+               const res = await fetch("https://api.cloudinary.com/v1_1/dldqlklcf/video/upload", {
+                 method: "POST",
+                 body: formData
+               })
+               const data = await res.json()
+               if (data.secure_url) {
+                  const secureUrl = data.secure_url
+                  const extIndex = secureUrl.lastIndexOf('.')
+                  let optimizedUrl = secureUrl
+                  if (extIndex !== -1) {
+                     optimizedUrl = secureUrl.substring(0, extIndex) + ".mp4"
+                  }
+                  fileLinks.push({ name: file.name, url: optimizedUrl, source: "cloudinary" })
+               } else {
+                  throw new Error("Cloudinary upload failed: " + JSON.stringify(data))
+               }
+             } catch (uploadErr) {
+               console.error("Cloudinary upload error:", uploadErr)
+               throw uploadErr
+             }
+          } else {
+             const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
+             const storageRef = ref(storage, `staff_tasks/${Date.now()}_${safeName}`)
+             await uploadBytes(storageRef, file)
+             const url = await getDownloadURL(storageRef)
+             fileLinks.push({ name: file.name, url, source: "firebase" })
+          }
         }
       }
 
@@ -363,7 +393,33 @@ export default function StaffTasks({ currentUser, staffTeam, sendBotNotification
             )}
 
             <div style={{ marginTop: 20, textAlign: "center", display: "flex", justifyContent: "center", gap: 12 }}>
-              <button onClick={() => window.open(previewModal.file.url, '_blank')} className="btn btn-teal">
+              <button 
+                onClick={async (e) => {
+                  const btn = e.currentTarget;
+                  const originalText = btn.innerHTML;
+                  btn.innerHTML = '<i class="ti ti-loader spin"></i> กำลังดาวน์โหลด...';
+                  btn.disabled = true;
+                  try {
+                    const res = await fetch(previewModal.file.url);
+                    const blob = await res.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = previewModal.file.name || 'download';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(blobUrl);
+                  } catch (err) {
+                    console.error(err);
+                    window.open(previewModal.file.url, '_blank');
+                  } finally {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                  }
+                }} 
+                className="btn btn-teal"
+              >
                 <i className="ti ti-download"></i> ดาวน์โหลดไฟล์ต้นฉบับ
               </button>
             </div>
