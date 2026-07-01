@@ -41,6 +41,8 @@ const StaffMembers = lazyWithRetry(() => import("./pages/StaffMembers.jsx"))
 const Donation = lazyWithRetry(() => import("./pages/Donation.jsx"))
 const OpenHouse = lazyWithRetry(() => import("./pages/OpenHouse.jsx"))
 const OpenHouseCampus = lazyWithRetry(() => import("./pages/OpenHouseCampus.jsx"))
+const BookCampaigns = lazyWithRetry(() => import("./pages/BookCampaigns.jsx"))
+const BookRegistration = lazyWithRetry(() => import("./pages/BookRegistration.jsx"))
 import { Toaster } from "react-hot-toast"
 import PWAInstallBanner from "./components/PWAInstallBanner.jsx"
 import "./styles/global.css"
@@ -71,6 +73,8 @@ const urlToPage = {
   "reader": "reader",
   "openhouse": "openhouse",
   "openhouse-campus": "openhouse-campus",
+  "books": "books",
+  "book-register": "book-register",
 }
 
 export default function App() {
@@ -383,6 +387,8 @@ export default function App() {
               <Route path="/donate" element={<Donation />} />
               <Route path="/openhouse" element={<OpenHouse go={go} />} />
               <Route path="/openhouse-campus" element={<OpenHouseCampus go={go} ctx={ctx} />} />
+              <Route path="/books" element={<BookCampaigns go={go} />} />
+              <Route path="/book-register" element={<BookRegistration go={go} ctx={ctx} />} />
               <Route path="/reader" element={
                 <RequireLogin authState={authState}>
                   <ReadingApp authState={authState} go={go} ctx={ctx} theme={theme} />

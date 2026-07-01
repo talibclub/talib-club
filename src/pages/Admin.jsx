@@ -7,12 +7,14 @@ import AdminTracking from "./admin/AdminTracking.jsx"
 import AdminSite from "./admin/AdminSite.jsx"
 import AdminTaxonomy from "./admin/AdminTaxonomy.jsx"
 import AdminOpenHouse from "./admin/AdminOpenHouse.jsx"
+import AdminBookCampaigns from "./admin/AdminBookCampaigns.jsx"
 
 const TABS = [
   { id: "articles", label: "บทความ", icon: "ti-file-text" },
   { id: "library", label: "หนังสือ/PDF", icon: "ti-books" },
   { id: "media", label: "มีเดีย", icon: "ti-player-play" },
   { id: "scholars", label: "อุลามาอฺ", icon: "ti-users" },
+  { id: "book_campaigns", label: "แจกหนังสือ/ขาย", icon: "ti-book" },
   { id: "openhouse", label: "นิทรรศการ (Open House)", icon: "ti-map" },
   { id: "taxonomy", label: "หมวด/ตัวเลือก", icon: "ti-tags" },
   { id: "tracking", label: "Tracking", icon: "ti-package" },
@@ -189,6 +191,7 @@ export default function Admin({ go, authState, initialTab = "articles" }) {
           {tab === "openhouse" && <AdminOpenHouse go={go} />}
           {tab === "taxonomy" && <AdminTaxonomy />}
           {tab === "tracking" && <AdminTracking />}
+          {tab === "book_campaigns" && <AdminBookCampaigns />}
           {tab === "site" && <AdminSite />}
         </div>
       </div>
