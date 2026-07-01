@@ -76,7 +76,7 @@ export default function StaffCalendar({ currentUser, staffTeam, sendBotNotificat
           { isStaffOnly: true }
         )
         if (sendBotNotification) {
-          sendBotNotification(`📅 มีแผนงานใหม่ลงปฏิทิน: ${form.title}\nวันที่: ${dateStr}\nช่องทาง: ${form.platforms.join(", ")}\nผู้รับผิดชอบ: ${form.assignee}`);
+          sendBotNotification(`📅 วางแผนลงโพสต์ใหม่: ${form.title}\nวันที่: ${dateStr}\nช่องทาง: ${form.platforms.join(", ")}\nรับผิดชอบ: ${form.assignee}\n\n📌 ดูคิวโพสต์: https://talibclub.org/staff-work`);
         }
       }
       setSelectedDate(null)
@@ -94,7 +94,11 @@ export default function StaffCalendar({ currentUser, staffTeam, sendBotNotificat
       danger: true
     })
     if (ok) {
+      const eventToDelete = events.find(e => e.id === id);
       await deleteDoc(doc(db, "content_calendar", id))
+      if (sendBotNotification && eventToDelete) {
+        sendBotNotification(`🗑️ ลบ/ยกเลิกแผนลงโพสต์:\nเรื่อง: ${eventToDelete.title}\nผู้รับผิดชอบ: ${eventToDelete.assignee}\nลบโดย: ${currentUser}\n\n📌 ดูคิวโพสต์: https://talibclub.org/staff-work`);
+      }
       notifySuccess("ลบแผนงานแล้ว")
       setSelectedDate(null)
     }

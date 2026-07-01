@@ -120,7 +120,7 @@ export default function StaffTasks({ currentUser, staffTeam, sendBotNotification
       )
       
       if (sendBotNotification) {
-        sendBotNotification(`📋 มีงานใหม่มอบหมายให้: ${form.assignee}\nเรื่อง: ${form.title}\nสั่งโดย: ${currentUser}`);
+        sendBotNotification(`📋 มีงานใหม่มอบหมายให้: ${form.assignee}\nเรื่อง: ${form.title}\nสั่งโดย: ${currentUser}\n\n📌 ดูงาน: https://talibclub.org/staff-work`);
       }
       
       setForm({ title: "", description: "", assignee: "", dueDate: "", files: [] })
@@ -176,7 +176,11 @@ export default function StaffTasks({ currentUser, staffTeam, sendBotNotification
       danger: true
     })
     if (ok) {
+      const taskToDelete = tasks.find(t => t.id === id);
       await deleteDoc(doc(db, "staff_tasks", id))
+      if (sendBotNotification && taskToDelete) {
+        sendBotNotification(`🗑️ ลบ/ยกเลิกงาน:\nเรื่อง: ${taskToDelete.title}\nผู้รับผิดชอบ: ${taskToDelete.assignee}\nลบโดย: ${currentUser}\n\n📌 ดูงาน: https://talibclub.org/staff-work`);
+      }
       notifySuccess("ลบงานแล้ว")
     }
   }

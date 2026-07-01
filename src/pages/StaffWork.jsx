@@ -222,34 +222,51 @@ export default function StaffWork({ authState, go }) {
 
     const checkMonthlyQueue = async () => {
       const now = new Date()
+      const currentDay = now.getDate()
       const currentMonthIndex = now.getMonth()
       const currentYear = now.getFullYear()
-      const currentMonth = `${currentYear}-${currentMonthIndex}`
-
-      // Skip if we already notified this month (stored in useRef to persist across renders)
-      if (notifiedMonthRef.current === currentMonth) return
-
       const currentQueue = magazineQueue[currentMonthIndex]
-      if (currentQueue && currentQueue.user) {
-        try {
-          await sendBotNotification(`📚 [แจ้งเตือนคิววารสาร]\nเข้าสู่เดือน ${currentQueue.month} แล้ว!\n\nรับผิดชอบวารสารหลักเดือนนี้คือ: 🌟 ${currentQueue.user} 🌟\n\nเตรียมตัววางแผนงานได้เลยครับ 🚀`)
-          await triggerPushNotification(
-            "📚 แจ้งเตือนคิววารสารประจำเดือน",
-            `เข้าสู่เดือน ${currentQueue.month} แล้ว! ผู้รับผิดชอบหลักคือ ${currentQueue.user}`,
-            "/staff-work",
-            { isStaffOnly: true }
-          )
-          // Mark this month as notified to prevent duplicate alerts
-          notifiedMonthRef.current = currentMonth
-        } catch (err) {
-          console.error("Failed to send monthly notification:", err)
+      
+      if (!currentQueue || !currentQueue.user) return
+
+      let phase = null
+      let message = ""
+      if (currentDay >= 1 && currentDay <= 7) {
+        phase = "start"
+        message = `📣 [แจ้งเตือนวารสารต้นเดือน]\nเดือน ${currentQueue.month} นี้ เป็นคิวของ: 👤 ${currentQueue.user} ⭐️\n\nเตรียมตัวคิดหัวข้อและเตรียมงานได้เลยครับ! ✌️\n\n📌 ดูงาน: https://talibclub.org/staff-work`
+      } else if (currentDay >= 14 && currentDay <= 20) {
+        phase = "mid"
+        message = `⏳ [แจ้งเตือนวารสารกลางเดือน]\nเดือน ${currentQueue.month} คิวของ 👤 ${currentQueue.user}\n\nเหลือเวลาอีกประมาณ ${28 - currentDay} วันก่อนถึงกำหนด (วันที่ 28)\nใครมีหน้าที่ช่วยซัพพอร์ต เตรียมตัวให้พร้อมนะครับ!\n\n📌 ดูงาน: https://talibclub.org/staff-work`
+      } else if (currentDay >= 28) {
+        phase = "deadline"
+        message = `🚨 [แจ้งเตือนวารสารโค้งสุดท้าย]\nวันนี้วันที่ ${currentDay} แล้ว! กำหนดมอบหมายงานวารสารประจำเดือน ${currentQueue.month}\n\nคิวของ: 👤 ${currentQueue.user}\nรีบจัดการมอบหมายงานลงระบบได้เลยครับ 🔥\n\n📌 ดูงาน: https://talibclub.org/staff-work`
+      }
+
+      if (!phase) return
+      
+      const notifyKey = `mag_notify_${currentYear}_${currentMonthIndex}_${phase}`
+
+      // Check local session first to prevent rapid spam
+      if (notifiedMonthRef.current === notifyKey) return
+      
+      try {
+        const notifyDocRef = doc(db, "system", "magazine_notify")
+        const snap = await getDoc(notifyDocRef)
+        const data = snap.exists() ? snap.data() : {}
+        
+        if (!data[notifyKey]) {
+          await sendBotNotification(message)
+          await setDoc(notifyDocRef, { ...data, [notifyKey]: true })
         }
+        
+        notifiedMonthRef.current = notifyKey
+      } catch (err) {
+        console.error("Failed to process magazine notification", err)
       }
     }
 
     checkMonthlyQueue()
-    // Run once on mount and when magazine queue is initially loaded, not on every update
-  }, [isAdmin])
+  }, [isAdmin, magazineQueue])
 
   const filteredSubs = useMemo(() => {
     return subs.filter(s => {
@@ -408,7 +425,7 @@ export default function StaffWork({ authState, go }) {
       
       await sendBotNotification(
         `📬 [งานใหม่] ส่งโดย: ${currentUser}\nหัวข้อ: "${form.title}"\nประเภท: ${form.type}\n` +
-        `✍️ เขียน/แปล: ${form.writer || "-"}\n🎨 กราฟิก: ${form.graphic || "-"}\n📢 คนลงโพสต์: ${form.poster || "-"}\n\nรอแอดมินตรวจสอบครับ 🚀`
+        `✍️ เขียน/แปล: ${form.writer || "-"}\n🎨 กราฟิก: ${form.graphic || "-"}\n📢 คนลงโพสต์: ${form.poster || "-"}\n\n📌 ดูงาน: https://talibclub.org/staff-work`
       )
       await triggerPushNotification(
         "📬 มีงานส่งใหม่รอการตรวจสอบ",
@@ -440,7 +457,7 @@ export default function StaffWork({ authState, go }) {
       const targetSub = subs.find(s => s.id === id)
       if (!targetSub) return
       if (nextStatus === STATUS_OPTIONS.APPROVED) {
-        await sendBotNotification(`✅ [อนุมัติแล้ว] งาน "${targetSub.title}"\nตรวจผ่านแล้ว 🎉 เตรียมจัดคิวลงแพลตฟอร์มได้เลย!`)
+        await sendBotNotification(`✅ [อนุมัติแล้ว] งาน "${targetSub.title}"\nตรวจผ่านแล้ว 🎉 เตรียมจัดคิวลงแพลตฟอร์มได้เลย!\n\n📌 ดูงาน: https://talibclub.org/staff-work`)
         await triggerPushNotification(
           "✅ งานผ่านการอนุมัติแล้ว",
           `งาน "${targetSub.title}" ได้รับการอนุมัติโดยแอดมิน`,
@@ -448,7 +465,7 @@ export default function StaffWork({ authState, go }) {
           { isStaffOnly: true }
         )
       } else if (nextStatus === STATUS_OPTIONS.REJECTED) {
-        await sendBotNotification(`⚠️ [ถูกตีกลับ] งาน "${targetSub.title}"\nของถูกตีกลับให้แก้ไข!\n\n💬 ฟีดแบ็กจากแอดมิน:\n"${feedbackText}"\n\nรีบเข้าไปแก้ไขด้วยนะครับ 🛠️`)
+        await sendBotNotification(`⚠️ [ถูกตีกลับ] งาน "${targetSub.title}"\nของถูกตีกลับให้แก้ไข!\n\n💬 ฟีดแบ็กจากแอดมิน:\n"${feedbackText}"\n\nรีบเข้าไปแก้ไขด้วยนะครับ 🛠️\n\n📌 ดูงาน: https://talibclub.org/staff-work`)
         await triggerPushNotification(
           "⚠️ งานถูกตีกลับให้แก้ไข",
           `งาน "${targetSub.title}" ถูกส่งกลับ: "${feedbackText}"`,
@@ -478,7 +495,7 @@ export default function StaffWork({ authState, go }) {
       const postUrl = postingForm.postLink
       setPostingForm({ scheduleDate: "", platforms: [], postLink: "" })
 
-      await sendBotNotification(`📢 [ลงโพสต์เรียบร้อย]\nงาน: "${targetSub.title}"\n\n📱 แพลตฟอร์ม: ${platformsStr}\n🔗 ลิงก์: ${postUrl || "ไม่ได้ระบุ"}`)
+      await sendBotNotification(`📢 [ลงโพสต์เรียบร้อย]\nงาน: "${targetSub.title}"\n\n📱 แพลตฟอร์ม: ${platformsStr}\n🔗 ลิงก์: ${postUrl || "ไม่ได้ระบุ"}\n\n📌 ดูคิวโพสต์: https://talibclub.org/staff-work`)
       await triggerPushNotification(
         "📢 ลงงานจริงเรียบร้อย",
         `งาน "${targetSub.title}" เผยแพร่ลง ${platformsStr} แล้ว`,
