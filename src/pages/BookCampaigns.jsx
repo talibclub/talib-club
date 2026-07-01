@@ -29,7 +29,7 @@ export default function BookCampaigns({ go }) {
   }, [])
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: "60px 20px" }}>
+    <div style={{ maxWidth: 1000, margin: "0 auto", padding: "60px 20px" }}>
       <style dangerouslySetInnerHTML={{__html: `
         .campaign-card {
           transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -38,6 +38,7 @@ export default function BookCampaigns({ go }) {
           background: var(--bg);
           position: relative;
           box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+          overflow: hidden;
         }
         .campaign-card:hover {
           transform: translateY(-8px);
@@ -58,23 +59,23 @@ export default function BookCampaigns({ go }) {
         .book-img-container {
           transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .book-item:hover .book-img-container {
-          transform: translateY(-10px) scale(1.05);
+        .campaign-card:hover .book-img-container {
+          transform: translateY(-5px) scale(1.02);
         }
         .premium-btn {
           background: linear-gradient(135deg, var(--teal), #2b8a3e);
           color: white;
           border: none;
-          padding: 14px 32px;
-          border-radius: 30px;
-          font-size: 16px;
-          font-weight: 600;
+          padding: 16px 32px;
+          border-radius: 16px;
+          font-size: 18px;
+          font-weight: 700;
           cursor: pointer;
           transition: all 0.3s ease;
           box-shadow: 0 8px 20px rgba(18, 184, 134, 0.25);
           display: inline-flex;
           alignItems: center;
-          gap: 8px;
+          gap: 10px;
         }
         .premium-btn:hover {
           transform: translateY(-2px);
@@ -84,17 +85,51 @@ export default function BookCampaigns({ go }) {
           transform: translateY(1px);
           box-shadow: 0 4px 10px rgba(18, 184, 134, 0.2);
         }
+        
+        .campaign-content-layout {
+          display: flex;
+          flex-direction: row;
+          gap: 48px;
+          padding: 48px;
+        }
+        .campaign-image-side {
+          flex: 0 0 260px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .campaign-text-side {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        @media (max-width: 768px) {
+          .campaign-content-layout {
+            flex-direction: column;
+            gap: 32px;
+            padding: 32px 24px;
+          }
+          .campaign-image-side {
+            flex: 1;
+            width: 100%;
+            align-items: center;
+          }
+          .book-featured {
+            max-width: 260px;
+          }
+        }
       `}} />
 
-      <div style={{ textAlign: "center", marginBottom: 50, position: "relative" }}>
+      <div style={{ textAlign: "center", marginBottom: 60, position: "relative" }}>
         <div style={{ 
           position: "absolute", top: -80, left: "50%", transform: "translateX(-50%)", 
           width: 300, height: 300, background: "var(--teal)", filter: "blur(120px)", opacity: 0.12, zIndex: -1 
         }} />
-        <h1 style={{ fontSize: 42, fontWeight: 800, marginBottom: 16, background: "linear-gradient(135deg, var(--teal), #2b8a3e)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+        <h1 style={{ fontSize: 48, fontWeight: 800, marginBottom: 16, background: "linear-gradient(135deg, var(--teal), #2b8a3e)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
           แจก / สั่งซื้อหนังสือ
         </h1>
-        <p style={{ color: "var(--t2)", fontSize: 16, maxWidth: 500, margin: "0 auto", lineHeight: 1.6 }}>
+        <p style={{ color: "var(--t2)", fontSize: 18, maxWidth: 600, margin: "0 auto", lineHeight: 1.6 }}>
           ศูนย์รวมการลงทะเบียนรับสิทธิ์หนังสือและสื่อความรู้จาก Talib Club
         </p>
       </div>
@@ -111,66 +146,87 @@ export default function BookCampaigns({ go }) {
           <p>รอติดตามการแจกหนังสือรอบถัดไปได้เร็วๆ นี้</p>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 40 }}>
           {campaigns.map(c => (
             <div key={c.id} className="campaign-card">
-              {/* Top Accent Line */}
               <div style={{ height: 6, width: "100%", background: "linear-gradient(90deg, var(--teal), #38d9a9)" }} />
               
-              <div style={{ padding: "40px 32px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 24 }}>
-                  <div style={{ flex: 1, minWidth: 280 }}>
-                    <h2 style={{ margin: "0 0 16px 0", fontSize: 28, fontWeight: 800, color: "var(--text)", letterSpacing: "-0.5px" }}>{c.title}</h2>
-                    {c.description && (
-                      <p style={{ color: "var(--t2)", margin: "0 0 24px 0", fontSize: 16, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-                        {c.description}
-                      </p>
-                    )}
-                    
-                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                      <div className="campaign-badge" style={{ color: "#d97706", background: "rgba(245, 158, 11, 0.1)", borderColor: "rgba(245, 158, 11, 0.2)" }}>
-                        <i className="ti ti-ticket" style={{ fontSize: 16 }}></i> โควตา {c.quota} สิทธิ์
+              <div className="campaign-content-layout">
+                {/* Left Side: Images */}
+                <div className="campaign-image-side">
+                  {c.items && c.items.length > 0 ? (
+                    <>
+                      {/* Featured Image */}
+                      <div className="book-img-container book-featured" style={{ width: "100%", aspectRatio: "3/4", borderRadius: 16, overflow: "hidden", boxShadow: "0 16px 32px rgba(0,0,0,0.15)" }}>
+                        {c.items[0].imageUrl ? (
+                          <img src={c.items[0].imageUrl} alt={c.items[0].name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        ) : (
+                          <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", background: "var(--bg3)", color: "var(--t3)" }}>
+                            <i className="ti ti-book" style={{ fontSize: 60 }}></i>
+                          </div>
+                        )}
                       </div>
-                      <div className="campaign-badge" style={{ color: "var(--teal)", background: "rgba(18, 184, 134, 0.1)", borderColor: "rgba(18, 184, 134, 0.2)" }}>
-                        <i className="ti ti-truck-delivery" style={{ fontSize: 16 }}></i> {c.shippingFee > 0 ? `ค่าจัดส่ง ${c.shippingFee} ฿` : "จัดส่งฟรี!"}
-                      </div>
-                      <div className="campaign-badge" style={{ color: "var(--t2)" }}>
-                        <i className="ti ti-clock-stopwatch" style={{ fontSize: 16 }}></i> ให้เวลาโอน {c.timeLimit} นาที
-                      </div>
+                      
+                      {/* Thumbnails */}
+                      {c.items.length > 1 && (
+                        <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8, marginTop: 8 }}>
+                          {c.items.slice(1).map((item, idx) => (
+                            <div key={idx} style={{ width: 64, flexShrink: 0, aspectRatio: "3/4", borderRadius: 8, overflow: "hidden", border: "1px solid var(--br)", opacity: 0.8, transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = 1} onMouseLeave={e => e.currentTarget.style.opacity = 0.8}>
+                              {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ background: "var(--bg3)", height: "100%" }} />}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="book-featured" style={{ width: "100%", aspectRatio: "3/4", borderRadius: 16, border: "2px dashed var(--br)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t3)" }}>
+                      <i className="ti ti-gift" style={{ fontSize: 60 }}></i>
                     </div>
-                  </div>
+                  )}
                 </div>
 
-                {c.items && c.items.length > 0 && (
-                  <div style={{ 
-                    marginTop: 32, paddingTop: 32, borderTop: "1px dashed var(--br)", 
-                    display: "flex", gap: 24, overflowX: "auto", paddingBottom: 24, scrollbarWidth: "none",
-                    WebkitOverflowScrolling: "touch"
-                  }}>
-                    {c.items.map((item, idx) => (
-                      <div key={idx} className="book-item" style={{ width: 130, flexShrink: 0 }}>
-                        <div className="book-img-container" style={{ width: "100%", aspectRatio: "3/4", borderRadius: 16, overflow: "hidden", boxShadow: "0 12px 24px rgba(0,0,0,0.12)", marginBottom: 16 }}>
-                          {item.imageUrl ? (
-                            <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          ) : (
-                            <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", background: "var(--bg3)", color: "var(--t3)" }}>
-                              <i className="ti ti-book" style={{ fontSize: 40 }}></i>
-                            </div>
-                          )}
-                        </div>
-                        <div style={{ fontSize: 14, fontWeight: 700, textAlign: "center", color: "var(--text)", lineHeight: 1.4 }}>{item.name}</div>
-                      </div>
-                    ))}
+                {/* Right Side: Content */}
+                <div className="campaign-text-side">
+                  <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+                    <div className="campaign-badge" style={{ color: "#d97706", background: "rgba(245, 158, 11, 0.1)", borderColor: "rgba(245, 158, 11, 0.2)" }}>
+                      <i className="ti ti-ticket" style={{ fontSize: 16 }}></i> โควตา {c.quota} สิทธิ์
+                    </div>
+                    <div className="campaign-badge" style={{ color: "var(--teal)", background: "rgba(18, 184, 134, 0.1)", borderColor: "rgba(18, 184, 134, 0.2)" }}>
+                      <i className="ti ti-truck-delivery" style={{ fontSize: 16 }}></i> {c.shippingFee > 0 ? `ค่าจัดส่ง ${c.shippingFee} ฿` : "จัดส่งฟรี!"}
+                    </div>
+                    <div className="campaign-badge" style={{ color: "var(--t2)", background: "var(--bg3)" }}>
+                      <i className="ti ti-clock-stopwatch" style={{ fontSize: 16 }}></i> ให้เวลาโอน {c.timeLimit} นาที
+                    </div>
                   </div>
-                )}
-                
-                <div style={{ marginTop: 24, display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
-                  <button 
-                    className="premium-btn"
-                    onClick={() => go("book-register", { campaignId: c.id })}
-                  >
-                    ลงทะเบียนรับสิทธิ์ <i className="ti ti-arrow-right"></i>
-                  </button>
+
+                  <h2 style={{ margin: "0 0 16px 0", fontSize: 36, fontWeight: 800, color: "var(--text)", letterSpacing: "-0.5px", lineHeight: 1.2 }}>{c.title}</h2>
+                  
+                  {c.description && (
+                    <p style={{ color: "var(--t2)", margin: "0 0 32px 0", fontSize: 16, lineHeight: 1.7, whiteSpace: "pre-wrap", flex: 1 }}>
+                      {c.description}
+                    </p>
+                  )}
+
+                  {c.items && c.items.length > 0 && (
+                    <div style={{ marginBottom: 40, padding: "20px 24px", background: "var(--bg2)", borderRadius: 16, border: "1px solid var(--br)" }}>
+                      <h4 style={{ margin: "0 0 12px 0", fontSize: 14, color: "var(--teal)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>หนังสือในแคมเปญนี้</h4>
+                      <ul style={{ margin: 0, paddingLeft: 20, color: "var(--text)", fontSize: 15, lineHeight: 1.6, fontWeight: 500 }}>
+                        {c.items.map((item, idx) => (
+                          <li key={idx} style={{ marginBottom: c.items.length > 1 ? 6 : 0 }}>{item.name}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div style={{ marginTop: "auto" }}>
+                    <button 
+                      className="premium-btn"
+                      onClick={() => go("book-register", { campaignId: c.id })}
+                      style={{ width: "100%", justifyContent: "center" }}
+                    >
+                      ลงทะเบียนรับสิทธิ์ทันที <i className="ti ti-arrow-right"></i>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
