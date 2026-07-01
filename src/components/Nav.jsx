@@ -73,6 +73,7 @@ const NAV_LINKS = [
   { id: "library", label: "ห้องสมุด", icon: "ti-books" },
   { id: "media", label: "มีเดีย", icon: "ti-player-play" },
   { id: "scholars", label: "ทำเนียบบุคคล", icon: "ti-users" },
+  { id: "openhouse", label: "แหล่งเรียนรู้", icon: "ti-map" },
   { id: "tracking", label: "ตรวจพัสดุ", icon: "ti-package" },
 ]
 

@@ -6,12 +6,14 @@ import AdminScholars from "./admin/AdminScholars.jsx"
 import AdminTracking from "./admin/AdminTracking.jsx"
 import AdminSite from "./admin/AdminSite.jsx"
 import AdminTaxonomy from "./admin/AdminTaxonomy.jsx"
+import AdminOpenHouse from "./admin/AdminOpenHouse.jsx"
 
 const TABS = [
   { id: "articles", label: "บทความ", icon: "ti-file-text" },
   { id: "library", label: "หนังสือ/PDF", icon: "ti-books" },
   { id: "media", label: "มีเดีย", icon: "ti-player-play" },
   { id: "scholars", label: "อุลามาอฺ", icon: "ti-users" },
+  { id: "openhouse", label: "นิทรรศการ (Open House)", icon: "ti-map" },
   { id: "taxonomy", label: "หมวด/ตัวเลือก", icon: "ti-tags" },
   { id: "tracking", label: "Tracking", icon: "ti-package" },
   { id: "site", label: "ตั้งค่าเว็บ", icon: "ti-settings" },
@@ -181,9 +183,10 @@ export default function Admin({ go, authState, initialTab = "articles" }) {
 
         <div className="admin-content-area" style={{ flex: 1, minWidth: 0 }}>
           {tab === "articles" && <AdminArticles />}
-          {tab === "library" && <AdminLibrary />}
-          {tab === "media" && <AdminMedia />}
-          {tab === "scholars" && <AdminScholars />}
+          {tab === "library" && <AdminLibrary go={go} currentUser={currentUser} />}
+          {tab === "media" && <AdminMedia go={go} currentUser={currentUser} />}
+          {tab === "scholars" && <AdminScholars go={go} currentUser={currentUser} />}
+          {tab === "openhouse" && <AdminOpenHouse go={go} />}
           {tab === "taxonomy" && <AdminTaxonomy />}
           {tab === "tracking" && <AdminTracking />}
           {tab === "site" && <AdminSite />}
