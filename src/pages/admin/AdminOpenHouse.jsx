@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, deleteDoc } from "firebase/firestore"
-import { db } from "../../../lib/firebase.js"
+import { db } from "../../lib/firebase.js"
 import { toast } from "react-hot-toast"
 import { confirmAction } from "../../../utils/feedback.jsx"
 
