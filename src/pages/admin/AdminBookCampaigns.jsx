@@ -288,15 +288,15 @@ export default function AdminBookCampaigns() {
                   โควตา: {c.quota} สิทธิ์ | เวลาโอน: {c.timeLimit} นาที | หนังสือ: {c.items?.length || 0} เล่ม
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button className="btn" onClick={() => toast("ระบบดูรายชื่อกำลังจะมาเร็วๆ นี้", { icon: "🚧" })} style={{ padding: "6px 12px", fontSize: 13, background: "var(--teal-bg)", color: "var(--teal)", border: "none" }}>
-                  <i className="ti ti-users" style={{ marginRight: 6 }}></i> ดูรายชื่อ
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <button className="btn btn-outline" onClick={() => toast("ระบบดูรายชื่อกำลังจะมาเร็วๆ นี้", { icon: "🚧" })} style={{ padding: "6px 12px", fontSize: 12, color: "var(--teal)", borderColor: "var(--teal-bg)" }}>
+                  <i className="ti ti-users" style={{ marginRight: 4 }}></i> รายชื่อ
                 </button>
-                <button className="btn btn-outline" onClick={() => handleOpenForm(c)} style={{ padding: "6px 12px", fontSize: 13, background: "var(--bg)", borderColor: "var(--br)" }}>
-                  <i className="ti ti-edit" style={{ marginRight: 4 }}></i> แก้ไข
+                <button className="btn btn-outline" onClick={() => handleOpenForm(c)} style={{ padding: "6px 12px", fontSize: 12 }}>
+                  <i className="ti ti-pencil"></i>
                 </button>
-                <button className="btn" onClick={() => handleDelete(c.id)} style={{ padding: "6px 12px", fontSize: 13, background: "rgba(239, 68, 68, 0.1)", color: "var(--red)", border: "none" }}>
-                  <i className="ti ti-trash" style={{ marginRight: 4 }}></i> ลบ
+                <button className="btn btn-outline" onClick={() => handleDelete(c.id)} style={{ color: "#e05555", borderColor: "rgba(224,85,85,.3)", padding: "6px 12px", fontSize: 12 }}>
+                  <i className="ti ti-trash"></i>
                 </button>
               </div>
             </div>
