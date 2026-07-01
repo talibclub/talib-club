@@ -13,11 +13,12 @@ export default function BookCampaigns({ go }) {
       try {
         const q = query(
           collection(db, "book_campaigns"), 
-          where("status", "==", "active"),
-          orderBy("createdAt", "desc")
+          where("status", "==", "active")
         )
         const snap = await getDocs(q)
-        setCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        data.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
+        setCampaigns(data)
       } catch (err) {
         console.error(err)
       } finally {
