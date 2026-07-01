@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react"
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, deleteDoc } from "firebase/firestore"
 import { db } from "../../lib/firebase.js"
 import { toast } from "react-hot-toast"
-import { confirmAction } from "../../../utils/feedback.jsx"
+import { confirmAction } from "../../utils/feedback.jsx"
 
 const notifySuccess = (msg) => toast.success(msg)
 const notifyError = (msg) => toast.error(msg)
