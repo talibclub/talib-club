@@ -80,7 +80,7 @@ export default function BookRegistration({ go, ctx }) {
           const completedSnap = await getCountFromServer(completedQ)
           const completedCount = completedSnap.data().count
 
-          const reservedQ = query(collection(db, "book_campaigns", campaignId, "holds"), where("status", "==", "reserved"), where("expiresAt", ">", new Date()))
+          const reservedQ = query(collection(db, "book_campaigns", campaignId, "holds"), where("expiresAt", ">", new Date()))
           const reservedSnap = await getCountFromServer(reservedQ)
           const reservedCount = reservedSnap.data().count
 
@@ -135,7 +135,7 @@ export default function BookRegistration({ go, ctx }) {
       const completedQ = query(collection(db, "book_campaigns", campaignId, "holds"), where("status", "==", "completed"))
       const completedSnap = await getCountFromServer(completedQ)
       
-      const reservedQ = query(collection(db, "book_campaigns", campaignId, "holds"), where("status", "==", "reserved"), where("expiresAt", ">", new Date()))
+      const reservedQ = query(collection(db, "book_campaigns", campaignId, "holds"), where("expiresAt", ">", new Date()))
       const reservedSnap = await getCountFromServer(reservedQ)
       
       if (completedSnap.data().count + reservedSnap.data().count >= campaign.quota) {
