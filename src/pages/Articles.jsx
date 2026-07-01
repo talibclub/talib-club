@@ -5,6 +5,7 @@ import { clampPage } from "../utils/pagination.js"
 import PaginationBar from "../components/PaginationBar.jsx"
 import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
+import ArticleCard from "../components/ArticleCard.jsx"
 
 export default function Articles({ go, authState, ctx }) {
   // Keep the public article list fresh so it reflects the current Firestore state.
@@ -29,12 +30,14 @@ export default function Articles({ go, authState, ctx }) {
   const types = [{ id: "all", label: "ทั้งหมด" }, ...(taxonomy.articleTypes || [])]
   const categories = [{ id: "all", label: "ทั้งหมด" }, ...(taxonomy.articleCategories || [])]
 
-  const filtered = articles.filter(a => {
-    const matchCat = cat === "all" || String(a.category).toLowerCase() === String(cat).toLowerCase()
-    const matchType = type === "all" || String(a.type).toLowerCase() === String(type).toLowerCase()
-    const matchSearch = !search || String(a.title).toLowerCase().includes(search.toLowerCase())
-    return matchCat && matchType && matchSearch
-  })
+  const filtered = useMemo(() => {
+    return articles.filter(a => {
+      const matchCat = cat === "all" || String(a.category).toLowerCase() === String(cat).toLowerCase()
+      const matchType = type === "all" || String(a.type).toLowerCase() === String(type).toLowerCase()
+      const matchSearch = !search || String(a.title).toLowerCase().includes(search.toLowerCase())
+      return matchCat && matchType && matchSearch
+    })
+  }, [articles, cat, type, search])
 
   const sortedFiltered = useMemo(() => {
     const parseDateToMs = (dateStr) => {
@@ -206,30 +209,7 @@ export default function Articles({ go, authState, ctx }) {
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>
             {selectedSeries.articles.map(a => (
-              <div key={a.id} className="card" style={{ cursor: "pointer", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between" }} onClick={() => viewArticle(a)}>
-                {a.coverUrl ? (
-                  <div style={{ width: "100%", height: 160, overflow: "hidden", borderBottom: ".5px solid var(--br2)" }}>
-                    <ImageWithFallback src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  </div>
-                ) : (
-                  <div style={{ width: "100%", height: 160, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: ".5px solid var(--br2)" }}>
-                    <span style={{ fontSize: 40 }}>{a.coverEmoji || "📖"}</span>
-                  </div>
-                )}
-                <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                      <span style={{ fontSize: 10, color: "var(--teal)", fontWeight: 500, background: "var(--teal-bg)", padding: "2px 8px", borderRadius: 4 }}>ตอนที่ {a.part}</span>
-                      <span className="tag">{a.category}</span>
-                    </div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", lineHeight: 1.45, marginBottom: 8, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{a.title}</div>
-                    <p style={{ fontSize: 12, marginBottom: 12, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", color: "var(--t2)" }}>{a.excerpt}</p>
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300, marginTop: "auto" }}>
-                    {a.author} · {a.date}
-                  </div>
-                </div>
-              </div>
+              <ArticleCard key={a.id} article={a} onClick={viewArticle} />
             ))}
           </div>
         </div>
@@ -320,29 +300,7 @@ export default function Articles({ go, authState, ctx }) {
                 <div className="sec-hd"><span className="sec-title">บทความมาใหม่ล่าสุด</span></div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>
                   {recentArticles.map(a => (
-                    <div key={a.id} className="card" style={{ cursor: "pointer", overflow: "hidden", display: "flex", flexDirection: "column" }} onClick={() => viewArticle(a)}>
-                      {a.coverUrl ? (
-                        <div style={{ width: "100%", height: 160, overflow: "hidden", borderBottom: ".5px solid var(--br2)" }}>
-                          <ImageWithFallback src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        </div>
-                      ) : (
-                        <div style={{ width: "100%", height: 160, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: ".5px solid var(--br2)" }}>
-                          <span style={{ fontSize: 40 }}>{a.coverEmoji || "📖"}</span>
-                        </div>
-                      )}
-                      <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                        <div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                            <span className="tag tag-teal">{a.category}</span>
-                          </div>
-                          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", lineHeight: 1.45, marginBottom: 8, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{a.title}</div>
-                          <p style={{ fontSize: 12, marginBottom: 10, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", color: "var(--t2)" }}>{a.excerpt}</p>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" }}>
-                          <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>{a.author} · {a.date}</div>
-                        </div>
-                      </div>
-                    </div>
+                    <ArticleCard key={a.id} article={a} onClick={viewArticle} />
                   ))}
                 </div>
                 {sortedFiltered.length > 6 && (
@@ -412,29 +370,7 @@ export default function Articles({ go, authState, ctx }) {
                           <div style={{ fontSize: 13, color: "var(--teal)", fontWeight: 600, marginBottom: 12, marginTop: filteredSeries.length > 0 ? 28 : 0 }}>บทความทั่วไป / บทความเฉพาะเรื่อง</div>
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>
                             {paginatedGeneral.map(a => (
-                              <div key={a.id} className="card" style={{ cursor: "pointer", overflow: "hidden", display: "flex", flexDirection: "column" }} onClick={() => viewArticle(a)}>
-                                {a.coverUrl ? (
-                                  <div style={{ width: "100%", height: 160, overflow: "hidden", borderBottom: ".5px solid var(--br2)" }}>
-                                    <ImageWithFallback src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                  </div>
-                                ) : (
-                                  <div style={{ width: "100%", height: 160, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: ".5px solid var(--br2)" }}>
-                                    <span style={{ fontSize: 40 }}>{a.coverEmoji || "📖"}</span>
-                                  </div>
-                                )}
-                                <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                                  <div>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                                      <span className="tag tag-teal">{a.category}</span>
-                                    </div>
-                                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", lineHeight: 1.45, marginBottom: 8, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{a.title}</div>
-                                    <p style={{ fontSize: 12, marginBottom: 10, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", color: "var(--t2)" }}>{a.excerpt}</p>
-                                  </div>
-                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" }}>
-                                    <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>{a.author} · {a.date}</div>
-                                  </div>
-                                </div>
-                              </div>
+                              <ArticleCard key={a.id} article={a} onClick={viewArticle} />
                             ))}
                           </div>
 
@@ -450,31 +386,7 @@ export default function Articles({ go, authState, ctx }) {
                     <>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>
                         {paginatedFiltered.map(a => (
-                          <div key={a.id} className="card" style={{ cursor: "pointer", overflow: "hidden", display: "flex", flexDirection: "column" }} onClick={() => viewArticle(a)}>
-                            {a.coverUrl ? (
-                              <div style={{ width: "100%", height: 160, overflow: "hidden", borderBottom: ".5px solid var(--br2)" }}>
-                                <ImageWithFallback src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                              </div>
-                            ) : (
-                              <div style={{ width: "100%", height: 160, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: ".5px solid var(--br2)" }}>
-                                <span style={{ fontSize: 40 }}>{a.coverEmoji || "📖"}</span>
-                              </div>
-                            )}
-                            <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                              <div>
-                                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                                  <span className="tag tag-teal">{a.category}</span>
-                                  {a.type === "series" && <span className="tag tag-acc">ซีรีส์ ตอน {a.part}</span>}
-                                  {a.type === "specific" && a.seriesName && <span className="tag tag-acc">{a.seriesName}</span>}
-                                </div>
-                                <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", lineHeight: 1.45, marginBottom: 8, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{a.title}</div>
-                                <p style={{ fontSize: 12, marginBottom: 10, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", color: "var(--t2)" }}>{a.excerpt}</p>
-                              </div>
-                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" }}>
-                                <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>{a.author} · {a.date}</div>
-                              </div>
-                            </div>
-                          </div>
+                          <ArticleCard key={a.id} article={a} onClick={viewArticle} />
                         ))}
                       </div>
 

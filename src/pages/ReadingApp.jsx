@@ -5,7 +5,8 @@ import { BOOKS, DEFAULT_TAXONOMY } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings, useUserDoc } from "../lib/contentStore.js"
 import { confirmAction } from "../utils/feedback.jsx"
 import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage"
-import { storage, app } from "../lib/firebase.js"
+import { doc, getDoc } from "firebase/firestore"
+import { storage, app, db } from "../lib/firebase.js"
 import { safeDateNow } from "../utils/time.js"
 
 // --- Helper Functions ---
@@ -834,10 +835,14 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       // Calculate session rewards
       const sessionGems = Math.min(10, Math.floor(seconds / 120)) // 1 Gem per 2 mins, max 10
 
+      // Get latest streak document to avoid overwriting recent gems
+      const latestStreakSnap = await getDoc(doc(db, "content_reading_streaks", uid))
+      const currentGems = latestStreakSnap.exists() ? Number(latestStreakSnap.data().gems || 0) : Number(streakSettings?.gems || 0)
+
       // Update user's streak document with gems
       await saveStreakSettings({
         ...streakSettings,
-        gems: Number(streakSettings.gems || 0) + sessionGems,
+        gems: currentGems + sessionGems,
       })
 
       const nextProgress = getProgressFromSession(activeBook, end, report.pagesRead)
@@ -845,13 +850,19 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       const cleanItem = { ...activeBook }
       delete cleanItem.book
 
+      // Get latest shelf item to avoid overwriting concurrent read time
+      const latestBookSnap = await getDoc(doc(db, "content_bookshelf", activeBook.id))
+      const latestBookData = latestBookSnap.exists() ? latestBookSnap.data() : activeBook
+      const currentReadSeconds = Number(latestBookData.totalReadSeconds || 0)
+      const currentVerifiedSessions = Number(latestBookData.verifiedSessions || 0)
+
       await saveShelfItem({
         ...cleanItem,
         progress: nextProgress,
         currentPage: end,
         status: nextProgress >= 100 ? "finished" : "reading",
-        totalReadSeconds: Number(activeBook.totalReadSeconds || 0) + seconds,
-        verifiedSessions: Number(activeBook.verifiedSessions || 0) + 1,
+        totalReadSeconds: currentReadSeconds + seconds,
+        verifiedSessions: currentVerifiedSessions + 1,
         lastReadAt: safeDateNow(),
         lastVerificationScore: report.score,
       })

@@ -68,7 +68,7 @@ function parseDateStringToMs(dateStr) {
 function getMs(val) {
   if (!val) return 0
   if (typeof val.toDate === "function") return val.toDate().getTime()
-  if (val.seconds) return val.seconds * 1000
+  if (val.seconds !== undefined && val.nanoseconds !== undefined) return val.seconds * 1000
   if (typeof val === "number") return val
   if (typeof val === "string") return parseDateStringToMs(val)
   const parsed = Date.parse(val)
@@ -161,7 +161,7 @@ function stableStringify(obj) {
   const sorted = {}
   const keys = Object.keys(obj).sort()
   for (const key of keys) {
-    sorted[key] = obj[key]
+    sorted[key] = stableStringify(obj[key])
   }
   return JSON.stringify(sorted)
 }
@@ -521,7 +521,7 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
 
   const items = useMemo(() => {
     if (loading && remoteItems === null) {
-      return []
+      return stableFallbackItems
     }
     const merged = mergeWithFallback(stableFallbackItems, remoteItems)
     return [...merged].filter(item => !item.deleted).sort(byNewest)
@@ -546,7 +546,10 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
     const localPayload = { ...payload, updatedAt: Date.now() }
     if (localPayload.createdAt) localPayload.createdAt = Date.now()
 
+    let backupRemoteItems = null
+    let backupCacheItems = null
     setRemoteItems(prev => {
+      backupRemoteItems = prev
       const list = prev || []
       const idx = list.findIndex(d => String(d.id) === id)
       if (idx >= 0) {
@@ -560,6 +563,7 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
     // 🟢 อัปเดตใน Cache ด้วย เพื่อให้หน้าที่ใช้ข้อมูลเดียวกันไม่ต้องดึงใหม่
     for (const [key, entry] of collectionCache.entries()) {
       if (key.includes(`"collectionName":"${collectionName}"`)) {
+        backupCacheItems = entry.items
         const idx = entry.items.findIndex(d => String(d.id) === id)
         const newItems = idx >= 0
           ? entry.items.map(d => String(d.id) === id ? { ...d, ...localPayload } : d)
@@ -571,15 +575,34 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
       }
     }
 
-    // ยิงเซฟลง Firestore แค่ 1 Write
-    await setDoc(doc(db, collectionName, id), payload, { merge: true })
-    await updateCollectionMetadata(collectionName)
+    try {
+      // ยิงเซฟลง Firestore แค่ 1 Write
+      await setDoc(doc(db, collectionName, id), payload, { merge: true })
+      await updateCollectionMetadata(collectionName)
+    } catch (err) {
+      // Rollback on failure
+      setRemoteItems(backupRemoteItems)
+      if (backupCacheItems) {
+        for (const [key, entry] of collectionCache.entries()) {
+          if (key.includes(`"collectionName":"${collectionName}"`)) {
+             collectionCache.set(key, { ...entry, items: backupCacheItems })
+             if (PUBLIC_COLLECTIONS.includes(collectionName)) {
+               try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: backupCacheItems, at: Date.now() })) } catch (e) { }
+             }
+          }
+        }
+      }
+      throw err
+    }
 
   }, [collectionName, isUserSpecific, uid])
 
   const deleteItem = useCallback(async (id) => {
+    let backupRemoteItems = null
+    let backupCacheItems = null
     // 🟢 Optimistic Update: มาร์กเป็น deleted: true บนหน้าจอก่อนทันที (เพื่อแก้ปัญหา Fallback Merge ย้อนกลับมาแสดง)
     setRemoteItems(prev => {
+      backupRemoteItems = prev
       const list = prev || []
       const idx = list.findIndex(d => String(d.id) === String(id))
       if (idx >= 0) {
@@ -593,6 +616,7 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
     // 🟢 มาร์กเป็น deleted: true ใน Cache
     for (const [key, entry] of collectionCache.entries()) {
       if (key.includes(`"collectionName":"${collectionName}"`)) {
+        backupCacheItems = entry.items
         const idx = entry.items.findIndex(d => String(d.id) === String(id))
         const newItems = idx >= 0
           ? entry.items.map(d => String(d.id) === String(id) ? { ...d, deleted: true } : d)
@@ -604,12 +628,27 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
       }
     }
 
-    await setDoc(doc(db, collectionName, String(id)), {
-      id: String(id),
-      deleted: true,
-      updatedAt: serverTimestamp(),
-    }, { merge: true })
-    await updateCollectionMetadata(collectionName)
+    try {
+      await setDoc(doc(db, collectionName, String(id)), {
+        id: String(id),
+        deleted: true,
+        updatedAt: serverTimestamp(),
+      }, { merge: true })
+      await updateCollectionMetadata(collectionName)
+    } catch (err) {
+      setRemoteItems(backupRemoteItems)
+      if (backupCacheItems) {
+        for (const [key, entry] of collectionCache.entries()) {
+          if (key.includes(`"collectionName":"${collectionName}"`)) {
+             collectionCache.set(key, { ...entry, items: backupCacheItems })
+             if (PUBLIC_COLLECTIONS.includes(collectionName)) {
+               try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: backupCacheItems, at: Date.now() })) } catch (e) { }
+             }
+          }
+        }
+      }
+      throw err
+    }
 
   }, [collectionName])
 
@@ -648,13 +687,16 @@ export async function saveContentItem(name, item, uid = null) {
 
   await setDoc(doc(db, collectionName, id), payload, { merge: true })
 
+  const localPayload = { ...payload, updatedAt: Date.now() }
+  if (localPayload.createdAt) localPayload.createdAt = Date.now()
+
   // 🟢 Optimistic Update แทนการล้าง Cache
   for (const [key, entry] of collectionCache.entries()) {
     if (key.includes(`"collectionName":"${collectionName}"`)) {
       const idx = entry.items.findIndex(d => String(d.id) === id)
       const newItems = idx >= 0
-        ? entry.items.map(d => String(d.id) === id ? { ...d, ...payload } : d)
-        : [payload, ...entry.items]
+        ? entry.items.map(d => String(d.id) === id ? { ...d, ...localPayload } : d)
+        : [localPayload, ...entry.items]
       collectionCache.set(key, { ...entry, items: newItems })
       if (PUBLIC_COLLECTIONS.includes(collectionName)) {
         try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: newItems, at: Date.now() })) } catch (e) { }
@@ -963,20 +1005,9 @@ export function useUserCollection(name, uid) {
   }, [collectionName, uid, name, isQuranBookmarks])
 
   useEffect(() => {
-    if (!uid || fetchedRef.current) return
-    fetchedRef.current = true
+    if (!uid || fetchedRef.current === uid) return
+    fetchedRef.current = uid
     fetchItems()
-  }, [uid, fetchItems])
-
-  // Re-fetch when uid changes (login/logout)
-  const prevUidRef = useRef(uid)
-  useEffect(() => {
-    if (prevUidRef.current !== uid) {
-      prevUidRef.current = uid
-      fetchedRef.current = false
-      if (uid) fetchItems()
-      else setItems([])
-    }
   }, [uid, fetchItems])
 
   const saveItem = useCallback(async (item) => {
@@ -1224,8 +1255,9 @@ export function useContentDoc(collectionKey, docId, fallback = null) {
 
     setLoading(true)
     if (cachedFromCollection) {
-      // Use cached data only as an immediate placeholder, then verify against Firestore.
       setItem(cachedFromCollection)
+      setLoading(false)
+      return undefined // skip Firestore read if cached
     }
     getDoc(doc(db, collectionName, String(docId)))
       .then(snapshot => {

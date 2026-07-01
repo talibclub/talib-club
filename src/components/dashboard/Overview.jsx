@@ -8,6 +8,7 @@ import DashboardNav from "../DashboardNav.jsx"
 let cachedOverviewCounts = null
 let cachedOverviewTimestamp = 0
 let cachedOverviewUid = null
+let inFlightOverviewPromise = null
 const OVERVIEW_CACHE_TTL = 60 * 1000 // 1 minute
 
 export default function Overview({ authState, go, setView, onOpenQuran, onOpenSavedVerses }) {
@@ -40,7 +41,27 @@ export default function Overview({ authState, go, setView, onOpenQuran, onOpenSa
       return
     }
 
+    if (inFlightOverviewPromise) {
+      try {
+        await inFlightOverviewPromise
+        if (cachedOverviewUid === userId) {
+           setCounts(cachedOverviewCounts)
+           setLoadingCounts(false)
+        }
+      } catch (e) {
+         setLoadingCounts(false)
+      }
+      return
+    }
+
     setLoadingCounts(true)
+    
+    inFlightOverviewPromise = Promise.all([
+      getCountFromServer(query(collection(db, "content_bookshelf"), where("uid", "==", userId), where("status", "!=", "finished"))),
+      getCountFromServer(query(collection(db, "content_bookshelf"), where("uid", "==", userId), where("status", "==", "finished"))),
+      getCountFromServer(query(collection(db, "content_quran_bookmarks"), where("uid", "==", userId))),
+      getCountFromServer(query(collection(db, "content_reading_sessions"), where("uid", "==", userId), where("verified", "==", true))),
+    ])
     
     try {
       const [
@@ -48,12 +69,7 @@ export default function Overview({ authState, go, setView, onOpenQuran, onOpenSa
         finishedBooksSnap,
         bookmarkSnap,
         sessionSnap,
-      ] = await Promise.all([
-        getCountFromServer(query(collection(db, "content_bookshelf"), where("uid", "==", userId), where("status", "!=", "finished"))),
-        getCountFromServer(query(collection(db, "content_bookshelf"), where("uid", "==", userId), where("status", "==", "finished"))),
-        getCountFromServer(query(collection(db, "content_quran_bookmarks"), where("uid", "==", userId))),
-        getCountFromServer(query(collection(db, "content_reading_sessions"), where("uid", "==", userId), where("verified", "==", true))),
-      ])
+      ] = await inFlightOverviewPromise
       
       const newCounts = {
         activeBooks: activeBooksSnap.data().count,
@@ -73,6 +89,7 @@ export default function Overview({ authState, go, setView, onOpenQuran, onOpenSa
         console.error("Failed to load overview counts:", err)
       }
     } finally {
+      inFlightOverviewPromise = null
       setLoadingCounts(false)
     }
   }, [])

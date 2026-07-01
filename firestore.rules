@@ -7,20 +7,20 @@ service cloud.firestore {
 
     function isStaff() {
       return signedIn()
-        && (request.auth.token.email == "islamofwhite@gmail.com" ||
-            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "staff" ||
-            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin");
+        && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "staff" ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "owner");
     }
 
     function isAdmin() {
       return signedIn()
-        && (request.auth.token.email == "islamofwhite@gmail.com" ||
-            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin");
+        && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "owner");
     }
 
     function isOwner() {
       return signedIn()
-        && request.auth.token.email == "islamofwhite@gmail.com";
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "owner";
     }
 
     function isOwnerOrAdmin() {
@@ -109,6 +109,11 @@ service cloud.firestore {
       allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
 
+    match /push_subscriptions/{docId} {
+      allow read: if isStaff();
+      allow create, update, delete: if signedIn();
+    }
+
     // --- Staff Portal Collections ---
     match /submissions/{docId} {
       allow read, write: if isStaff();
@@ -134,13 +139,13 @@ service cloud.firestore {
     // --- Logistics Tracking Collections ---
     match /records/{docId} {
       allow get: if true;
-      allow list: if isStaff() || (request.query.limit != null && request.query.limit <= 5 && request.query.filters.size() > 0);
+      allow list: if isStaff() || (request.query.limit != null && request.query.limit <= 5);
       allow write: if isStaff();
     }
 
     match /recipients/{docId} {
       allow get: if true;
-      allow list: if isStaff() || (request.query.limit != null && request.query.limit <= 5 && request.query.filters.size() > 0);
+      allow list: if isStaff() || (request.query.limit != null && request.query.limit <= 5);
       allow write: if isStaff();
     }
   }

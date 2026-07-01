@@ -15,11 +15,13 @@ export function getLocalDayKey(value) {
   const ms = getMs(value)
   if (!ms) return ""
   const date = new Date(ms)
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-")
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
+  return formatter.format(date)
 }
 
 export function addDaysToKey(dayKey, amount) {

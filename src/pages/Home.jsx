@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from "react"
 import { ARTICLES, BOOKS, MEDIA, SITE } from "../data/index.js"
 import { useContentCollection, useSiteSettings, useCollectionCount } from "../lib/contentStore.js"
+import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
+import ArticleCard from "../components/ArticleCard.jsx"
 
 const QURAN_DUAS = [
   { sura: 1, aya: 6 },
@@ -74,6 +76,7 @@ export default function Home({ go }) {
 
   useEffect(() => {
     if (!site) return
+    let isMounted = true
 
     const todayStr = new Date().toDateString()
     const cached = localStorage.getItem("talib_club_daily_dua")
@@ -103,6 +106,7 @@ export default function Home({ go }) {
         return res.json()
       })
       .then(data => {
+        if (!isMounted) return
         if (data && data.result) {
           const fetchedDua = {
             dateString: todayStr,
@@ -125,6 +129,7 @@ export default function Home({ go }) {
         }
       })
       .catch(err => {
+        if (!isMounted) return
         console.error("Failed to fetch daily dua:", err)
         setDailyDua({
           ar: site.ayah?.ar,
@@ -132,6 +137,8 @@ export default function Home({ go }) {
           ref: site.ayah?.ref
         })
       })
+      
+    return () => { isMounted = false }
   }, [site])
 
   const displayDua = dailyDua || {
@@ -140,6 +147,8 @@ export default function Home({ go }) {
     ref: site?.ayah?.ref || ""
   }
 
+
+  if (!site) return null
 
   return (
     <div>
@@ -226,36 +235,12 @@ export default function Home({ go }) {
         ) : (
           <div className="grid-art">
             {recent.map(a => (
-              <div key={a.id} className="card" style={{ cursor: "pointer", overflow: "hidden", display: "flex", flexDirection: "column" }}
-                onClick={() => go("article", a)}>
-                {a.coverUrl ? (
-                  <div style={{ width: "100%", height: 140, overflow: "hidden", borderBottom: ".5px solid var(--br2)" }}>
-                    <ImageWithFallback src={a.coverUrl} alt={a.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  </div>
-                ) : (
-                  <div style={{ width: "100%", height: 140, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: ".5px solid var(--br2)" }}>
-                    <span style={{ fontSize: 36 }}>{a.coverEmoji || "📖"}</span>
-                  </div>
-                )}
-                <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                      <span className="tag tag-teal" style={{ fontSize: 10 }}>{a.category}</span>
-                    </div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", lineHeight: 1.45, marginBottom: 6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                      {a.title}
-                    </div>
-                    <p style={{ fontSize: 12, marginBottom: 8, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", color: "var(--t2)" }}>
-                      {a.excerpt}
-                    </p>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" }}>
-                    <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>
-                      {a.author} · {a.date}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <ArticleCard 
+                key={a.id} 
+                article={a} 
+                onClick={(art) => go("article", art)} 
+                coverHeight={140} 
+              />
             ))}
           </div>
         )}

@@ -673,7 +673,8 @@ export default function Quran({ initialSura, initialAyah, authState }) {
   }
 
   const handleSaveBookmark = async () => {
-    if (!activeBookmarkModal) return
+    if (!activeBookmarkModal || activeBookmarkModal.isSaving) return
+    setActiveBookmarkModal(prev => ({ ...prev, isSaving: true }))
     const toastId = toast.loading("กำลังบันทึก...")
 
     try {
@@ -692,6 +693,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
       toast.success(isNew ? "บันทึกอายะฮ์สำเร็จ" : "อัปเดตข้อคิดแล้ว", { id: toastId })
       setActiveBookmarkModal(null)
     } catch (err) {
+      setActiveBookmarkModal(prev => prev ? { ...prev, isSaving: false } : null)
       toast.error("บันทึกผิดพลาดกรุณาลองใหม่", { id: toastId })
     }
   }

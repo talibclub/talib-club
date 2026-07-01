@@ -91,9 +91,9 @@ export function useAuth() {
           const photoURL = currentUser.photoURL || snapData.photoURL || ""
 
           const hasChanged =
-            snapData.email !== email ||
-            snapData.displayName !== displayName ||
-            snapData.photoURL !== photoURL
+            (snapData.email || "") !== email ||
+            (snapData.displayName || "") !== displayName ||
+            (snapData.photoURL || "") !== photoURL
 
           if (hasChanged) {
             // Only write if data truly changed
@@ -121,7 +121,7 @@ export function useAuth() {
           }
           await setDoc(ref, nextProfile)
           if (currentSeq !== activeSeq) return
-          setProfile(nextProfile)
+          setProfile({ ...nextProfile, createdAt: new Date() })
         }
       } catch (err) {
         console.error("Cannot load user profile", err)
@@ -153,12 +153,14 @@ export function useAuth() {
       }
     },
     async register({ email, password, displayName }) {
-      const res = await createUserWithEmailAndPassword(auth, email, password)
-      if (displayName) await updateProfile(res.user, { displayName })
+      const cleanEmail = email.trim().toLowerCase()
+      const cleanDisplayName = displayName ? displayName.trim() : ""
+      const res = await createUserWithEmailAndPassword(auth, cleanEmail, password)
+      if (cleanDisplayName) await updateProfile(res.user, { displayName: cleanDisplayName })
       await setDoc(doc(db, "users", res.user.uid), {
         role: "member",
-        displayName: displayName || "",
-        email,
+        displayName: cleanDisplayName,
+        email: cleanEmail,
         emailVerified: res.user.emailVerified,
         createdAt: serverTimestamp(),
       })
@@ -185,7 +187,7 @@ export function useAuth() {
     },
     async requestEmailChange(nextEmail) {
       if (!auth.currentUser) throw new Error("Missing current user")
-      const cleanEmail = nextEmail.trim()
+      const cleanEmail = (nextEmail || "").trim().toLowerCase()
       if (!cleanEmail) throw new Error("Missing email")
       if (cleanEmail === auth.currentUser.email) throw new Error("Email is unchanged")
       await verifyBeforeUpdateEmail(auth.currentUser, cleanEmail)
@@ -211,7 +213,7 @@ export function useAuth() {
       await sendPasswordResetEmail(auth, auth.currentUser.email)
     },
     async sendPasswordResetForEmail(email) {
-      const cleanEmail = email.trim()
+      const cleanEmail = (email || "").trim().toLowerCase()
       if (!cleanEmail) throw new Error("Missing email")
       await sendPasswordResetEmail(auth, cleanEmail)
     },

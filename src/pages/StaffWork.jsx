@@ -110,7 +110,7 @@ export default function StaffWork({ authState, go }) {
   // Security: Require authenticated user with uid, never fall back to localStorage
   const uid = authState?.user?.uid
   const currentUser = authState?.profile?.displayName || authState?.user?.displayName || ""
-  const isAdmin = authState?.profile?.role === "admin" || authState?.user?.email === "islamofwhite@gmail.com" || (currentUser && ADMIN_TEAM.includes(currentUser))
+  const isAdmin = authState?.profile?.role === "admin" || authState?.profile?.role === "owner" || authState?.profile?.role === "staff"
 
   // Redirect if not authenticated
   if (!uid || !currentUser) {
@@ -134,6 +134,7 @@ export default function StaffWork({ authState, go }) {
     let pollInterval = null
     let isMounted = true
     let pollBackoffDelay = 10000 // Start with 10 seconds
+    let currentFailureCount = 0
 
     const fetchData = async () => {
       try {
@@ -142,16 +143,18 @@ export default function StaffWork({ authState, go }) {
         if (isMounted) {
           setSubs(snap.docs.map(d => ({ id: d.id, ...d.data() })))
           setPollError(null)
+          currentFailureCount = 0
           setFailureCount(0)
           pollBackoffDelay = 10000 // Reset backoff on success
         }
       } catch (err) {
         if (isMounted) {
           console.error("Fetch sub error:", err)
-          setFailureCount(prev => prev + 1)
+          currentFailureCount++
+          setFailureCount(currentFailureCount)
           setPollError("ไม่สามารถดึงข้อมูลงานได้ - กำลังลองใหม่...")
           // Exponential backoff: 10s, 20s, 40s max 60s
-          pollBackoffDelay = Math.min(10000 * Math.pow(2, failureCount), 60000)
+          pollBackoffDelay = Math.min(10000 * Math.pow(2, currentFailureCount), 60000)
         }
       }
     }

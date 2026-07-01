@@ -46,28 +46,7 @@ import "./styles/dashboard.css"
 import { useContentCollection } from "./lib/contentStore.js"
 import { syncServerTime, safeDateNow } from "./utils/time.js"
 
-function getTimeMs(value) {
-  if (!value) return 0
-  if (typeof value.toDate === "function") return value.toDate().getTime()
-  if (value.seconds) return value.seconds * 1000
-  if (typeof value === "number") return value
-  const parsed = Date.parse(value)
-  return Number.isNaN(parsed) ? 0 : parsed
-}
-
-function getLocalDayKey(value) {
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value
-  const ms = getTimeMs(value)
-  if (!ms) return ""
-  const d = new Date(ms)
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Bangkok',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  })
-  return formatter.format(d)
-}
+import { getMs, getLocalDayKey } from "./utils/streak.js"
 
 const urlToPage = {
   "": "home",
@@ -540,13 +519,13 @@ function RequireOwner({ authState, children }) {
     const fullPath = location.pathname + location.search
     return <Navigate to="/auth" replace state={{ from: fullPath }} />
   }
-  if (authState.user.email !== "islamofwhite@gmail.com") {
+  if (authState.profile?.role !== "owner") {
     return (
       <div className="card" style={{ maxWidth: 520, margin: "44px auto", padding: 24, textAlign: "center" }}>
         <i className="ti ti-lock" style={{ fontSize: 28, color: "var(--red)", marginBottom: 10 }}></i>
         <h2 style={{ fontSize: 18, marginBottom: 8 }}>พื้นที่นี้สงวนสิทธิ์เฉพาะผู้ได้รับอนุญาต</h2>
         <p style={{ marginBottom: 16 }}>
-          บัญชีของคุณ ({authState.user.email}) ไม่มีสิทธิ์เข้าถึงส่วนนี้ มีเพียงเจ้าของระบบเท่านั้นที่เข้าถึงได้
+          บัญชีของคุณไม่มีสิทธิ์เข้าถึงส่วนนี้ มีเพียงเจ้าของระบบเท่านั้นที่เข้าถึงได้
         </p>
         <button className="btn btn-teal" onClick={() => navigate("/")}>
           กลับหน้าหลัก
