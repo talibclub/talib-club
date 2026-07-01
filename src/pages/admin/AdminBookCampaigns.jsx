@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react"
 import { collection, query, orderBy, getDocs, doc, setDoc, deleteDoc, serverTimestamp, updateDoc } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { db, storage } from "../../lib/firebase.js"
+import toast from "react-hot-toast"
+import { confirmAction } from "../../utils/feedback.jsx"
 
 export default function AdminBookCampaigns() {
   const [campaigns, setCampaigns] = useState([])
@@ -90,20 +92,23 @@ export default function AdminBookCampaigns() {
       }
       setShowForm(false)
       fetchCampaigns()
-      alert("บันทึกข้อมูลเรียบร้อย")
+      toast.success("บันทึกข้อมูลเรียบร้อย")
     } catch (err) {
       console.error(err)
-      alert("เกิดข้อผิดพลาดในการบันทึก")
+      toast.error("เกิดข้อผิดพลาดในการบันทึก")
     }
   }
 
   const handleDelete = async (id) => {
-    if (!window.confirm("ยืนยันการลบแคมเปญนี้? ข้อมูลการลงทะเบียนที่ผูกอยู่จะยังคงอยู่ในระบบแต่จะไม่แสดงผลหน้าเว็บ")) return
+    const confirmed = await confirmAction("ยืนยันการลบ", "คุณต้องการลบแคมเปญนี้ใช่หรือไม่? ข้อมูลการลงทะเบียนที่ผูกอยู่จะยังคงอยู่ในระบบแต่จะไม่แสดงผลหน้าเว็บ")
+    if (!confirmed) return
     try {
       await deleteDoc(doc(db, "book_campaigns", id))
       fetchCampaigns()
+      toast.success("ลบแคมเปญเรียบร้อยแล้ว")
     } catch (err) {
-      alert("เกิดข้อผิดพลาดในการลบ")
+      console.error(err)
+      toast.error("เกิดข้อผิดพลาดในการลบ")
     }
   }
 
@@ -138,9 +143,10 @@ export default function AdminBookCampaigns() {
       await uploadBytes(storageRef, file)
       const url = await getDownloadURL(storageRef)
       onComplete(url)
+      toast.success("อัปโหลดรูปภาพสำเร็จ")
     } catch (err) {
       console.error(err)
-      alert("เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ")
+      toast.error("เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ")
     } finally {
       setUploadingImage(false)
     }
@@ -209,9 +215,9 @@ export default function AdminBookCampaigns() {
               <span className="label-text">รูปรหัสคิวอาร์โค้ด (QR Code) (URL หรือ อัปโหลด)</span>
               <div style={{ display: "flex", gap: 8 }}>
                 <input type="text" value={formData.qrCodeUrl} onChange={e => setFormData({...formData, qrCodeUrl: e.target.value})} placeholder="https://..." style={{ flex: 1 }} />
-                <label className="btn btn-outline" style={{ cursor: "pointer", padding: "6px 12px", background: "var(--bg)" }}>
-                  <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleImageUpload(e.target.files[0], url => setFormData({...formData, qrCodeUrl: url}))} />
-                  <i className="ti ti-upload"></i> อัปโหลด
+                <label className="btn btn-outline" style={{ cursor: uploadingImage ? "not-allowed" : "pointer", padding: "6px 12px", background: "var(--bg)", opacity: uploadingImage ? 0.7 : 1 }}>
+                  <input type="file" accept="image/*" style={{ display: "none" }} disabled={uploadingImage} onChange={(e) => handleImageUpload(e.target.files[0], url => setFormData({...formData, qrCodeUrl: url}))} />
+                  {uploadingImage ? <><i className="ti ti-loader-2 spin"></i> โหลด...</> : <><i className="ti ti-upload"></i> อัปโหลด</>}
                 </label>
               </div>
             </label>
@@ -239,9 +245,9 @@ export default function AdminBookCampaigns() {
                       <input type="text" placeholder="ชื่อหนังสือ / คำอธิบายสั้นๆ" value={item.name} onChange={e => updateItem(idx, "name", e.target.value)} required style={{ padding: "6px 10px", fontSize: 13 }} />
                       <div style={{ display: "flex", gap: 8 }}>
                         <input type="text" placeholder="ลิงก์รูปภาพหน้าปก (URL)" value={item.imageUrl} onChange={e => updateItem(idx, "imageUrl", e.target.value)} style={{ padding: "6px 10px", fontSize: 13, flex: 1 }} />
-                        <label className="btn btn-outline" style={{ cursor: "pointer", padding: "4px 8px", background: "var(--bg)" }}>
-                          <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleImageUpload(e.target.files[0], url => updateItem(idx, "imageUrl", url))} />
-                          <i className="ti ti-upload"></i> อัปโหลด
+                        <label className="btn btn-outline" style={{ cursor: uploadingImage ? "not-allowed" : "pointer", padding: "4px 8px", background: "var(--bg)", opacity: uploadingImage ? 0.7 : 1 }}>
+                          <input type="file" accept="image/*" style={{ display: "none" }} disabled={uploadingImage} onChange={(e) => handleImageUpload(e.target.files[0], url => updateItem(idx, "imageUrl", url))} />
+                          {uploadingImage ? <><i className="ti ti-loader-2 spin"></i> โหลด...</> : <><i className="ti ti-upload"></i> อัปโหลด</>}
                         </label>
                       </div>
                     </div>
@@ -282,15 +288,15 @@ export default function AdminBookCampaigns() {
                   โควตา: {c.quota} สิทธิ์ | เวลาโอน: {c.timeLimit} นาที | หนังสือ: {c.items?.length || 0} เล่ม
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button className="btn btn-outline" onClick={() => alert("ระบบดูรายชื่อจะตามมาใน Phase 2")} style={{ padding: "6px 12px", fontSize: 13 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button className="btn" onClick={() => toast("ระบบดูรายชื่อกำลังจะมาเร็วๆ นี้", { icon: "🚧" })} style={{ padding: "6px 12px", fontSize: 13, background: "var(--teal-bg)", color: "var(--teal)", border: "none" }}>
                   <i className="ti ti-users" style={{ marginRight: 6 }}></i> ดูรายชื่อ
                 </button>
-                <button className="btn btn-outline" onClick={() => handleOpenForm(c)} style={{ padding: "6px 12px", fontSize: 13 }}>
-                  แก้ไข
+                <button className="btn btn-outline" onClick={() => handleOpenForm(c)} style={{ padding: "6px 12px", fontSize: 13, background: "var(--bg)", borderColor: "var(--br)" }}>
+                  <i className="ti ti-edit" style={{ marginRight: 4 }}></i> แก้ไข
                 </button>
-                <button className="btn btn-danger" onClick={() => handleDelete(c.id)} style={{ background: "none", border: "none", color: "var(--red)", padding: "6px 12px", fontSize: 13 }}>
-                  ลบ
+                <button className="btn" onClick={() => handleDelete(c.id)} style={{ padding: "6px 12px", fontSize: 13, background: "rgba(239, 68, 68, 0.1)", color: "var(--red)", border: "none" }}>
+                  <i className="ti ti-trash" style={{ marginRight: 4 }}></i> ลบ
                 </button>
               </div>
             </div>
