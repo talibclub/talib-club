@@ -354,7 +354,14 @@ export default function BookRegistration({ go, ctx }) {
           <h2 style={{ color: "var(--teal)", marginBottom: 16 }}>ลงทะเบียนสำเร็จ!</h2>
           <p style={{ color: "var(--text)", fontSize: 16 }}>ระบบได้รับข้อมูลและการชำระเงินของคุณเรียบร้อยแล้ว</p>
           <p style={{ color: "var(--t2)", marginTop: 8 }}>ทีมงานจะทำการตรวจสอบสลิปและจัดส่งพัสดุให้คุณตามที่อยู่จัดส่ง คุณสามารถตรวจสอบสถานะพัสดุได้ในเมนู Tracking</p>
-          <button className="btn btn-outline" onClick={() => go("home")} style={{ marginTop: 32 }}>กลับสู่หน้าหลัก</button>
+          <div style={{ marginTop: 32, display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
+            <button className="btn btn-teal" onClick={() => go("tracking-system")} style={{ padding: "12px 24px", fontSize: 16, fontWeight: 600 }}>
+              <i className="ti ti-list-search" style={{ marginRight: 8 }}></i> เช็ครายชื่อและสถานะ
+            </button>
+            <button className="btn btn-outline" onClick={() => go("home")} style={{ padding: "12px 24px", fontSize: 16 }}>
+              กลับสู่หน้าหลัก
+            </button>
+          </div>
         </div>
       )}
     </div>

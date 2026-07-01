@@ -6,6 +6,7 @@ import { useAuth } from "../hooks/useAuth.js"
 export default function BookCampaigns({ go }) {
   const [campaigns, setCampaigns] = useState([])
   const [loading, setLoading] = useState(true)
+  const [activeImageIdx, setActiveImageIdx] = useState({})
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -155,29 +156,47 @@ export default function BookCampaigns({ go }) {
                 {/* Left Side: Images */}
                 <div className="campaign-image-side">
                   {c.items && c.items.length > 0 ? (
-                    <>
-                      {/* Featured Image */}
-                      <div className="book-img-container book-featured" style={{ width: "100%", aspectRatio: "3/4", borderRadius: 16, overflow: "hidden", boxShadow: "0 16px 32px rgba(0,0,0,0.15)" }}>
-                        {c.items[0].imageUrl ? (
-                          <img src={c.items[0].imageUrl} alt={c.items[0].name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        ) : (
-                          <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", background: "var(--bg3)", color: "var(--t3)" }}>
-                            <i className="ti ti-book" style={{ fontSize: 60 }}></i>
+                    (() => {
+                      const activeIdx = activeImageIdx[c.id] || 0;
+                      const activeItem = c.items[activeIdx] || c.items[0];
+                      return (
+                        <>
+                          {/* Featured Image */}
+                          <div className="book-img-container book-featured" style={{ width: "100%", aspectRatio: "3/4", borderRadius: 16, overflow: "hidden", boxShadow: "0 16px 32px rgba(0,0,0,0.15)" }}>
+                            {activeItem.imageUrl ? (
+                              <img src={activeItem.imageUrl} alt={activeItem.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            ) : (
+                              <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", background: "var(--bg3)", color: "var(--t3)" }}>
+                                <i className="ti ti-book" style={{ fontSize: 60 }}></i>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                      
-                      {/* Thumbnails */}
-                      {c.items.length > 1 && (
-                        <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8, marginTop: 8 }}>
-                          {c.items.slice(1).map((item, idx) => (
-                            <div key={idx} style={{ width: 64, flexShrink: 0, aspectRatio: "3/4", borderRadius: 8, overflow: "hidden", border: "1px solid var(--br)", opacity: 0.8, transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = 1} onMouseLeave={e => e.currentTarget.style.opacity = 0.8}>
-                              {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ background: "var(--bg3)", height: "100%" }} />}
+                          
+                          {/* Thumbnails */}
+                          {c.items.length > 1 && (
+                            <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8, marginTop: 8 }}>
+                              {c.items.map((item, idx) => (
+                                <div 
+                                  key={idx} 
+                                  onClick={() => setActiveImageIdx(prev => ({ ...prev, [c.id]: idx }))}
+                                  style={{ 
+                                    width: 64, flexShrink: 0, aspectRatio: "3/4", borderRadius: 8, overflow: "hidden", 
+                                    border: activeIdx === idx ? "2px solid var(--teal)" : "1px solid var(--br)", 
+                                    opacity: activeIdx === idx ? 1 : 0.6, 
+                                    cursor: "pointer",
+                                    transition: "all 0.2s" 
+                                  }}
+                                  onMouseEnter={e => { if (activeIdx !== idx) e.currentTarget.style.opacity = 0.9 }} 
+                                  onMouseLeave={e => { if (activeIdx !== idx) e.currentTarget.style.opacity = 0.6 }}
+                                >
+                                  {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ background: "var(--bg3)", height: "100%" }} />}
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </>
+                          )}
+                        </>
+                      );
+                    })()
                   ) : (
                     <div className="book-featured" style={{ width: "100%", aspectRatio: "3/4", borderRadius: 16, border: "2px dashed var(--br)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t3)" }}>
                       <i className="ti ti-gift" style={{ fontSize: 60 }}></i>
