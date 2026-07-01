@@ -75,7 +75,8 @@ export default function BookCampaigns({ go }) {
           transition: all 0.3s ease;
           box-shadow: 0 8px 20px rgba(18, 184, 134, 0.25);
           display: inline-flex;
-          alignItems: center;
+          align-items: center;
+          justify-content: center;
           gap: 10px;
         }
         .premium-btn:hover {

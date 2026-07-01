@@ -500,6 +500,14 @@ class PageErrorBoundary extends Component {
         <p style={{ marginBottom: 16 }}>
           ระบบเจอข้อผิดพลาดระหว่างแสดงผลหน้า ลองโหลดใหม่ หรือกลับหน้าแรกเพื่อใช้งานต่อได้เลย
         </p>
+        {this.state.error && (
+          <div style={{ textAlign: "left", background: "var(--bg3)", padding: 12, borderRadius: 8, marginBottom: 16, fontSize: 12, overflowX: "auto" }}>
+            <strong style={{ color: "var(--red)" }}>{this.state.error.toString()}</strong>
+            <pre style={{ margin: "8px 0 0", color: "var(--t2)", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+              {this.state.error.stack}
+            </pre>
+          </div>
+        )}
         <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
           <button className="btn btn-teal" onClick={() => window.location.reload()}>
             <i className="ti ti-refresh" style={{ marginRight: 6 }}></i>โหลดใหม่

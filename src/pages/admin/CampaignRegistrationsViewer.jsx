@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { collection, query, where, getDocs, updateDoc, doc, serverTimestamp, setDoc } from "firebase/firestore"
+import { collection, query, where, getDocs, updateDoc, doc, serverTimestamp, setDoc, writeBatch } from "firebase/firestore"
 import { db } from "../../lib/firebase.js"
 import { trackingDb } from "../../lib/trackingFirebase.js"
 import toast from "react-hot-toast"
@@ -10,6 +10,7 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState("all") // all, submitted, approved, shipped, rejected
   const [search, setSearch] = useState("")
+  const [selected, setSelected] = useState([])
 
   const fetchRegistrations = async () => {
     setLoading(true)
@@ -31,6 +32,7 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
   useEffect(() => {
     if (campaign) {
       fetchRegistrations()
+      setSelected([])
     }
   }, [campaign])
 
@@ -123,18 +125,77 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
   }
 
   const filteredRegistrations = registrations.filter(r => {
-    if (filter !== "all") {
-      const rStatus = r.status || "submitted"
-      if (rStatus !== filter) return false
-    }
-    if (search) {
-      const q = search.toLowerCase()
-      if (!r.name.toLowerCase().includes(q) && !r.phone.includes(q)) {
-        return false
-      }
-    }
-    return true
+    if (filter === "all") return true
+    if (filter === "submitted") return !r.status || r.status === "submitted"
+    return r.status === filter
+  }).filter(r => {
+    if (!search) return true
+    return (r.name || "").toLowerCase().includes(search.toLowerCase()) || (r.phone || "").includes(search)
   })
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelected(filteredRegistrations.map(r => r.id))
+    } else {
+      setSelected([])
+    }
+  }
+
+  const toggleSelect = (id) => {
+    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  const handleBulkApprove = async () => {
+    if (selected.length === 0) return
+    const confirmed = await confirmAction(`ยืนยันการอนุมัติ ${selected.length} รายการที่เลือกใช่หรือไม่?`)
+    if (!confirmed) return
+
+    const toastId = toast.loading("กำลังอนุมัติ...")
+    try {
+      const batch = writeBatch(db)
+      selected.forEach(id => {
+        const ref = doc(db, "book_registrations", id)
+        batch.update(ref, { status: "approved", updatedAt: serverTimestamp() })
+      })
+      await batch.commit()
+      toast.success("อนุมัติสำเร็จ", { id: toastId })
+      setSelected([])
+      fetchRegistrations()
+    } catch (err) {
+      console.error(err)
+      toast.error("เกิดข้อผิดพลาดในการอนุมัติ", { id: toastId })
+    }
+  }
+
+  const handleExportCSV = () => {
+    if (filteredRegistrations.length === 0) {
+      return toast.error("ไม่มีข้อมูลสำหรับส่งออก")
+    }
+    
+    const headers = ["ลำดับ", "ชื่อ-นามสกุล", "เบอร์โทรศัพท์", "ที่อยู่จัดส่ง", "รหัสไปรษณีย์", "ช่องทางติดต่อ", "สถานะ", "เวลาลงทะเบียน"]
+    const rows = filteredRegistrations.map((r, idx) => {
+      return [
+        idx + 1,
+        `"${(r.name || '').replace(/"/g, '""')}"`,
+        `"${(r.phone || '').replace(/"/g, '""')}"`,
+        `"${(r.address || '').replace(/\n/g, ' ').replace(/"/g, '""')}"`,
+        `"${(r.zipcode || '').replace(/"/g, '""')}"`,
+        `"${(r.contact || '').replace(/"/g, '""')}"`,
+        r.status || 'submitted',
+        r.createdAt ? new Date(r.createdAt.toMillis()).toLocaleString('th-TH') : ''
+      ].join(",")
+    })
+    
+    const csvContent = "\uFEFF" + headers.join(",") + "\n" + rows.join("\n")
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.setAttribute("download", `รายชื่อ_${campaign.title}_${new Date().toISOString().split('T')[0]}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
   const getStatusBadge = (status) => {
     const s = status || "submitted"
@@ -179,12 +240,29 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
               onChange={e => setSearch(e.target.value)} 
             />
           </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {selected.length > 0 && (
+              <button className="btn btn-teal" onClick={handleBulkApprove} style={{ padding: "8px 16px" }}>
+                <i className="ti ti-check"></i> อนุมัติ ({selected.length})
+              </button>
+            )}
+            <button className="btn btn-outline" onClick={handleExportCSV} style={{ padding: "8px 16px" }}>
+              <i className="ti ti-download"></i> โหลด CSV
+            </button>
+          </div>
         </div>
 
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", fontSize: 13, textAlign: "left", borderCollapse: "collapse" }}>
             <thead style={{ background: "var(--bg2)", borderBottom: "1px solid var(--br)" }}>
               <tr>
+                <th style={{ padding: 12, width: 40, textAlign: "center" }}>
+                  <input 
+                    type="checkbox" 
+                    checked={filteredRegistrations.length > 0 && selected.length === filteredRegistrations.length}
+                    onChange={handleSelectAll}
+                  />
+                </th>
                 <th style={{ padding: 12 }}>ลำดับ</th>
                 <th style={{ padding: 12 }}>ชื่อ-นามสกุล / เบอร์โทร</th>
                 <th style={{ padding: 12 }}>ที่อยู่จัดส่ง</th>
@@ -195,12 +273,19 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="6" style={{ textAlign: "center", padding: 32, color: "var(--t3)" }}><i className="ti ti-loader-2 spin"></i> กำลังโหลด...</td></tr>
+                <tr><td colSpan="7" style={{ textAlign: "center", padding: 32, color: "var(--t3)" }}><i className="ti ti-loader-2 spin"></i> กำลังโหลด...</td></tr>
               ) : filteredRegistrations.length === 0 ? (
-                <tr><td colSpan="6" style={{ textAlign: "center", padding: 32, color: "var(--t3)" }}>ไม่พบรายชื่อ</td></tr>
+                <tr><td colSpan="7" style={{ textAlign: "center", padding: 32, color: "var(--t3)" }}>ไม่พบรายชื่อ</td></tr>
               ) : (
                 filteredRegistrations.map((reg, idx) => (
                   <tr key={reg.id} style={{ borderBottom: "1px solid var(--br2)", background: idx % 2 === 0 ? "var(--card)" : "var(--bg2)" }}>
+                    <td style={{ padding: 12, textAlign: "center" }}>
+                      <input 
+                        type="checkbox" 
+                        checked={selected.includes(reg.id)}
+                        onChange={() => toggleSelect(reg.id)}
+                      />
+                    </td>
                     <td style={{ padding: 12, color: "var(--t2)" }}>{idx + 1}</td>
                     <td style={{ padding: 12 }}>
                       <div style={{ fontWeight: 600 }}>{reg.name}</div>
