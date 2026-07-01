@@ -4,14 +4,16 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { db, storage } from "../../lib/firebase.js"
 import toast from "react-hot-toast"
 import { confirmAction } from "../../utils/feedback.jsx"
+import CampaignRegistrationsViewer from "./CampaignRegistrationsViewer.jsx"
 
 export default function AdminBookCampaigns() {
   const [campaigns, setCampaigns] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // Form State
+  // Form & View State
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [viewingCampaign, setViewingCampaign] = useState(null)
   
   const [formData, setFormData] = useState({
     title: "",
@@ -149,6 +151,15 @@ export default function AdminBookCampaigns() {
     } finally {
       setUploadingImage(false)
     }
+  }
+
+  if (viewingCampaign) {
+    return (
+      <CampaignRegistrationsViewer 
+        campaign={viewingCampaign} 
+        onBack={() => setViewingCampaign(null)} 
+      />
+    )
   }
 
   return (
@@ -298,7 +309,7 @@ export default function AdminBookCampaigns() {
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
-                    <button className="btn btn-outline" onClick={() => toast("ระบบดูรายชื่อกำลังจะมาเร็วๆ นี้", { icon: "🚧" })} style={{ padding: "8px 16px", fontSize: 13, color: "var(--teal)", borderColor: "var(--teal-bg)", background: "var(--teal-bg)", borderRadius: 20, display: "flex", alignItems: "center", gap: 6 }}>
+                    <button className="btn btn-outline" onClick={() => setViewingCampaign(c)} style={{ padding: "8px 16px", fontSize: 13, color: "var(--teal)", borderColor: "var(--teal-bg)", background: "var(--teal-bg)", borderRadius: 20, display: "flex", alignItems: "center", gap: 6 }}>
                       <i className="ti ti-users"></i> รายชื่อ
                     </button>
                     <button className="btn btn-outline" onClick={() => handleOpenForm(c)} style={{ width: 36, height: 36, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", background: "var(--bg)", borderColor: "var(--br)", color: "var(--text)" }}>

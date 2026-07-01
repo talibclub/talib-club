@@ -188,6 +188,7 @@ export default function BookRegistration({ go, ctx }) {
         zipcode: formData.zipcode,
         contact: formData.contact,
         slipUrl,
+        status: "submitted",
         createdAt: serverTimestamp()
       })
 
