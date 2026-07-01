@@ -2533,3 +2533,39 @@ button.dashboard-card:hover {
   background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%) !important;
   color: #fff !important;
 }
+
+/* --- MOBILE UX IMPROVEMENTS --- */
+@media (max-width: 767px) {
+  /* Prevent iOS Auto-Zoom on inputs */
+  input, select, textarea {
+    font-size: 16px !important;
+    padding: 12px 14px;
+  }
+  
+  /* Reduce global padding on mobile to save space */
+  .card {
+    padding: 16px !important;
+  }
+  
+  /* Bigger touch targets for buttons */
+  .btn {
+    min-height: 44px;
+  }
+  
+  /* Touch feedback active state */
+  .btn:active, button:active, a.card:active, .article-card:active {
+    transform: scale(0.97);
+    transition: transform 0.1s;
+  }
+  
+  /* Ensure admin sidebar dropdown is tall enough */
+  .admin-mobile-select-wrapper select {
+    min-height: 48px;
+    font-size: 16px !important;
+  }
+}
+
+/* Ensure mobile menu locks body scroll */
+body.menu-open {
+  overflow: hidden !important;
+}

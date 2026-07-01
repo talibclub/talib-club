@@ -84,6 +84,11 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
   const accountRef = useRef(null)
   const notificationRef = useRef(null)
 
+  useEffect(() => {
+    document.body.classList.toggle("menu-open", menuOpen)
+    return () => document.body.classList.remove("menu-open")
+  }, [menuOpen])
+
   const {
     isInstallable,
     isInstalled,
