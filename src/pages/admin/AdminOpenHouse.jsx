@@ -269,7 +269,7 @@ export default function AdminOpenHouse() {
         <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <i className="ti ti-map" style={{ color: "var(--teal)" }}></i> ระบบนิทรรศการ (Open House)
         </h2>
-        <button className="btn btn-teal" onClick={() => { setShowBoothForm(true); setEditingBoothId(null); setBoothForm({ name: "", platform: "YouTube", language: "Thai", description: "", logoUrl: "", themeColor: "#1a5f7a", order: 1 }); }} style={{ padding: "6px 12px", fontSize: 13 }}>
+        <button className="btn btn-teal" onClick={() => { setShowBoothForm(true); setEditingBoothId(null); setBoothForm({ name: "", platforms: ["YouTube"], language: "Thai", description: "", logoUrl: "", themeColor: "#1a5f7a", order: 1, networks: [] }); }} style={{ padding: "6px 12px", fontSize: 13 }}>
           + เพิ่มบูธใหม่
         </button>
       </div>

@@ -2,37 +2,37 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://talib.club/</loc>
-    <lastmod>2026-06-22</lastmod>
+    <lastmod>2026-07-01</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://talib.club/articles</loc>
-    <lastmod>2026-06-22</lastmod>
+    <lastmod>2026-07-01</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://talib.club/library</loc>
-    <lastmod>2026-06-22</lastmod>
+    <lastmod>2026-07-01</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://talib.club/media</loc>
-    <lastmod>2026-06-22</lastmod>
+    <lastmod>2026-07-01</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://talib.club/scholars</loc>
-    <lastmod>2026-06-22</lastmod>
+    <lastmod>2026-07-01</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://talib.club/donate</loc>
-    <lastmod>2026-06-22</lastmod>
+    <lastmod>2026-07-01</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -1058,7 +1058,7 @@
   </url>
   <url>
     <loc>https://talib.club/library-detail?id=217c0cd8-3969-4026-a0e9-68dd2a21fcb3</loc>
-    <lastmod>2026-06-04</lastmod>
+    <lastmod>2026-07-01</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -1166,19 +1166,19 @@
   </url>
   <url>
     <loc>https://talib.club/library-detail?id=42</loc>
-    <lastmod>2026-06-09</lastmod>
+    <lastmod>2026-07-01</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://talib.club/library-detail?id=4257d22b-8b1e-4267-92ee-dcc212a25fec</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-07-01</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://talib.club/library-detail?id=44</loc>
-    <lastmod>2026-06-09</lastmod>
+    <lastmod>2026-07-01</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -1292,13 +1292,19 @@
   </url>
   <url>
     <loc>https://talib.club/library-detail?id=77daccc9-a38f-4076-8272-df009f071654</loc>
-    <lastmod>2026-06-21</lastmod>
+    <lastmod>2026-07-01</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://talib.club/library-detail?id=9fd3765c-bf8f-4290-9ab0-b65838bd287f</loc>
-    <lastmod>2026-06-09</lastmod>
+    <lastmod>2026-07-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://talib.club/library-detail?id=b4219736-aaa0-40ef-8280-b4f2743a99d1</loc>
+    <lastmod>2026-07-01</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
