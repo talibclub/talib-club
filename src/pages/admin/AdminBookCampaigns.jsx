@@ -123,11 +123,19 @@ export default function AdminBookCampaigns() {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <h2><i className="ti ti-book" style={{ color: "var(--teal)", marginRight: 8 }}></i> ระบบแจก/ขายหนังสือ (Campaigns)</h2>
-        <button className="btn btn-teal" onClick={() => handleOpenForm()}>
-          <i className="ti ti-plus"></i> สร้างแคมเปญใหม่
-        </button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <h2><i className="ti ti-book" style={{ color: "var(--teal)", marginRight: 8 }}></i> ระบบแจก/ขายหนังสือ (Campaigns)</h2>
+          <p style={{ marginTop: 8 }}>จัดการแคมเปญแจกหนังสือ หรือขายหนังสือ พร้อมระบบจองโควตาแบบเรียลไทม์</p>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <a className="btn btn-outline" href="/books" target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+            <i className="ti ti-external-link" style={{ marginRight: 6 }}></i>หน้าเว็บผู้ใช้ (ไว้แชร์)
+          </a>
+          <button className="btn btn-teal" onClick={() => handleOpenForm()}>
+            <i className="ti ti-plus"></i> สร้างแคมเปญใหม่
+          </button>
+        </div>
       </div>
 
       {showForm && (

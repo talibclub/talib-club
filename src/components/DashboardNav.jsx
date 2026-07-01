@@ -71,6 +71,22 @@ export default function DashboardNav({
       colorVar: "#818cf8",
       bgVar: "rgba(129,140,248,0.1)",
     },
+    {
+      icon: "ti ti-book",
+      label: "แจก/สั่งซื้อหนังสือ",
+      desc: "ลงทะเบียนรับหนังสือหรือสั่งซื้อหนังสือจาก Talib Club",
+      view: "books",
+      colorVar: "#10b981",
+      bgVar: "rgba(16,185,129,0.1)",
+    },
+    {
+      icon: "ti ti-package",
+      label: "ตรวจสอบสถานะพัสดุ",
+      desc: "ติดตามการจัดส่งหนังสือหรือของรางวัลของคุณ",
+      view: "tracking",
+      colorVar: "#8b5cf6",
+      bgVar: "rgba(139,92,246,0.1)",
+    },
   ]
 
   function handleClick(view) {
@@ -82,6 +98,10 @@ export default function DashboardNav({
       }
     } else if (view === "reader") {
       go("reader")
+    } else if (view === "books") {
+      go("books")
+    } else if (view === "tracking") {
+      go("tracking")
     } else {
       setView(view)
     }

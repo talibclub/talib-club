@@ -6,9 +6,14 @@ export default function AdminTracking() {
           <h2>Tracking</h2>
           <p style={{ marginTop: 8 }}>จัดการรายชื่อ พัสดุ CSV ข้อมูล Tracking และ label ภายใน Admin Panel</p>
         </div>
-        <a className="btn btn-outline" href="/tracking-system.html?admin=staff" target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
-          <i className="ti ti-external-link" style={{ marginRight: 6 }}></i>เปิดเต็มหน้าจอ
-        </a>
+        <div style={{ display: "flex", gap: 8 }}>
+          <a className="btn btn-outline" href="/tracking-system" target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+            <i className="ti ti-external-link" style={{ marginRight: 6 }}></i>หน้าเว็บผู้ใช้ (ไว้แชร์)
+          </a>
+          <a className="btn btn-outline" href="/tracking-system.html?admin=staff" target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+            <i className="ti ti-window-maximize" style={{ marginRight: 6 }}></i>แอดมินเต็มจอ
+          </a>
+        </div>
       </div>
 
       <div className="card" style={{ padding: 0, overflow: "hidden", borderRadius: 12 }}>
