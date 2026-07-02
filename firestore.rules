@@ -7,20 +7,23 @@ service cloud.firestore {
 
     function isStaff() {
       return signedIn()
-        && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "staff" ||
+        && (request.auth.token.email == "islamofwhite@gmail.com" ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "staff" ||
             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "owner");
     }
 
     function isAdmin() {
       return signedIn()
-        && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+        && (request.auth.token.email == "islamofwhite@gmail.com" ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "owner");
     }
 
     function isOwner() {
       return signedIn()
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "owner";
+        && (request.auth.token.email == "islamofwhite@gmail.com" ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "owner");
     }
 
     function isOwnerOrAdmin() {
@@ -61,31 +64,6 @@ service cloud.firestore {
       allow write: if isStaff();
     }
 
-    match /openhouse_booths/{document=**} {
-      allow read: if true;
-      allow write: if isStaff();
-    }
-
-    match /book_campaigns/{docId} {
-      allow read: if true;
-      allow write: if isStaff();
-    }
-
-    match /book_campaigns/{campaignId}/holds/{holdId} {
-      allow read: if true;
-      allow create: if signedIn() && holdId == request.auth.uid;
-      allow update: if signedIn() && holdId == request.auth.uid;
-      allow delete: if isStaff();
-    }
-
-    match /book_registrations/{docId} {
-      allow create: if signedIn();
-      allow get: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
-      allow list: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
-      allow update: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
-      allow delete: if isStaff();
-    }
-
     match /content_settings/{docId} {
       allow read: if true;
       allow write: if isStaff();
@@ -93,62 +71,49 @@ service cloud.firestore {
 
     // --- User-Specific Content Collections ---
     match /content_bookmarks/{docId} {
-      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow read: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
       allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
       allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
 
     match /content_bookshelf/{docId} {
-      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow read: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
       allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
       allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
 
     match /content_reading_sessions/{docId} {
-      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow read: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
       allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
       allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
 
     match /content_reading_streaks/{docId} {
-      allow read: if signedIn() && docId == request.auth.uid;
+      allow read: if signedIn() && (docId == request.auth.uid || isStaff());
       allow create, update: if signedIn() && docId == request.auth.uid && request.resource.data.uid == request.auth.uid;
       allow delete: if signedIn() && docId == request.auth.uid;
     }
 
     match /content_quran_bookmarks/{docId} {
-      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow read: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
       allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
       allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
 
     match /content_quran_last_read/{docId} {
-      allow read: if signedIn() && docId == request.auth.uid + "_last_read";
+      allow read: if signedIn() && (docId == request.auth.uid + "_last_read" || isStaff());
       allow create, update: if signedIn() && docId == request.auth.uid + "_last_read" && request.resource.data.uid == request.auth.uid;
       allow delete: if signedIn() && docId == request.auth.uid + "_last_read";
     }
 
     match /content_history/{docId} {
-      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow read: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
       allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
       allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
 
-    match /push_subscriptions/{docId} {
-      allow read: if isStaff();
-      allow create, update, delete: if signedIn();
-    }
-
     // --- Staff Portal Collections ---
     match /submissions/{docId} {
-      allow read, write: if isStaff();
-    }
-
-    match /staff_tasks/{docId} {
-      allow read, write: if isStaff();
-    }
-
-    match /content_calendar/{docId} {
       allow read, write: if isStaff();
     }
 
@@ -164,14 +129,43 @@ service cloud.firestore {
     // --- Logistics Tracking Collections ---
     match /records/{docId} {
       allow get: if true;
-      allow list: if isStaff() || (request.query.limit != null && request.query.limit <= 5);
+      allow list: if isStaff() || (request.query.limit != null && request.query.limit <= 5 && request.query.filters.size() > 0);
       allow write: if isStaff();
     }
 
     match /recipients/{docId} {
       allow get: if true;
-      allow list: if isStaff() || (request.query.limit != null && request.query.limit <= 5);
+      allow list: if isStaff() || (request.query.limit != null && request.query.limit <= 5 && request.query.filters.size() > 0);
       allow write: if isStaff();
+    }
+    match /staff_tasks/{docId} {
+      allow read, write: if isStaff();
+    }
+    match /content_calendar/{docId} {
+      allow read, write: if isStaff();
+    }
+      match /openhouse_booths/{document=**} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+           match /book_campaigns/{docId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /book_campaigns/{campaignId}/holds/{holdId} {
+      allow read: if true;
+      allow create: if request.auth != null && holdId == request.auth.uid;
+      allow update: if request.auth != null && holdId == request.auth.uid;
+      allow delete: if isStaff();
+    }
+
+      match /book_registrations/{docId} {
+      allow create: if signedIn();
+      allow get: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
+      allow list: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow update: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
+      allow delete: if isStaff();
     }
   }
 }
