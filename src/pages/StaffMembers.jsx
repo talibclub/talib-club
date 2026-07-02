@@ -34,7 +34,7 @@ export default function StaffMembers({ authState, go }) {
   })
 
   const currentUser = authState?.profile?.displayName || authState?.user?.displayName || ""
-  const isSuperAdmin = profile?.role === "admin" || authState?.user?.email === "islamofwhite@gmail.com"
+  const isSuperAdmin = profile?.role === "admin" || profile?.role === "owner"
 
   // Fetch users on mount
   useEffect(() => {
