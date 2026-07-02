@@ -6,20 +6,13 @@ import {
 import { db } from "../lib/firebase.js"
 import { toast } from "react-hot-toast"
 import { Z } from "../utils/ui.js"
+import { formatFirebaseDate } from "../utils/format.js"
 
 const USERS_CACHE_TTL = 60 * 1000
 const USER_STATS_CACHE_TTL = 60 * 1000
 let cachedUsersList = null
 let cachedUsersListAt = 0
 const cachedUserStatsMap = new Map()
-
-// Helper function to format timestamp/date
-const formatDate = (dateValue) => {
-  if (!dateValue) return "-"
-  const d = dateValue?.toDate ? dateValue.toDate() : (dateValue.seconds ? new Date(dateValue.seconds * 1000) : new Date(dateValue))
-  if (isNaN(d.getTime())) return "-"
-  return new Intl.DateTimeFormat("th-TH", { year: "numeric", month: "short", day: "numeric" }).format(d)
-}
 
 export default function StaffMembers({ authState, go }) {
   const { profile } = authState
@@ -40,9 +33,8 @@ export default function StaffMembers({ authState, go }) {
     targetRole: ""
   })
 
-  const currentUser = authState?.profile?.displayName || authState?.user?.displayName || localStorage.getItem("talib_user") || ""
-  const secureUserForAdminCheck = authState?.profile?.displayName || authState?.user?.displayName || ""
-  const isSuperAdmin = profile?.role === "admin" || (secureUserForAdminCheck && ["อนันดา", "ฟาดิล", "Usman Manu"].includes(secureUserForAdminCheck)) || authState?.user?.email === "islamofwhite@gmail.com"
+  const currentUser = authState?.profile?.displayName || authState?.user?.displayName || ""
+  const isSuperAdmin = profile?.role === "admin" || authState?.user?.email === "islamofwhite@gmail.com"
 
   // Fetch users on mount
   useEffect(() => {
@@ -282,7 +274,7 @@ export default function StaffMembers({ authState, go }) {
                       {isSelf && <span className="badge" style={{ fontSize: 10, background: "var(--br2)" }}>บัญชีของคุณ</span>}
                     </div>
                     <div style={{ fontSize: 12, color: "var(--t3)", marginTop: 4 }}>
-                      {u.email} • เข้าร่วมเมื่อ: {formatDate(u.createdAt)}
+                      {u.email} • เข้าร่วมเมื่อ: {formatFirebaseDate(u.createdAt)}
                     </div>
                   </div>
                 </div>

@@ -2,13 +2,14 @@ import React, { useEffect, useMemo, useState, useRef } from "react"
 import { createPortal } from "react-dom"
 import {
   collection, query, updateDoc, doc, getDocs, getDoc,
-  serverTimestamp, addDoc, deleteDoc, setDoc, orderBy 
+  serverTimestamp, addDoc, deleteDoc, setDoc, orderBy, onSnapshot
 } from "firebase/firestore"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { toast } from "react-hot-toast"
 import { db, app } from "../lib/firebase.js"
 import { triggerPushNotification } from "../utils/pushNotifications.js"
 import { Z } from "../utils/ui.js"
+import { formatFirebaseDate } from "../utils/format.js"
 import StaffTasks from "../components/dashboard/StaffTasks.jsx"
 import StaffCalendar from "../components/dashboard/StaffCalendar.jsx"
 
@@ -33,41 +34,17 @@ const DEFAULT_MAGAZINE = [
   { month: "พฤศจิกายน", user: "มะห์ดี" }, { month: "ธันวาคม", user: "ชาฟิน" }
 ]
 
-// ━━━ TELEGRAM (ตั้งใน .env — ดู .env.example) ━━━
-const TELEGRAM_BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || ""
-const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID || ""
-const TELEGRAM_TOPIC_ID = import.meta.env.VITE_TELEGRAM_TOPIC_ID || "" // สำหรับกลุ่มที่มี Topics
-
+// ━━━ TELEGRAM NOTIFICATION ━━━
 const sendBotNotification = async (message) => {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
-  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-  
-  const payload = {
-    chat_id: TELEGRAM_CHAT_ID,
-    text: message,
-    parse_mode: "HTML"
-  };
-
-  if (TELEGRAM_TOPIC_ID) {
-    payload.message_thread_id = TELEGRAM_TOPIC_ID;
-  }
-
   try {
-    await fetch(url, {
+    await fetch("/api/send-telegram", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ message })
     })
   } catch (e) {
-    console.error("Telegram error:", e)
+    console.error("Telegram notify error:", e)
   }
-}
-
-const formatDate = (date) => {
-  if (!date) return "-"
-  const d = date?.toDate ? date.toDate() : (date.seconds ? new Date(date.seconds * 1000) : new Date(date))
-  if (isNaN(d.getTime())) return "-"
-  return new Intl.DateTimeFormat("th-TH", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(d)
 }
 
 const getFileIcon = (filename) => {
@@ -125,93 +102,51 @@ export default function StaffWork({ authState, go }) {
   const [pollError, setPollError] = useState(null)
   const [failureCount, setFailureCount] = useState(0)
   
-  // Use getDocs + periodic polling instead of onSnapshot to reduce Firebase reads
-  // Polling every 10 seconds should give near real-time feel without excessive reads
+  // Phase 2: Use onSnapshot instead of polling to dramatically reduce Firebase reads and cost
   useEffect(() => {
     setLoading(true)
     setPollError(null)
-    setFailureCount(0)
-    let pollInterval = null
-    let isMounted = true
-    let pollBackoffDelay = 10000 // Start with 10 seconds
-    let currentFailureCount = 0
-
-    const fetchData = async () => {
-      try {
-        const qSubs = query(collection(db, "submissions"), orderBy("createdAt", "desc"))
-        const snap = await getDocs(qSubs)
-        if (isMounted) {
-          setSubs(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-          setPollError(null)
-          currentFailureCount = 0
-          setFailureCount(0)
-          pollBackoffDelay = 10000 // Reset backoff on success
-        }
-      } catch (err) {
-        if (isMounted) {
-          console.error("Fetch sub error:", err)
-          currentFailureCount++
-          setFailureCount(currentFailureCount)
-          setPollError("ไม่สามารถดึงข้อมูลงานได้ - กำลังลองใหม่...")
-          // Exponential backoff: 10s, 20s, 40s max 60s
-          pollBackoffDelay = Math.min(10000 * Math.pow(2, currentFailureCount), 60000)
-        }
-      }
-    }
-
-    const fetchSettings = async () => {
-      try {
-        const staffSnap = await getDoc(doc(db, "settings", "staff"))
-        if (isMounted && staffSnap.exists() && staffSnap.data().members) {
-          setStaffTeam(staffSnap.data().members)
-        }
-      } catch (err) {
-        console.error("Fetch staff settings error:", err)
-      }
-
-      try {
-        const magSnap = await getDoc(doc(db, "settings", "magazine"))
-        if (isMounted) {
-          if (magSnap.exists() && magSnap.data().queue) {
-            setMagazineQueue(magSnap.data().queue)
-          } else {
-            setMagazineQueue(DEFAULT_MAGAZINE)
-          }
-        }
-      } catch (err) {
-        console.error("Fetch magazine settings error:", err)
-      }
-    }
-
-    // Initial load
-    Promise.all([fetchData(), fetchSettings()]).then(() => {
-      if (isMounted) setLoading(false)
-    }).catch(err => {
-      if (isMounted) {
-        console.error("Initial fetch error:", err)
+    
+    const unsubSubs = onSnapshot(
+      query(collection(db, "submissions"), orderBy("createdAt", "desc")),
+      (snap) => {
+        setSubs(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+        setLoading(false)
+        setPollError(null)
+      },
+      (err) => {
+        console.error("Listen subs error:", err)
+        setPollError("ไม่สามารถรับข้อมูลงานแบบ Real-time ได้")
         setLoading(false)
       }
-    })
+    )
 
-    // Schedule first poll after initial load
-    let nextPollDelay = pollBackoffDelay
-    const schedulePoll = () => {
-      if (!isMounted) return
-      pollInterval = setTimeout(() => {
-        if (!isMounted) return
-        fetchData()
-        fetchSettings()
-        // Reschedule next poll with current backoff
-        nextPollDelay = pollBackoffDelay
-        schedulePoll()
-      }, nextPollDelay)
-    }
-    
-    schedulePoll()
+    const unsubStaff = onSnapshot(
+      doc(db, "settings", "staff"),
+      (snap) => {
+        if (snap.exists() && snap.data().members) {
+          setStaffTeam(snap.data().members)
+        }
+      },
+      (err) => console.error("Listen staff settings error:", err)
+    )
+
+    const unsubMag = onSnapshot(
+      doc(db, "settings", "magazine"),
+      (snap) => {
+        if (snap.exists() && snap.data().queue) {
+          setMagazineQueue(snap.data().queue)
+        } else {
+          setMagazineQueue(DEFAULT_MAGAZINE)
+        }
+      },
+      (err) => console.error("Listen mag settings error:", err)
+    )
 
     return () => {
-      isMounted = false
-      if (pollInterval) clearTimeout(pollInterval)
+      unsubSubs()
+      unsubStaff()
+      unsubMag()
     }
   }, [])
 
@@ -612,7 +547,7 @@ export default function StaffWork({ authState, go }) {
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
                           <span className="tag tag-acc">{sub.type}</span>
                           <span className={`staff-status ${isPending ? "warn" : isRejected ? "bad" : isApproved ? "ok" : "info"}`}>{sub.status}</span>
-                          <span style={{ fontSize: "11px", color: "var(--t3)" }}>ส่งโดย: {sub.staffName} • {formatDate(sub.createdAt)}</span>
+                          <span style={{ fontSize: "11px", color: "var(--t3)" }}>ส่งโดย: {sub.staffName} • {formatFirebaseDate(sub.createdAt, true)}</span>
                         </div>
                         <h2 style={{ fontSize: "18px", fontWeight: "600", color: "var(--text)", lineHeight: "1.3" }}>{sub.title}</h2>
                         {sub.description && <p style={{ marginTop: "8px", color: "var(--t2)", whiteSpace: "pre-wrap" }}>{sub.description}</p>}
@@ -695,7 +630,7 @@ export default function StaffWork({ authState, go }) {
 
                     {isPosted && (
                       <div style={{ marginTop: "14px", padding: "12px", background: "rgba(45,190,160,0.05)", border: "1px solid rgba(45,190,160,0.2)", borderRadius: "8px", fontSize: "12px" }}>
-                        <p>📆 <strong>ลงงานจริง:</strong> {formatDate(sub.scheduleDate)}</p>
+                        <p>📆 <strong>ลงงานจริง:</strong> {formatFirebaseDate(sub.scheduleDate, true)}</p>
                         <p style={{ marginTop: "4px" }}>📱 <strong>แพลตฟอร์ม:</strong> {sub.platforms?.join(", ")}</p>
                         {sub.postLink && <p style={{ marginTop: "4px" }}>🔗 <strong>ลิงก์:</strong> <a href={sub.postLink} target="_blank" rel="noreferrer" style={{ color: "var(--teal)" }}>กดเพื่อดูโพสต์</a></p>}
                       </div>

@@ -17,3 +17,17 @@ export function truncate(str, n = 80) {
   if (!str) return ""
   return str.length > n ? str.slice(0, n) + "…" : str
 }
+
+// แปลง Firebase Timestamp หรือ Date object เป็นวันที่แบบไทย
+export function formatFirebaseDate(dateValue, includeTime = false) {
+  if (!dateValue) return "-"
+  const d = dateValue?.toDate ? dateValue.toDate() : (dateValue.seconds ? new Date(dateValue.seconds * 1000) : new Date(dateValue))
+  if (isNaN(d.getTime())) return "-"
+  
+  const options = { year: "numeric", month: "short", day: "numeric" }
+  if (includeTime) {
+    options.hour = "2-digit"
+    options.minute = "2-digit"
+  }
+  return new Intl.DateTimeFormat("th-TH", options).format(d)
+}

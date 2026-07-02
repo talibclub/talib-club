@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { collection, getDocs, writeBatch, doc, updateDoc, deleteDoc, Timestamp, query, where, or, limit } from "firebase/firestore";
 import { trackingDb as db } from "../lib/trackingFirebase.js";
 import { canAccessTrackingAdmin, verifyTrackingAdminPassword } from "../utils/trackingAuth.js";
+import { formatFirebaseDate } from "../utils/format.js";
 
 const TRACKING_AUTH_KEY = "talib_tracking_admin_v2";
 
@@ -375,18 +376,26 @@ export default function Tracking({ authState }) {
       'therm-100x150': `@page{size:100mm 150mm;margin:0}body{margin:0;width:100mm;font-family:'Prompt',sans-serif;}.plabel{width:100mm;height:149mm;box-sizing:border-box;padding:2mm;page-break-after:always;display:flex;flex-direction:column}.l-inner{border:2px solid #000;flex:1;display:flex;flex-direction:column;padding:3mm;border-radius:4px}.l-sender{padding-bottom:3mm;border-bottom:1px dashed #000;font-size:10pt;line-height:1.4}.l-recv{flex:1;padding:4mm 2mm}.l-recv-name{font-size:20pt;font-weight:700;line-height:1.2;margin-bottom:2mm}.l-recv-phone{font-size:14pt;font-weight:600;margin-bottom:2mm}.l-recv-addr{font-size:13pt;line-height:1.5}.l-foot{display:flex;border-top:1px solid #000;height:24mm;align-items:center}.l-note{flex:1;font-size:12pt;font-weight:600;padding-left:2mm;color:#b45309}.l-zip{font-size:32pt;font-weight:700;letter-spacing:1px;padding-right:2mm}`
     };
 
+    const escapeHTML = (str) => {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, function(match) {
+        const escapeMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+        return escapeMap[match];
+      });
+    };
+
     const labelsHtml = listToPrint.map(r => `
       <div class="plabel"><div class="l-inner">
-        <div class="l-sender"><strong>ผู้ส่ง: ${sName}</strong> ${sPhone ? `📞 ${sPhone}` : ''}<br/>${sAddr}</div>
+        <div class="l-sender"><strong>ผู้ส่ง: ${escapeHTML(sName)}</strong> ${sPhone ? `📞 ${escapeHTML(sPhone)}` : ''}<br/>${escapeHTML(sAddr)}</div>
         <div class="l-recv">
           <div style="font-size:10pt;font-weight:700;margin-bottom:4px">ผู้รับ:</div>
-          <div class="l-recv-name">${r.fullName}</div>
-          ${r.phone ? `<div class="l-recv-phone">📞 ${r.phone}</div>` : ''}
-          <div class="l-recv-addr">${r.address}</div>
+          <div class="l-recv-name">${escapeHTML(r.fullName)}</div>
+          ${r.phone ? `<div class="l-recv-phone">📞 ${escapeHTML(r.phone)}</div>` : ''}
+          <div class="l-recv-addr">${escapeHTML(r.address)}</div>
         </div>
         <div class="l-foot">
-          <div class="l-note">${r.bonusNote ? `⚠️ ${r.bonusNote}` : ''}</div>
-          <div class="l-zip">${r.postalCode || ''}</div>
+          <div class="l-note">${r.bonusNote ? `⚠️ ${escapeHTML(r.bonusNote)}` : ''}</div>
+          <div class="l-zip">${escapeHTML(r.postalCode || '')}</div>
         </div>
       </div></div>
     `).join('');
@@ -404,10 +413,6 @@ export default function Tracking({ authState }) {
   // ==========================================
   // ★ RENDER HELPERS
   // ==========================================
-  const formatDateTime = (ts) => {
-    if (!ts || !ts.toDate) return "-";
-    return ts.toDate().toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
-  };
 
   const filteredRecipients = recipients.filter(r => searchQ === "" || r.fullName.includes(searchQ) || (r.phone||"").includes(searchQ));
   const filteredRecords = records.filter(r => searchQ === "" || r.fullName.includes(searchQ) || (r.trackingNumber||"").includes(searchQ) || (r.phone||"").includes(searchQ));
@@ -749,7 +754,7 @@ export default function Tracking({ authState }) {
                           <td style={{ padding: "12px", fontFamily: "monospace", fontWeight: "700", color: "var(--teal)", letterSpacing: "0.5px" }}>{r.trackingNumber || "-"}</td>
                           <td style={{ padding: "12px", color: "var(--t2)" }}>{r.postalCode || "-"}</td>
                           <td style={{ padding: "12px", color: "var(--t2)" }}>{r.city || "-"}</td>
-                          <td style={{ padding: "12px", color: "var(--t2)", fontSize: "12px" }}>{formatDateTime(r.createdAt)}</td>
+                          <td style={{ padding: "12px", color: "var(--t2)", fontSize: "12px" }}>{formatFirebaseDate(r.createdAt)}</td>
                           <td style={{ padding: "12px", textAlign: "center", display: "flex", gap: "8px", justifyContent: "center" }}>
                             <button className="btn btn-outline btn-sm" style={{ padding: "4px 8px", borderColor: "var(--br)", color: "var(--t2)" }} onClick={() => { setEditData(r); setActiveModal('edit-record'); }}>✏️</button>
                             <button className="btn btn-outline btn-sm" style={{ padding: "4px 8px", borderColor: "#fecaca", color: "#dc2626", background: "#fef2f2" }} onClick={() => handleBulkDelete("records", [r.id])}>🗑️</button>
