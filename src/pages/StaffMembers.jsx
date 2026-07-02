@@ -351,9 +351,9 @@ export default function StaffMembers({ authState, go }) {
       )}
 
       {/* Dynamic Stats Modal */}
-      {selectedUser && (
+      {selectedUser && createPortal(
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: Z.modal, padding: '20px' }}>
-          <div className="card animate-fade-in" style={{ background: 'var(--bg)', padding: '24px', width: '100%', maxWidth: '500px', borderRadius: '20px', boxShadow: '0 20px 40px rgba(0,0,0,0.3)', position: 'relative' }}>
+          <div className="card animate-fade-in" style={{ background: 'var(--bg)', padding: '24px', width: '100%', maxWidth: '500px', borderRadius: '20px', boxShadow: '0 20px 40px rgba(0,0,0,0.3)', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
             <button 
               onClick={() => setSelectedUser(null)} 
               style={{ position: 'absolute', right: 20, top: 20, background: 'none', border: 'none', color: 'var(--t3)', cursor: 'pointer', fontSize: 22 }}
@@ -456,7 +456,8 @@ export default function StaffMembers({ authState, go }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Role Change Confirmation Modal */}
