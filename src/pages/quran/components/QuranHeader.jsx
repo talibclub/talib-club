@@ -25,7 +25,6 @@ export default function QuranHeader({
   thaiSize,
   setThaiSize,
   quranFont,
-  setQuranFont,
   tajweedEnabled,
   setTajweedEnabled,
   showWordByWord,
