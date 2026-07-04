@@ -912,12 +912,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
             quranFont={quranFont}
             tajweedEnabled={tajweedEnabled}
             setTajweedEnabled={setTajweedEnabled}
-            showWordByWord={showWordByWord}
-            setShowWordByWord={setShowWordByWord}
-            thaiTranslationId={thaiTranslationId}
-            setThaiTranslationId={setThaiTranslationId}
-            selectedTafsir={selectedTafsir}
-            setSelectedTafsir={setSelectedTafsir}
+
             scrollToReadingArea={scrollToReadingArea}
           />
 

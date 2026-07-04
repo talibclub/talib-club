@@ -27,12 +27,7 @@ export default function QuranHeader({
   quranFont,
   tajweedEnabled,
   setTajweedEnabled,
-  showWordByWord,
-  setShowWordByWord,
-  thaiTranslationId,
-  setThaiTranslationId,
-  selectedTafsir,
-  setSelectedTafsir,
+
   scrollToReadingArea
 }) {
   return (
