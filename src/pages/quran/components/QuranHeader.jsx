@@ -29,6 +29,9 @@ export default function QuranHeader({
   setTajweedEnabled,
   translationKey,
   setTranslationKey,
+  setSelectedPage,
+  showTajweedLegend,
+  setShowTajweedLegend,
   scrollToReadingArea
 }) {
   return (

@@ -914,6 +914,9 @@ export default function Quran({ initialSura, initialAyah, authState }) {
             setTajweedEnabled={setTajweedEnabled}
             translationKey={translationKey}
             setTranslationKey={setTranslationKey}
+            setSelectedPage={setSelectedPage}
+            showTajweedLegend={showTajweedLegend}
+            setShowTajweedLegend={setShowTajweedLegend}
             scrollToReadingArea={scrollToReadingArea}
           />
 
