@@ -910,7 +910,6 @@ export default function Quran({ initialSura, initialAyah, authState }) {
             thaiSize={thaiSize}
             setThaiSize={setThaiSize}
             quranFont={quranFont}
-            setQuranFont={setQuranFont}
             tajweedEnabled={tajweedEnabled}
             setTajweedEnabled={setTajweedEnabled}
             showWordByWord={showWordByWord}
