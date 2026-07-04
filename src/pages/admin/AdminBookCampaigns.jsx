@@ -4,6 +4,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { db, storage } from "../../lib/firebase.js"
 import toast from "react-hot-toast"
 import { confirmAction } from "../../utils/feedback.jsx"
+import BroadcastModal from "./components/BroadcastModal.jsx"
 import { triggerPushNotification } from "../../utils/pushNotifications.js"
 import CampaignRegistrationsViewer from "./CampaignRegistrationsViewer.jsx"
 
@@ -154,11 +155,14 @@ export default function AdminBookCampaigns() {
     }
   }
 
-  const handleBroadcast = async () => {
-    const title = window.prompt("หัวข้อการแจ้งเตือน (เช่น: แจกหนังสือใหม่!)")
-    if (!title) return
-    const body = window.prompt("รายละเอียดสั้นๆ:")
-    if (!body) return
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false)
+
+  const handleBroadcast = () => {
+    setShowBroadcastModal(true)
+  }
+
+  const submitBroadcast = async (title, body) => {
+    setShowBroadcastModal(false)
     
     const confirmed = await confirmAction(`ยืนยันการส่ง Push Notification ไปยังทุกคนใช่หรือไม่?`)
     if (!confirmed) return
@@ -351,6 +355,13 @@ export default function AdminBookCampaigns() {
           )}
         </>
       )}
+      
+      <BroadcastModal 
+        isOpen={showBroadcastModal} 
+        onClose={() => setShowBroadcastModal(false)}
+        onSubmit={submitBroadcast}
+        defaultTitle="แจกหนังสือใหม่!"
+      />
     </div>
   )
 }

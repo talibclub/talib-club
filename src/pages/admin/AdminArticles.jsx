@@ -3,6 +3,7 @@ import { ARTICLES, DEFAULT_TAXONOMY } from "../../data/index.js"
 import { useContentCollection, useTaxonomySettings, bulkDeleteItems, bulkSaveItems } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
 import ContentStatusBanner from "../../components/ContentStatusBanner.jsx"
+import BroadcastModal from "./components/BroadcastModal.jsx"
 import { clampPage } from "../../utils/pagination.js"
 import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage"
 import { storage, app } from "../../lib/firebase.js"
@@ -244,11 +245,14 @@ export default function AdminArticles() {
     }
   }
 
-  const handleBroadcast = async () => {
-    const title = window.prompt("หัวข้อการแจ้งเตือน (เช่น: บทความใหม่!)")
-    if (!title) return
-    const body = window.prompt("รายละเอียดสั้นๆ:")
-    if (!body) return
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false)
+
+  const handleBroadcast = () => {
+    setShowBroadcastModal(true)
+  }
+
+  const submitBroadcast = async (title, body) => {
+    setShowBroadcastModal(false)
     
     const confirmed = await confirmAction(`ยืนยันการส่ง Push Notification ไปยังทุกคนใช่หรือไม่?`)
     if (!confirmed) return
@@ -498,6 +502,13 @@ export default function AdminArticles() {
           <button className="btn btn-outline" disabled={page === totalPages} onClick={() => { setPage(page + 1); window.scrollTo(0, 0); }} style={{ padding: "6px 12px", fontSize: 12 }}>ถัดไป</button>
         </div>
       )}
+      
+      <BroadcastModal 
+        isOpen={showBroadcastModal} 
+        onClose={() => setShowBroadcastModal(false)}
+        onSubmit={submitBroadcast}
+        defaultTitle="บทความใหม่!"
+      />
     </div>
   )
 }
