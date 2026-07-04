@@ -20,6 +20,13 @@ import {
 } from "./quran/utils/quranUtils.js"
 import { useQuranSettings } from "./quran/hooks/useQuranSettings.js"
 
+import QuranHeader from "./quran/components/QuranHeader.jsx"
+import QuranSidebar from "./quran/components/QuranSidebar.jsx"
+import VerseList from "./quran/components/VerseList.jsx"
+import MushafView from "./quran/components/MushafView.jsx"
+import AyahMenuModal from "./quran/components/AyahMenuModal.jsx"
+import BookmarkModal from "./quran/components/BookmarkModal.jsx"
+
 export default function Quran({ initialSura, initialAyah, authState }) {
   const [selectedSura, setSelectedSura] = useState(() => normalizeSuraNumber(initialSura))
   const readingAreaRef = useRef(null)

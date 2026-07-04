@@ -17,7 +17,15 @@ const hasWebFirebase = Boolean(webFirebaseConfig.apiKey && webFirebaseConfig.pro
 if (!hasWebFirebase) {
   console.warn("[Firebase] Missing VITE_WEB_FIREBASE_* environment variables. Firebase services will not work correctly.")
 }
-const firebaseConfig = webFirebaseConfig
+const firebaseConfig = hasWebFirebase ? webFirebaseConfig : {
+  apiKey: "dummy-api-key-to-prevent-crash-123456789",
+  authDomain: "dummy-project.firebaseapp.com",
+  projectId: "dummy-project",
+  storageBucket: "dummy-project.appspot.com",
+  messagingSenderId: "123456789012",
+  appId: "1:123456789012:web:1234567890abcdef",
+  measurementId: "G-1234567890",
+}
 
 export const app = getApps().find(item => item.name === "talib-web")
   || initializeApp(firebaseConfig, "talib-web")

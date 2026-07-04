@@ -1,6 +1,6 @@
 import React from 'react';
 import DOMPurify from 'dompurify';
-import { useAudioContext } from '../../../context/AudioContext.jsx';
+import { useAudio } from '../../../context/AudioContext.jsx';
 import { stripTajweedTags } from '../utils/quranUtils.js';
 
 export default function MushafView({
@@ -13,7 +13,7 @@ export default function MushafView({
   setActiveAyahMenu,
   emptyMessage
 }) {
-  const { playingAudio } = useAudioContext();
+  const { playingAudio } = useAudio();
 
   return (
     <div

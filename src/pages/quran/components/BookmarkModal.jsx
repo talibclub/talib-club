@@ -13,7 +13,9 @@ export default function BookmarkModal({
 }) {
   if (!activeBookmarkModal) return null;
 
-  return ({/* BOOKMARK REFLECTION MODAL */}
+  return (
+    <>
+      {/* BOOKMARK REFLECTION MODAL */}
       {createPortal(
         <div style={{
           position: "fixed",
@@ -123,6 +125,6 @@ export default function BookmarkModal({
         </div>,
         document.querySelector(".app") || document.body
       )}
-
-        );
+    </>
+  );
 }

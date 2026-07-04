@@ -1,5 +1,6 @@
 import React from 'react';
-import { getSurahTheme, SURA_LIST, TAFSIR_OPTIONS } from '../../../lib/contentStore';
+import { SURA_LIST } from "../../../data/surahs.js";
+import { getSurahTheme } from "../../../data/quranThemes.js";
 
 export default function QuranHeader({
   currentSuraInfo,

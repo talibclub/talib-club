@@ -1,6 +1,6 @@
 import React from 'react';
 import DOMPurify from 'dompurify';
-import { useAudioContext } from '../../../context/AudioContext.jsx';
+import { useAudio } from '../../../context/AudioContext.jsx';
 import { SURA_LIST } from '../../../data/surahs.js';
 import { stripTajweedTags } from '../utils/quranUtils.js';
 
@@ -19,7 +19,7 @@ export default function VerseList({
   mode,
   isMobile
 }) {
-  const { playingAudio, audioState, play, pause, resume } = useAudioContext();
+  const { playingAudio, audioState, play, pause, resume } = useAudio();
 
   return (
 

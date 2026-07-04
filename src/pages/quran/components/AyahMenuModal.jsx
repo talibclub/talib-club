@@ -1,6 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { useAudioContext } from '../../../context/AudioContext.jsx';
+import { useAudio } from '../../../context/AudioContext.jsx';
 import { SURA_LIST } from '../../../data/surahs.js';
 import { stripTajweedTags } from '../utils/quranUtils.js';
 
@@ -19,11 +19,13 @@ export default function AyahMenuModal({
   getVerseTranslation,
   handleOpenBookmarkModal
 }) {
-  const { playingAudio, audioState, play, pause, resume } = useAudioContext();
+  const { playingAudio, audioState, play, pause, resume } = useAudio();
 
   if (!activeAyahMenu) return null;
 
-  return ({/* AYAH OPTIONS POPUP (MUSHAF MODE MENU) */}
+  return (
+    <>
+      {/* AYAH OPTIONS POPUP (MUSHAF MODE MENU) */}
       {createPortal(
         <div style={{
           position: "fixed",
@@ -208,6 +210,6 @@ export default function AyahMenuModal({
         </div>,
         document.querySelector(".app") || document.body
       )}
-
+    </>
   );
 }
