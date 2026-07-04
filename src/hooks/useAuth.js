@@ -80,11 +80,35 @@ export function useAuth() {
 
       try {
         const ref = doc(db, "users", currentUser.uid)
-        const snap = await getDoc(ref)
-        if (currentSeq !== activeSeq) return
+        
+        const cacheKey = `talib_user_profile_${currentUser.uid}`;
+        let snapData = null;
+        let exists = false;
+        
+        try {
+          const cached = sessionStorage.getItem(cacheKey);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Date.now() - parsed.timestamp < 5 * 60 * 1000) {
+              snapData = parsed.data;
+              exists = true;
+            }
+          }
+        } catch(e) {}
 
-        if (snap.exists()) {
-          const snapData = snap.data()
+        if (!exists) {
+          const snap = await getDoc(ref)
+          if (currentSeq !== activeSeq) return
+          if (snap.exists()) {
+            snapData = snap.data()
+            exists = true;
+            try { sessionStorage.setItem(cacheKey, JSON.stringify({ data: snapData, timestamp: Date.now() })) } catch(e) {}
+          }
+        } else {
+          if (currentSeq !== activeSeq) return
+        }
+
+        if (exists) {
           // Only update if auth data actually changed, not every render
           const email = currentUser.email || ""
           const displayName = currentUser.displayName || snapData.displayName || ""
@@ -97,12 +121,10 @@ export function useAuth() {
 
           if (hasChanged) {
             // Only write if data truly changed
-            await setDoc(ref, {
-              email,
-              displayName,
-              photoURL,
-              updatedAt: serverTimestamp(),
-            }, { merge: true }).catch(e => console.error("Sync profile to firestore failed", e))
+            const newData = { email, displayName, photoURL, updatedAt: serverTimestamp() };
+            await setDoc(ref, newData, { merge: true }).catch(e => console.error("Sync profile to firestore failed", e))
+            // Update cache
+            try { sessionStorage.setItem(cacheKey, JSON.stringify({ data: { ...snapData, email, displayName, photoURL }, timestamp: Date.now() })) } catch(e) {}
           }
           if (currentSeq !== activeSeq) return
           setProfile({
@@ -121,6 +143,7 @@ export function useAuth() {
           }
           await setDoc(ref, nextProfile)
           if (currentSeq !== activeSeq) return
+          try { sessionStorage.setItem(cacheKey, JSON.stringify({ data: nextProfile, timestamp: Date.now() })) } catch(e) {}
           setProfile({ ...nextProfile, createdAt: new Date() })
         }
       } catch (err) {

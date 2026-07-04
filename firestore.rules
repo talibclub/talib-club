@@ -8,16 +8,13 @@ service cloud.firestore {
     function isStaff() {
       return signedIn()
         && (request.auth.token.email == "islamofwhite@gmail.com" ||
-            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "staff" ||
-            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
-            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "owner");
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ["staff", "admin", "owner"]);
     }
 
     function isAdmin() {
       return signedIn()
         && (request.auth.token.email == "islamofwhite@gmail.com" ||
-            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
-            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "owner");
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ["admin", "owner"]);
     }
 
     function isOwner() {
@@ -27,7 +24,7 @@ service cloud.firestore {
     }
 
     function isOwnerOrAdmin() {
-      return isOwner() || isAdmin();
+      return isAdmin();
     }
 
     // --- Users Collection Rules ---

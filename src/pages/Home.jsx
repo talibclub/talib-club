@@ -58,8 +58,8 @@ const SURAH_NAMES = {
 
 export default function Home({ go }) {
   // Articles should reflect the current Firestore state immediately.
-  const articleQueryOptions = useMemo(() => ({ live: true }), [])
-  const readOnlyQueryOptions = useMemo(() => ({ live: false }), [])
+  const articleQueryOptions = useMemo(() => ({ live: true, limit: 6 }), [])
+  const readOnlyQueryOptions = useMemo(() => ({ live: false, limit: 6 }), [])
   const { items: articles, loading: loadingArticles } = useContentCollection("articles", ARTICLES, null, articleQueryOptions)
   const { items: books, loading: loadingBooks } = useContentCollection("books", BOOKS, null, readOnlyQueryOptions)
   const { items: media, loading: loadingMedia } = useContentCollection("media", MEDIA, null, readOnlyQueryOptions)

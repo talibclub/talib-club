@@ -157,7 +157,11 @@ export default function ArticleDetail({ item, go, authState }) {
   useEffect(() => {
     if (displayItem && !loadingArticles && hasIncrementedView.current !== displayItem.id) {
       hasIncrementedView.current = displayItem.id
-      bumpContentMetric("articles", displayItem.id, "views")
+      const viewKey = `talib_viewed_article_${displayItem.id}`
+      if (!sessionStorage.getItem(viewKey)) {
+        sessionStorage.setItem(viewKey, "1")
+        bumpContentMetric("articles", displayItem.id, "views")
+      }
     }
   }, [displayItem, loadingArticles])
 
@@ -166,15 +170,19 @@ export default function ArticleDetail({ item, go, authState }) {
     if (displayItem && authState?.user?.uid && hasSavedHistory.current !== displayItem.id) {
       hasSavedHistory.current = displayItem.id
       const uid = authState.user.uid;
-      const historyId = `${uid}_article_${displayItem.id}`;
-      saveContentItem("history", {
-        id: historyId,
-        uid,
-        itemId: displayItem.id,
-        type: "article",
-        title: displayItem.title,
-        timestamp: Date.now()
-      }, uid).catch(err => console.error("Failed to save read history to Firebase", err));
+      const historyKey = `talib_history_article_${displayItem.id}`;
+      if (!sessionStorage.getItem(historyKey)) {
+        sessionStorage.setItem(historyKey, "1");
+        const historyId = `${uid}_article_${displayItem.id}`;
+        saveContentItem("history", {
+          id: historyId,
+          uid,
+          itemId: displayItem.id,
+          type: "article",
+          title: displayItem.title,
+          timestamp: Date.now()
+        }, uid).catch(err => console.error("Failed to save read history to Firebase", err));
+      }
     }
   }, [displayItem, authState?.user?.uid])
 
