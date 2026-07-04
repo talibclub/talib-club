@@ -43,8 +43,86 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
   const [accountOpen, setAccountOpen] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [dynamicNotifications, setDynamicNotifications] = useState([])
   const accountRef = useRef(null)
   const notificationRef = useRef(null)
+
+  useEffect(() => {
+    async function fetchDynamicNotifications() {
+      try {
+        const { collection, query, orderBy, limit, getDocs } = await import("firebase/firestore")
+        const { db } = await import("../lib/firebase.js")
+        
+        const fetchLatestDoc = async (colName, orderField) => {
+          const snap = await getDocs(query(collection(db, colName), orderBy(orderField, "desc"), limit(1)))
+          if (snap.empty) return null
+          return { id: snap.docs[0].id, ...snap.docs[0].data() }
+        }
+
+        const [article, media, book, campaign] = await Promise.all([
+          fetchLatestDoc("content_articles", "createdAt").catch(() => null),
+          fetchLatestDoc("content_media", "createdAt").catch(() => null),
+          fetchLatestDoc("content_books", "createdAt").catch(() => null),
+          fetchLatestDoc("book_campaigns", "createdAt").catch(() => null)
+        ])
+
+        const newNotifs = []
+        
+        if (article) {
+          newNotifs.push({
+            id: `art-${article.id}`,
+            title: "บทความวิชาการใหม่",
+            desc: `อ่านบทความล่าสุด: "${article.title}" โดย ${article.author || "Talib Club"}`,
+            time: article.date || "เมื่อเร็วๆ นี้",
+            icon: "ti-file-text",
+            color: "var(--teal)",
+            onClick: () => nav("article", article)
+          })
+        }
+        
+        if (media) {
+          newNotifs.push({
+            id: `media-${media.id}`,
+            title: "คลิปวิดีโอใหม่",
+            desc: `รับชม: "${media.title}"`,
+            time: media.date || "เมื่อเร็วๆ นี้",
+            icon: "ti-brand-youtube",
+            color: "#e05555",
+            onClick: () => nav("media-detail", media)
+          })
+        }
+        
+        if (book) {
+          newNotifs.push({
+            id: `book-${book.id}`,
+            title: "หนังสือและตำราใหม่",
+            desc: `ดาวน์โหลดผลงานล่าสุด: "${book.title}" หมวดหมู่ ${book.category}`,
+            time: "เมื่อเร็วๆ นี้",
+            icon: "ti-book",
+            color: "rgb(255, 179, 0)",
+            onClick: () => nav("library-detail", book)
+          })
+        }
+
+        if (campaign) {
+          newNotifs.push({
+            id: `camp-${campaign.id}`,
+            title: "แจกหนังสือ/ตำราใหม่",
+            desc: `แคมเปญใหม่: "${campaign.title || campaign.items?.[0]?.name || "แจกหนังสือฟรี"}" มารับได้เลย!`,
+            time: "เมื่อเร็วๆ นี้",
+            icon: "ti-gift",
+            color: "var(--teal)",
+            onClick: () => nav("books")
+          })
+        }
+        
+        setDynamicNotifications(newNotifs)
+      } catch(e) {
+        console.error("Failed to fetch dynamic notifications:", e)
+      }
+    }
+    fetchDynamicNotifications()
+  }, [])
 
   useEffect(() => {
     document.body.classList.toggle("menu-open", menuOpen)
@@ -60,9 +138,6 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
   } = usePWA(authState?.user, authState?.isStaff)
 
   const uid = authState?.user?.uid
-  const latestContentQueryOptions = useMemo(() => ({ limit: 1, orderByField: "updatedAt", orderDirection: "desc", live: true }), [])
-  const { items: articles } = useContentCollection("articles", ARTICLES, null, latestContentQueryOptions)
-  const { items: books } = useContentCollection("books", BOOKS, null, latestContentQueryOptions)
   const readingSessions = readingSessionsProp ?? []
   const { item: streakRecord } = useUserDoc("reading_streaks", uid, uid, null)
 
@@ -158,33 +233,8 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
       onClick: () => nav("member", { view: "profile" })
     })
 
-    // 2. Latest Article Notification
-    if (articles && articles.length > 0) {
-      const latestArt = articles[0]
-      list.push({
-        id: `art-${latestArt.id}`,
-        title: "บทความวิชาการใหม่",
-        desc: `อ่านบทความล่าสุด: "${latestArt.title}" โดย ${latestArt.author}`,
-        time: latestArt.date || "เมื่อเร็วๆ นี้",
-        icon: "ti-file-text",
-        color: "var(--teal)",
-        onClick: () => nav("article", latestArt)
-      })
-    }
-
-    // 3. Latest Book Notification
-    if (books && books.length > 0) {
-      const latestBook = books[0]
-      list.push({
-        id: `book-${latestBook.id}`,
-        title: "หนังสือและตำราใหม่",
-        desc: `ดาวน์โหลดผลงานล่าสุด: "${latestBook.title}" หมวดหมู่ ${latestBook.category}`,
-        time: "เมื่อเร็วๆ นี้",
-        icon: "ti-book",
-        color: "rgb(255, 179, 0)",
-        onClick: () => nav("library-detail", latestBook)
-      })
-    }
+    // 2. Dynamic Latest Content Notifications
+    list.push(...dynamicNotifications)
 
     // 4. Feature Announcement
     list.push({
@@ -235,7 +285,7 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
     }
 
     return list
-  }, [articles, books, authState?.user, authState?.profile, uid, userSettings, hasReadToday, timeRemaining])
+  }, [dynamicNotifications, authState?.user, authState?.profile, uid, userSettings, hasReadToday, timeRemaining])
 
   const [seenIds, setSeenIds] = useState(() => {
     try {
