@@ -9,8 +9,8 @@ import { confirmAction } from "../utils/feedback.jsx"
 import DOMPurify from "dompurify"
 import { getOfflineItem, setOfflineItem } from "../lib/offlineStore.js"
 
-import {
 import "./quran/Quran.css"
+import {
   JUZ_STARTS,
   normalizeSuraNumber,
   normalizeAyahNumber,

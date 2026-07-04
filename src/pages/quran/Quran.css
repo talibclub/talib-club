@@ -122,7 +122,7 @@
         }
         .arabic-font,
         .arabic-font span {
-          font-family: ${quranFont === "UthmanicHafs" ? "'UthmanicHafs', " : quranFont === "Amiri" ? "'Amiri', " : quranFont === "NotoNaskh" ? "'Noto Naskh Arabic', " : ""}'Amiri', 'Noto Naskh Arabic', 'Geeza Pro', 'Segoe UI Arabic', 'Noto Sans Arabic', 'Traditional Arabic', serif !important;
+          font-family: var(--quran-font, 'UthmanicHafs', 'Amiri', 'Noto Naskh Arabic', 'Geeza Pro', 'Segoe UI Arabic', 'Noto Sans Arabic', 'Traditional Arabic', serif) !important;
           direction: rtl;
           text-align: right;
           line-height: 2.8;
@@ -130,7 +130,7 @@
         }
         .mushaf-flow,
         .mushaf-flow span {
-          font-family: ${quranFont === "UthmanicHafs" ? "'UthmanicHafs', " : quranFont === "Amiri" ? "'Amiri', " : quranFont === "NotoNaskh" ? "'Noto Naskh Arabic', " : ""}'Amiri', 'Noto Naskh Arabic', 'Geeza Pro', 'Segoe UI Arabic', 'Noto Sans Arabic', 'Traditional Arabic', serif !important;
+          font-family: var(--quran-font, 'UthmanicHafs', 'Amiri', 'Noto Naskh Arabic', 'Geeza Pro', 'Segoe UI Arabic', 'Noto Sans Arabic', 'Traditional Arabic', serif) !important;
           text-align: justify;
           direction: rtl;
           line-height: 2.8;
