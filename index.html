@@ -9,6 +9,8 @@
   <link rel="icon" type="image/png" href="/logo.png" />
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#0f6e56" />
+  <!-- M10: Add meta description for SEO -->
+  <meta name="description" content="Talib Club — แหล่งศึกษาอิสลามแนวทางสะลัฟ รวมบทความวิชาการ หนังสือ สื่อการเรียนรู้ และเครื่องมือติดตามการอ่าน" />
   <link rel="apple-touch-icon" href="/icon-192.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -16,9 +18,17 @@
   
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+  <!-- M9: Lock Tabler Icons version to prevent unexpected breaking changes -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.6.0/tabler-icons.min.css"/>
 </head>
 <body>
+  <!-- L3: Inline script to prevent theme flash (FOUT) before React hydration -->
+  <script>
+    try {
+      const theme = localStorage.getItem('talib-theme') || 'dark';
+      document.body.className = theme;
+    } catch(e) {}
+  </script>
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
 </body>

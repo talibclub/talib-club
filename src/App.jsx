@@ -4,6 +4,7 @@ import { useTheme } from "./hooks/useTheme.js"
 import { useAuth } from "./hooks/useAuth.js"
 import Nav from "./components/Nav.jsx"
 import { useAudio } from "./context/AudioContext.jsx"
+import { getPagePath } from "./utils/url.js"
 
 const lazyWithRetry = (componentImport) => {
   return lazy(() =>
@@ -140,10 +141,13 @@ export default function App() {
     return () => clearInterval(interval)
   }, [uid])
 
-  // --- Realtime Countdown Banner & Mandatory Notification (1s tick, 23:00 hour) ---
+  // --- Realtime Countdown Banner (1s tick, 23:00 hour) ---
+  // H5: Uses visibilitychange to pause when tab is hidden (saves CPU/battery)
   useEffect(() => {
     if (!uid) return
-    const interval = setInterval(() => {
+    let interval = null
+
+    const tick = () => {
       const now = new Date(safeDateNow())
       if (now.getHours() === 23) {
         const todayKey = getLocalDayKey(now.getTime())
@@ -159,17 +163,6 @@ export default function App() {
           const m = Math.floor(secondsLeft / 60)
           const s = secondsLeft % 60
           setCountdownText(`${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`)
-          // Mandatory native notification every 5 min (bypasses user toggle)
-          if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-            if (now.getMinutes() % 5 === 0 && now.getSeconds() < 2) {
-              const notif = new Notification("รีบด่วน! เหลือเวลารักษา Streak ⏰", {
-                body: `คุณเหลือเวลาอีก ${m} นาที ${s} วินาที!`,
-                tag: "streak-countdown",
-                requireInteraction: true
-              })
-              countdownNotifRef.current = notif
-            }
-          }
         } else {
           setCountdownText("")
           if (countdownNotifRef.current) {
@@ -180,8 +173,19 @@ export default function App() {
       } else {
         setCountdownText("")
       }
-    }, 1000)
-    return () => clearInterval(interval)
+    }
+
+    const start = () => { if (!interval) interval = setInterval(tick, 1000) }
+    const stop = () => { clearInterval(interval); interval = null }
+    const onVisibility = () => document.hidden ? stop() : start()
+
+    document.addEventListener('visibilitychange', onVisibility)
+    start()
+
+    return () => {
+      stop()
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [uid, readingSessions])
 
 
@@ -203,8 +207,9 @@ export default function App() {
     let canonicalUrl = baseUrl + cleanPath
     
     // Keep only the 'id' parameter for dynamic pages
-    const searchParams = new URLSearchParams(location.search)
-    const id = searchParams.get("id")
+    // M6: Renamed to avoid shadowing the outer searchParams from useSearchParams
+    const seoParams = new URLSearchParams(location.search)
+    const id = seoParams.get("id")
     if (id && ["/article", "/library-detail", "/media-detail"].includes(cleanPath)) {
       canonicalUrl += `?id=${id}`
     }
@@ -258,29 +263,7 @@ export default function App() {
   }, [location.pathname, location.search])
 
   const go = (p, data = null, options = {}) => {
-    let urlPath = "/";
-    if (p === "tracking") {
-      urlPath = "/tracking-system";
-    } else if (p !== "home") {
-      urlPath = "/" + p;
-    }
-    
-    if (data) {
-      const qParams = new URLSearchParams()
-      if (["article", "library-detail", "media-detail"].includes(p) && data.id) {
-        qParams.set("id", String(data.id))
-      } else {
-        Object.entries(data).forEach(([key, val]) => {
-          if (val !== null && val !== undefined && typeof val !== "object") {
-            qParams.set(key, String(val))
-          }
-        })
-      }
-      const queryString = qParams.toString()
-      if (queryString) {
-        urlPath += `?${queryString}`
-      }
-    }
+    const urlPath = getPagePath(p, data);
     
     if (options.replace) {
       navigate(urlPath, { replace: true, state: { ctx: data } });

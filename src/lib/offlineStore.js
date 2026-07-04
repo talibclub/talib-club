@@ -13,15 +13,24 @@ function getDB() {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
     request.onupgradeneeded = (e) => {
       const db = e.target.result
-      if (!db.objectStoreNames.contains('collections')) {
-        db.createObjectStore('collections') // key: cacheKey, value: { items, at }
+      // M11: IndexedDB upgrade path documentation
+      if (e.oldVersion < 1) {
+        if (!db.objectStoreNames.contains('collections')) {
+          db.createObjectStore('collections') // key: cacheKey, value: { items, at }
+        }
+        if (!db.objectStoreNames.contains('quran_pages')) {
+          db.createObjectStore('quran_pages') // key: pageNumber, value: { data, at }
+        }
+        if (!db.objectStoreNames.contains('quran_translations')) {
+          db.createObjectStore('quran_translations') // key: surahNumber, value: { data, at }
+        }
       }
-      if (!db.objectStoreNames.contains('quran_pages')) {
-        db.createObjectStore('quran_pages') // key: pageNumber, value: { data, at }
-      }
-      if (!db.objectStoreNames.contains('quran_translations')) {
-        db.createObjectStore('quran_translations') // key: surahNumber, value: { data, at }
-      }
+      // Example for future versions:
+      // if (e.oldVersion < 2) {
+      //   if (!db.objectStoreNames.contains("new_feature")) {
+      //     db.createObjectStore("new_feature")
+      //   }
+      // }
     }
     request.onsuccess = (e) => resolve(e.target.result)
     request.onerror = (e) => {

@@ -3,27 +3,20 @@ import { getAuth } from "firebase/auth"
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore } from "firebase/firestore"
 import { getStorage } from "firebase/storage"
 
-const defaultWebFirebaseConfig = {
-  apiKey: "AIzaSyC8HoWaAu0XWy3he_pMxqUIWwREDPdeUpg",
-  authDomain: "talibclub.org", // เปลี่ยนกลับเป็นโดเมนของคุณ
-  projectId: "talib-club-web", // เปลี่ยนกลับเป็น Project ID ของ Firebase
-  storageBucket: "talib-club-web.firebasestorage.app",
-  messagingSenderId: "300903382422",
-  appId: "1:300903382422:web:887e6f03a6c4f0092db1b7",
-  measurementId: "G-CQ5R964GMN",
-}
-
 const webFirebaseConfig = {
-  apiKey: import.meta.env.VITE_WEB_FIREBASE_API_KEY || defaultWebFirebaseConfig.apiKey,
-  authDomain: import.meta.env.VITE_WEB_FIREBASE_AUTH_DOMAIN || defaultWebFirebaseConfig.authDomain,
-  projectId: import.meta.env.VITE_WEB_FIREBASE_PROJECT_ID || defaultWebFirebaseConfig.projectId,
-  storageBucket: import.meta.env.VITE_WEB_FIREBASE_STORAGE_BUCKET || defaultWebFirebaseConfig.storageBucket,
-  messagingSenderId: import.meta.env.VITE_WEB_FIREBASE_MESSAGING_SENDER_ID || defaultWebFirebaseConfig.messagingSenderId,
-  appId: import.meta.env.VITE_WEB_FIREBASE_APP_ID || defaultWebFirebaseConfig.appId,
-  measurementId: import.meta.env.VITE_WEB_FIREBASE_MEASUREMENT_ID || defaultWebFirebaseConfig.measurementId,
+  apiKey: import.meta.env.VITE_WEB_FIREBASE_API_KEY || "",
+  authDomain: import.meta.env.VITE_WEB_FIREBASE_AUTH_DOMAIN || "",
+  projectId: import.meta.env.VITE_WEB_FIREBASE_PROJECT_ID || "",
+  storageBucket: import.meta.env.VITE_WEB_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: import.meta.env.VITE_WEB_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: import.meta.env.VITE_WEB_FIREBASE_APP_ID || "",
+  measurementId: import.meta.env.VITE_WEB_FIREBASE_MEASUREMENT_ID || "",
 }
 
 const hasWebFirebase = Boolean(webFirebaseConfig.apiKey && webFirebaseConfig.projectId && webFirebaseConfig.appId)
+if (!hasWebFirebase) {
+  console.warn("[Firebase] Missing VITE_WEB_FIREBASE_* environment variables. Firebase services will not work correctly.")
+}
 const firebaseConfig = webFirebaseConfig
 
 export const app = getApps().find(item => item.name === "talib-web")

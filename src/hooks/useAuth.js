@@ -120,7 +120,8 @@ export function useAuth() {
             (snapData.photoURL || "") !== photoURL
 
           if (hasChanged) {
-            // Only write if data truly changed
+            // Only write if data truly changed and auth state hasn't changed
+            if (currentSeq !== activeSeq) return
             const newData = { email, displayName, photoURL, updatedAt: serverTimestamp() };
             await setDoc(ref, newData, { merge: true }).catch(e => console.error("Sync profile to firestore failed", e))
             // Update cache
@@ -141,6 +142,7 @@ export function useAuth() {
             email: currentUser.email || "",
             createdAt: serverTimestamp(),
           }
+          if (currentSeq !== activeSeq) return
           await setDoc(ref, nextProfile)
           if (currentSeq !== activeSeq) return
           try { sessionStorage.setItem(cacheKey, JSON.stringify({ data: nextProfile, timestamp: Date.now() })) } catch(e) {}
@@ -200,6 +202,8 @@ export function useAuth() {
         updatedAt: serverTimestamp(),
       }
       await setDoc(doc(db, "users", auth.currentUser.uid), nextProfile, { merge: true })
+      // H2: Invalidate sessionStorage cache so the updated profile is fetched fresh
+      try { sessionStorage.removeItem(`talib_user_profile_${auth.currentUser.uid}`) } catch(e) {}
       setProfile(prev => ({ ...DEFAULT_PROFILE, ...(prev || {}), ...nextProfile }))
     },
     async updateUserPassword(newPassword) {

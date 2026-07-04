@@ -2,29 +2,7 @@ import { useEffect, useRef, useState, useMemo } from "react"
 import { Link } from "react-router-dom"
 import { SITE } from "../data/index.js"
 
-function getPagePath(id, data = null) {
-  if (id === "home" || id === "") return "/";
-  if (id === "tracking") return "/tracking-system";
-  
-  let p = "/" + id;
-  if (data) {
-    const qParams = new URLSearchParams()
-    if (["article", "library-detail", "media-detail"].includes(id) && data.id) {
-      qParams.set("id", String(data.id))
-    } else {
-      Object.entries(data).forEach(([key, val]) => {
-        if (val !== null && val !== undefined && typeof val !== "object") {
-          qParams.set(key, String(val))
-        }
-      })
-    }
-    const queryString = qParams.toString()
-    if (queryString) {
-      p += `?${queryString}`
-    }
-  }
-  return p;
-}
+import { getPagePath } from "../utils/url.js"
 import toast from "react-hot-toast"
 import { confirmAction } from "../utils/feedback.jsx"
 import { useContentCollection, useUserDoc, invalidateContentCache } from "../lib/contentStore.js"
@@ -32,29 +10,11 @@ import { ARTICLES, BOOKS } from "../data/index.js"
 import { usePWA } from "../hooks/usePWA.js"
 import { AccountDropdown, AccountDrawer } from "./nav/AccountComponents.jsx"
 import { NotificationDropdown, NotificationDrawer } from "./nav/NotificationComponents.jsx"
+// M2: Import shared utilities instead of duplicating them
+import { getMs as getTimeMs, getLocalDayKey } from "../utils/streak.js"
 
-function getTimeMs(value) {
-  if (!value) return 0
-  if (typeof value.toDate === "function") return value.toDate().getTime()
-  if (value.seconds) return value.seconds * 1000
-  if (typeof value === "number") return value
-  const parsed = Date.parse(value)
-  return Number.isNaN(parsed) ? 0 : parsed
-}
 
-function getLocalDayKey(value) {
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value
-  const ms = getTimeMs(value)
-  if (!ms) return ""
-  const d = new Date(ms)
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Bangkok',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  })
-  return formatter.format(d)
-}
+
 
 function normalizeStreakSettings(settings, uid) {
   const protectedDays = Array.isArray(settings?.protectedDays) ? settings.protectedDays : []
@@ -169,9 +129,11 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
         })
 
         // Trigger PWA/OS Alert if supported & permitted
-        if (Notification.permission === "granted") {
+        // M3: Guard against browsers without Notification API (e.g. iOS Safari)
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") {
           new Notification("📚 ได้เวลาอ่านหนังสือแล้ว!", {
-            body: "รักษา Streak ต่อเนื่อง of ท่านด้วยการอ่านบทความหรือหนังสืออย่างน้อย 10 นาทีวันนี้",
+            // M4: Fixed Thai typo ("of" → "ของ")
+            body: "รักษา Streak ต่อเนื่องของท่านด้วยการอ่านบทความหรือหนังสืออย่างน้อย 10 นาทีวันนี้",
             icon: "/icon-192.png"
           })
         }

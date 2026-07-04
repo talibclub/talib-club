@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect } from "react"
 
 export function useQuranSettings() {
   const [mode, setMode] = useState("translation") // "mushaf" | "translation" | "tafsir"
@@ -7,7 +7,6 @@ export function useQuranSettings() {
   const [arabicSize, setArabicSize] = useState(() => {
     return window.innerWidth < 768 ? 26 : 32
   }) // px
-  
   const [thaiSize, setThaiSize] = useState(15) // px
   const quranFont = "UthmanicHafs"
   
@@ -22,12 +21,18 @@ export function useQuranSettings() {
   const [showTajweedLegend, setShowTajweedLegend] = useState(false)
 
   return {
-    mode, setMode,
-    translationKey, setTranslationKey,
-    arabicSize, setArabicSize,
-    thaiSize, setThaiSize,
+    mode,
+    setMode,
+    translationKey,
+    setTranslationKey,
+    arabicSize,
+    setArabicSize,
+    thaiSize,
+    setThaiSize,
     quranFont,
-    tajweedEnabled, setTajweedEnabled,
-    showTajweedLegend, setShowTajweedLegend
+    tajweedEnabled,
+    setTajweedEnabled,
+    showTajweedLegend,
+    setShowTajweedLegend
   }
 }

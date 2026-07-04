@@ -1,20 +1,22 @@
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://talib.club"
+
 function send(res, status, data) {
   if (typeof res.setHeader === "function") {
-    res.setHeader("Access-Control-Allow-Origin", "*")
+    res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS")
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type")
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
   }
   if (typeof res.status === "function") return res.status(status).json(data)
   return {
     statusCode: status,
     headers: {
       "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
       "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
     },
     body: JSON.stringify(data),
   }
@@ -208,7 +210,7 @@ The array must contain exactly 20 objects: 7 easy, 8 medium, and 5 hard.`,
 }
 
 async function verifyFirebaseIdToken(idToken) {
-  const apiKey = process.env.VITE_WEB_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || "AIzaSyC8HoWaAu0XWy3he_pMxqUIWwREDPdeUpg"
+  const apiKey = process.env.VITE_WEB_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || ""
   try {
     const url = `https://identitytoolkit.googleapis.com/v1/getAccountInfo?key=${apiKey}`
     const response = await fetch(url, {

@@ -8,8 +8,8 @@ export function formatDate(d) {
   if (typeof d !== "string" || !d.includes("-")) return String(d)
   const months = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."]
   const [y, m, day] = d.split("-").map(Number)
-  if (isNaN(y) || isNaN(m) || isNaN(day)) return String(d)
-  return `${day} ${months[m - 1] || ""} ${y}`.trim()
+  if (isNaN(y) || isNaN(m) || isNaN(day) || m < 1 || m > 12) return String(d)
+  return `${day} ${months[m - 1]} ${y}`
 }
 
 // ตัด text ให้ไม่เกิน n ตัวอักษร

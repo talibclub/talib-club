@@ -109,6 +109,13 @@ service cloud.firestore {
       allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
 
+    // --- Push Notification Subscriptions (C3: was missing) ---
+    match /push_subscriptions/{docId} {
+      allow read: if isStaff();
+      allow create, update: if signedIn();
+      allow delete: if signedIn();
+    }
+
     // --- Staff Portal Collections ---
     match /submissions/{docId} {
       allow read, write: if isStaff();
@@ -126,26 +133,30 @@ service cloud.firestore {
     // --- Logistics Tracking Collections ---
     match /records/{docId} {
       allow get: if true;
-      allow list: if isStaff() || (request.query.limit != null && request.query.limit <= 5 && request.query.filters.size() > 0);
+      allow list: if isStaff() || (signedIn() && request.query.limit != null && request.query.limit <= 5);
       allow write: if isStaff();
     }
 
     match /recipients/{docId} {
       allow get: if true;
-      allow list: if isStaff() || (request.query.limit != null && request.query.limit <= 5 && request.query.filters.size() > 0);
+      allow list: if isStaff() || (signedIn() && request.query.limit != null && request.query.limit <= 5);
       allow write: if isStaff();
     }
+
     match /staff_tasks/{docId} {
       allow read, write: if isStaff();
     }
+
     match /content_calendar/{docId} {
       allow read, write: if isStaff();
     }
-      match /openhouse_booths/{document=**} {
+
+    match /openhouse_booths/{document=**} {
       allow read: if true;
       allow write: if isStaff();
     }
-           match /book_campaigns/{docId} {
+
+    match /book_campaigns/{docId} {
       allow read: if true;
       allow write: if isStaff();
     }
@@ -157,7 +168,7 @@ service cloud.firestore {
       allow delete: if isStaff();
     }
 
-      match /book_registrations/{docId} {
+    match /book_registrations/{docId} {
       allow create: if signedIn();
       allow get: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
       allow list: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);

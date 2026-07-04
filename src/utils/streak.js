@@ -4,7 +4,8 @@ import { safeDateNow } from "./time.js"
 export function getMs(value) {
   if (!value) return 0
   if (typeof value.toDate === "function") return value.toDate().getTime()
-  if (value.seconds) return value.seconds * 1000
+  // M5: Use strict check — value.seconds === 0 is valid (epoch)
+  if (value.seconds !== undefined && value.nanoseconds !== undefined) return value.seconds * 1000
   if (typeof value === "number") return value
   const parsed = Date.parse(value)
   return isNaN(parsed) ? 0 : parsed

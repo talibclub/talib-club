@@ -18,6 +18,7 @@ import {
   stripAllTags,
   cleanTajweedTags
 } from "./quran/utils/quranUtils.js"
+import { useQuranSettings } from "./quran/hooks/useQuranSettings.js"
 
 export default function Quran({ initialSura, initialAyah, authState }) {
   const [selectedSura, setSelectedSura] = useState(() => normalizeSuraNumber(initialSura))
@@ -236,8 +237,15 @@ export default function Quran({ initialSura, initialAyah, authState }) {
   }, [selectedPage])
 
   const [search, setSearch] = useState("")
-  const [mode, setMode] = useState("translation") // "mushaf" | "translation" | "tafsir"
-  const [translationKey, setTranslationKey] = useState("thai_complex") // "thai_complex" | "thai_rwwad"
+  const {
+    mode, setMode,
+    translationKey, setTranslationKey,
+    arabicSize, setArabicSize,
+    thaiSize, setThaiSize,
+    quranFont,
+    tajweedEnabled, setTajweedEnabled,
+    showTajweedLegend, setShowTajweedLegend
+  } = useQuranSettings()
 
   // Reset selectedPage if mode leaves mushaf
   useEffect(() => {
@@ -245,20 +253,6 @@ export default function Quran({ initialSura, initialAyah, authState }) {
       setSelectedPage(null)
     }
   }, [mode])
-
-  const [arabicSize, setArabicSize] = useState(() => {
-    return window.innerWidth < 768 ? 26 : 32
-  }) // px
-  const [thaiSize, setThaiSize] = useState(15) // px
-  const quranFont = "UthmanicHafs"
-  const [tajweedEnabled, setTajweedEnabled] = useState(() => {
-    return localStorage.getItem("quran-tajweed-enabled") !== "false"
-  })
-
-  useEffect(() => {
-    localStorage.setItem("quran-tajweed-enabled", tajweedEnabled)
-  }, [tajweedEnabled])
-  const [showTajweedLegend, setShowTajweedLegend] = useState(false)
 
   const [verses, setVerses] = useState([])
   const [loading, setLoading] = useState(false)
@@ -2408,304 +2402,33 @@ export default function Quran({ initialSura, initialAyah, authState }) {
         </div>
       </div>
 
-      {/* BOOKMARK REFLECTION MODAL */}
-      {activeBookmarkModal && createPortal(
-        <div style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(0, 0, 0, 0.6)",
-          backdropFilter: "blur(4px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 100000,
-          padding: 16
-        }}>
-          <div className="card" style={{
-            maxWidth: 540,
-            width: "100%",
-            padding: 24,
-            display: "flex",
-            flexDirection: "column",
-            gap: 16,
-            background: "var(--quran-card-bg)",
-            border: "0.5px solid var(--quran-br)",
-            boxShadow: "0 20px 50px rgba(0, 0, 0, 0.3)"
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--quran-text)", margin: 0 }}>
-                {activeBookmarkModal.bookmarkId ? "แก้ไขบันทึกข้อคิดอายะฮ์" : "บันทึกข้อคิดและประโยชน์จากอายะฮ์"}
-              </h3>
-              <button
-                onClick={() => setActiveBookmarkModal(null)}
-                style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "var(--quran-t3)" }}
-              >
-                <i className="ti ti-x"></i>
-              </button>
-            </div>
+      <BookmarkModal
+        activeBookmarkModal={activeBookmarkModal}
+        setActiveBookmarkModal={setActiveBookmarkModal}
+        modalNotes={modalNotes}
+        setModalNotes={setModalNotes}
+        tajweedEnabled={tajweedEnabled}
+        handleDeleteBookmark={handleDeleteBookmark}
+        handleSaveBookmark={handleSaveBookmark}
+      />
 
-            <div style={{ padding: 12, background: "var(--quran-bg)", borderRadius: 8, border: "0.5px solid var(--quran-br2)" }}>
-              <span style={{ fontSize: 10, color: "var(--quran-t3)", fontWeight: 500 }}>
-                ซูเราะฮ์ {activeBookmarkModal.suraName} อายะฮ์ที่ {activeBookmarkModal.aya}
-              </span>
-              <div style={{
-                fontFamily: "'Amiri', serif",
-                fontSize: 22,
-                direction: "rtl",
-                textAlign: "right",
-                margin: "8px 0",
-                lineHeight: 1.6,
-                color: "var(--quran-text)"
-              }} dangerouslySetInnerHTML={{ __html: tajweedEnabled ? activeBookmarkModal.arabicText : stripTajweedTags(activeBookmarkModal.arabicText) }} />
-              <div style={{ fontSize: 12, color: "var(--quran-t2)", lineHeight: 1.45, textAlign: "left" }}>
-                {activeBookmarkModal.translation}
-              </div>
-            </div>
+      <AyahMenuModal
+        activeAyahMenu={activeAyahMenu}
+        setActiveAyahMenu={setActiveAyahMenu}
+        quranFont={quranFont}
+        tajweedEnabled={tajweedEnabled}
+        selectedPage={selectedPage}
+        pageVerses={pageVerses}
+        verses={verses}
+        modalDetails={modalDetails}
+        updateLastRead={updateLastRead}
+        lastRead={lastRead}
+        getBookmarkForVerse={getBookmarkForVerse}
+        getVerseTranslation={getVerseTranslation}
+        handleOpenBookmarkModal={handleOpenBookmarkModal}
+      />
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, textAlign: "left" }}>
-              <label style={{ fontSize: 12, fontWeight: 500, color: "var(--quran-teal)" }}>
-                บันทึกข้อคิด/ประโยชน์ที่ได้รับ (จดบันทึกส่วนตัวเพื่อเตือนตนเอง):
-              </label>
-              <textarea
-                value={modalNotes}
-                onChange={e => setModalNotes(e.target.value)}
-                placeholder="พิมพ์สิ่งที่ได้รับจากโองการนี้ เช่น ข้อเตือนใจ, ข้อปฏิบัติในชีวิตประจำวัน..."
-                style={{
-                  width: "100%",
-                  minHeight: 100,
-                  padding: 12,
-                  borderRadius: 8,
-                  border: "0.5px solid var(--quran-br)",
-                  background: "var(--quran-card-bg)",
-                  color: "var(--quran-text)",
-                  fontSize: 13,
-                  fontFamily: "'Prompt', sans-serif"
-                }}
-              />
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-              <div>
-                {activeBookmarkModal.bookmarkId && (
-                  <button
-                    className="btn btn-outline"
-                    style={{ color: "var(--red)", borderColor: "rgba(220, 38, 38, 0.2)", fontSize: 12, padding: "6px 14px" }}
-                    onClick={handleDeleteBookmark}
-                  >
-                    <i className="ti ti-trash" style={{ marginRight: 4 }}></i> ลบบันทึก
-                  </button>
-                )}
-              </div>
-
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  className="btn btn-outline"
-                  style={{ fontSize: 12, padding: "6px 16px" }}
-                  onClick={() => setActiveBookmarkModal(null)}
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  className="btn btn-teal"
-                  style={{ fontSize: 12, padding: "6px 16px" }}
-                  onClick={handleSaveBookmark}
-                >
-                  บันทึก
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.querySelector(".app") || document.body
-      )}
-
-      {/* AYAH OPTIONS POPUP (MUSHAF MODE MENU) */}
-      {activeAyahMenu && createPortal(
-        <div style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(0, 0, 0, 0.45)",
-          backdropFilter: "blur(3px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 100001,
-          padding: 16
-        }} onClick={() => setActiveAyahMenu(null)}>
-          <div className="card" style={{
-            maxWidth: 480,
-            width: "100%",
-            padding: 24,
-            display: "flex",
-            flexDirection: "column",
-            gap: 16,
-            background: "var(--quran-card-bg)",
-            border: "0.5px solid var(--quran-br)",
-            boxShadow: "0 15px 35px rgba(0, 0, 0, 0.25)",
-            animation: "scaleUp 0.15s cubic-bezier(0.16, 1, 0.3, 1)"
-          }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "0.5px solid var(--quran-br2)", paddingBottom: 10 }}>
-              <span style={{ fontSize: 12, color: "var(--quran-t2)", fontWeight: 600, fontFamily: "'Prompt', sans-serif" }}>
-                ซูเราะฮ์ {SURA_LIST.find(s => Number(s.number) === Number(activeAyahMenu.sura))?.englishName} อายะฮ์ที่ {activeAyahMenu.aya}
-              </span>
-              <button
-                onClick={() => setActiveAyahMenu(null)}
-                style={{ background: "none", border: "none", color: "var(--quran-t3)", cursor: "pointer", fontSize: 16 }}
-              >
-                <i className="ti ti-x"></i>
-              </button>
-            </div>
-
-            <div style={{
-              padding: 12,
-              background: "var(--quran-bg)",
-              borderRadius: 8,
-              border: "0.5px solid var(--quran-br2)",
-              textAlign: "right",
-              fontFamily: quranFont === "UthmanicHafs" ? "'UthmanicHafs', serif" : quranFont === "Amiri" ? "'Amiri', serif" : "'Noto Naskh Arabic', serif",
-              fontSize: 22,
-              color: "var(--quran-text)",
-              lineHeight: 1.5,
-              maxHeight: 120,
-              overflowY: "auto",
-              direction: "rtl"
-            }} dangerouslySetInnerHTML={{
-              __html: tajweedEnabled ? (activeAyahMenu.verse?.arabic_text_tajweed || activeAyahMenu.arabicText || "") : stripTajweedTags(activeAyahMenu.verse?.arabic_text_tajweed || activeAyahMenu.arabicText || "")
-            }} />
-
-            {/* Play/Pause Button for this verse */}
-            <div style={{ display: "flex", justifyContent: "center" }}>
-              <button
-                className="btn"
-                onClick={() => {
-                  const isCurrent = Number(playingAudio?.sura) === Number(activeAyahMenu.sura) && Number(playingAudio?.aya) === Number(activeAyahMenu.aya)
-                  if (isCurrent && audioState === "playing") {
-                    pause()
-                  } else if (isCurrent && audioState === "paused") {
-                    resume()
-                  } else {
-                    const currentList = selectedPage ? pageVerses : verses
-                    play(activeAyahMenu.sura, activeAyahMenu.aya, SURA_LIST.find(s => Number(s.number) === Number(activeAyahMenu.sura))?.englishName || "", currentList)
-                  }
-                }}
-                style={{
-                  background: (Number(playingAudio?.sura) === Number(activeAyahMenu.sura) && Number(playingAudio?.aya) === Number(activeAyahMenu.aya) && audioState === "playing") ? "rgba(220, 38, 38, 0.06)" : "rgba(45, 190, 160, 0.06)",
-                  border: (Number(playingAudio?.sura) === Number(activeAyahMenu.sura) && Number(playingAudio?.aya) === Number(activeAyahMenu.aya) && audioState === "playing") ? "0.5px solid #dc2626" : "0.5px solid var(--teal)",
-                  color: (Number(playingAudio?.sura) === Number(activeAyahMenu.sura) && Number(playingAudio?.aya) === Number(activeAyahMenu.aya) && audioState === "playing") ? "#dc2626" : "var(--teal)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  fontSize: 12,
-                  padding: "8px 16px",
-                  borderRadius: 16,
-                  cursor: "pointer",
-                  fontWeight: 500,
-                  width: "100%",
-                  transition: "all 0.2s"
-                }}
-              >
-                <i className={(Number(playingAudio?.sura) === Number(activeAyahMenu.sura) && Number(playingAudio?.aya) === Number(activeAyahMenu.aya) && audioState === "playing") ? "ti ti-player-pause" : "ti ti-player-play"} style={{ fontSize: 13 }}></i>
-                {(Number(playingAudio?.sura) === Number(activeAyahMenu.sura) && Number(playingAudio?.aya) === Number(activeAyahMenu.aya) && audioState === "playing") ? "หยุดฟังเสียงอายะฮ์นี้" : "ฟังเสียงอายะฮ์นี้"}
-              </button>
-            </div>
-
-            {/* Translation & Tafsir Load/Display */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, textAlign: "left" }}>
-              {modalDetails.loading ? (
-                <div style={{ padding: "12px 0", textAlign: "center" }}>
-                  <i className="ti ti-loader-2 spin" style={{ fontSize: 16, color: "var(--teal)", marginBottom: 4 }}></i>
-                  <div style={{ fontSize: 11, color: "var(--t3)" }}>กำลังโหลดคำแปลและตัฟซีร...</div>
-                </div>
-              ) : modalDetails.error ? (
-                <div style={{ fontSize: 11, color: "var(--red)", textAlign: "center", padding: "6px 0" }}>
-                  {modalDetails.error}
-                </div>
-              ) : (
-                <>
-                  <div style={{ fontSize: 13, lineHeight: 1.5, color: "var(--text)" }}>
-                    <strong style={{ display: "block", fontSize: 11, color: "var(--quran-teal)", marginBottom: 4 }}>คำแปลภาษาไทย:</strong>
-                    {modalDetails.translation}
-                  </div>
-                  {modalDetails.tafsir && (
-                    <div style={{
-                      fontSize: 12,
-                      lineHeight: 1.5,
-                      color: "var(--t2)",
-                      background: "var(--quran-acc2)",
-                      padding: 10,
-                      borderRadius: 6,
-                      borderLeft: "2.5px solid var(--quran-teal)"
-                    }}>
-                      <strong style={{ display: "block", fontSize: 10, color: "var(--quran-teal)", marginBottom: 4 }}>ตัฟซีรย่อภาษาไทย:</strong>
-                      {modalDetails.tafsir}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {/* คั่นหน้า / ยกเลิกคั่นหน้า */}
-              <button
-                className="btn btn-teal"
-                style={{
-                  width: "100%",
-                  fontSize: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  padding: "10px 0"
-                }}
-                onClick={() => {
-                  updateLastRead(activeAyahMenu.sura, activeAyahMenu.aya)
-                  setActiveAyahMenu(null)
-                }}
-              >
-                <i className={(lastRead?.sura === activeAyahMenu.sura && lastRead?.aya === activeAyahMenu.aya) ? "ti ti-flag-2-filled" : "ti ti-flag-2"} style={{ fontSize: 14 }}></i>
-                {(lastRead?.sura === activeAyahMenu.sura && lastRead?.aya === activeAyahMenu.aya) ? "ยกเลิกคั่นหน้าการอ่านล่าสุด" : "คั่นหน้านี้เป็นจุดอ่านล่าสุด"}
-              </button>
-
-              {/* บันทึกข้อคิด */}
-              <button
-                className="btn btn-outline"
-                style={{
-                  width: "100%",
-                  fontSize: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  padding: "10px 0",
-                  borderColor: "var(--quran-br)"
-                }}
-                onClick={() => {
-                  const bookmark = getBookmarkForVerse(activeAyahMenu.aya)
-                  const tr = modalDetails.translation || getVerseTranslation(activeAyahMenu.sura, activeAyahMenu.aya)
-                  handleOpenBookmarkModal(
-                    {
-                      id: activeAyahMenu.verse.id,
-                      sura: activeAyahMenu.sura,
-                      aya: activeAyahMenu.aya,
-                      arabic_text: activeAyahMenu.arabicText,
-                      translation: tr || "เปิดโหมดคำแปลเพื่ออ่านคำแปลและการอธิบายความหมายย่อสำหรับอายะฮ์นี้"
-                    },
-                    bookmark
-                  )
-                  setActiveAyahMenu(null)
-                }}
-              >
-                <i className={getBookmarkForVerse(activeAyahMenu.aya) ? "ti ti-bookmark-filled" : "ti ti-bookmark"} style={{ fontSize: 14 }}></i>
-                {getBookmarkForVerse(activeAyahMenu.aya) ? "แก้ไขหรือลบบันทึกข้อคิด" : "เขียนบันทึกข้อคิด / ประโยชน์"}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.querySelector(".app") || document.body
-      )}
-
-      {/* MOBILE BOTTOM SHEET NAVIGATION DRAWER */}
+            {/* MOBILE BOTTOM SHEET NAVIGATION DRAWER */}
       {isMobile && isMobileNavOpen && createPortal(
         <div style={{
           position: "fixed",

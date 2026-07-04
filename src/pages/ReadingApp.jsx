@@ -8,6 +8,10 @@ import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage"
 import { doc, getDoc } from "firebase/firestore"
 import { storage, app, db } from "../lib/firebase.js"
 import { safeDateNow } from "../utils/time.js"
+import { useReadingTimer } from "./reading/hooks/useReadingTimer.js"
+import { TutorialModal } from "./reading/components/TutorialModal.jsx"
+import { QuizModal } from "./reading/components/QuizModal.jsx"
+import { MissionRow } from "./reading/components/MissionRow.jsx"
 
 // --- Helper Functions ---
 function sanitizeStorageName(name) {
@@ -206,11 +210,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   const [uploadingExternal, setUploadingExternal] = useState(false)
 
   // Stopwatch states
-  const [seconds, setSeconds] = useState(0)
-  const [isRunning, setIsRunning] = useState(false)
-  const timerRef = useRef(null)
-  const startTimestampRef = useRef(null)
-  const accumulatedSecondsRef = useRef(0)
+  const { seconds, isRunning, startTimer, pauseTimer, resumeTimer, resetTimer } = useReadingTimer()
 
   // Log Form states
   const [startPage, setStartPage] = useState("")
@@ -697,35 +697,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     }
   }
 
-  // --- Stopwatch logic ---
-  useEffect(() => {
-    if (isRunning) {
-      const tick = () => {
-        const elapsed = Math.floor((safeDateNow() - startTimestampRef.current) / 1000)
-        setSeconds(accumulatedSecondsRef.current + elapsed)
-      }
 
-      tick()
-      timerRef.current = setInterval(tick, 1000)
-
-      const handleVisibilityChange = () => {
-        if (document.visibilityState === "visible") {
-          tick()
-        }
-      }
-      document.addEventListener("visibilitychange", handleVisibilityChange)
-
-      return () => {
-        if (timerRef.current) clearInterval(timerRef.current)
-        document.removeEventListener("visibilitychange", handleVisibilityChange)
-      }
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current)
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
-    }
-  }, [isRunning])
 
   // Auto-start reading session when shelfItemId is passed via context
   useEffect(() => {
@@ -740,25 +712,31 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 
   function startReading(shelfItem) {
     setActiveBook(shelfItem)
-    accumulatedSecondsRef.current = 0
-    setSeconds(0)
-    setIsRunning(true)
+    resumeTimer()
     setStartPage(shelfItem.currentPage || 1)
     setEndPage("")
     setReflection("")
     setActiveMobileTab("form")
-    startTimestampRef.current = safeDateNow()
   }
 
-  const toggleStopwatch = () => {
+  function cancelReading() {
+    setActiveBook(null)
+    resetTimer()
+    setStartPage("")
+    setEndPage("")
+    setReflection("")
+  }
+
+  function stopReading() {
+    pauseTimer()
+  }
+
+  function toggleTimer() {
     if (isRunning) {
-      const elapsed = Math.floor((safeDateNow() - startTimestampRef.current) / 1000)
-      accumulatedSecondsRef.current += elapsed
-      setSeconds(accumulatedSecondsRef.current)
+      pauseTimer()
     } else {
-      startTimestampRef.current = safeDateNow()
+      resumeTimer()
     }
-    setIsRunning(!isRunning)
   }
 
   const exitReadingRoom = async () => {
@@ -769,10 +747,9 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       danger: true
     })
     if (!ok) return
-    setIsRunning(false)
+    stopReading()
     setActiveBook(null)
-    setSeconds(0)
-    accumulatedSecondsRef.current = 0
+    resetTimer()
     clearShelfLaunchContext()
   }
 
@@ -868,9 +845,8 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       })
 
       toast.success(`บันทึกการอ่านเสร็จสมบูรณ์! (+${sessionGems} 💎) คะแนนยืนยันการเรียนรู้: ${report.score}/100`)
-      setIsRunning(false)
+      resetTimer()
       setActiveBook(null)
-      setSeconds(0)
       clearShelfLaunchContext()
     } catch (err) {
       console.error(err)
@@ -1015,101 +991,20 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
           `}} />
 
           {/* Left Panel: Reading Log Panel */}
-          <div className="card reader-form-card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14, overflowY: "auto", height: "100%" }}>
-            <h3 style={{ fontSize: 14, borderBottom: "1.5px solid var(--br2)", paddingBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-              <i className="ti ti-notebook" style={{ color: "var(--teal)" }}></i> บันทึกผลการอ่าน
-            </h3>
-
-            {/* Instruction/Warning Note */}
-            <div style={{
-              background: "rgba(224, 85, 85, 0.08)",
-              border: "1px solid rgba(224, 85, 85, 0.25)",
-              padding: "10px 12px",
-              borderRadius: 10,
-              fontSize: 11,
-              color: "#e05555",
-              lineHeight: 1.6
-            }}>
-              <i className="ti ti-alert-triangle" style={{ marginRight: 6 }}></i>
-              <strong>โปรดทราบ:</strong> คุณต้องสะสมเวลาให้ครบ 3 นาทีขึ้นไป, ระบุเลขหน้าให้ถูกต้อง และบันทึกข้อคิดอย่างน้อย 20 ตัวอักษร จึงจะสามารถกดบันทึกความคืบหน้าได้ หากคุณกด "ออก" ก่อนกดบันทึก เวลาและสถิติทั้งหมดในรอบนี้จะสูญหายทันที
-            </div>
-
-            {/* Dynamic Checklist HUD */}
-            <div style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              background: "var(--bg2)",
-              padding: 12,
-              borderRadius: 12,
-              border: "1px solid var(--br2)",
-              fontSize: 12
-            }}>
-              <span style={{ fontSize: 10, fontWeight: 600, color: "var(--t3)", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 2 }}>เกณฑ์การยืนยันเซสชัน</span>
-
-              <div style={{ display: "flex", alignItems: "center", gap: 8, color: seconds >= MIN_VERIFIED_SECONDS ? "var(--teal)" : "var(--t3)", transition: "color 0.2s" }}>
-                <i className={`ti ${seconds >= MIN_VERIFIED_SECONDS ? "ti-circle-check" : "ti-circle"}`} style={{ fontSize: 14, color: seconds >= MIN_VERIFIED_SECONDS ? "var(--teal)" : "var(--t3)" }}></i>
-                <span>เวลาอ่านอย่างน้อย 3 นาที (ขณะนี้: {displayTimer})</span>
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: 8, color: (endPage && Number(endPage) >= Number(startPage)) ? "var(--teal)" : "var(--t3)", transition: "color 0.2s" }}>
-                <i className={`ti ${(endPage && Number(endPage) >= Number(startPage)) ? "ti-circle-check" : "ti-circle"}`} style={{ fontSize: 14, color: (endPage && Number(endPage) >= Number(startPage)) ? "var(--teal)" : "var(--t3)" }}></i>
-                <span>ระบุหน้าที่อ่านถึง (หน้า {startPage} ถึง {endPage || "?"})</span>
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: 8, color: reflection.trim().length >= MIN_REFLECTION_CHARS ? "var(--teal)" : "var(--t3)", transition: "color 0.2s" }}>
-                <i className={`ti ${reflection.trim().length >= MIN_REFLECTION_CHARS ? "ti-circle-check" : "ti-circle"}`} style={{ fontSize: 14, color: reflection.trim().length >= MIN_REFLECTION_CHARS ? "var(--teal)" : "var(--t3)" }}></i>
-                <span>บันทึกข้อคิด {MIN_REFLECTION_CHARS} ตัวอักษรขึ้นไป ({reflection.trim().length}/{MIN_REFLECTION_CHARS})</span>
-              </div>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11, color: "var(--t2)" }}>หน้าเริ่มต้น *</span>
-                <input
-                  type="number"
-                  value={startPage}
-                  onChange={e => setStartPage(e.target.value)}
-                  style={{ fontSize: 13, padding: "8px 10px" }}
-                />
-              </label>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11, color: "var(--t2)" }}>อ่านถึงหน้า *</span>
-                <input
-                  type="number"
-                  placeholder="เช่น 12"
-                  value={endPage}
-                  onChange={e => setEndPage(e.target.value)}
-                  style={{ fontSize: 13, padding: "8px 10px" }}
-                />
-              </label>
-            </div>
-
-            <label style={{ display: "grid", gap: 4 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 11, color: "var(--t2)" }}>บันทึกข้อคิดที่ได้รับ (สั้นๆ) *</span>
-                <span style={{ fontSize: 10, color: reflection.length >= MIN_REFLECTION_CHARS ? "var(--teal)" : "#e05555" }}>
-                  {reflection.length}/{MIN_REFLECTION_CHARS} อักษร
-                </span>
-              </div>
-              <textarea
-                value={reflection}
-                onChange={e => setReflection(e.target.value)}
-                rows={5}
-                placeholder="วันนี้ได้ข้อคิดสะกิดใจเรื่องอะไรบ้างจากการอ่านหัวข้อนี้? พิมพ์ข้อเขียนสั้นๆ (อย่างน้อย 20 ตัวอักษรเพื่อรับสถิติยืนยัน)"
-                style={{ fontSize: 12, padding: 10, lineHeight: 1.5 }}
-              />
-            </label>
-
-            <button
-              onClick={saveReadingProgress}
-              disabled={saving || seconds < MIN_VERIFIED_SECONDS || reflection.length < MIN_REFLECTION_CHARS || !endPage || Number(endPage) < Number(startPage)}
-              className="btn btn-teal"
-              style={{ width: "100%", marginTop: "auto", padding: "10px 0", fontSize: 13 }}
-            >
-              {saving ? "กำลังบันทึก..." : "บันทึกความคืบหน้า"}
-            </button>
-          </div>
+                    <TimerPanel
+            seconds={seconds}
+            displayTimer={displayTimer}
+            startPage={startPage}
+            setStartPage={setStartPage}
+            endPage={endPage}
+            setEndPage={setEndPage}
+            reflection={reflection}
+            setReflection={setReflection}
+            saving={saving}
+            saveReadingProgress={saveReadingProgress}
+            MIN_VERIFIED_SECONDS={MIN_VERIFIED_SECONDS}
+            MIN_REFLECTION_CHARS={MIN_REFLECTION_CHARS}
+          />
 
           {/* Right Panel: Embedded Google Preview Viewer */}
           <div className="reader-preview" style={{ borderRadius: 16, overflow: "hidden", border: "1px solid var(--br2)", background: "var(--bg2)", height: "100%" }}>
@@ -1851,512 +1746,4 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     </div>
   )
 }
-
-function MissionRow({ title, desc, progress, target, formatProgress, rewardText, claimed, onClaim }) {
-  const completed = progress >= target
-  const percent = Math.min(100, Math.round((progress / target) * 100))
-
-  const containerBg = claimed
-    ? "rgba(45, 190, 160, 0.04)"
-    : completed
-      ? "rgba(45, 190, 160, 0.08)"
-      : "var(--bg2)"
-  const borderColor = claimed
-    ? "rgba(45, 190, 160, 0.15)"
-    : completed
-      ? "rgba(45, 190, 160, 0.35)"
-      : "var(--br)"
-
-  return (
-    <div style={{
-      padding: "10px 12px",
-      background: containerBg,
-      border: `1px solid ${borderColor}`,
-      borderRadius: 12,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
-      flexWrap: "wrap",
-      textAlign: "left",
-      transition: "all 0.2s ease"
-    }}>
-      <div style={{ flex: 1, minWidth: 200 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-          <strong style={{ fontSize: 12, color: "var(--text)" }}>{title}</strong>
-          <span style={{ fontSize: 9, fontWeight: 500, color: "var(--teal)", background: "var(--teal-bg)", padding: "1px 5px", borderRadius: 4 }}>
-            {rewardText}
-          </span>
-        </div>
-        <p style={{ fontSize: 10, color: "var(--t2)", marginBottom: 6, lineHeight: 1.3 }}>{desc}</p>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ flex: 1, height: 4, background: "var(--bg3)", borderRadius: 2, overflow: "hidden" }}>
-            <div style={{ width: `${percent}%`, height: "100%", background: "var(--teal)", borderRadius: 2 }}></div>
-          </div>
-          <span style={{ fontSize: 9, color: "var(--t3)", fontWeight: 500, whiteSpace: "nowrap" }}>
-            {formatProgress(progress)}
-          </span>
-        </div>
-      </div>
-
-      <div>
-        {claimed ? (
-          <button className="btn btn-outline" disabled style={{ padding: "4px 8px", fontSize: 10, opacity: 0.6, cursor: "not-allowed", color: "var(--teal)", borderColor: "rgba(45, 190, 160, 0.2)" }}>
-            <i className="ti ti-check" style={{ marginRight: 2 }}></i>รับแล้ว
-          </button>
-        ) : (
-          <button
-            onClick={onClaim}
-            disabled={!completed}
-            className={`btn ${completed ? "btn-teal" : "btn-outline"}`}
-            style={{
-              padding: "4px 10px",
-              fontSize: 10,
-              opacity: completed ? 1 : 0.6,
-              cursor: completed ? "pointer" : "not-allowed",
-              boxShadow: completed ? "0 4px 10px rgba(45,190,160,0.15)" : "none"
-            }}
-          >
-            {completed ? "รับรางวัล" : "ยังไม่เสร็จ"}
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function TutorialModal({ onClose }) {
-  return createPortal(
-    <div style={{
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,0.45)",
-      zIndex: 99999,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "20px 16px",
-      overflowY: "auto",
-    }} onClick={onClose}>
-      <div className="card" style={{
-        maxWidth: 500,
-        width: "100%",
-        padding: "28px 22px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 14,
-        textAlign: "center",
-        animation: "pageFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-        boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
-        position: "relative",
-      }} onClick={e => e.stopPropagation()}>
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          style={{
-            position: "absolute",
-            top: 12,
-            right: 12,
-            background: "none",
-            border: "none",
-            fontSize: 18,
-            cursor: "pointer",
-            color: "var(--t3)",
-            width: 32,
-            height: 32,
-            display: "grid",
-            placeItems: "center",
-            borderRadius: "50%",
-            transition: "background 0.15s",
-          }}
-          title="ปิด"
-        >
-          <i className="ti ti-x"></i>
-        </button>
-
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: -4 }}>
-          <span className="badge badge-teal" style={{ fontSize: 11, padding: "4px 10px", fontWeight: 600 }}>แนะนำการใช้งาน 🚀</span>
-        </div>
-
-        <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text)", margin: 0 }}>
-          ห้องอ่านหนังสือส่วนตัวคืออะไร?
-        </h2>
-
-        <p style={{ fontSize: 13, color: "var(--t2)", lineHeight: 1.6, margin: 0 }}>
-          เครื่องมือสร้างวินัยรักการอ่าน ผ่านการจับเวลาจริง บันทึกผล และสะสมสถิติความต่อเนื่อง (Streak)
-        </p>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, textAlign: "left" }}>
-
-          <div style={{ display: "flex", gap: 12, background: "var(--bg2)", padding: 13, borderRadius: 12, border: "0.5px solid var(--br)" }}>
-            <div style={{ width: 34, height: 34, background: "var(--teal-bg)", color: "var(--teal)", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 16, flexShrink: 0 }}>
-              <i className="ti ti-books"></i>
-            </div>
-            <div>
-              <strong style={{ fontSize: 13, color: "var(--text)", display: "block", marginBottom: 2 }}>เพิ่มหนังสือแล้วเริ่มอ่าน</strong>
-              <span style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.5 }}>เลือกหนังสือจากคลังหรืออัปโหลด PDF กด <span style={{ color: "var(--teal)", fontWeight: 500 }}>เริ่มอ่าน</span> เพื่อเข้าโหมดจับเวลา ระบบบันทึกเวลาที่อ่านจริงเท่านั้น</span>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 12, background: "var(--bg2)", padding: 13, borderRadius: 12, border: "0.5px solid var(--br)" }}>
-            <div style={{ width: 34, height: 34, background: "rgba(248, 113, 113, 0.12)", color: "#f87171", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 16, flexShrink: 0 }}>
-              <i className="ti ti-flame"></i>
-            </div>
-            <div>
-              <strong style={{ fontSize: 13, color: "var(--text)", display: "block", marginBottom: 2 }}>รักษา Streak ต่อเนื่อง 🔥</strong>
-              <span style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.5 }}>อ่าน and บันทึกเซสชันทุกวัน ระบบจะนับวันต่อเนื่อง หากวันไหนอ่านไม่ได้ ใช้ไอเทมคุ้มครองแทนได้</span>
-            </div>
-          </div>
-
-          {/* ─── น้ำแข็ง & ลากิจ ─── */}
-          <div style={{ background: "rgba(96,165,250,0.07)", border: "0.5px solid rgba(96,165,250,0.2)", borderRadius: 12, padding: 13 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-              <i className="ti ti-shield-check" style={{ color: "#60a5fa" }}></i>
-              ไอเทมคุ้มครอง Streak (สูงสุด 2 ชิ้นต่อประเภท)
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                <span style={{ fontSize: 15, flexShrink: 0 }}>🧊</span>
-                <div>
-                  <strong style={{ fontSize: 12, color: "var(--text)" }}>น้ำแข็ง (Freeze)</strong>
-                  <span style={{ fontSize: 11, color: "var(--t2)", display: "block", lineHeight: 1.4 }}>ระบบใช้อัตโนมัติเมื่อลืมอ่านหนังสือในวันก่อนหน้า เพื่อรักษา Streak ของคุณ ได้จากภารกิจสะสม</span>
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                <span style={{ fontSize: 15, flexShrink: 0 }}>📅</span>
-                <div>
-                  <strong style={{ fontSize: 12, color: "var(--text)" }}>ลากิจ (Leave)</strong>
-                  <span style={{ fontSize: 11, color: "var(--t2)", display: "block", lineHeight: 1.4 }}>ใช้เมื่อวางแผนล่วงหน้าแล้วว่าน่าจะเรียนไม่ทันหรือไม่ว่าง สามารถกดใช้วันนี้ด้วยตัวเอง ได้จากภารกิจสะสม</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 12, background: "var(--bg2)", padding: 13, borderRadius: 12, border: "0.5px solid var(--br)" }}>
-            <div style={{ width: 34, height: 34, background: "rgba(245,158,11,0.1)", color: "#f59e0b", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 16, flexShrink: 0 }}>
-              <i className="ti ti-target"></i>
-            </div>
-            <div>
-              <strong style={{ fontSize: 13, color: "var(--text)", display: "block", marginBottom: 2 }}>ภารกิจรายวัน (ไม่ง่าย)</strong>
-              <span style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.5 }}>อ่าน 10 นาที หรือเขียนข้อคิด 100 ตัวอักษร หรือผ่านแบบทดสอบ 12/20 ข้อ จึงจะได้รับไอเทม และมีสิทธิ์รับได้เพียงครั้งเดียวต่อวัน</span>
-            </div>
-          </div>
-
-        </div>
-
-        <button
-          className="btn btn-teal"
-          onClick={onClose}
-          style={{ width: "100%", padding: "12px", fontSize: 14, marginTop: 4 }}
-        >
-          เข้าใจแล้ว เริ่มต้นใช้งานเลย!
-        </button>
-
-      </div>
-    </div>,
-    document.body
-  )
-}
-
-// --- Quiz Modal Component ---
-function QuizModal({ shelfItem, onClose, onSaveScore, theme, user }) {
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [questions, setQuestions] = useState([])
-  const [quizSource, setQuizSource] = useState("ai")
-  const [started, setStarted] = useState(false)
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [answers, setAnswers] = useState([])
-  const [selectedOption, setSelectedOption] = useState(null)
-  const [showExplanation, setShowExplanation] = useState(false)
-  const [completed, setCompleted] = useState(false)
-
-  const book = shelfItem.book || shelfItem.customBook || {}
-
-  useEffect(() => {
-    async function loadQuiz() {
-      try {
-        setLoading(true)
-        setError(null)
-        const idToken = user ? await user.getIdToken() : ""
-        const res = await fetch("/api/generate-quiz", {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "authorization": `Bearer ${idToken}`
-          },
-          body: JSON.stringify({ book })
-        })
-        if (!res.ok) throw new Error(`HTTP Error Status ${res.status}`)
-        const data = await res.json()
-        if (data.error) throw new Error(data.error)
-        setQuestions(data.quiz || [])
-        setQuizSource(data.source || "ai")
-      } catch (err) {
-        console.error("Failed to load quiz", err)
-        setError("ไม่สามารถโหลดข้อสอบได้ กรุณาลองใหม่อีกครั้ง")
-      } finally {
-        setLoading(false)
-      }
-    }
-    loadQuiz()
-  }, [shelfItem, user])
-
-  const handleSelectOption = (idx) => {
-    if (showExplanation) return
-    setSelectedOption(idx)
-    setShowExplanation(true)
-    const nextAnswers = [...answers]
-    nextAnswers[currentIndex] = idx
-    setAnswers(nextAnswers)
-  }
-
-  const handleNext = () => {
-    if (currentIndex < questions.length - 1) {
-      setCurrentIndex(prev => prev + 1)
-      setSelectedOption(null)
-      setShowExplanation(false)
-    } else {
-      const finalScore = questions.reduce((score, q, i) => {
-        return score + (answers[i] === q.answerIndex ? 1 : 0)
-      }, 0)
-      onSaveScore(shelfItem.id, finalScore)
-      setCompleted(true)
-    }
-  }
-
-  const handleRestart = () => {
-    setCurrentIndex(0)
-    setAnswers([])
-    setSelectedOption(null)
-    setShowExplanation(false)
-    setCompleted(false)
-    setStarted(false)
-  }
-
-  const correctAnswersCount = useMemo(() => {
-    return questions.reduce((score, q, i) => {
-      return score + (answers[i] === q.answerIndex ? 1 : 0)
-    }, 0)
-  }, [questions, answers])
-
-  return createPortal(
-    <div className={`app ${theme || "light"}`} style={{
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,0.65)",
-      backdropFilter: "blur(4px)",
-      zIndex: 99999,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: 16,
-      fontFamily: "'Prompt', sans-serif"
-    }}>
-      <div className="card" style={{
-        maxWidth: 600,
-        width: "100%",
-        padding: 24,
-        background: "var(--card)",
-        border: "0.5px solid var(--br)",
-        borderRadius: 24,
-        boxShadow: "0 20px 40px rgba(0,0,0,0.35)",
-        maxHeight: "90vh",
-        display: "flex",
-        flexDirection: "column",
-        animation: "pageFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)"
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--br2)", paddingBottom: 16, marginBottom: 16 }}>
-          <h3 style={{ margin: 0, fontSize: 16, display: "flex", alignItems: "center", gap: 8, color: "var(--text)" }}>
-            <i className="ti ti-help" style={{ color: "var(--teal)", fontSize: 20 }}></i>
-            แบบทดสอบทบทวนความเข้าใจหลังอ่านจบ
-          </h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--t3)", cursor: "pointer", fontSize: 20 }} aria-label="ปิด">
-            <i className="ti ti-x"></i>
-          </button>
-        </div>
-
-        <div style={{ flex: 1, overflowY: "auto", paddingRight: 4, marginBottom: 16 }}>
-          {loading && (
-            <div style={{ textAlign: "center", padding: "40px 0" }}>
-              <i className="ti ti-loader-2 spin" style={{ fontSize: 36, color: "var(--teal)" }}></i>
-              <p style={{ marginTop: 12, fontSize: 13, color: "var(--t2)" }}>ระบบ AI กำลังวิเคราะห์เนื้อหาและเตรียมชุดแบบทดสอบ...</p>
-            </div>
-          )}
-
-          {error && (
-            <div style={{ textAlign: "center", padding: "30px 0", color: "#e05555" }}>
-              <i className="ti ti-alert-triangle" style={{ fontSize: 36, marginBottom: 12 }}></i>
-              <p style={{ fontSize: 14, fontWeight: 500 }}>{error}</p>
-              <button className="btn btn-outline" onClick={onClose} style={{ marginTop: 16, borderRadius: 20 }}>ปิดหน้าต่าง</button>
-            </div>
-          )}
-
-          {!loading && !error && (
-            <>
-              {!started && !completed && (
-                <div style={{ textAlign: "center", padding: "10px 0" }}>
-                  {quizSource === "fallback" && (
-                    <div style={{
-                      background: "rgba(245,158,11,0.08)",
-                      border: "1px solid rgba(245,158,11,0.2)",
-                      borderRadius: 12,
-                      padding: "10px 14px",
-                      fontSize: 12,
-                      color: "#d97706",
-                      marginBottom: 16,
-                      textAlign: "left",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8
-                    }}>
-                      <i className="ti ti-alert-triangle" style={{ fontSize: 16 }}></i>
-                      <span><strong>โหมดทบทวนทั่วไป (Practice Mode):</strong> ระบบกำลังจำลองแบบทดสอบพื้นฐานเนื่องจาก AI คีย์ไม่พร้อมใช้งาน</span>
-                    </div>
-                  )}
-                  <div style={{ width: 64, height: 64, borderRadius: 16, background: "var(--teal-bg)", display: "flex", alignItems: "center", justifyItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                    <i className="ti ti-award" style={{ color: "var(--teal)", fontSize: 32 }}></i>
-                  </div>
-                  <h4 style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", margin: "0 0 8px" }}>{book.title}</h4>
-                  <p style={{ fontSize: 12, color: "var(--t3)", margin: "0 0 16px" }}>ผู้เขียน: {book.author || "ไม่ระบุ"}</p>
-
-                  <div style={{ background: "var(--bg3)", padding: 16, borderRadius: 16, textAlign: "left", fontSize: 13, lineHeight: 1.6, color: "var(--t2)", marginBottom: 20 }}>
-                    <h5 style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 600, color: "var(--text)" }}>คำแนะนำก่อนทำแบบทดสอบ:</h5>
-                    <ul style={{ paddingLeft: 20, margin: 0 }}>
-                      <li>แบบทดสอบประกอบด้วยคำถามทบทวนเนื้อหาและความเข้าใจ จำนวน 20 ข้อ</li>
-                      <li>เกณฑ์การผ่าน: ตอบถูก 12 ข้อขึ้นไป (12/20)</li>
-                      <li>เมื่อสอบผ่านจะได้รับ 💎 gems ประจำวันเพิ่มขึ้น</li>
-                      <li>หากทำไม่สำเร็จ สามารถกลับมาสอบทบทวนได้เรื่อยๆ</li>
-                    </ul>
-                  </div>
-
-                  <button className="btn btn-teal" onClick={() => setStarted(true)} style={{ width: "100%", padding: "10px 0", borderRadius: 20, fontSize: 13 }}>
-                    เริ่มทำแบบทดสอบ (20 ข้อ)
-                  </button>
-                </div>
-              )}
-
-              {started && !completed && questions.length > 0 && (
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--t3)", marginBottom: 8 }}>
-                    <span>ข้อที่ {currentIndex + 1} จาก {questions.length}</span>
-                    <span style={{ textTransform: "uppercase", fontWeight: 600, color: questions[currentIndex].difficulty === "hard" ? "#e05555" : questions[currentIndex].difficulty === "medium" ? "#3b73c4" : "var(--teal)" }}>
-                      ระดับ: {questions[currentIndex].difficulty === "hard" ? "ยาก" : questions[currentIndex].difficulty === "medium" ? "ปานกลาง" : "ง่าย"}
-                    </span>
-                  </div>
-                  <div style={{ height: 6, background: "var(--bg3)", borderRadius: 3, overflow: "hidden", marginBottom: 20 }}>
-                    <div style={{ width: `${((currentIndex + 1) / questions.length) * 100}%`, height: "100%", background: "var(--teal)", transition: "width 0.2s" }}></div>
-                  </div>
-
-                  <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 16, lineHeight: 1.5 }}>
-                    {questions[currentIndex].question}
-                  </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
-                    {questions[currentIndex].options.map((option, idx) => {
-                      const isSelected = selectedOption === idx
-                      const isCorrect = idx === questions[currentIndex].answerIndex
-                      let bg = "var(--bg3)"
-                      let border = "1px solid var(--br)"
-                      let color = "var(--text)"
-
-                      if (showExplanation) {
-                        if (isCorrect) {
-                          bg = "rgba(45, 190, 160, 0.12)"
-                          border = "1.5px solid var(--teal)"
-                          color = "var(--teal)"
-                        } else if (isSelected) {
-                          bg = "rgba(224, 85, 85, 0.1)"
-                          border = "1.5px solid #e05555"
-                          color = "#e05555"
-                        }
-                      } else if (isSelected) {
-                        border = "1.5px solid var(--teal)"
-                      }
-
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => handleSelectOption(idx)}
-                          disabled={showExplanation}
-                          style={{
-                            textAlign: "left",
-                            padding: "12px 16px",
-                            borderRadius: 12,
-                            background: bg,
-                            border: border,
-                            color: color,
-                            fontSize: 13,
-                            cursor: showExplanation ? "default" : "pointer",
-                            transition: "all 0.15s ease",
-                            fontFamily: "'Prompt', sans-serif",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between"
-                          }}
-                        >
-                          <span>{option}</span>
-                          {showExplanation && (
-                            isCorrect ? (
-                              <i className="ti ti-circle-check" style={{ fontSize: 16, color: "var(--teal)" }}></i>
-                            ) : isSelected ? (
-                              <i className="ti ti-circle-x" style={{ fontSize: 16, color: "#e05555" }}></i>
-                            ) : null
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  {showExplanation && (
-                    <div style={{ animation: "pageFadeIn 0.2s ease-out" }}>
-                      <div style={{ background: "rgba(45, 190, 160, 0.05)", borderLeft: "3px solid var(--teal)", padding: "10px 14px", borderRadius: "0 8px 8px 0", fontSize: 12, color: "var(--t2)", lineHeight: 1.5, marginBottom: 16 }}>
-                        <strong style={{ display: "block", color: "var(--teal)", marginBottom: 4 }}>คำอธิบายความรู้:</strong>
-                        {questions[currentIndex].explanation}
-                      </div>
-
-                      <button className="btn btn-teal" onClick={handleNext} style={{ width: "100%", padding: "10px 0", borderRadius: 20, fontSize: 13 }}>
-                        {currentIndex < questions.length - 1 ? "ทำข้อถัดไป ➔" : "ดูผลลัพธ์การทดสอบ"}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {completed && (
-                <div style={{ textAlign: "center", padding: "10px 0" }}>
-                  <div style={{ width: 72, height: 72, borderRadius: "50%", background: correctAnswersCount >= 12 ? "rgba(45, 190, 160, 0.12)" : "rgba(224, 85, 85, 0.1)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                    <i className={`ti ${correctAnswersCount >= 12 ? "ti-circle-check-filled" : "ti-circle-x-filled"}`} style={{ color: correctAnswersCount >= 12 ? "var(--teal)" : "#e05555", fontSize: 44 }}></i>
-                  </div>
-
-                  <h4 style={{ fontSize: 18, fontWeight: 600, color: "var(--text)", margin: "0 0 6px" }}>
-                    {correctAnswersCount >= 12 ? "สอบผ่านเกณฑ์ทบทวนความรู้! 🎉" : "คะแนนยังไม่ผ่านเกณฑ์"}
-                  </h4>
-                  <p style={{ fontSize: 24, fontWeight: 700, color: correctAnswersCount >= 12 ? "var(--teal)" : "#e05555", margin: "8px 0" }}>
-                    {correctAnswersCount} / 20 คะแนน
-                  </p>
-                  <p style={{ fontSize: 13, color: "var(--t2)", margin: "0 0 20px", lineHeight: 1.5 }}>
-                    {correctAnswersCount >= 12
-                      ? "ยอดเยี่ยมมากครับ! คุณจดจำและทำความเข้าใจหนังสือเรื่องนี้ได้ดีมาก ได้ทบทวนบทเรียนและทำภารกิจสำเร็จ"
-                      : "พยายามอีกนิดครับ! ลองอ่านทวนบทเรียนในหนังสือหรือสมุดข้อคิด จากนั้นเข้ามาเริ่มทำแบบทดสอบใหม่อีกครั้งนะ"
-                    }
-                  </p>
-
-                  <div style={{ display: "flex", gap: 10 }}>
-                    <button className="btn btn-outline" onClick={handleRestart} style={{ flex: 1, borderRadius: 20 }}>
-                      ทำแบบทดสอบอีกครั้ง
-                    </button>
-                    <button className="btn btn-teal" onClick={onClose} style={{ flex: 1, borderRadius: 20 }}>
-                      ปิดหน้าต่าง
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    </div>,
-    document.body
-  )
-}
+

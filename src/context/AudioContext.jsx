@@ -26,17 +26,19 @@ export function AudioProvider({ children }) {
     setPlayingAudio(null)
   }, [])
 
+  // M1: Use ref to break circular dependency between play and handleNext
+  const playRef = useRef(null)
+
   const handleNext = useCallback((sura, aya, suraName) => {
     const list = playlistRef.current
     const currentIndex = list.findIndex(item => Number(item.sura) === Number(sura) && Number(item.aya) === Number(aya))
     if (currentIndex !== -1 && currentIndex < list.length - 1) {
       const nextVerse = list[currentIndex + 1]
-      // eslint-disable-next-line no-use-before-define
-      play(nextVerse.sura, nextVerse.aya, suraName, list)
+      playRef.current?.(nextVerse.sura, nextVerse.aya, suraName, list)
     } else {
       stop()
     }
-  }, [stop]) // play is hoisted
+  }, [stop])
 
   const play = useCallback((sura, aya, suraName, playlist = []) => {
     if (audioRef.current) {
@@ -80,6 +82,11 @@ export function AudioProvider({ children }) {
       }
     }
   }, [handleNext, stop])
+
+  // Keep ref in sync with latest play function
+  useEffect(() => {
+    playRef.current = play
+  }, [play])
 
   const pause = useCallback(() => {
     if (audioRef.current) {
