@@ -1016,22 +1016,41 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                                 </div>
                               </div>
                               {selectedSura === s.number && (
-                                <div style={{ padding: "8px 14px", background: "var(--quran-bg2)", borderBottom: "0.5px solid var(--quran-br)", display: "flex", alignItems: "center", gap: 8 }}>
-                                  <i className="ti ti-corner-down-right" style={{ fontSize: 14, color: "var(--quran-teal)" }}></i>
-                                  <div style={{ position: "relative", width: "100%" }}>
-                                    <select
-                                      value={targetScrollAyah || ""}
-                                      onChange={e => {
-                                        if (e.target.value) setTargetScrollAyah(parseInt(e.target.value))
-                                      }}
-                                      style={{ width: "100%", height: 32, padding: "0 24px 0 10px", fontSize: "11.5px", fontWeight: 500, borderRadius: "6px", border: "0.5px solid var(--quran-br)", background: "var(--quran-bg)", color: "var(--quran-text)", cursor: "pointer", appearance: "none", WebkitAppearance: "none", MozAppearance: "none", outline: "none" }}
-                                    >
-                                      <option value="">🎯 เลือกอายะฮ์เพื่อข้ามไป...</option>
-                                      {Array.from({ length: s.numberOfAyahs }, (_, i) => i + 1).map(a => (
-                                        <option key={a} value={a}>อายะฮ์ที่ {a}</option>
-                                      ))}
-                                    </select>
-                                    <i className="ti ti-chevron-down" style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", fontSize: 9, pointerEvents: "none", color: "var(--quran-t3)" }}></i>
+                                <div style={{ padding: "12px 14px", background: "var(--quran-bg2)", borderBottom: "0.5px solid var(--quran-br)" }}>
+                                  <div style={{ fontSize: "11px", color: "var(--quran-t2)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                                    <i className="ti ti-layout-grid" style={{ fontSize: 13, color: "var(--quran-teal)" }}></i> เลือกอายะฮ์
+                                  </div>
+                                  <div style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "repeat(auto-fill, minmax(32px, 1fr))",
+                                    gap: "4px",
+                                    maxHeight: "180px",
+                                    overflowY: "auto",
+                                    paddingRight: "4px",
+                                  }}>
+                                    {Array.from({ length: s.numberOfAyahs }, (_, i) => i + 1).map(a => (
+                                      <button
+                                        key={a}
+                                        onClick={() => setTargetScrollAyah(a)}
+                                        style={{
+                                          width: "100%",
+                                          aspectRatio: "1/1",
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          borderRadius: "6px",
+                                          fontSize: "11px",
+                                          fontWeight: 500,
+                                          background: targetScrollAyah === a ? "var(--quran-teal)" : "var(--quran-bg)",
+                                          color: targetScrollAyah === a ? "#fff" : "var(--quran-text)",
+                                          border: targetScrollAyah === a ? "none" : "0.5px solid var(--quran-br)",
+                                          cursor: "pointer",
+                                          transition: "all 0.2s"
+                                        }}
+                                      >
+                                        {a}
+                                      </button>
+                                    ))}
                                   </div>
                                 </div>
                               )}
@@ -1323,10 +1342,12 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                       color: "var(--quran-text)",
                       cursor: "pointer",
                       appearance: "none",
+                      WebkitAppearance: "none",
+                      MozAppearance: "none",
                       outline: "none"
                     }}
                   >
-                    <option value="">🎯 เลือกอายะฮ์...</option>
+                    <option value="">เลือกอายะฮ์...</option>
                     {Array.from({ length: currentSuraInfo.numberOfAyahs }, (_, i) => i + 1).map(a => (
                       <option key={a} value={a}>อายะฮ์ที่ {a}</option>
                     ))}
@@ -1345,7 +1366,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between",
+                  justifyContent: "between",
                   padding: "8px 10px",
                   fontSize: "11.5px",
                   fontWeight: 500,
