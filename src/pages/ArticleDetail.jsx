@@ -280,7 +280,11 @@ export default function ArticleDetail({ item, go, authState }) {
       const title = matchH3[1].trim();
       const id = `toc-${index}`;
       toc.push({ id, title, level: 3 });
-      parsedBody.push(<h3 key={`h3-${index}`} id={id} style={{ marginTop: 24, marginBottom: 12, fontSize: 18 }}>{title}</h3>);
+      parsedBody.push(
+        <h3 key={`h3-${index}`} id={id} style={{ marginTop: 28, marginBottom: 12, fontSize: 19, color: "var(--text)", fontWeight: 600 }}>
+          <span style={{ color: "var(--acc)", marginRight: 8 }}>✿</span>{title}
+        </h3>
+      );
       return;
     }
     const matchH2 = trimmed.match(/^##([^#].*)$/);
@@ -289,7 +293,15 @@ export default function ArticleDetail({ item, go, authState }) {
       const title = matchH2[1].trim();
       const id = `toc-${index}`;
       toc.push({ id, title, level: 2 });
-      parsedBody.push(<h2 key={`h2-${index}`} id={id} style={{ marginTop: 36, marginBottom: 16, fontSize: 22, color: "var(--teal)" }}>{title}</h2>);
+      parsedBody.push(
+        <h2 key={`h2-${index}`} id={id} style={{ 
+          marginTop: 40, marginBottom: 20, fontSize: 24, color: "var(--teal)", fontWeight: 700,
+          background: "linear-gradient(90deg, rgba(20,184,166,0.15) 0%, transparent 100%)",
+          padding: "10px 16px", borderRadius: 12, borderLeft: "5px solid var(--teal)"
+        }}>
+          {title}
+        </h2>
+      );
       return;
     }
 
@@ -318,13 +330,18 @@ export default function ArticleDetail({ item, go, authState }) {
         <i className="ti ti-arrow-left" style={{ marginRight: 6, fontSize: 12 }}></i>กลับหน้าบทความ
       </button>
 
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-          <span className="tag tag-teal">{displayItem.category}</span>
-          {displayItem.type === "series" && <span className="tag tag-acc">ซีรีส์ {displayItem.seriesId} ตอน {displayItem.part}</span>}
-          {displayItem.type === "specific" && displayItem.seriesName && <span className="tag tag-acc">{displayItem.seriesName}</span>}
+      <div style={{ marginBottom: 24, position: "relative" }}>
+        <div style={{ position: "absolute", top: -40, left: -40, width: 120, height: 120, background: "var(--acc)", opacity: 0.1, filter: "blur(40px)", borderRadius: "50%", zIndex: 0 }}></div>
+        <div style={{ position: "absolute", bottom: -20, right: 0, width: 100, height: 100, background: "var(--teal)", opacity: 0.1, filter: "blur(40px)", borderRadius: "50%", zIndex: 0 }}></div>
+        
+        <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
+          <span style={{ padding: "4px 12px", background: "linear-gradient(135deg, var(--teal), #0d9488)", color: "#fff", borderRadius: 20, fontSize: 13, fontWeight: 500, boxShadow: "0 4px 10px rgba(20,184,166,0.3)" }}>{displayItem.category}</span>
+          {displayItem.type === "series" && <span style={{ padding: "4px 12px", background: "linear-gradient(135deg, var(--acc), #d97706)", color: "#fff", borderRadius: 20, fontSize: 13, fontWeight: 500, boxShadow: "0 4px 10px rgba(245,158,11,0.3)" }}>ซีรีส์ {displayItem.seriesId} ตอน {displayItem.part}</span>}
+          {displayItem.type === "specific" && displayItem.seriesName && <span style={{ padding: "4px 12px", background: "linear-gradient(135deg, var(--acc), #d97706)", color: "#fff", borderRadius: 20, fontSize: 13, fontWeight: 500, boxShadow: "0 4px 10px rgba(245,158,11,0.3)" }}>{displayItem.seriesName}</span>}
         </div>
-        <h1 className="article-title">{displayItem.title}</h1>
+        <h1 className="article-title" style={{ position: "relative", zIndex: 1, fontSize: 32, lineHeight: 1.4, background: "linear-gradient(to right, var(--text), var(--teal))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+          {displayItem.title}
+        </h1>
 
         <div style={{ display: "flex", gap: 16, color: "var(--t3)", fontSize: 12, fontWeight: 300, flexWrap: "wrap", marginTop: 12 }}>
           <span><i className="ti ti-user" style={{ marginRight: 4, fontSize: 13 }}></i>{displayItem.author}</span>
@@ -350,11 +367,12 @@ export default function ArticleDetail({ item, go, authState }) {
       </div>
 
       {displayItem.coverUrl && (
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: 28, width: "100%" }}>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 36, width: "100%", position: "relative" }}>
+          <div style={{ position: "absolute", top: "10%", left: "5%", right: "5%", bottom: "-10%", background: "linear-gradient(45deg, var(--teal), var(--acc))", filter: "blur(30px)", opacity: 0.2, zIndex: 0, borderRadius: 30 }}></div>
           <ImageWithFallback
             src={displayItem.coverUrl}
             alt={displayItem.title}
-            style={{ maxWidth: "100%", maxHeight: 420, borderRadius: 12, boxShadow: "0 10px 25px rgba(0,0,0,0.1)", objectFit: "contain", border: ".5px solid var(--br2)" }}
+            style={{ maxWidth: "100%", maxHeight: 420, borderRadius: 16, boxShadow: "0 20px 40px rgba(0,0,0,0.15)", objectFit: "contain", border: "2px solid rgba(255,255,255,0.5)", zIndex: 1, position: "relative", background: "var(--bg)" }}
           />
         </div>
       )}
