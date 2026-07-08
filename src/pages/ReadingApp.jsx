@@ -1189,11 +1189,23 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       books={books} addNewBookToShelf={addNewBookToShelf}
       externalBook={externalBook} setExternalBook={setExternalBook}
       uploadingExternal={uploadingExternal} addExternalBook={addExternalBook}
-      searchQ={searchQ} setSearchQ={setSearchQ}
-      filteredActiveBooks={filteredActiveBooks} filteredFinishedBooks={filteredFinishedBooks}
       startReadingSession={startReadingSession}
       markFinished={markFinished}
       removeShelfItem={removeShelfItem}
+      go={go}
+      availableBooks={availableBooks}
+      startReading={startReading}
+      formatReadingMinutes={formatReadingMinutes}
+      protectToday={protectToday}
+      last7Days={last7Days}
+      renderNotificationSettings={renderNotificationSettings}
+      buyItem={buyItem}
+      claimMission={claimMission}
+      todaySessions={todaySessions}
+      todayQuizPassed={todayQuizPassed}
+      theme={theme}
+      authState={authState}
+      handleSaveQuizScore={handleSaveQuizScore}
       stats={stats}
       hasConfiguredNotif={hasConfiguredNotif}
       notifEnabled={notifEnabled} setNotifEnabled={setNotifEnabled}
@@ -1207,8 +1219,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       showShop={showShop} setShowShop={setShowShop}
       inventory={inventory} setInventory={setInventory}
       useFreeze={useFreeze} useLeave={useLeave}
-      missionStatus={missionStatus} handleClaimMission={handleClaimMission}
-      activeQuizShelfItem={activeQuizShelfItem} setActiveQuizShelfItem={setActiveQuizShelfItem} handleQuizSubmit={handleQuizSubmit}
+      activeQuizShelfItem={activeQuizShelfItem} setActiveQuizShelfItem={setActiveQuizShelfItem}
     />
   );
 }

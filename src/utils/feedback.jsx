@@ -13,6 +13,13 @@ export function notifyError(message) {
 function ConfirmDialog({ title, message, confirmText, cancelText, danger, onResolve }) {
   const [visible, setVisible] = useState(false)
 
+  const handleClose = (value) => {
+    setVisible(false)
+    setTimeout(() => {
+      onResolve(value)
+    }, 200) // matches transition duration
+  }
+
   useEffect(() => {
     // Animate in
     const raf = requestAnimationFrame(() => setVisible(true))
@@ -30,13 +37,6 @@ function ConfirmDialog({ title, message, confirmText, cancelText, danger, onReso
       window.removeEventListener("keydown", handleKeyDown)
     }
   }, [])
-
-  const handleClose = (value) => {
-    setVisible(false)
-    setTimeout(() => {
-      onResolve(value)
-    }, 200) // matches transition duration
-  }
 
   return (
     <div

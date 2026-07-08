@@ -1,4 +1,5 @@
 import React from 'react';
+import toast from 'react-hot-toast';
 import { TutorialModal } from './TutorialModal.jsx';
 import { QuizModal } from './QuizModal.jsx';
 import { MissionRow } from './MissionRow.jsx';
@@ -14,8 +15,20 @@ export default function ReadingDashboard(props) {
     books, addNewBookToShelf,
     externalBook, setExternalBook,
     uploadingExternal, addExternalBook,
-    searchQ, setSearchQ,
-    filteredActiveBooks, filteredFinishedBooks,
+    go,
+    availableBooks,
+    startReading,
+    formatReadingMinutes,
+    protectToday,
+    last7Days,
+    renderNotificationSettings,
+    buyItem,
+    claimMission,
+    todaySessions,
+    todayQuizPassed,
+    theme,
+    authState,
+    handleSaveQuizScore,
     startReadingSession,
     markFinished,
     removeShelfItem,
@@ -32,8 +45,7 @@ export default function ReadingDashboard(props) {
     showShop, setShowShop,
     inventory, setInventory,
     useFreeze, useLeave,
-    missionStatus, handleClaimMission,
-    activeQuizShelfItem, setActiveQuizShelfItem, handleQuizSubmit
+    activeQuizShelfItem, setActiveQuizShelfItem
   } = props;
 
   // --- Reading App Home / Dashboard View ---
