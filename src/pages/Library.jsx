@@ -174,82 +174,79 @@ export default function Library({ go, authState, ctx }) {
       <ContentStatusBanner loading={loading} error={error} isUsingFallback={isUsingFallback} />
 
       {/* SEARCH + MAIN FILTER */}
-      <div className="filter-bar">
-        <div className="filter-search">
-          <i className="ti ti-search"></i>
+      {/* ━━━ SEARCH & FILTER BAR ━━━ */}
+      <div style={{ display: "flex", gap: 8, marginBottom: showAdvancedFilters ? 12 : 24 }}>
+        <div style={{ flex: 1, position: "relative" }}>
+          <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
           <input
-            placeholder="ค้นหาชื่อหนังสือ, ผู้เขียน, หรือเนื้อหา..."
             value={search}
             onChange={e => { setSearch(e.target.value); updateFilters({ search: e.target.value }) }}
+            placeholder="ค้นหาชื่อหนังสือ, ผู้เขียน, หรือเนื้อหา..."
+            style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "12px 16px 12px 42px", background: "var(--bg2)", border: "1px solid transparent", fontSize: 14, outline: "none", transition: "border 0.2s" }}
+            onFocus={(e) => e.target.style.border = "1px solid var(--teal)"}
+            onBlur={(e) => e.target.style.border = "1px solid transparent"}
           />
         </div>
-        {filter === "วารสาร" ? (
-          <select
-            className="filter-select"
-            value={sortBy}
-            onChange={e => updateFilters({ sortBy: e.target.value })}
-          >
-            <option value="issue-desc">เล่มใหม่ล่าสุด ➜ เล่มเก่า</option>
-            <option value="issue-asc">เล่มเก่าสุด ➜ เล่มใหม่</option>
-          </select>
-        ) : (
-          <select
-            className="filter-select"
-            value={sortBy}
-            onChange={e => updateFilters({ sortBy: e.target.value })}
-          >
-            <option value="newest">ปีที่พิมพ์ ใหม่ ➜ เก่า</option>
-            <option value="oldest">ปีที่พิมพ์ เก่า ➜ ใหม่</option>
-          </select>
-        )}
-
         <button
           onClick={() => updateFilters({ showAdv: !showAdvancedFilters ? "true" : "false" })}
-          className={showAdvancedFilters ? "btn btn-teal" : "btn btn-outline"}
-          style={{
-            padding: "0 16px",
-            display: "inline-flex",
+          style={{ 
+            padding: "0 18px", 
+            borderRadius: 24, 
+            background: showAdvancedFilters ? "var(--teal)" : "var(--bg2)", 
+            color: showAdvancedFilters ? "#fff" : "var(--text)", 
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
             alignItems: "center",
-            gap: 6,
-            fontSize: 12,
-            height: 40,
-            borderRadius: 12,
-            boxSizing: "border-box"
+            justifyContent: "center",
+            transition: "all 0.2s"
           }}
+          title="ตัวกรองเพิ่มเติม"
         >
-          <i className="ti ti-filter"></i> ตัวกรองเพิ่มเติม
+          <i className="ti ti-filter" style={{ fontSize: 18 }}></i>
         </button>
       </div>
 
-      <div className="filter-pills">
-        {types.map(t => (
-          <button
-            key={t}
-            onClick={() => updateFilters({ filter: t })}
-            className={`filter-pill ${filter === t ? 'active' : ''}`}
-          >
-            {t === "all" ? "ทั้งหมด" : t}
-          </button>
-        ))}
-      </div>
-
-      {/* ADVANCED FILTERS */}
+      {/* ━━━ EXPANDABLE FILTERS ━━━ */}
       {showAdvancedFilters && (
-        <div className="card" style={{ padding: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, background: "var(--acc2)" }}>
-          <div>
-            <label style={{ display: "block", fontSize: 11, color: "var(--t2)", marginBottom: 6, fontWeight: 500 }}>หมวดหมู่เนื้อหา</label>
-            <select value={categoryFilter} onChange={e => updateFilters({ cat: e.target.value })} style={{ width: "100%", padding: "8px 12px", fontSize: 13, borderRadius: 8, border: "0.5px solid var(--br)", background: "var(--card)", color: "var(--text)" }}>
+        <div style={{ background: "var(--bg2)", padding: "16px", borderRadius: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>ประเภทสื่อ</span>
+            <select value={filter} onChange={e => updateFilters({ filter: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+              {types.map(t => <option key={t} value={t}>{t === "all" ? "ทั้งหมด" : t}</option>)}
+            </select>
+          </label>
+
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>หมวดหมู่เนื้อหา</span>
+            <select value={categoryFilter} onChange={e => updateFilters({ cat: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
               <option value="all">-- ทุกหมวดหมู่ --</option>
               {availableCategories.filter(c => c !== "all").map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-          </div>
-          <div>
-            <label style={{ display: "block", fontSize: 11, color: "var(--t2)", marginBottom: 6, fontWeight: 500 }}>แหล่งที่มา / สำนักพิมพ์</label>
-            <select value={sourceFilter} onChange={e => updateFilters({ source: e.target.value })} style={{ width: "100%", padding: "8px 12px", fontSize: 13, borderRadius: 8, border: "0.5px solid var(--br)", background: "var(--card)", color: "var(--text)" }}>
+          </label>
+
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>แหล่งที่มา / สำนักพิมพ์</span>
+            <select value={sourceFilter} onChange={e => updateFilters({ source: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
               <option value="all">-- ทุกสำนักพิมพ์ --</option>
               {availableSources.filter(s => s !== "all").map(s => <option key={s} value={s}>{s}</option>)}
             </select>
-          </div>
+          </label>
+
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>เรียงลำดับ</span>
+            {filter === "วารสาร" ? (
+              <select value={sortBy} onChange={e => updateFilters({ sortBy: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+                <option value="issue-desc">เล่มใหม่ล่าสุด ➜ เล่มเก่า</option>
+                <option value="issue-asc">เล่มเก่าสุด ➜ เล่มใหม่</option>
+              </select>
+            ) : (
+              <select value={sortBy} onChange={e => updateFilters({ sortBy: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+                <option value="newest">ปีที่พิมพ์ ใหม่ ➜ เก่า</option>
+                <option value="oldest">ปีที่พิมพ์ เก่า ➜ ใหม่</option>
+              </select>
+            )}
+          </label>
         </div>
       )}
 

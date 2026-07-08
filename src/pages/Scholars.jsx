@@ -29,8 +29,8 @@ export default function Scholars() {
   const scholarsQueryOptions = useMemo(() => ({ live: false }), [])
   const { items: scholars, loading } = useContentCollection("scholars", SCHOLARS, null, scholarsQueryOptions)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
-  
   const [search, setSearch] = useState("")
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [era, setEra] = useState("0")
   const [field, setField] = useState("all")
   
@@ -128,83 +128,98 @@ export default function Scholars() {
           <strong>ชี้แจง:</strong> รายชื่อและฐานข้อมูลบุคคลด้านล่างนี้ยังอยู่ในขั้นตอนการปรับปรุงและอัปเดตข้อมูลให้สมบูรณ์ ทีมงานกำลังทยอยตรวจสอบรายละเอียดวิชาการทีละท่านอย่างรอบคอบ
         </span>
       </div>
-      {/* SEARCH + FILTER */}
-      <div className="filter-bar">
-        <div className="filter-search">
-          <i className="ti ti-search"></i>
-          <input 
-            placeholder="ค้นหาชื่ออุลามาอ์ (ไทย/English/ประวัติ)..." 
+      {/* ━━━ SEARCH & FILTER BAR ━━━ */}
+      <div style={{ display: "flex", gap: 8, marginBottom: showAdvanced ? 12 : 24 }}>
+        <div style={{ flex: 1, position: "relative" }}>
+          <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
+          <input
             value={search}
-            onChange={e => { setSearch(e.target.value); resetVisible(); }} 
+            onChange={e => { setSearch(e.target.value); resetVisible(); }}
+            placeholder="ค้นหาชื่ออุลามาอ์ (ไทย/English/ประวัติ)..."
+            style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "12px 16px 12px 42px", background: "var(--bg2)", border: "1px solid transparent", fontSize: 14, outline: "none", transition: "border 0.2s" }}
+            onFocus={(e) => e.target.style.border = "1px solid var(--teal)"}
+            onBlur={(e) => e.target.style.border = "1px solid transparent"}
           />
         </div>
-        <select 
-          className="filter-select"
-          value={field} 
-          onChange={e => { setField(e.target.value); resetVisible(); }} 
+        <button
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          style={{ 
+            padding: "0 18px", 
+            borderRadius: 24, 
+            background: showAdvanced ? "var(--teal)" : "var(--bg2)", 
+            color: showAdvanced ? "#fff" : "var(--text)", 
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "all 0.2s"
+          }}
+          title="ตัวกรองเพิ่มเติม"
         >
-          {fields.map(f => <option key={f} value={f}>{f === "all" ? "ทุกสาขาวิชา" : f}</option>)}
-        </select>
-      </div>
-      
-      {/* Advanced Filters */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 20 }}>
-        <select 
-          className="filter-select"
-          value={aqFilter} 
-          onChange={e => { setAqFilter(e.target.value); resetVisible(); }} 
-          style={{ width: "100%" }}
-        >
-          <option value="">ทุกอะกีดะฮฺ</option>
-          <option value="สะลัฟ">สะลัฟ / อะฮฺลุสสุนนะฮฺ</option>
-          <option value="อะชะอะรี">อะชะอะรี</option>
-          <option value="มาตุรีดี">มาตุรีดี</option>
-          <option value="ไม่ระบุ">ไม่ระบุ</option>
-        </select>
-        <select 
-          className="filter-select"
-          value={mhFilter} 
-          onChange={e => { setMhFilter(e.target.value); resetVisible(); }} 
-          style={{ width: "100%" }}
-        >
-          <option value="">ทุกมันฮัจญ์</option>
-          <option value="สะลัฟี">สะลัฟี</option>
-          <option value="ศูฟี">ศูฟี / ตะเซาวุฟ</option>
-          <option value="เดโอบันดี">เดโอบันดี</option>
-          <option value="บะเรลวี">บะเรลวี</option>
-          <option value="ตับลีฆ">ตับลีฆ</option>
-          <option value="อิควาน">อิควาน</option>
-          <option value="กลาสสิก">กลาสสิก / อะชะอะรี</option>
-          <option value="ไม่ระบุ">ไม่ระบุ</option>
-        </select>
-        <select 
-          className="filter-select"
-          value={mzFilter} 
-          onChange={e => { setMzFilter(e.target.value); resetVisible(); }} 
-          style={{ width: "100%" }}
-        >
-          <option value="">ทุกมัซฮับ</option>
-          <option value="หัมบะลี">หัมบะลี</option>
-          <option value="ชาฟิอี">ชาฟิอี</option>
-          <option value="มาลิกี">มาลิกี</option>
-          <option value="หะนะฟี">หะนะฟี</option>
-          <option value="ซอฮิรี">ซอฮิรี</option>
-          <option value="ไม่ระบุ">ไม่ระบุ</option>
-        </select>
+          <i className="ti ti-filter" style={{ fontSize: 18 }}></i>
+        </button>
       </div>
 
-      {/* ERA TABS */}
-      <div className="filter-pills">
-        {eras.map(e => (
-          <button 
-            key={e} 
-            onClick={() => { setEra(e); resetVisible(); }} 
-            className={`filter-pill ${era === e ? 'active' : ''}`}
-          >
-            {e === "0" ? "ทั้งหมด" : eraLabelMap[e] || ERA_LABELS[e] || `ยุคที่ ${e}`}
-          </button>
-        ))}
-      </div>
+      {/* ━━━ EXPANDABLE FILTERS ━━━ */}
+      {showAdvanced && (
+        <div style={{ background: "var(--bg2)", padding: "16px", borderRadius: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>สาขาวิชา</span>
+            <select value={field} onChange={e => { setField(e.target.value); resetVisible(); }} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+              {fields.map(f => <option key={f} value={f}>{f === "all" ? "ทุกสาขาวิชา" : f}</option>)}
+            </select>
+          </label>
+
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>ยุคสมัย</span>
+            <select value={era} onChange={e => { setEra(e.target.value); resetVisible(); }} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+              {eras.map(e => (
+                <option key={e} value={e}>{e === "0" ? "-- ทุกยุคสมัย --" : eraLabelMap[e] || ERA_LABELS[e] || `ยุคที่ ${e}`}</option>
+              ))}
+            </select>
+          </label>
+
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>อะกีดะฮฺ</span>
+            <select value={aqFilter} onChange={e => { setAqFilter(e.target.value); resetVisible(); }} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+              <option value="">ทุกอะกีดะฮฺ</option>
+              <option value="สะลัฟ">สะลัฟ / อะฮฺลุสสุนนะฮฺ</option>
+              <option value="อะชะอะรี">อะชะอะรี</option>
+              <option value="มาตุรีดี">มาตุรีดี</option>
+              <option value="ไม่ระบุ">ไม่ระบุ</option>
+            </select>
+          </label>
+
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>มันฮัจญ์</span>
+            <select value={mhFilter} onChange={e => { setMhFilter(e.target.value); resetVisible(); }} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+              <option value="">ทุกมันฮัจญ์</option>
+              <option value="สะลัฟี">สะลัฟี</option>
+              <option value="ศูฟี">ศูฟี / ตะเซาวุฟ</option>
+              <option value="เดโอบันดี">เดโอบันดี</option>
+              <option value="บะเรลวี">บะเรลวี</option>
+              <option value="ตับลีฆ">ตับลีฆ</option>
+              <option value="อิควาน">อิควาน</option>
+              <option value="กลาสสิก">กลาสสิก / อะชะอะรี</option>
+              <option value="ไม่ระบุ">ไม่ระบุ</option>
+            </select>
+          </label>
+
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>มัซฮับ</span>
+            <select value={mzFilter} onChange={e => { setMzFilter(e.target.value); resetVisible(); }} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+              <option value="">ทุกมัซฮับ</option>
+              <option value="หัมบะลี">หัมบะลี</option>
+              <option value="ชาฟิอี">ชาฟิอี</option>
+              <option value="มาลิกี">มาลิกี</option>
+              <option value="หะนะฟี">หะนะฟี</option>
+              <option value="ซอฮิรี">ซอฮิรี</option>
+              <option value="ไม่ระบุ">ไม่ระบุ</option>
+            </select>
+          </label>
+        </div>
+      )}
 
       {/* TIMELINE */}
       {loading ? (

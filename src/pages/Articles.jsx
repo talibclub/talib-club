@@ -20,6 +20,7 @@ export default function Articles({ go, authState, ctx }) {
   const requestedPage = parseInt(ctx?.page, 10) || 1
 
   const [search, setSearch] = useState(() => ctx?.search || "")
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   useEffect(() => {
     setSearch(ctx?.search || "")
@@ -215,29 +216,65 @@ export default function Articles({ go, authState, ctx }) {
         </div>
       ) : (
         <>
-          <div className="filter-bar">
-            <div className="filter-search">
-              <i className="ti ti-search"></i>
-              <input placeholder="ค้นหาบทความ..." value={search}
-                onChange={e => { setSearch(e.target.value); updateFilters({ search: e.target.value, showAllBrowse: e.target.value ? true : showAllBrowse }) }} />
+          {/* ━━━ SEARCH & FILTER BAR ━━━ */}
+          <div style={{ display: "flex", gap: 8, marginBottom: showAdvanced ? 12 : 24 }}>
+            <div style={{ flex: 1, position: "relative" }}>
+              <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
+              <input
+                value={search}
+                onChange={e => { setSearch(e.target.value); updateFilters({ search: e.target.value, showAllBrowse: e.target.value ? true : showAllBrowse }) }}
+                placeholder="ค้นหาบทความ..."
+                style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "12px 16px 12px 42px", background: "var(--bg2)", border: "1px solid transparent", fontSize: 14, outline: "none", transition: "border 0.2s" }}
+                onFocus={(e) => e.target.style.border = "1px solid var(--teal)"}
+                onBlur={(e) => e.target.style.border = "1px solid transparent"}
+              />
             </div>
-            <select className="filter-select" value={type} onChange={e => updateFilters({ type: e.target.value, showAllBrowse: e.target.value !== "all" ? true : showAllBrowse })}>
-              {types.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-            </select>
-            <select className="filter-select" value={sortOrder} onChange={e => updateFilters({ sort: e.target.value })}>
-              <option value="newest">ใหม่ไปเก่า</option>
-              <option value="oldest">เก่าไปใหม่</option>
-            </select>
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              style={{ 
+                padding: "0 18px", 
+                borderRadius: 24, 
+                background: showAdvanced ? "var(--teal)" : "var(--bg2)", 
+                color: showAdvanced ? "#fff" : "var(--text)", 
+                border: "none",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all 0.2s"
+              }}
+              title="ตัวกรองเพิ่มเติม"
+            >
+              <i className="ti ti-filter" style={{ fontSize: 18 }}></i>
+            </button>
           </div>
 
-          <div className="filter-pills">
-            {categories.map(c => (
-              <button key={c.id} onClick={() => updateFilters({ cat: c.id, showAllBrowse: c.id !== "all" ? true : showAllBrowse })}
-                className={`filter-pill ${cat === c.id ? 'active' : ''}`}>
-                {c.label}
-              </button>
-            ))}
-          </div>
+          {/* ━━━ EXPANDABLE FILTERS ━━━ */}
+          {showAdvanced && (
+            <div style={{ background: "var(--bg2)", padding: "16px", borderRadius: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+              <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>หมวดหมู่</span>
+                <select value={cat} onChange={e => updateFilters({ cat: e.target.value, showAllBrowse: e.target.value !== "all" ? true : showAllBrowse })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                </select>
+              </label>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>ประเภท</span>
+                <select value={type} onChange={e => updateFilters({ type: e.target.value, showAllBrowse: e.target.value !== "all" ? true : showAllBrowse })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+                  {types.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                </select>
+              </label>
+              
+              <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>เรียงลำดับ</span>
+                <select value={sortOrder} onChange={e => updateFilters({ sort: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+                  <option value="newest">ใหม่ไปเก่า</option>
+                  <option value="oldest">เก่าไปใหม่</option>
+                </select>
+              </label>
+            </div>
+          )}
 
           {loading ? (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>

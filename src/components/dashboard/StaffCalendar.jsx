@@ -128,12 +128,27 @@ export default function StaffCalendar({ currentUser, staffTeam, sendBotNotificat
         <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <i className="ti ti-calendar" style={{ color: "var(--teal)" }}></i> ปฏิทินวางแผนลงงาน
         </h2>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <button className="btn btn-outline" onClick={handlePrevMonth}>&lt;</button>
-          <strong style={{ fontSize: 18, minWidth: 150, textAlign: "center" }}>
-            {new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric" }).format(currentDate)}
-          </strong>
-          <button className="btn btn-outline" onClick={handleNextMonth}>&gt;</button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button className="btn btn-outline" onClick={handlePrevMonth} style={{ padding: "6px 12px" }}>&lt;</button>
+          
+          <div style={{ position: "relative", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", minWidth: 160, padding: "8px 16px", background: "var(--bg2)", borderRadius: 24, border: "1px solid var(--br)" }}>
+            <input 
+              type="month" 
+              value={`${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`}
+              onChange={(e) => {
+                if (e.target.value) {
+                  const [y, m] = e.target.value.split("-")
+                  setCurrentDate(new Date(y, m - 1, 1))
+                }
+              }}
+              style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer" }}
+            />
+            <strong style={{ fontSize: 16, color: "var(--t1)", pointerEvents: "none" }}>
+              {new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric" }).format(currentDate)} <i className="ti ti-chevron-down" style={{ fontSize: 14, marginLeft: 4 }}></i>
+            </strong>
+          </div>
+
+          <button className="btn btn-outline" onClick={handleNextMonth} style={{ padding: "6px 12px" }}>&gt;</button>
         </div>
       </div>
 

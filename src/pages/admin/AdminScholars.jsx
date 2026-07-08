@@ -181,42 +181,55 @@ export default function AdminScholars() {
         </button>
       </div>
 
-      {/* แถบค้นหา และ ปุ่มกรอง */}
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: showAdvanced ? 12 : 24 }}>
-        <div style={{ flex: "1 1 250px", position: "relative" }}>
+      {/* ━━━ SEARCH & FILTER BAR ━━━ */}
+      <div style={{ display: "flex", gap: 8, marginBottom: showAdvanced ? 12 : 24 }}>
+        <div style={{ flex: 1, position: "relative" }}>
           <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
-          <input 
-            value={search} 
-            onChange={e => setSearch(e.target.value)} 
-            placeholder="ค้นหาชื่ออุลามาอฺ..." 
-            style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "10px 16px 10px 42px", background: "var(--bg2)", border: "none" }} 
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="ค้นหาชื่ออุลามาอฺ..."
+            style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "12px 16px 12px 42px", background: "var(--bg2)", border: "1px solid transparent", fontSize: 14, outline: "none", transition: "border 0.2s" }}
+            onFocus={(e) => e.target.style.border = "1px solid var(--teal)"}
+            onBlur={(e) => e.target.style.border = "1px solid transparent"}
           />
         </div>
-
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          <button onClick={() => setFieldFilter("all")} className={`pill ${fieldFilter === "all" ? "on-acc" : ""}`} style={{ padding: "8px 16px" }}>ทั้งหมด</button>
-          {(taxonomy.scholarFields || []).map(field => (
-            <button key={field} onClick={() => setFieldFilter(field)} className={`pill ${fieldFilter === field ? "on-acc" : ""}`} style={{ padding: "8px 16px" }}>
-              {field}
-            </button>
-          ))}
-        </div>
-
-        <button 
-          className={`btn ${showAdvanced ? "btn-teal" : "btn-outline"}`} 
+        <button
           onClick={() => setShowAdvanced(!showAdvanced)}
-          style={{ padding: "8px 16px", borderRadius: 24 }}
+          style={{ 
+            padding: "0 18px", 
+            borderRadius: 24, 
+            background: showAdvanced ? "var(--teal)" : "var(--bg2)", 
+            color: showAdvanced ? "#fff" : "var(--text)", 
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "all 0.2s"
+          }}
+          title="ตัวกรองเพิ่มเติม"
         >
-          <i className="ti ti-filter" style={{ marginRight: 6 }}></i>ตัวกรองเพิ่มเติม
+          <i className="ti ti-filter" style={{ fontSize: 18 }}></i>
         </button>
       </div>
 
-      {/* แถบตัวกรองเพิ่มเติม */}
+      {/* ━━━ EXPANDABLE FILTERS ━━━ */}
       {showAdvanced && (
-        <div style={{ background: "var(--bg2)", padding: "16px 20px", borderRadius: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+        <div style={{ background: "var(--bg2)", padding: "16px", borderRadius: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>สาขาวิชา</span>
+            <select value={fieldFilter} onChange={e => setFieldFilter(e.target.value)} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+              <option value="all">-- ทุกสาขาวิชา --</option>
+              {(taxonomy.scholarFields || []).map(field => (
+                <option key={field} value={field}>{field}</option>
+              ))}
+            </select>
+          </label>
+
           <label style={{ display: "grid", gap: 6 }}>
             <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>ยุคสมัย</span>
-            <select value={eraFilter} onChange={e => setEraFilter(e.target.value)} style={{ background: "var(--card)", border: "none" }}>
+            <select value={eraFilter} onChange={e => setEraFilter(e.target.value)} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
               <option value="all">-- ทุกยุคสมัย --</option>
               {(taxonomy.scholarEras || []).map(era => (
                 <option key={era.id} value={era.id}>{era.label}</option>

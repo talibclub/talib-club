@@ -247,57 +247,77 @@ export default function AdminLibrary() {
         </button>
       </div>
 
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: showAdvanced ? 12 : 24 }}>
-        <div style={{ flex: "1 1 250px", position: "relative" }}>
+      {/* ━━━ SEARCH & FILTER BAR ━━━ */}
+      <div style={{ display: "flex", gap: 8, marginBottom: showAdvanced ? 12 : 24 }}>
+        <div style={{ flex: 1, position: "relative" }}>
           <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
-          <input 
-            value={search} 
-            onChange={e => setSearch(e.target.value)} 
-            placeholder="ค้นหาชื่อหนังสือ, ผู้เขียน, หรือเนื้อหา..." 
-            style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "10px 16px 10px 42px", background: "var(--bg2)", border: "none" }} 
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="ค้นหาชื่อหนังสือ, ผู้เขียน, หรือเนื้อหา..."
+            style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "12px 16px 12px 42px", background: "var(--bg2)", border: "1px solid transparent", fontSize: 14, outline: "none", transition: "border 0.2s" }}
+            onFocus={(e) => e.target.style.border = "1px solid var(--teal)"}
+            onBlur={(e) => e.target.style.border = "1px solid transparent"}
           />
         </div>
-
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-          <button onClick={() => setTypeFilter("all")} className={`pill ${typeFilter === "all" ? "on-acc" : ""}`} style={{ padding: "8px 16px" }}>ทั้งหมด</button>
-          {(taxonomy.bookTypes || []).map(type => (
-            <button key={type} onClick={() => setTypeFilter(type)} className={`pill ${typeFilter === type ? "on-acc" : ""}`} style={{ padding: "8px 16px" }}>
-              {type}
-            </button>
-          ))}
-          <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} style={{ width: "auto", height: 36, borderRadius: 24, padding: "0 16px", background: "var(--bg2)", border: "none", color: "var(--text)" }}>
-            <option value="newest">ปีที่พิมพ์ ใหม่ ➜ เก่า</option>
-            <option value="oldest">ปีที่พิมพ์ เก่า ➜ ใหม่</option>
-          </select>
-        </div>
-
-        <button 
-          className={`btn ${showAdvanced ? "btn-teal" : "btn-outline"}`} 
+        <button
           onClick={() => setShowAdvanced(!showAdvanced)}
-          style={{ padding: "8px 16px", borderRadius: 24 }}
+          style={{ 
+            padding: "0 18px", 
+            borderRadius: 24, 
+            background: showAdvanced ? "var(--teal)" : "var(--bg2)", 
+            color: showAdvanced ? "#fff" : "var(--text)", 
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "all 0.2s"
+          }}
+          title="ตัวกรองเพิ่มเติม"
         >
-          <i className="ti ti-filter" style={{ marginRight: 6 }}></i>ตัวกรองเพิ่มเติม
+          <i className="ti ti-filter" style={{ fontSize: 18 }}></i>
         </button>
       </div>
 
+      {/* ━━━ EXPANDABLE FILTERS ━━━ */}
       {showAdvanced && (
-        <div style={{ background: "var(--bg2)", padding: "16px 20px", borderRadius: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+        <div style={{ background: "var(--bg2)", padding: "16px", borderRadius: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
           <label style={{ display: "grid", gap: 6 }}>
-            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>หมวดหมู่เนื้อหา</span>
-            <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={{ background: "var(--card)", border: "none" }}>
+            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>ประเภท</span>
+            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+              <option value="all">-- ทุกประเภท --</option>
+              {(taxonomy.bookTypes || []).map(type => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+          </label>
+
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>หมวดหมู่</span>
+            <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
               <option value="all">-- ทุกหมวดหมู่ --</option>
               {(taxonomy.articleCategories || []).map(cat => (
                 <option key={cat.id} value={cat.id}>{cat.label}</option>
               ))}
             </select>
           </label>
+
           <label style={{ display: "grid", gap: 6 }}>
-            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>แหล่งที่มา / สำนักพิมพ์</span>
-            <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} style={{ background: "var(--card)", border: "none" }}>
+            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>สำนักพิมพ์</span>
+            <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
               <option value="all">-- ทุกสำนักพิมพ์ --</option>
               {(taxonomy.bookSources || []).map(src => (
                 <option key={src} value={src}>{src}</option>
               ))}
+            </select>
+          </label>
+
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>เรียงลำดับ</span>
+            <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+              <option value="newest">ปีที่พิมพ์ ใหม่ ➜ เก่า</option>
+              <option value="oldest">ปีที่พิมพ์ เก่า ➜ ใหม่</option>
             </select>
           </label>
         </div>

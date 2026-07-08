@@ -285,10 +285,7 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
         const newItems = idx >= 0
           ? entry.items.map(d => String(d.id) === id ? { ...d, ...localPayload } : d)
           : [localPayload, ...entry.items]
-        collectionCache.set(key, { ...entry, items: newItems })
-        if (PUBLIC_COLLECTIONS.includes(collectionName)) {
-          try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: newItems, at: Date.now() })) } catch (e) { }
-        }
+        writeCachedCollection(key, newItems)
       }
     }
 
