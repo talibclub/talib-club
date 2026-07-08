@@ -258,21 +258,27 @@ export default function ArticleDetail({ item, go, authState }) {
     let isHtml = /<[a-z][\s\S]*>/i.test(body);
     const tocList = [];
     
-    if (!isHtml) {
-      // 1. จัดการ Notes ที่อยู่ท้ายบทความ (ดึงข้อความมาทำ Tooltip)
-      const notesMatch = body.match(/## Notes\s*([\s\S]*)$/i);
-      let notesDict = {};
-      if (notesMatch) {
-        const notesStr = notesMatch[1];
-        const noteLines = notesStr.split('\n');
-        noteLines.forEach(line => {
-          const match = line.match(/^(\d+)\.\s*(.*)/);
-          if (match) {
-            notesDict[match[1]] = match[2].trim();
-          }
-        });
-      }
+    // 1. จัดการ Notes (ดึงข้อความมาทำ Tooltip)
+    const notesRegex = /(?:<h2>Notes<\/h2>|<h3>Notes<\/h3>|<p>## Notes<\/p>|## Notes\s*\n)[\s\S]*$/i;
+    const notesMatch = body.match(notesRegex);
+    let notesDict = {};
+    if (notesMatch) {
+      const notesSection = notesMatch[0];
+      body = body.replace(notesMatch[0], ""); // เอาออกจากเนื้อหาหลักก่อน
+      
+      // แปลงเนื้อหา note ให้เป็นบรรทัดๆ 
+      // เปลี่ยน </p>, <br> เป็น \n ก่อนแล้วลบแท็กที่เหลือทิ้ง
+      const tempText = notesSection.replace(/<\/p>|<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+      const noteLines = tempText.split('\n');
+      noteLines.forEach(line => {
+        const match = line.match(/^\s*(\d+)\.\s*(.*)/);
+        if (match) {
+          notesDict[match[1]] = match[2].trim();
+        }
+      });
+    }
 
+    if (!isHtml) {
       // แปลง Markdown-like headers
       body = body.replace(/^###\s+(.*)$/gm, '<h3>$1</h3>');
       body = body.replace(/^##\s+(.*)$/gm, '<h2>$1</h2>');
@@ -285,12 +291,6 @@ export default function ArticleDetail({ item, go, authState }) {
           return `<blockquote class="hadith-block">${p1}</blockquote>`;
         }
         return `<blockquote>${p1}</blockquote>`;
-      });
-      
-      // แปลง [1] เป็นเชิงอรรถ พร้อม tooltip
-      body = body.replace(/\[(\d+)\]/g, (match, p1) => {
-        const tooltip = notesDict[p1] ? `title="${notesDict[p1].replace(/"/g, '&quot;')}"` : '';
-        return `<sup ${tooltip}><a href="#note-${p1}" class="footnote-link">${p1}</a></sup>`;
       });
       
       // จัด Paragraph (บรรทัดที่ไม่มี tag ให้ครอบ p)
@@ -314,23 +314,16 @@ export default function ArticleDetail({ item, go, authState }) {
       if (inP) htmlLines.push('</p>');
       
       body = htmlLines.join('\n');
-      
-      // แปลงส่วน ## Notes ให้เป็น HTML Section สวยๆ
-      if (notesMatch) {
-         body = body.replace(/<h2>Notes<\/h2>[\s\S]*$/, '');
-         let notesHtml = '<div class="article-notes-section"><div class="notes-title">Footnotes / อ้างอิง</div>';
-         for (const [key, val] of Object.entries(notesDict)) {
-           // ทำให้ลิงก์ (Arabic text) ใน Notes เป็นลิงก์ที่คลิกแล้วรูปเด้ง
-           let noteText = val.replace(/\((Arabic text|ข้อความภาษาอาหรับ)\)/gi, '<a href="#">(Arabic text)</a>');
-           // แปลงลิงก์ http ธรรมดาเป็น a href
-           noteText = noteText.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>');
-           notesHtml += `<div class="article-note-item" id="note-${key}" style="transition: background-color 0.5s"><span class="article-note-badge">${key}</span><div>${noteText}</div></div>`;
-         }
-         notesHtml += '</div>';
-         body += notesHtml;
-      }
     }
     
+    // ทำการแทนที่เชิงอรรถทั้งแบบ [1] และ <sup>1</sup> ให้กลายเป็น Tooltip Link
+    body = body.replace(/<sup>\s*<a[^>]*>(\d+)<\/a>\s*<\/sup>|<sup>\s*(\d+)\s*<\/sup>|\[(\d+)\]/g, (match, p1, p2, p3) => {
+      const num = p1 || p2 || p3;
+      if (!num) return match;
+      const tooltip = notesDict[num] ? `title="${notesDict[num].replace(/"/g, '&quot;')}"` : '';
+      return `<sup ${tooltip}><a href="#note-${num}" class="footnote-link">${num}</a></sup>`;
+    });
+
     // สร้าง TOC และใส่ id ให้ h2, h3
     let counter = 0;
     body = body.replace(/<(h[23])([^>]*)>(.*?)<\/\1>/gi, (match, tag, attrs, content) => {
@@ -360,6 +353,18 @@ export default function ArticleDetail({ item, go, authState }) {
       }
       return match;
     });
+
+    // ต่อท้ายด้วยส่วนประกอบ Notes สวยๆ
+    if (notesMatch && Object.keys(notesDict).length > 0) {
+       let notesHtml = '<div class="article-notes-section"><div class="notes-title">Footnotes / อ้างอิง</div>';
+       for (const [key, val] of Object.entries(notesDict)) {
+         let noteText = val.replace(/\((Arabic text|ข้อความภาษาอาหรับ)\)/gi, '<a href="#">(Arabic text)</a>');
+         noteText = noteText.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>');
+         notesHtml += `<div class="article-note-item" id="note-${key}" style="transition: background-color 0.5s"><span class="article-note-badge">${key}</span><div>${noteText}</div></div>`;
+       }
+       notesHtml += '</div>';
+       body += notesHtml;
+    }
 
     return { toc: tocList, finalHtml: body };
   }, [displayItem.body]);
