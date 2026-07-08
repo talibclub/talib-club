@@ -137,14 +137,16 @@ export default function StaffCalendar({ currentUser, staffTeam, sendBotNotificat
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 8, textAlign: "center", fontWeight: "bold", color: "var(--t2)" }}>
-        <div>อา.</div><div>จ.</div><div>อ.</div><div>พ.</div><div>พฤ.</div><div>ศ.</div><div>ส.</div>
-      </div>
+      <div style={{ overflowX: "auto", paddingBottom: 8, WebkitOverflowScrolling: "touch", scrollbarWidth: "none", margin: "0 -clamp(12px, 3vw, 24px)", padding: "0 clamp(12px, 3vw, 24px)" }}>
+        <div style={{ minWidth: 600 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 8, textAlign: "center", fontWeight: "bold", color: "var(--t2)" }}>
+            <div>อา.</div><div>จ.</div><div>อ.</div><div>พ.</div><div>พฤ.</div><div>ศ.</div><div>ส.</div>
+          </div>
 
-      {loading ? (
-        <div style={{ padding: 40, textAlign: "center" }}><i className="ti ti-loader-2 spin"></i> กำลังโหลดปฏิทิน...</div>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, minHeight: 400 }}>
+          {loading ? (
+            <div style={{ padding: 40, textAlign: "center" }}><i className="ti ti-loader-2 spin"></i> กำลังโหลดปฏิทิน...</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, minHeight: 400 }}>
           {Array.from({ length: firstDayOfMonth }).map((_, i) => (
             <div key={`empty-${i}`} style={{ background: "var(--bg)", border: "1px solid var(--border)", opacity: 0.3, borderRadius: 8 }}></div>
           ))}
@@ -201,8 +203,10 @@ export default function StaffCalendar({ currentUser, staffTeam, sendBotNotificat
               </div>
             )
           })}
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {selectedDate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>

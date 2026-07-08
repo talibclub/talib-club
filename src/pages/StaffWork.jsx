@@ -522,7 +522,7 @@ export default function StaffWork({ authState, go }) {
       </div>
 
       {/* ━━━ TABS NAVIGATION ━━━ */}
-      <div className="staff-tabs" style={{ marginBottom: "24px", flexWrap: "wrap" }}>
+      <div className="staff-tabs" style={{ display: "flex", gap: "8px", marginBottom: "24px", overflowX: "auto", whiteSpace: "nowrap", paddingBottom: "8px", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", margin: "0 -clamp(12px, 3vw, 24px)", padding: "0 clamp(12px, 3vw, 24px)" }}>
         <button className={`pill ${tab === "dashboard" ? "on" : ""}`} onClick={() => setTab("dashboard")}>📊 แดชบอร์ดติดตามงาน</button>
         <button className={`pill ${tab === "submit" ? "on" : ""}`} onClick={() => setTab("submit")}>📤 โยนไฟล์ส่งงาน</button>
         <button className={`pill ${tab === "tasks" ? "on" : ""}`} onClick={() => setTab("tasks")}>📋 มอบหมายงาน</button>
