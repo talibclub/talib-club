@@ -278,102 +278,101 @@ export default function AdminArticles() {
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
-        <div style={{ flex: 1 }}>
-          <h2 style={{ minWidth: 150 }}>บทความ <span style={{ fontSize: 12, color: "var(--t3)" }}>({sorted.length} รายการ)</span></h2>
-          <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>
-            บทความวิชาการอิสลามทั้งหมดของ Talib Club {totalPages > 0 && `(หน้า ${safePage}/${totalPages})`}
+      {/* ━━━ HEADER SECTION ━━━ */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 150 }}>
+          <h2 style={{ fontSize: 20, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+            บทความ <span style={{ fontSize: 13, color: "var(--t3)", fontWeight: 400 }}>({sorted.length})</span>
+          </h2>
+          <p style={{ fontSize: 12, color: "var(--t2)", marginTop: 4, marginBottom: 0 }}>
+            {totalPages > 0 ? `หน้า ${safePage}/${totalPages}` : "จัดการบทความทั้งหมด"}
           </p>
           <ContentStatusBanner loading={loading} error={error} isUsingFallback={isUsingFallback} />
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn btn-outline" onClick={handleBroadcast} disabled={busy} style={{ opacity: busy ? 0.6 : 1, color: "var(--teal)", borderColor: "var(--teal)" }}>
-            <i className="ti ti-bell-ringing" style={{ marginRight: 6 }}></i>บรอดแคสต์
+          <button className="btn btn-outline" onClick={handleBroadcast} disabled={busy} title="บรอดแคสต์" style={{ padding: "8px 12px", borderRadius: 10, opacity: busy ? 0.6 : 1, color: "var(--teal)", borderColor: "var(--teal)" }}>
+            <i className="ti ti-bell-ringing" style={{ fontSize: 18 }}></i>
           </button>
-          <button className="btn btn-teal" onClick={openNew} disabled={busy} style={{ opacity: busy ? 0.6 : 1 }}>
-            <i className="ti ti-plus" style={{ marginRight: 6 }}></i>เพิ่มใหม่
+          <button className="btn btn-teal" onClick={openNew} disabled={busy} style={{ padding: "8px 16px", borderRadius: 10, opacity: busy ? 0.6 : 1, display: "flex", alignItems: "center", gap: 6 }}>
+            <i className="ti ti-plus" style={{ fontSize: 18 }}></i>
+            <span style={{ fontSize: 14 }}>เพิ่มใหม่</span>
           </button>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: showAdvanced ? 12 : 24 }}>
-        <div style={{ flex: "1 1 250px", position: "relative" }}>
+      {/* ━━━ SEARCH & FILTER BAR ━━━ */}
+      <div style={{ display: "flex", gap: 8, marginBottom: showAdvanced ? 12 : 24 }}>
+        <div style={{ flex: 1, position: "relative" }}>
           <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="ค้นหาชื่อบทความ, ผู้เขียน..."
-            style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "10px 16px 10px 42px", background: "var(--bg2)", border: "none" }}
+            style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "12px 16px 12px 42px", background: "var(--bg2)", border: "1px solid transparent", fontSize: 14, outline: "none", transition: "border 0.2s" }}
+            onFocus={(e) => e.target.style.border = "1px solid var(--teal)"}
+            onBlur={(e) => e.target.style.border = "1px solid transparent"}
           />
         </div>
-
-        <select 
-          value={typeFilter} 
-          onChange={e => setTypeFilter(e.target.value)}
-          style={{ 
-            background: "var(--bg2)", 
-            border: "1px solid var(--br)", 
-            borderRadius: 24, 
-            padding: "0 16px", 
-            fontSize: 13, 
-            color: "var(--text)",
-            height: 38,
-            cursor: "pointer",
-            width: "auto"
-          }}
-        >
-          <option value="all">-- ทุกประเภท --</option>
-          {(taxonomy.articleTypes || []).map(type => (
-            <option key={type.id} value={type.id}>{type.label}</option>
-          ))}
-        </select>
-
-        {/* ✅ กล่องตัวกรองซีรีส์ (แสดงเมื่อเลือกประเภทซีรีส์) */}
-        {isSeriesType(typeFilter) && (
-          <select 
-            value={seriesFilter} 
-            onChange={e => setSeriesFilter(e.target.value)} 
-            style={{ 
-              background: "var(--bg2)", 
-              border: "1px solid var(--br)", 
-              borderRadius: 24, 
-              padding: "8px 16px", 
-              fontSize: 13, 
-              color: "var(--text)",
-              height: 38,
-              cursor: "pointer"
-            }}
-          >
-            <option value="all">-- ทุกซีรีส์ --</option>
-            {(taxonomy.articleSeries || []).map(series => (
-              <option key={series.id} value={series.id}>{series.name}</option>
-            ))}
-          </select>
-        )}
-
-        <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} style={{ width: "auto", height: 38, borderRadius: 24, padding: "0 16px", background: "var(--bg2)", border: "none", color: "var(--text)" }}>
-          <option value="newest">ใหม่ไปเก่า</option>
-          <option value="oldest">เก่าไปใหม่</option>
-        </select>
-
         <button
-          className={`btn ${showAdvanced ? "btn-teal" : "btn-outline"}`}
           onClick={() => setShowAdvanced(!showAdvanced)}
-          style={{ padding: "8px 16px", borderRadius: 24 }}
+          style={{ 
+            padding: "0 18px", 
+            borderRadius: 24, 
+            background: showAdvanced ? "var(--teal)" : "var(--bg2)", 
+            color: showAdvanced ? "#fff" : "var(--text)", 
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "all 0.2s"
+          }}
+          title="ตัวกรองเพิ่มเติม"
         >
-          <i className="ti ti-filter" style={{ marginRight: 6 }}></i>ตัวกรองเพิ่มเติม
+          <i className="ti ti-filter" style={{ fontSize: 18 }}></i>
         </button>
       </div>
 
+      {/* ━━━ EXPANDABLE FILTERS ━━━ */}
       {showAdvanced && (
-        <div style={{ background: "var(--bg2)", padding: "16px 20px", borderRadius: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+        <div style={{ background: "var(--bg2)", padding: "16px", borderRadius: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
           <label style={{ display: "grid", gap: 6 }}>
-            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>หมวดหมู่บทความ</span>
-            <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={{ background: "var(--card)", border: "none" }}>
+            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>ประเภท</span>
+            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+              <option value="all">-- ทุกประเภท --</option>
+              {(taxonomy.articleTypes || []).map(type => (
+                <option key={type.id} value={type.id}>{type.label}</option>
+              ))}
+            </select>
+          </label>
+
+          {isSeriesType(typeFilter) && (
+            <label style={{ display: "grid", gap: 6 }}>
+              <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>ซีรีส์</span>
+              <select value={seriesFilter} onChange={e => setSeriesFilter(e.target.value)} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+                <option value="all">-- ทุกซีรีส์ --</option>
+                {(taxonomy.articleSeries || []).map(series => (
+                  <option key={series.id} value={series.id}>{series.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>หมวดหมู่</span>
+            <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
               <option value="all">-- ทุกหมวดหมู่ --</option>
               {(taxonomy.articleCategories || []).map(cat => (
                 <option key={cat.id} value={cat.id}>{cat.label}</option>
               ))}
+            </select>
+          </label>
+
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>การเรียงลำดับ</span>
+            <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+              <option value="newest">ใหม่ไปเก่า</option>
+              <option value="oldest">เก่าไปใหม่</option>
             </select>
           </label>
         </div>

@@ -972,6 +972,9 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 2.2fr", gap: 18, flex: 1, minHeight: 0 }} className="reader-split">
           <style dangerouslySetInnerHTML={{
             __html: `
+            .mobile-only-btn {
+              display: none !important;
+            }
             @media (max-width: 900px) {
               .mobile-tabs-container {
                 display: flex !important;
@@ -992,9 +995,6 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
               .mobile-only-btn {
                 display: flex !important;
               }
-            }
-            .mobile-only-btn {
-              display: none !important;
             }
           `}} />
 

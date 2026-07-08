@@ -522,7 +522,7 @@ export default function StaffWork({ authState, go }) {
       </div>
 
       {/* ━━━ TABS NAVIGATION ━━━ */}
-      <div className="staff-tabs" style={{ display: "flex", gap: "20px", marginBottom: "24px", overflowX: "auto", whiteSpace: "nowrap", borderBottom: "1px solid var(--br2)", margin: "0 -clamp(12px, 3vw, 24px)", padding: "0 clamp(12px, 3vw, 24px)", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
+      <div className="staff-tabs" style={{ display: "flex", flexWrap: "nowrap", gap: "20px", marginBottom: "24px", overflowX: "auto", whiteSpace: "nowrap", borderBottom: "1px solid var(--br2)", margin: "0 -clamp(12px, 3vw, 24px)", padding: "0 clamp(12px, 3vw, 24px)", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
         {[
           { id: "dashboard", icon: "📊", label: "แดชบอร์ดติดตามงาน" },
           { id: "submit", icon: "📤", label: "โยนไฟล์ส่งงาน" },
