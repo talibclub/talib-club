@@ -29,8 +29,6 @@ export default function ReadingDashboard(props) {
     theme,
     authState,
     handleSaveQuizScore,
-    startReadingSession,
-    markFinished,
     removeShelfItem,
     stats,
     hasConfiguredNotif,

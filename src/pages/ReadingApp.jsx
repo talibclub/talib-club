@@ -12,19 +12,6 @@ import { useReadingTimer } from "./reading/hooks/useReadingTimer.js"
 import { TutorialModal } from "./reading/components/TutorialModal.jsx"
 import { QuizModal } from "./reading/components/QuizModal.jsx"
 import { MissionRow } from "./reading/components/MissionRow.jsx"
-import ReadingDashboard from "./reading/components/ReadingDashboard.jsx"
-
-// --- Helper Functions ---
-function sanitizeStorageName(name) {
-  return String(name || "book.pdf")
-    .replace(/[^\w.\-ก-๙]+/g, "-")
-    .replace(/-+/g, "-")
-    .slice(0, 90)
-}
-
-const DAILY_READING_GOAL_MINUTES = 10
-const MIN_VERIFIED_SECONDS = 180
-const MIN_REFLECTION_CHARS = 20
 const DEFAULT_FREEZE_CREDITS = 2
 const DEFAULT_LEAVE_CREDITS = 1
 
@@ -771,7 +758,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     setSaving(true)
     try {
       const payload = {
-        startedAt: startTimestampRef.current || safeDateNow() - (seconds * 1000),
+        startedAt: safeDateNow() - (seconds * 1000),
         activeSeconds: seconds,
         inactiveSeconds: 0,
         startPage: start,
@@ -904,7 +891,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
               <strong style={{ fontFamily: "monospace", fontSize: 16, color: seconds >= MIN_VERIFIED_SECONDS ? "var(--teal)" : "var(--text)" }}>{displayTimer}</strong>
             </div>
 
-            <button onClick={toggleStopwatch} className={`btn ${isRunning ? "btn-outline" : "btn-teal"}`} style={{ padding: "8px 14px", fontSize: 12 }}>
+            <button onClick={toggleTimer} className={`btn ${isRunning ? "btn-outline" : "btn-teal"}`} style={{ padding: "8px 14px", fontSize: 12 }}>
               <i className={`ti ${isRunning ? "ti-player-pause" : "ti-player-play"}`}></i> {isRunning ? "หยุดจับเวลา" : "เริ่มจับเวลา"}
             </button>
             <button onClick={exitReadingRoom} className="btn" style={{ background: "#e05555", color: "#fff", padding: "8px 14px", fontSize: 12 }}>
@@ -1189,8 +1176,6 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       books={books} addNewBookToShelf={addNewBookToShelf}
       externalBook={externalBook} setExternalBook={setExternalBook}
       uploadingExternal={uploadingExternal} addExternalBook={addExternalBook}
-      startReadingSession={startReadingSession}
-      markFinished={markFinished}
       removeShelfItem={removeShelfItem}
       go={go}
       availableBooks={availableBooks}
