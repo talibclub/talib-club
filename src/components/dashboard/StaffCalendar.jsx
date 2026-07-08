@@ -61,6 +61,9 @@ export default function StaffCalendar({ currentUser, staffTeam, sendBotNotificat
           updatedAt: serverTimestamp()
         })
         notifySuccess("อัปเดตแผนการโพสต์แล้ว")
+        if (sendBotNotification) {
+          sendBotNotification(`📅 แก้ไขแผนลงโพสต์:\n${form.title}\nวันที่: ${dateStr}\nช่องทาง: ${form.platforms.join(", ")}\nรับผิดชอบ: ${form.assignee}\n\n📌 ดูคิวโพสต์: https://talibclub.org/staff-work`);
+        }
       } else {
         await addDoc(collection(db, "content_calendar"), {
           ...form,

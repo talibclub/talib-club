@@ -256,6 +256,7 @@ export default function StaffWork({ authState, go }) {
         const updatedTeam = staffTeam.filter(n => n !== name)
         await setDoc(doc(db, "settings", "staff"), { members: updatedTeam }, { merge: true })
         notifySuccess(`ลบ "${name}" แล้ว`)
+        await sendBotNotification(`👥 [อัปเดตทีมงาน]\nลบ "${name}" ออกจากระบบโดย ${currentUser}\n\n📌 ดูหน้าทีมงาน: https://talibclub.org/staff-work`)
         setConfirmDialog({ isOpen: false })
       }
     })
@@ -267,6 +268,7 @@ export default function StaffWork({ authState, go }) {
     try {
       await setDoc(doc(db, "settings", "magazine"), { queue: updatedQueue }, { merge: true })
       notifySuccess(`อัปเดตคิววารสารสำเร็จ`)
+      await sendBotNotification(`📚 [คิววารสาร]\nเปลี่ยนผู้รับผิดชอบเดือน ${magazineQueue[index].month} เป็น "${newUser}"\nอัปเดตโดย: ${currentUser}\n\n📌 ดูคิวงาน: https://talibclub.org/staff-work`)
     } catch (e) {
       notifyError("เกิดข้อผิดพลาดในการอัปเดตคิววารสาร")
     }
@@ -461,6 +463,7 @@ export default function StaffWork({ authState, go }) {
         try {
           await deleteDoc(doc(db, "submissions", id))
           notifySuccess("ลบงานเรียบร้อยแล้ว")
+          await sendBotNotification(`🗑️ [ลบงาน]\nงานเรื่อง "${title}" ถูกลบทิ้งโดย ${currentUser}\n\n📌 ดูหน้างาน: https://talibclub.org/staff-work`)
           setConfirmDialog({ isOpen: false })
         } catch (e) {
           notifyError("ลบงานล้มเหลว")
