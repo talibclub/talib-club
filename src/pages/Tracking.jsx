@@ -223,20 +223,24 @@ export default function Tracking({ authState }) {
 
             if (targetCollection === "records") {
               dataObj.trackingNumber = String(getVal(['เลข', 'tracking', 'track']) || "").replace(/\s/g, '').toUpperCase();
-              dataObj.city = String(getVal(['เมือง', 'จังหวัด', 'city']) || "").trim() || "";
+              dataObj.city = String(getVal(['เมือง', 'จังหวัด', 'city', 'ปลายทาง']) || "").trim() || "";
             }
 
             rows.push(dataObj);
           });
 
           const BATCH_LIMIT = 450;
+          const commitPromises = [];
+          
           for (let i = 0; i < rows.length; i += BATCH_LIMIT) {
             const batch = writeBatch(db);
             for (const dataObj of rows.slice(i, i + BATCH_LIMIT)) {
               batch.set(doc(collection(db, targetCollection)), dataObj);
             }
-            await batch.commit();
+            commitPromises.push(batch.commit());
           }
+          
+          await Promise.all(commitPromises);
 
           const count = rows.length;
           if (count > 0) {

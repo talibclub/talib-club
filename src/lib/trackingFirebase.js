@@ -1,5 +1,6 @@
 import { initializeApp, getApps } from "firebase/app"
 import { getFirestore } from "firebase/firestore"
+import { app as mainApp, db as mainDb } from "./firebase.js"
 
 const trackingFirebaseConfig = {
   apiKey: import.meta.env.VITE_TRACKING_FIREBASE_API_KEY || "",
@@ -11,12 +12,14 @@ const trackingFirebaseConfig = {
   measurementId: import.meta.env.VITE_TRACKING_FIREBASE_MEASUREMENT_ID || "",
 }
 
-if (!trackingFirebaseConfig.apiKey || !trackingFirebaseConfig.projectId) {
-  console.warn("[TrackingFirebase] Missing VITE_TRACKING_FIREBASE_* environment variables.")
+const hasTrackingConfig = Boolean(trackingFirebaseConfig.apiKey && trackingFirebaseConfig.projectId);
+
+if (!hasTrackingConfig) {
+  console.info("[TrackingFirebase] No separate tracking config found. Falling back to main Firebase database.")
 }
 
-const trackingApp = getApps().find(item => item.name === "talib-tracking")
-  || initializeApp(trackingFirebaseConfig, "talib-tracking")
+export const trackingApp = hasTrackingConfig 
+  ? (getApps().find(item => item.name === "talib-tracking") || initializeApp(trackingFirebaseConfig, "talib-tracking"))
+  : mainApp;
 
-export const trackingDb = getFirestore(trackingApp)
-
+export const trackingDb = hasTrackingConfig ? getFirestore(trackingApp) : mainDb;
