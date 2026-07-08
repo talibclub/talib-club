@@ -3011,3 +3011,96 @@ input:focus, select:focus, textarea:focus {
   0% { left: -100%; }
   100% { left: 200%; }
 }
+
+/* ━━━ AI TRANSLATION LOADER ANIMATIONS ━━━ */
+@keyframes aiPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(0.95); box-shadow: 0 0 10px rgba(15, 110, 86, 0.2); }
+}
+@keyframes translateScan {
+  0% { transform: translateY(-10px); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: translateY(80px); opacity: 0; }
+}
+@keyframes skeletonShimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+.ai-translating-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background: linear-gradient(145deg, var(--bg2), var(--card));
+  border-radius: 16px;
+  border: 1px dashed var(--br);
+  margin-top: 20px;
+  overflow: hidden;
+}
+.ai-translating-icon-wrapper {
+  position: relative;
+  width: 70px;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--teal);
+  border-radius: 50%;
+  box-shadow: 0 0 25px rgba(15, 110, 86, 0.4);
+  animation: aiPulse 2s infinite ease-in-out;
+  margin-bottom: 20px;
+}
+.ai-translating-icon-wrapper i {
+  font-size: 32px;
+  color: white;
+}
+.ai-translating-scanner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: rgba(255,255,255,0.9);
+  box-shadow: 0 0 12px rgba(255,255,255,0.9);
+  animation: translateScan 1.5s infinite linear;
+}
+.ai-translating-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--teal);
+  margin-bottom: 8px;
+}
+.ai-translating-subtext {
+  font-size: 13px;
+  color: var(--t3);
+  text-align: center;
+  max-width: 350px;
+}
+.ai-skeleton-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  width: 100%;
+  max-width: 500px;
+  margin-top: 30px;
+}
+.ai-skeleton-box {
+  height: 50px;
+  background: var(--br);
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+}
+.ai-skeleton-box::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: skeletonShimmer 1.5s infinite;
+}
+

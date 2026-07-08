@@ -428,10 +428,22 @@ export default function StaffTranslation({ go }) {
           </div>
 
           {translating && (
-            <div className="empty" style={{ padding: "40px" }}>
-              <i className="ti ti-loader-2 spin" style={{ fontSize: "36px", color: "var(--teal)" }} />
-              <p style={{ marginTop: "12px", fontWeight: 500 }}>ระบบ AI กำลังแปลและจัดเรียงเนื้อหาทีละประโยคแบบละเอียด...</p>
-              <p style={{ fontSize: "12px", color: "var(--t3)" }}>ขั้นตอนนี้อาจใช้เวลา 5-15 วินาที ขึ้นอยู่กับความยาวของเนื้อหา</p>
+            <div className="ai-translating-container">
+              <div className="ai-translating-icon-wrapper">
+                <div className="ai-translating-scanner"></div>
+                <i className="ti ti-cpu"></i>
+              </div>
+              <div className="ai-translating-text">AI กำลังวิเคราะห์และแปลภาษา...</div>
+              <div className="ai-translating-subtext">ขั้นตอนนี้อาจใช้เวลา 5-15 วินาที ขึ้นอยู่กับความยาวของเนื้อหา โปรดรอสักครู่</div>
+              
+              <div className="ai-skeleton-row">
+                <div className="ai-skeleton-box" style={{ opacity: 0.8 }}></div>
+                <div className="ai-skeleton-box" style={{ opacity: 0.4 }}></div>
+              </div>
+              <div className="ai-skeleton-row" style={{ marginTop: 12 }}>
+                <div className="ai-skeleton-box" style={{ opacity: 0.6 }}></div>
+                <div className="ai-skeleton-box" style={{ opacity: 0.2 }}></div>
+              </div>
             </div>
           )}
 
