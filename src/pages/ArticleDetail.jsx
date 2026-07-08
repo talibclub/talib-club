@@ -279,12 +279,19 @@ export default function ArticleDetail({ item, go, authState }) {
     }
 
     if (!isHtml) {
-      // แปลง Markdown-like headers
-      body = body.replace(/^###\s+(.*)$/gm, '<h3>$1</h3>');
-      body = body.replace(/^##\s+(.*)$/gm, '<h2>$1</h2>');
+      // แปลง Markdown-like headers (ข้ามบรรทัดที่ว่างเปล่า)
+      body = body.replace(/^###\s+(.*)$/gm, (match, p1) => {
+        if (!p1 || p1.trim() === '') return '<br/>';
+        return `<h3>${p1}</h3>`;
+      });
+      body = body.replace(/^##\s+(.*)$/gm, (match, p1) => {
+        if (!p1 || p1.trim() === '') return '<br/>';
+        return `<h2>${p1}</h2>`;
+      });
       
-      // แปลง Blockquotes และดักจับ กุรอาน/หะดีษ แบบง่ายๆ
+      // แปลง Blockquotes และดักจับ กุรอาน/หะดีษ แบบง่ายๆ (ข้ามบรรทัดว่าง)
       body = body.replace(/^>\s+(.*)$/gm, (match, p1) => {
+        if (!p1 || p1.trim() === '') return '<br/>';
         if (p1.includes('อัลลอฮฺตรัส') || p1.includes('อัลกุรอาน')) {
           return `<blockquote class="quran-block">${p1}</blockquote>`;
         } else if (p1.includes('ร่อซูล') || p1.includes('นบี') || p1.includes('หะดีษ')) {
