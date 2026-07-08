@@ -8,6 +8,7 @@ import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage"
 import { doc, getDoc } from "firebase/firestore"
 import { storage, app, db } from "../lib/firebase.js"
 import { safeDateNow } from "../utils/time.js"
+import { getLocalDayKey, addDaysToKey, todayKey, calculateReadingStreak } from "../utils/streak.js"
 import { useReadingTimer } from "./reading/hooks/useReadingTimer.js"
 import { TutorialModal } from "./reading/components/TutorialModal.jsx"
 import { QuizModal } from "./reading/components/QuizModal.jsx"
@@ -30,36 +31,6 @@ const DEFAULT_FREEZE_CREDITS = 2
 const DEFAULT_LEAVE_CREDITS = 1
 
 // --- Helper Functions ---
-function getMs(val) {
-  if (!val) return 0
-  if (typeof val.toDate === "function") return val.toDate().getTime()
-  if (val.seconds) return val.seconds * 1000
-  if (typeof val === "number") return val
-  const parsed = Date.parse(val)
-  return isNaN(parsed) ? 0 : parsed
-}
-
-function getLocalDayKey(value) {
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value
-  const ms = getMs(value)
-  if (!ms) return ""
-  const date = new Date(ms)
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-")
-}
-
-function addDaysToKey(dayKey, amount) {
-  const date = new Date(`${dayKey}T00:00:00`)
-  date.setDate(date.getDate() + amount)
-  return getLocalDayKey(date.getTime())
-}
-
-function todayKey() {
-  return getLocalDayKey(safeDateNow())
-}
 
 function formatReadingMinutes(seconds) {
   const minutes = Math.round(Number(seconds || 0) / 60)
@@ -112,55 +83,6 @@ function normalizeStreakSettings(settings, uid) {
     streakCount: Number(settings?.streakCount || 0),
     bestStreak: Number(settings?.bestStreak || 0),
     displayName: settings?.displayName || "",
-  }
-}
-
-function calculateReadingStreak(values, protections = []) {
-  const days = new Set(values.map(getLocalDayKey).filter(Boolean))
-  const protectedByDay = new Map(
-    protections
-      .map(item => ({
-        ...item,
-        date: item.date || item.dayKey || getLocalDayKey(item.createdAt || item.usedAt),
-      }))
-      .filter(item => item.date)
-      .map(item => [item.date, item])
-  )
-  const coveredDays = new Set([...days, ...protectedByDay.keys()])
-  const sorted = [...coveredDays].sort()
-  let best = 0
-  let run = 0
-  let prevTime = 0
-
-  sorted.forEach(day => {
-    const currentTime = new Date(`${day}T00:00:00`).getTime()
-    run = prevTime && currentTime - prevTime === 86400000 ? run + 1 : 1
-    best = Math.max(best, run)
-    prevTime = currentTime
-  })
-
-  let current = 0
-  const today = todayKey()
-  const yesterday = addDaysToKey(today, -1)
-  const startDay = coveredDays.has(today) ? today : coveredDays.has(yesterday) ? yesterday : ""
-
-  if (startDay) {
-    const cursor = new Date(`${startDay}T00:00:00`)
-    while (coveredDays.has(getLocalDayKey(cursor.getTime()))) {
-      current += 1
-      cursor.setDate(cursor.getDate() - 1)
-    }
-  }
-
-  return {
-    current,
-    best,
-    totalDays: days.size,
-    protectedTotal: protectedByDay.size,
-    todayKey: today,
-    todayVerified: days.has(today),
-    todayProtected: protectedByDay.get(today) || null,
-    coveredDays,
   }
 }
 

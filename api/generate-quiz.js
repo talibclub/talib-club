@@ -1,3 +1,5 @@
+import { verifyIdToken } from './_firebase-admin.js';
+
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 
@@ -165,8 +167,13 @@ async function generateWithOpenAI(book, apiKey) {
 
   const data = await response.json()
   const content = data.choices?.[0]?.message?.content?.trim() || "{}"
-  const quiz = normalizeQuiz(JSON.parse(content), book)
-  return quiz.length ? quiz : null
+  try {
+    const quiz = normalizeQuiz(JSON.parse(content), book)
+    return quiz.length ? quiz : null
+  } catch (e) {
+    console.error("JSON parse error from OpenAI Quiz:", e);
+    return null;
+  }
 }
 
 async function generateWithAnthropic(book, apiKey) {
@@ -205,28 +212,16 @@ The array must contain exactly 20 objects: 7 easy, 8 medium, and 5 hard.`,
   const data = await response.json()
   const text = data.content?.map(part => part.text || "").join("\n").trim() || "[]"
   const jsonText = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim()
-  const quiz = normalizeQuiz(JSON.parse(jsonText), book)
-  return quiz.length ? quiz : null
-}
-
-async function verifyFirebaseIdToken(idToken) {
-  const apiKey = process.env.VITE_WEB_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || ""
   try {
-    const url = `https://identitytoolkit.googleapis.com/v1/getAccountInfo?key=${apiKey}`
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ idToken })
-    })
-    if (!response.ok) return null
-    const data = await response.json()
-    return data.users?.[0]?.localId || null
-  } catch (err) {
-    console.error("Token verification failed", err)
-    return null
+    const quiz = normalizeQuiz(JSON.parse(jsonText), book)
+    return quiz.length ? quiz : null
+  } catch (e) {
+    console.error("JSON parse error from Anthropic Quiz:", e);
+    return null;
   }
 }
 
+// verifyFirebaseIdToken removed in favor of firebase-admin
 export default async function handler(req, res) {
   const method = req.method || req.httpMethod
   if (method === "OPTIONS") return send(res, 200, { ok: true })
@@ -251,7 +246,14 @@ export default async function handler(req, res) {
     return send(res, 401, { error: "Unauthorized: Missing authentication token" })
   }
 
-  const uid = await verifyFirebaseIdToken(idToken)
+  let decodedToken;
+  try {
+    decodedToken = await verifyIdToken(idToken);
+  } catch (err) {
+    return send(res, 401, { error: `Unauthorized: Invalid authentication token. ${err.message}` })
+  }
+  
+  const uid = decodedToken.uid;
   if (!uid) {
     return send(res, 401, { error: "Unauthorized: Invalid authentication token" })
   }

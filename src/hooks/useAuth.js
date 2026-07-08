@@ -152,8 +152,11 @@ export function useAuth() {
         console.error("Cannot load user profile", err)
         if (currentSeq !== activeSeq) return
         setProfile({ ...DEFAULT_PROFILE, email: currentUser.email || "" })
+      } finally {
+        if (currentSeq === activeSeq) {
+          setLoading(false)
+        }
       }
-      setLoading(false)
     })
   }, [])
 

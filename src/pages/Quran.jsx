@@ -129,12 +129,19 @@ export default function Quran({ initialSura, initialAyah, authState }) {
 
   // Track window scroll for progress bar and scroll-to-top button
   useEffect(() => {
+    let ticking = false;
     const handleScroll = () => {
-      const totalHeight = document.documentElement.scrollHeight - window.innerHeight
-      if (totalHeight > 0) {
-        setScrollPercent((window.scrollY / totalHeight) * 100)
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const totalHeight = document.documentElement.scrollHeight - window.innerHeight
+          if (totalHeight > 0) {
+            setScrollPercent((window.scrollY / totalHeight) * 100)
+          }
+          setShowScrollTop(window.scrollY > 300)
+          ticking = false;
+        });
+        ticking = true;
       }
-      setShowScrollTop(window.scrollY > 300)
     }
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
@@ -423,6 +430,13 @@ export default function Quran({ initialSura, initialAyah, authState }) {
 
   // --- Global Audio Recitation Context ---
   const { playingAudio, audioState, autoplayNext, setAutoplayNext, play, pause, resume, stop } = useAudio()
+  
+  useEffect(() => {
+    return () => {
+      stop()
+    }
+  }, [stop])
+  
   const [modalDetails, setModalDetails] = useState({ loading: false, translation: "", tafsir: "", error: null })
 
   // Fetch translation & tafsir dynamically for activeAyahMenu in Mushaf mode
@@ -1571,7 +1585,9 @@ export default function Quran({ initialSura, initialAyah, authState }) {
                           searchResults.map((match, i) => {
                             const highlightText = (text, query) => {
                               if (!query) return text
-                              const parts = text.split(new RegExp(`(${query})`, "gi"))
+                              const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                              const safeQuery = escapeRegExp(query)
+                              const parts = text.split(new RegExp(`(${safeQuery})`, "gi"))
                               return parts.map((part, idx) =>
                                 part.toLowerCase() === query.toLowerCase()
                                   ? <span key={idx} className="search-highlight">{part}</span>

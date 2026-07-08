@@ -1,5 +1,5 @@
 import { collection, getDocs, query, where, doc, setDoc, deleteDoc } from "firebase/firestore"
-import { db } from "../lib/firebase.js"
+import { db, auth } from "../lib/firebase.js"
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || '';
 
@@ -156,11 +156,15 @@ export async function triggerPushNotification(title, body, url = '/', filterOpti
     }
 
     // 2. Post to API
+    const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch('/api/send-push', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers,
       body: JSON.stringify({
         subscriptions,
         payload: { title, body, url }

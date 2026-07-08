@@ -3,14 +3,17 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import { AudioProvider } from './context/AudioContext.jsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <AudioProvider>
-        <App />
-      </AudioProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AudioProvider>
+          <App />
+        </AudioProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>
 )
 

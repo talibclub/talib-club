@@ -4,6 +4,7 @@ import { collection, getDocs, writeBatch, doc, updateDoc, deleteDoc, Timestamp, 
 import { trackingDb as db } from "../lib/trackingFirebase.js";
 import { canAccessTrackingAdmin, verifyTrackingAdminPassword } from "../utils/trackingAuth.js";
 import { formatFirebaseDate } from "../utils/format.js";
+import { exportCSV } from "../utils/csvTracking.js";
 
 const TRACKING_AUTH_KEY = "talib_tracking_admin_v2";
 
@@ -37,9 +38,11 @@ export default function Tracking({ authState }) {
 
   // Load PapaParse script
   useEffect(() => {
-    if (!window.Papa) {
-      const script = document.createElement("script");
+    let script;
+    if (!window.Papa && !document.getElementById("papa-parse-script")) {
+      script = document.createElement("script");
       script.src = "https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js";
+      script.id = "papa-parse-script";
       document.head.appendChild(script);
     }
     const savedPassword = sessionStorage.getItem(TRACKING_AUTH_KEY);
@@ -47,6 +50,12 @@ export default function Tracking({ authState }) {
       setIsAdminAuthenticated(true);
       setView("admin-dashboard");
     }
+    return () => {
+      if (script && document.head.contains(script)) {
+        document.head.removeChild(script);
+        delete window.Papa;
+      }
+    };
   }, [authState?.isStaff]);
 
   useEffect(() => {
@@ -322,28 +331,7 @@ export default function Tracking({ authState }) {
     setIsLoading(false);
   };
 
-  const exportCSV = async (data, isRecords) => {
-    if (!data.length) {
-      await myAlert("ไม่มีข้อมูลให้ Export", "แจ้งเตือน");
-      return;
-    }
-    const bom = "\uFEFF";
-    let csvContent = "";
-    
-    if (isRecords) {
-      csvContent = "ชื่อ-นามสกุล,เบอร์โทร,เลข Tracking,รหัสไปรษณีย์,เมือง,วันที่บันทึก,โบนัสพิเศษ\n" + 
-        data.map(r => `"${r.fullName}","${r.phone}","${r.trackingNumber}","${r.postalCode}","${r.city}","${r.createdAt?.toDate().toLocaleDateString('th-TH')}","${r.bonusNote||''}"`).join("\n");
-    } else {
-      csvContent = "ชื่อ-นามสกุล,เบอร์โทร,ที่อยู่ / รหัสไปรษณีย์,โบนัสพิเศษ\n" + 
-        data.map(r => `"${r.fullName}","${r.phone}","${r.address} ${r.postalCode}","${r.bonusNote||''}"`).join("\n");
-    }
 
-    const blob = new Blob([bom + csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = isRecords ? "tracking_records.csv" : "recipients_list.csv";
-    link.click();
-  };
 
   // ==========================================
   // ★ SINGLE ROW EDITING
@@ -629,7 +617,7 @@ export default function Tracking({ authState }) {
                   </div>
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                     <button className="btn" style={{ background: "var(--teal)", color: "white" }} onClick={() => setActiveModal('label')}>🏷️ สร้าง/พิมพ์ลาเบล</button>
-                    <button className="btn btn-outline" onClick={() => exportCSV(recipients, false)}>📥 Export CSV</button>
+                    <button className="btn btn-outline" onClick={() => exportCSV(recipients, false, myAlert)}>📥 Export CSV</button>
                     <button className="btn btn-outline" style={{ color: "#d97706", borderColor: "#fcd34d", background: "#fffbeb" }} onClick={() => handleBulkBonus("recipients", selectedRecipients)}>🎁 โบนัสที่เลือก</button>
                     <button className="btn btn-outline" style={{ color: "#dc2626", borderColor: "#fecaca", background: "#fef2f2" }} onClick={() => handleBulkDelete("recipients", selectedRecipients)}>🗑️ ลบที่เลือก</button>
                     <button className="btn" style={{ background: "#dc2626", color: "white" }} onClick={() => handleBulkDelete("recipients", [], true)}>🗑️ ล้างทั้งหมด</button>
@@ -715,7 +703,7 @@ export default function Tracking({ authState }) {
                     <input type="text" className="inp" placeholder="🔍 ค้นหาชื่อ / เบอร์ / Track..." value={searchQ} onChange={(e) => setSearchQ(e.target.value)} />
                   </div>
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                    <button className="btn btn-outline" onClick={() => exportCSV(records, true)}>📥 Export CSV</button>
+                    <button className="btn btn-outline" onClick={() => exportCSV(records, true, myAlert)}>📥 Export CSV</button>
                     <button className="btn btn-outline" style={{ color: "#d97706", borderColor: "#fcd34d", background: "#fffbeb" }} onClick={() => handleBulkBonus("records", selectedRecords)}>🎁 โบนัสที่เลือก</button>
                     <button className="btn btn-outline" style={{ color: "#dc2626", borderColor: "#fecaca", background: "#fef2f2" }} onClick={() => handleBulkDelete("records", selectedRecords)}>🗑️ ลบที่เลือก</button>
                     <button className="btn" style={{ background: "#dc2626", color: "white" }} onClick={() => handleBulkDelete("records", [], true)}>🗑️ ล้างทั้งหมด</button>

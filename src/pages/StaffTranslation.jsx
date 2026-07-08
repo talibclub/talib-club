@@ -214,7 +214,10 @@ export default function StaffTranslation({ go }) {
     setScraping(true)
     setScrapeProgress(30)
     try {
-      const res = await fetch("/api/abuiyaad-scrape")
+      const idToken = user ? await user.getIdToken() : ""
+      const res = await fetch("/api/abuiyaad-scrape", {
+        headers: { "authorization": `Bearer ${idToken}` }
+      })
       const data = await res.json()
       if (!data.articles) throw new Error(data.error)
       setScrapeProgress(70)

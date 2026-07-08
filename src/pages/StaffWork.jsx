@@ -6,7 +6,7 @@ import {
 } from "firebase/firestore"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { toast } from "react-hot-toast"
-import { db, app } from "../lib/firebase.js"
+import { db, app, auth } from "../lib/firebase.js"
 import { triggerPushNotification } from "../utils/pushNotifications.js"
 import { Z } from "../utils/ui.js"
 import { formatFirebaseDate } from "../utils/format.js"
@@ -37,9 +37,14 @@ const DEFAULT_MAGAZINE = [
 // ━━━ TELEGRAM NOTIFICATION ━━━
 const sendBotNotification = async (message) => {
   try {
+    const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+    const headers = { "Content-Type": "application/json" };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
     const res = await fetch("/api/send-telegram", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ message })
     })
     if (!res.ok) {
@@ -95,21 +100,17 @@ export default function StaffWork({ authState, go }) {
   const currentUser = authState?.profile?.displayName || authState?.user?.displayName || ""
   const isAdmin = authState?.profile?.role === "admin" || authState?.profile?.role === "owner" || authState?.profile?.role === "staff"
 
-  // Redirect if not authenticated
-  if (!uid || !currentUser) {
-    return (
-      <div style={{ padding: 20, textAlign: "center" }}>
-        <p>กรุณาเข้าสู่ระบบเพื่อเข้าถึงหน้านี้</p>
-      </div>
-    )
-  }
-
   // ━━━ FETCH DATA ━━━
   const [pollError, setPollError] = useState(null)
   const [failureCount, setFailureCount] = useState(0)
   
   // Phase 2: Use onSnapshot instead of polling to dramatically reduce Firebase reads and cost
   useEffect(() => {
+    if (!uid || !currentUser) {
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     setPollError(null)
     
@@ -466,6 +467,15 @@ export default function StaffWork({ authState, go }) {
         }
       }
     })
+  }
+
+  // Redirect if not authenticated (moved here to comply with Rules of Hooks)
+  if (!uid || !currentUser) {
+    return (
+      <div style={{ padding: 20, textAlign: "center" }}>
+        <p>กรุณาเข้าสู่ระบบเพื่อเข้าถึงหน้านี้</p>
+      </div>
+    )
   }
 
   if (loading && subs.length === 0) {

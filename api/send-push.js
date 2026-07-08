@@ -1,4 +1,5 @@
 import webpush from 'web-push';
+import { verifyIdToken } from './_firebase-admin.js';
 
 const publicKey = process.env.VITE_VAPID_PUBLIC_KEY;
 const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -22,25 +23,7 @@ if (publicKey && privateKey) {
   );
 }
 
-// C4: Firebase ID token verification for authentication
-async function verifyFirebaseIdToken(idToken) {
-  const apiKey = process.env.VITE_WEB_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || "";
-  if (!apiKey) return null;
-  try {
-    const url = `https://identitytoolkit.googleapis.com/v1/getAccountInfo?key=${apiKey}`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ idToken })
-    });
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data.users?.[0]?.localId || null;
-  } catch (err) {
-    console.error("Token verification failed", err);
-    return null;
-  }
-}
+// verifyFirebaseIdToken removed in favor of firebase-admin
 
 export default async function handler(req, res) {
   // Support standard Vercel response formatting
@@ -101,7 +84,14 @@ export default async function handler(req, res) {
   if (!idToken) {
     return sendResponse(401, { error: 'Unauthorized: Missing authentication token' });
   }
-  const uid = await verifyFirebaseIdToken(idToken);
+  let decodedToken;
+  try {
+    decodedToken = await verifyIdToken(idToken);
+  } catch (err) {
+    return sendResponse(401, { error: `Unauthorized: Invalid authentication token. ${err.message}` });
+  }
+
+  const uid = decodedToken.uid;
   if (!uid) {
     return sendResponse(401, { error: 'Unauthorized: Invalid authentication token' });
   }

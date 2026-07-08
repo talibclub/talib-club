@@ -1,3 +1,5 @@
+import { verifyIdToken } from './_firebase-admin.js';
+
 const OPENAI_URL = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1/chat/completions"
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 
@@ -112,7 +114,12 @@ async function translateWithOpenAI(elements, apiKey) {
 
   const data = await response.json()
   const resultText = data.choices?.[0]?.message?.content?.trim() || "{}"
-  return JSON.parse(resultText)
+  try {
+    return JSON.parse(resultText)
+  } catch (e) {
+    console.error("JSON parse error from OpenAI:", e);
+    throw new Error("Failed to parse JSON from AI response");
+  }
 }
 
 async function translateWithAnthropic(elements, apiKey) {
@@ -145,7 +152,12 @@ Return ONLY a valid JSON object with the "translations" array, no markdown block
   const data = await response.json()
   const text = data.content?.map(part => part.text || "").join("\n").trim() || "{}"
   const jsonText = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim()
-  return JSON.parse(jsonText)
+  try {
+    return JSON.parse(jsonText)
+  } catch (e) {
+    console.error("JSON parse error from Anthropic:", e);
+    throw new Error("Failed to parse JSON from AI response");
+  }
 }
 
 async function translateWithGemini(elements, apiKey, modelName = "gemini-2.5-flash") {
@@ -178,7 +190,12 @@ async function translateWithGemini(elements, apiKey, modelName = "gemini-2.5-fla
   const data = await response.json()
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "{}"
   const jsonText = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim()
-  return JSON.parse(jsonText)
+  try {
+    return JSON.parse(jsonText)
+  } catch (e) {
+    console.error("JSON parse error from Gemini:", e);
+    throw new Error("Failed to parse JSON from AI response");
+  }
 }function repairParagraphs(html) {
   const tokens = html.split(/(<\/?[a-zA-Z0-9]+(?:\s+[^>]*)?>)/g)
   let result = []
@@ -237,32 +254,7 @@ async function translateWithGemini(elements, apiKey, modelName = "gemini-2.5-fla
   return result.join("")
 }
 
-async function verifyFirebaseIdToken(idToken) {
-  const apiKey = process.env.VITE_WEB_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || "AIzaSyC8HoWaAu0XWy3he_pMxqUIWwREDPdeUpg"
-  try {
-    const url = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { 
-        "content-type": "application/json",
-        "referer": "https://talib.club/",
-        "origin": "https://talib.club"
-      },
-      body: JSON.stringify({ idToken })
-    })
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("Token verification failed with status:", response.status, errText);
-      throw new Error(`Token API Error ${response.status}: ${errText}`);
-    }
-    const data = await response.json()
-    return data.users?.[0]?.localId || null
-  } catch (err) {
-    console.error("Token verification failed", err)
-    throw err
-  }
-}
-
+// verifyFirebaseIdToken removed in favor of firebase-admin
 export default async function handler(req, res) {
   const method = req.method || req.httpMethod
   if (method === "OPTIONS") return send(res, 200, { ok: true })
@@ -284,13 +276,17 @@ export default async function handler(req, res) {
     return send(res, 401, { error: "Unauthorized: Missing authentication token" })
   }
 
-  let uid;
+  let decodedToken;
   try {
-    uid = await verifyFirebaseIdToken(idToken);
+    decodedToken = await verifyIdToken(idToken);
+    if (decodedToken.role !== 'staff' && decodedToken.role !== 'admin' && decodedToken.role !== 'owner') {
+      return send(res, 403, { error: "Forbidden: Staff access required" })
+    }
   } catch (err) {
     return send(res, 401, { error: `Unauthorized: Token error. ${err.message}` });
   }
 
+  const uid = decodedToken.uid;
   if (!uid) {
     return send(res, 401, { error: "Unauthorized: Invalid authentication token" })
   }

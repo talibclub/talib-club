@@ -1,3 +1,5 @@
+import { verifyIdToken } from './_firebase-admin.js';
+
 const SOURCE = "https://abuiyaad.com/"
 
 function decodeEntities(value = "") {
@@ -52,20 +54,58 @@ function extractLinks(html, baseUrl) {
 }
 
 export default async function handler(req, res) {
+  // Set CORS headers
+  res.setHeader("Access-Control-Allow-Origin", process.env.ALLOWED_ORIGIN || "https://talib.club");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  // Authentication
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Unauthorized: Missing token" });
+  }
+
+  try {
+    const token = authHeader.split("Bearer ")[1];
+    const decodedToken = await verifyIdToken(token);
+    if (decodedToken.role !== 'staff' && decodedToken.role !== 'admin' && decodedToken.role !== 'owner') {
+      return res.status(403).json({ error: "Forbidden: Staff access required" });
+    }
+  } catch (error) {
+    return res.status(401).json({ error: "Unauthorized: Invalid token" });
+  }
+
   try {
     const queue = [SOURCE]
     const seenPages = new Set()
     const articles = new Map()
-    const maxPages = Number(req.query.maxPages || 600)
+    // Cap maxPages to prevent abuse (e.g. 100 max)
+    const maxPages = Math.min(Number(req.query.maxPages || 100), 200)
 
     while (queue.length && seenPages.size < maxPages) {
       const url = queue.shift()
       if (seenPages.has(url)) continue
       seenPages.add(url)
 
-      const response = await fetch(url, {
-        headers: { "user-agent": "TalibClubTranslationTracker/1.0" }
-      })
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout per request
+      
+      let response;
+      try {
+        response = await fetch(url, {
+          headers: { "user-agent": "TalibClubTranslationTracker/1.0" },
+          signal: controller.signal
+        });
+      } catch (err) {
+        clearTimeout(timeout);
+        continue; // skip on timeout or network error
+      }
+      clearTimeout(timeout);
+      
       if (!response.ok) continue
 
       const html = await response.text()

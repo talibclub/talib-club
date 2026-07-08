@@ -661,7 +661,22 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
 
         <Field label="บทคัดย่อ (แสดงหน้าการ์ด)" span><textarea value={item.excerpt || ""} onChange={e => set("excerpt", e.target.value)} rows={2} placeholder="เนื้อหาสรุปสั้นๆ..." /></Field>
         <Field label="Tags (คั่นด้วยลูกน้ำ ,)" span><input value={(item.tags || []).join(", ")} onChange={e => set("tags", e.target.value.split(",").map(tag => tag.trim()).filter(Boolean))} placeholder="เช่น ฟิกฮ์, อะกีดะฮ์" /></Field>
-        <Field label="เนื้อหาบทความแบบเต็ม" span><textarea value={item.body || ""} onChange={e => set("body", e.target.value)} rows={12} placeholder="พิมพ์เนื้อหาที่นี่..." style={{ lineHeight: 1.6 }} /></Field>
+        <Field label={
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>เนื้อหาบทความแบบเต็ม</span>
+            <span style={{ fontSize: 11, color: "var(--teal)", fontWeight: 400, background: "rgba(20,184,166,0.1)", padding: "4px 8px", borderRadius: 12 }}>
+              <i className="ti ti-bulb" style={{ marginRight: 4 }}></i>พิมพ์ <b>## เว้นวรรค</b> เพื่อทำหัวข้อ H2 และ <b>### เว้นวรรค</b> สำหรับ H3
+            </span>
+          </div>
+        } span>
+          <textarea 
+            value={item.body || ""} 
+            onChange={e => set("body", e.target.value)} 
+            rows={15} 
+            placeholder={`วิธีสร้างหัวข้อ (ระบบจะใส่สีสันให้อัตโนมัติในหน้าผู้อ่าน):\n\n## นี่คือหัวข้อใหญ่ (H2)\nพิมพ์เนื้อหาของหัวข้อใหญ่ตรงนี้...\n\n### นี่คือหัวข้อย่อย (H3)\nพิมพ์เนื้อหาย่อย...\n\n(เว้นบรรทัดและพิมพ์ข้อความได้ตามปกติ)`} 
+            style={{ lineHeight: 1.6 }} 
+          />
+        </Field>
       </div>
 
       <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
