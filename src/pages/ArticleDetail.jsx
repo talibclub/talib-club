@@ -305,7 +305,7 @@ export default function ArticleDetail({ item, go, authState }) {
   const readerClass = `article-body reader-size-${readerPrefs.size} reader-tone-${readerPrefs.tone}`
 
   return (
-    <div className="article-page" style={{ maxWidth: 720, margin: "0 auto" }}>
+    <div className="article-page animate-float-cute" style={{ maxWidth: 720, margin: "0 auto" }}>
       <button className="btn btn-outline" onClick={() => {
         if (displayItem?.fromFilters) {
           go("articles", displayItem.fromFilters)
@@ -337,14 +337,14 @@ export default function ArticleDetail({ item, go, authState }) {
       <div className="divider" />
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 }}>
-        <button onClick={handleShare} className="btn btn-outline" style={{ fontSize: 12, flex: "1 1 100px", padding: "8px 0" }}>
+        <button onClick={handleShare} className="btn btn-outline hover-wiggle" style={{ fontSize: 12, flex: "1 1 100px", padding: "8px 0" }}>
           <i className="ti ti-share" style={{ marginRight: 6, fontSize: 14 }}></i> คัดลอกลิงก์
         </button>
-        <button onClick={handlePrint} className="btn btn-outline" style={{ fontSize: 12, flex: "1 1 100px", padding: "8px 0" }}>
+        <button onClick={handlePrint} className="btn btn-outline hover-wiggle" style={{ fontSize: 12, flex: "1 1 100px", padding: "8px 0" }}>
           <i className="ti ti-printer" style={{ marginRight: 6, fontSize: 14 }}></i> ปริ้น / PDF
         </button>
-        <button onClick={toggleSave} className={`btn ${isSaved ? "btn-teal" : "btn-outline"}`} style={{ fontSize: 12, flex: "1 1 100px", padding: "8px 0" }}>
-          <i className={`ti ${isSaved ? "ti-bookmark-filled" : "ti-bookmark"}`} style={{ marginRight: 6, fontSize: 14 }}></i>
+        <button onClick={toggleSave} className={`btn ${isSaved ? "btn-teal" : "btn-outline"} hover-wiggle`} style={{ fontSize: 12, flex: "1 1 100px", padding: "8px 0" }}>
+          <i className={`ti ${isSaved ? "ti-bookmark-filled animate-pulse-cute" : "ti-bookmark"}`} style={{ marginRight: 6, fontSize: 14 }}></i>
           {isSaved ? "บันทึกแล้ว" : "บันทึกไว้อ่าน"}
         </button>
       </div>
@@ -359,7 +359,7 @@ export default function ArticleDetail({ item, go, authState }) {
         </div>
       )}
 
-      <div className="reader-tools" aria-label="ตัวเลือกการอ่าน">
+      <div className="reader-tools animate-float-cute" aria-label="ตัวเลือกการอ่าน" style={{ animationDelay: "0.2s" }}>
         <div className="reader-control" aria-label="ขนาดตัวอักษร">
           {Object.entries(READER_SIZE_LABELS).map(([value, label]) => (
             <button key={value} type="button" className={`reader-btn ${readerPrefs.size === value ? "on" : ""}`} onClick={() => setReaderPrefs(prev => ({ ...prev, size: value }))}>{label}</button>
@@ -443,7 +443,7 @@ export default function ArticleDetail({ item, go, authState }) {
         </div>
       )}
 
-      <div className={readerClass} style={{ scrollBehavior: "smooth" }}>{parsedBody}</div>
+      <div className={`${readerClass} animate-float-cute`} style={{ scrollBehavior: "smooth", animationDelay: "0.4s", padding: "16px 20px" }}>{parsedBody}</div>
 
       {displayItem.tags && displayItem.tags.length > 0 && (
         <div style={{ marginTop: 32, display: "flex", gap: 6, flexWrap: "wrap" }}>
