@@ -16,7 +16,7 @@ const TABS = [
   { id: "library", label: "หนังสือ/PDF", icon: "ti-books" },
   { id: "media", label: "มีเดีย", icon: "ti-player-play" },
   { id: "scholars", label: "อุลามาอฺ", icon: "ti-users" },
-  { id: "book_campaigns", label: "แจกหนังสือ/ขาย", icon: "ti-book" },
+  { id: "book_campaigns", label: "แจกหนังสือ", icon: "ti-book" },
   { id: "openhouse", label: "นิทรรศการ (Open House)", icon: "ti-map" },
   { id: "taxonomy", label: "หมวด/ตัวเลือก", icon: "ti-tags" },
   { id: "tracking", label: "Tracking", icon: "ti-package" },

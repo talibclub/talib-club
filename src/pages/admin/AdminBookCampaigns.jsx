@@ -195,10 +195,10 @@ export default function AdminBookCampaigns() {
         <div style={{ flex: "1 1 min-content", minWidth: 280 }}>
           <h2 style={{ fontSize: 26, margin: 0, color: "var(--text)", display: "flex", alignItems: "center", gap: 10, lineHeight: 1.3 }}>
             <i className="ti ti-book" style={{ color: "var(--teal)", padding: 8, background: "var(--teal-bg)", borderRadius: 12 }}></i>
-            ระบบแจก/ขายหนังสือ (Campaigns)
+            ระบบแจกหนังสือ (Campaigns)
           </h2>
           <p style={{ marginTop: 12, color: "var(--t2)", fontSize: 15, lineHeight: 1.5, maxWidth: 600 }}>
-            จัดการแคมเปญแจกหนังสือ หรือขายหนังสือ พร้อมระบบจองโควตาแบบเรียลไทม์
+            จัดการแคมเปญแจกหนังสือ พร้อมระบบจองโควตาแบบเรียลไทม์
           </p>
         </div>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", flexShrink: 0 }}>
