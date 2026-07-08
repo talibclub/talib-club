@@ -191,20 +191,25 @@ export default function AdminBookCampaigns() {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 16 }}>
-        <div style={{ flex: "1 1 300px" }}>
-          <h2 style={{ fontSize: 24, display: "flex", alignItems: "center", gap: 8 }}><i className="ti ti-book" style={{ color: "var(--teal)" }}></i> ระบบแจก/ขายหนังสือ (Campaigns)</h2>
-          <p style={{ marginTop: 8, color: "var(--t2)" }}>จัดการแคมเปญแจกหนังสือ หรือขายหนังสือ พร้อมระบบจองโควตาแบบเรียลไทม์</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, flexWrap: "wrap", gap: 20 }}>
+        <div style={{ flex: "1 1 min-content", minWidth: 280 }}>
+          <h2 style={{ fontSize: 26, margin: 0, color: "var(--text)", display: "flex", alignItems: "center", gap: 10, lineHeight: 1.3 }}>
+            <i className="ti ti-book" style={{ color: "var(--teal)", padding: 8, background: "var(--teal-bg)", borderRadius: 12 }}></i>
+            ระบบแจก/ขายหนังสือ (Campaigns)
+          </h2>
+          <p style={{ marginTop: 12, color: "var(--t2)", fontSize: 15, lineHeight: 1.5, maxWidth: 600 }}>
+            จัดการแคมเปญแจกหนังสือ หรือขายหนังสือ พร้อมระบบจองโควตาแบบเรียลไทม์
+          </p>
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", width: "100%", maxWidth: "max-content" }}>
-          <a className="btn btn-outline" href="/books" target="_blank" rel="noreferrer" style={{ textDecoration: "none", flex: 1, justifyContent: "center" }}>
-            <i className="ti ti-external-link" style={{ marginRight: 6 }}></i>หน้าเว็บ
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", flexShrink: 0 }}>
+          <a className="btn btn-outline" href="/books" target="_blank" rel="noreferrer" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 12 }}>
+            <i className="ti ti-external-link"></i> หน้าเว็บ
           </a>
-          <button className="btn btn-outline" onClick={handleBroadcast} style={{ color: "var(--teal)", borderColor: "var(--teal)", flex: 1, justifyContent: "center" }}>
-            <i className="ti ti-bell-ringing" style={{ marginRight: 6 }}></i>บรอดแคสต์
+          <button className="btn btn-outline" onClick={handleBroadcast} style={{ color: "var(--teal)", borderColor: "var(--teal)", display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 12 }}>
+            <i className="ti ti-bell-ringing"></i> บรอดแคสต์
           </button>
-          <button className="btn btn-teal" onClick={() => handleOpenForm()} style={{ flex: 1, justifyContent: "center" }}>
-            <i className="ti ti-plus" style={{ marginRight: 6 }}></i>สร้างแคมเปญ
+          <button className="btn btn-teal" onClick={() => handleOpenForm()} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 20px", borderRadius: 12, fontWeight: 600 }}>
+            <i className="ti ti-plus"></i> สร้างแคมเปญ
           </button>
         </div>
       </div>

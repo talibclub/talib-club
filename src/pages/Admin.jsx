@@ -35,24 +35,24 @@ export default function Admin({ go, authState, initialTab = "dashboard" }) {
   return (
     <div>
       <div style={{
-        display: "flex", alignItems: "flex-start", justifyContent: "space-between",
-        marginBottom: 24, paddingBottom: 20, borderBottom: "1px solid var(--br2)",
-        flexWrap: "wrap", gap: 16,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        marginBottom: 32, paddingBottom: 24, borderBottom: "1px solid var(--br2)",
+        flexWrap: "wrap", gap: 20,
       }}>
-        <div style={{ flex: "1 1 300px" }}>
-          <span className="badge badge-teal" style={{ marginBottom: 8, display: "inline-block" }}>Staff only</span>
-          <div style={{ fontSize: 28, fontWeight: 700, color: "var(--text)", marginTop: 4, display: "flex", alignItems: "center", gap: 8 }}>
-            <i className="ti ti-shield-check" style={{ color: "var(--teal)" }}></i>
+        <div style={{ flex: "1 1 min-content", minWidth: 280 }}>
+          <span className="badge badge-teal" style={{ marginBottom: 10, display: "inline-block", padding: "4px 10px", fontSize: 12 }}>Staff only</span>
+          <div style={{ fontSize: 28, fontWeight: 700, color: "var(--text)", margin: 0, display: "flex", alignItems: "center", gap: 10, lineHeight: 1.3 }}>
+            <i className="ti ti-shield-check" style={{ color: "var(--teal)", padding: 8, background: "var(--teal-bg)", borderRadius: 12 }}></i>
             Admin Panel
           </div>
-          <p style={{ marginTop: 6, color: "var(--t2)", fontSize: 14 }}>จัดการเนื้อหาและข้อมูลหลักของ Talib Club</p>
+          <p style={{ marginTop: 12, color: "var(--t2)", fontSize: 15, lineHeight: 1.5, maxWidth: 600 }}>จัดการเนื้อหาและข้อมูลหลักของ Talib Club</p>
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", width: "100%", maxWidth: "max-content" }}>
-          <button className="btn btn-outline" onClick={() => go("staff")} style={{ flex: 1, justifyContent: "center" }}>
-            <i className="ti ti-arrow-left" style={{ marginRight: 6 }}></i>Staff
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", flexShrink: 0 }}>
+          <button className="btn btn-outline" onClick={() => go("staff")} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 12 }}>
+            <i className="ti ti-arrow-left"></i> Staff
           </button>
-          <button className="btn btn-outline" onClick={() => authState?.logout?.()} style={{ flex: 1, justifyContent: "center" }}>
-            <i className="ti ti-logout" style={{ marginRight: 6 }}></i>ออกจากระบบ
+          <button className="btn btn-outline" onClick={() => authState?.logout?.()} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 12, color: "var(--red)", borderColor: "rgba(220,38,38,0.2)" }}>
+            <i className="ti ti-logout"></i> ออกจากระบบ
           </button>
         </div>
       </div>
