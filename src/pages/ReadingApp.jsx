@@ -187,9 +187,11 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     go("reader", Object.keys(next).length ? next : null, { replace: true, noScroll: true })
   }
   const readOnlyQueryOptions = useMemo(() => ({ live: false }), [])
+  const liveQueryOptions = useMemo(() => ({ live: true }), [])
+  
   const { items: books } = useContentCollection("books", BOOKS, null, readOnlyQueryOptions)
-  const { items: shelfItems, saveItem: saveShelfItem, deleteItem: deleteShelfItem } = useContentCollection("bookshelf", [], uid, readOnlyQueryOptions)
-  const { items: readingSessions, loading: loadingSessions, saveItem: saveReadingSession } = useContentCollection("reading_sessions", [], uid, readOnlyQueryOptions)
+  const { items: shelfItems, saveItem: saveShelfItem, deleteItem: deleteShelfItem } = useContentCollection("bookshelf", [], uid, liveQueryOptions)
+  const { items: readingSessions, loading: loadingSessions, saveItem: saveReadingSession } = useContentCollection("reading_sessions", [], uid, liveQueryOptions)
   const { item: streakRecord, loading: loadingStreaks, saveItem: saveStreakSettings } = useUserDoc("reading_streaks", uid, uid, null)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
 
