@@ -561,8 +561,8 @@ export async function bulkSaveItems(name, items, uid = null) {
   return { saved, failed }
 }
 
-const COUNT_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes memory
-const COUNT_LOCAL_STORAGE_TTL_MS = 30 * 60 * 1000 // 30 minutes localStorage
+const COUNT_CACHE_TTL_MS = 1 * 60 * 1000 // 1 minute memory
+const COUNT_LOCAL_STORAGE_TTL_MS = 1 * 60 * 1000 // 1 minute localStorage
 
 export function useCollectionCount(name) {
   const collectionName = CONTENT_COLLECTIONS[name]

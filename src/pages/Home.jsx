@@ -58,8 +58,8 @@ const SURAH_NAMES = {
 
 export default function Home({ go }) {
   // Articles should reflect the current Firestore state immediately.
-  const articleQueryOptions = useMemo(() => ({ live: true, limit: 6, orderByField: "createdAt", orderDirection: "desc" }), [])
-  const bookQueryOptions = useMemo(() => ({ live: false, limit: 6, orderByField: "createdAt", orderDirection: "desc" }), [])
+  const articleQueryOptions = useMemo(() => ({ live: true, limit: 6, orderByField: "date", orderDirection: "desc" }), [])
+  const bookQueryOptions = useMemo(() => ({ live: false, limit: 6, orderByField: "year", orderDirection: "desc" }), [])
   const mediaQueryOptions = useMemo(() => ({ live: false, limit: 6, orderByField: "date", orderDirection: "desc" }), [])
   
   const { items: articles, loading: loadingArticles } = useContentCollection("articles", ARTICLES, null, articleQueryOptions)
