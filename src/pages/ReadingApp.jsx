@@ -1187,13 +1187,8 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       addMode={addMode} setAddMode={setAddMode}
       selectedBookToAdd={selectedBookToAdd} setSelectedBookToAdd={setSelectedBookToAdd}
       books={books} addNewBookToShelf={addNewBookToShelf}
-      customBookTitle={customBookTitle} setCustomBookTitle={setCustomBookTitle}
-      customBookAuthor={customBookAuthor} setCustomBookAuthor={setCustomBookAuthor}
-      customBookUrl={customBookUrl} setCustomBookUrl={setCustomBookUrl}
-      customBookDesc={customBookDesc} setCustomBookDesc={setCustomBookDesc}
-      customBookTotalPages={customBookTotalPages} setCustomBookTotalPages={setCustomBookTotalPages}
-      customBookFile={customBookFile} setCustomBookFile={setCustomBookFile}
-      uploadingExternal={uploadingExternal} addCustomBookToShelf={addCustomBookToShelf}
+      externalBook={externalBook} setExternalBook={setExternalBook}
+      uploadingExternal={uploadingExternal} addExternalBook={addExternalBook}
       searchQ={searchQ} setSearchQ={setSearchQ}
       filteredActiveBooks={filteredActiveBooks} filteredFinishedBooks={filteredFinishedBooks}
       startReadingSession={startReadingSession}

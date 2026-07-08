@@ -13,6 +13,7 @@ export default function QuranSidebar({
   filteredSurahs,
   selectedSura,
   setSelectedSura,
+  selectedPage,
   setSelectedPage,
   setTargetScrollAyah,
   targetScrollAyah,

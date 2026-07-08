@@ -863,6 +863,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
           filteredSurahs={filteredSurahs}
           selectedSura={selectedSura}
           setSelectedSura={setSelectedSura}
+          selectedPage={selectedPage}
           setSelectedPage={setSelectedPage}
           setTargetScrollAyah={setTargetScrollAyah}
           targetScrollAyah={targetScrollAyah}
