@@ -133,7 +133,7 @@ export default function StaffTasks({ currentUser, staffTeam, sendBotNotification
     }
   }
 
-  const handleUpdateProgress = async (e, id, currentLog) => {
+  const handleUpdateProgress = async (e, task) => {
     e.preventDefault()
     if (!progressText.trim()) return
     try {
@@ -142,10 +142,13 @@ export default function StaffTasks({ currentUser, staffTeam, sendBotNotification
         user: currentUser,
         date: new Date().toISOString()
       }
-      await updateDoc(doc(db, "staff_tasks", id), {
-        progressLog: [...(currentLog || []), newEntry],
+      await updateDoc(doc(db, "staff_tasks", task.id), {
+        progressLog: [...(task.progressLog || []), newEntry],
         updatedAt: serverTimestamp()
       })
+      if (sendBotNotification) {
+        sendBotNotification(`💬 อัปเดตความคืบหน้างาน:\nเรื่อง: ${task.title}\nผู้รับผิดชอบ: ${task.assignee}\nความคืบหน้า: "${progressText}"\nอัปเดตโดย: ${currentUser}\n\n📌 ดูงาน: https://talibclub.org/staff-work`);
+      }
       notifySuccess("อัปเดตความคืบหน้าแล้ว")
       setUpdatingId(null)
       setProgressText("")
@@ -155,12 +158,16 @@ export default function StaffTasks({ currentUser, staffTeam, sendBotNotification
     }
   }
 
-  const handleUpdateStatus = async (id, status) => {
+  const handleUpdateStatus = async (task, status) => {
     try {
-      await updateDoc(doc(db, "staff_tasks", id), {
+      await updateDoc(doc(db, "staff_tasks", task.id), {
         status,
         updatedAt: serverTimestamp()
       })
+      if (sendBotNotification) {
+        const statusTH = status === "DONE" ? "✅ เสร็จสิ้น" : "🔄 กำลังดำเนินการ";
+        sendBotNotification(`📌 อัปเดตสถานะงาน:\nเรื่อง: ${task.title}\nผู้รับผิดชอบ: ${task.assignee}\nสถานะใหม่: ${statusTH}\nอัปเดตโดย: ${currentUser}\n\n📌 ดูงาน: https://talibclub.org/staff-work`);
+      }
       notifySuccess("อัปเดตสถานะงานแล้ว")
     } catch (err) {
       console.error(err)
@@ -280,7 +287,7 @@ export default function StaffTasks({ currentUser, staffTeam, sendBotNotification
                   <span className={`badge ${isDone ? "badge-green" : "badge-teal"}`}>{isDone ? "เสร็จสิ้น" : "กำลังดำเนินการ"}</span>
                   <select 
                     value={task.status} 
-                    onChange={(e) => handleUpdateStatus(task.id, e.target.value)}
+                    onChange={(e) => handleUpdateStatus(task, e.target.value)}
                     style={{ fontSize: 12, padding: "4px 8px" }}
                   >
                     <option value="IN_PROGRESS">กำลังดำเนินการ</option>
@@ -341,7 +348,7 @@ export default function StaffTasks({ currentUser, staffTeam, sendBotNotification
                 ))}
                 
                 {updatingId === task.id ? (
-                  <form onSubmit={(e) => handleUpdateProgress(e, task.id, task.progressLog)} style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                  <form onSubmit={(e) => handleUpdateProgress(e, task)} style={{ marginTop: 8, display: "flex", gap: 8 }}>
                     <input autoFocus required type="text" value={progressText} onChange={e => setProgressText(e.target.value)} placeholder="ระบุความคืบหน้า..." style={{ flex: 1, padding: "6px 12px", fontSize: 13 }} />
                     <button type="submit" className="btn btn-teal" style={{ padding: "6px 12px", fontSize: 13 }}>บันทึก</button>
                     <button type="button" className="btn btn-outline" onClick={() => setUpdatingId(null)} style={{ padding: "6px 12px", fontSize: 13 }}>ยกเลิก</button>
