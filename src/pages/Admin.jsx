@@ -35,23 +35,23 @@ export default function Admin({ go, authState, initialTab = "dashboard" }) {
   return (
     <div>
       <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        marginBottom: 24, paddingBottom: 16, borderBottom: ".5px solid var(--br2)",
-        flexWrap: "wrap", gap: 12,
+        display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+        marginBottom: 24, paddingBottom: 20, borderBottom: "1px solid var(--br2)",
+        flexWrap: "wrap", gap: 16,
       }}>
-        <div>
-          <span className="badge badge-teal">Staff only</span>
-          <div style={{ fontSize: 22, fontWeight: 600, color: "var(--text)", marginTop: 8 }}>
-            <i className="ti ti-shield-check" style={{ marginRight: 8, color: "var(--teal)" }}></i>
+        <div style={{ flex: "1 1 300px" }}>
+          <span className="badge badge-teal" style={{ marginBottom: 8, display: "inline-block" }}>Staff only</span>
+          <div style={{ fontSize: 28, fontWeight: 700, color: "var(--text)", marginTop: 4, display: "flex", alignItems: "center", gap: 8 }}>
+            <i className="ti ti-shield-check" style={{ color: "var(--teal)" }}></i>
             Admin Panel
           </div>
-          <p style={{ marginTop: 4 }}>จัดการเนื้อหาและข้อมูลหลักของ Talib Club</p>
+          <p style={{ marginTop: 6, color: "var(--t2)", fontSize: 14 }}>จัดการเนื้อหาและข้อมูลหลักของ Talib Club</p>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="btn btn-outline" onClick={() => go("staff")}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", width: "100%", maxWidth: "max-content" }}>
+          <button className="btn btn-outline" onClick={() => go("staff")} style={{ flex: 1, justifyContent: "center" }}>
             <i className="ti ti-arrow-left" style={{ marginRight: 6 }}></i>Staff
           </button>
-          <button className="btn btn-outline" onClick={() => authState?.logout?.()}>
+          <button className="btn btn-outline" onClick={() => authState?.logout?.()} style={{ flex: 1, justifyContent: "center" }}>
             <i className="ti ti-logout" style={{ marginRight: 6 }}></i>ออกจากระบบ
           </button>
         </div>

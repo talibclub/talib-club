@@ -18,7 +18,7 @@ const STAFF_TOOLS = [
 export default function StaffDashboard({ authState, go }) {
   if (!authState.isStaff) {
     return (
-      <div className="card" style={{ maxWidth: 560, margin: "44px auto", padding: 24, textAlign: "center" }}>
+      <div className="card animate-fade-in-up" style={{ maxWidth: 560, margin: "44px auto", padding: 24, textAlign: "center" }}>
         <i className="ti ti-lock" style={{ fontSize: 34, color: "var(--t3)" }}></i>
         <h1 style={{ fontSize: 24, marginTop: 12 }}>พื้นที่นี้สำหรับสตาฟ</h1>
         <p style={{ marginTop: 8 }}>บัญชีของคุณยังเป็นสมาชิกทั่วไป หากต้องการสิทธิ์สตาฟ ให้ผู้ดูแลเพิ่ม role เป็น staff ใน Firestore</p>
@@ -29,7 +29,7 @@ export default function StaffDashboard({ authState, go }) {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 24, flexWrap: "wrap" }}>
+      <div className="animate-fade-in-up" style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 24, flexWrap: "wrap", animationDelay: "0ms" }}>
         <div>
           <span className="badge badge-teal">Staff</span>
           <h1 style={{ marginTop: 10, fontSize: 28 }}>Staff Workspace</h1>
@@ -40,16 +40,16 @@ export default function StaffDashboard({ authState, go }) {
         </button>
       </div>
 
-      <div className="grid3">
+      <div className="grid3 animate-fade-in-up" style={{ animationDelay: "50ms" }}>
         <ActionCard icon="ti-file-text" title="จัดการเนื้อหา" text="เพิ่ม/แก้บทความ หนังสือ มีเดีย อุลามาอฺ และข้อมูลเว็บ" onClick={() => go("admin")} />
         <ActionCard icon="ti-package" title="Tracking" text="ตรวจสอบและจัดการข้อมูลการจัดส่ง" onClick={() => go("admin", { tab: "tracking" })} />
         <ActionCard icon="ti-users" title="สมาชิก" text="ดูแลสมาชิก สิทธิ์ผู้ใช้งาน และตรวจสอบสถิติการเรียนรู้สะสม" onClick={() => go("staff-members")} />
       </div>
 
-      <h2 style={{ marginTop: 28, marginBottom: 12 }}>เครื่องมือของสตาฟ</h2>
-      <div className="grid2 staff-tool-grid">
+      <h2 className="animate-fade-in-up" style={{ marginTop: 28, marginBottom: 12, animationDelay: "100ms" }}>เครื่องมือของสตาฟ</h2>
+      <div className="grid2 staff-tool-grid animate-fade-in-up" style={{ animationDelay: "150ms" }}>
         {STAFF_TOOLS.map(tool => (
-          <button key={tool.title} className="card" onClick={() => tool.page && go(tool.page)} style={{
+          <button key={tool.title} className="card dashboard-card" onClick={() => tool.page && go(tool.page)} style={{
             padding: 18,
             textAlign: "left",
             cursor: tool.page ? "pointer" : "default",
@@ -71,7 +71,7 @@ export default function StaffDashboard({ authState, go }) {
 
 function ActionCard({ icon, title, text, onClick, disabled }) {
   return (
-    <button type="button" onClick={disabled ? undefined : onClick} disabled={disabled} className="card" style={{
+    <button type="button" onClick={disabled ? undefined : onClick} disabled={disabled} className="card dashboard-card" style={{
       padding: 18,
       minHeight: 160,
       textAlign: "left",
@@ -86,3 +86,4 @@ function ActionCard({ icon, title, text, onClick, disabled }) {
     </button>
   )
 }
+
