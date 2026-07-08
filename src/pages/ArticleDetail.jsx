@@ -353,6 +353,14 @@ export default function ArticleDetail({ item, go, authState }) {
       return match;
     });
 
+    // แปลงอ้างอิงอัลกุรอาน (67:5) เป็นลิงก์ที่สามารถคลิกไปหน้า Quran ได้
+    body = body.replace(/\((\d{1,3}):(\d{1,3})\)/g, (match, sura, ayah) => {
+      if (Number(sura) >= 1 && Number(sura) <= 114) {
+        return `(<a href="/quran?sura=${sura}&ayah=${ayah}" class="quran-ref-link" data-sura="${sura}" data-ayah="${ayah}" style="color: var(--teal); font-weight: 500; text-decoration: none;" title="เปิดดูอัลกุรอาน ซูเราะห์ที่ ${sura} อายะห์ที่ ${ayah}">${sura}:${ayah}</a>)`;
+      }
+      return match;
+    });
+
     return { toc: tocList, finalHtml: body };
   }, [displayItem.body]);
 
@@ -377,6 +385,15 @@ export default function ArticleDetail({ item, go, authState }) {
           window.scrollTo({ top: y, behavior: 'smooth' });
           el.style.backgroundColor = 'rgba(245,158,11,0.2)';
           setTimeout(() => el.style.backgroundColor = 'transparent', 2000);
+        }
+      }
+      // 3. เช็คว่าเป็นลิงก์อัลกุรอาน (Quran Reference)
+      else if (a.classList.contains('quran-ref-link') || (href && href.includes('/quran?sura='))) {
+        e.preventDefault();
+        const sura = a.getAttribute('data-sura');
+        const ayah = a.getAttribute('data-ayah');
+        if (sura && ayah) {
+          go("quran", { sura: Number(sura), ayah: Number(ayah) });
         }
       }
     }
