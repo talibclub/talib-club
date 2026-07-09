@@ -823,7 +823,7 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
         },
         highlightText: function() {
           const quill = this.quill;
-          const range = quill.getSelection();
+          const range = quill.getSelection(true);
           if (range && range.length > 0) {
             const currentFormat = quill.getFormat(range);
             quill.format('highlightText', !currentFormat.highlightText);
@@ -833,7 +833,7 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
         },
         dropCap: function() {
           const quill = this.quill;
-          const range = quill.getSelection();
+          const range = quill.getSelection(true);
           if (range && range.length > 0) {
             const currentFormat = quill.getFormat(range);
             quill.format('dropCap', !currentFormat.dropCap);
