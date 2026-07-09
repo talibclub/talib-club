@@ -1,6 +1,119 @@
 import { useState, useEffect, useMemo, useRef } from "react"
 import ReactQuill from "react-quill"
 import "react-quill/dist/quill.snow.css"
+
+const Quill = ReactQuill.Quill;
+if (Quill) {
+  const Inline = Quill.import('blots/inline');
+  class NumberCircleBlot extends Inline { }
+  NumberCircleBlot.blotName = 'numberCircle';
+  NumberCircleBlot.tagName = 'span';
+  NumberCircleBlot.className = 'numberCircleBlue';
+  Quill.register(NumberCircleBlot, true);
+
+  class HighlightTextBlot extends Inline { }
+  HighlightTextBlot.blotName = 'highlightText';
+  HighlightTextBlot.tagName = 'span';
+  HighlightTextBlot.className = 'text-highlight-yellow';
+  Quill.register(HighlightTextBlot, true);
+
+  class DropCapBlot extends Inline { }
+  DropCapBlot.blotName = 'dropCap';
+  DropCapBlot.tagName = 'span';
+  DropCapBlot.className = 'drop-cap';
+  Quill.register(DropCapBlot, true);
+
+  const BlockEmbed = Quill.import('blots/block/embed');
+  class PdfAttachmentBlot extends BlockEmbed {
+    static create(value) {
+      let node = super.create();
+      node.setAttribute('href', value.url || '#');
+      node.setAttribute('target', '_blank');
+      node.setAttribute('contenteditable', 'false');
+      
+      node.innerHTML = `
+        <div class="pdf-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M5 12v-7a2 2 0 0 1 2 -2h7l5 5v4" /><path d="M5 18h1.5a1.5 1.5 0 0 0 0 -3h-1.5v6" /><path d="M17 18h2" /><path d="M20 15h-3v6" /><path d="M11 15l-1.9 6h1.9" /><path d="M9 15l1.9 6" /></svg>
+        </div>
+        <div class="pdf-details">
+          <div class="pdf-title">${value.title || 'PDF Document'}</div>
+          <div class="pdf-action">View PDF File</div>
+          ${value.pages ? `<div class="pdf-meta">${value.pages}</div>` : ''}
+        </div>
+      `;
+      return node;
+    }
+
+    static value(node) {
+      return {
+        url: node.getAttribute('href'),
+        title: node.querySelector('.pdf-title')?.innerText || '',
+        pages: node.querySelector('.pdf-meta')?.innerText || ''
+      };
+    }
+  }
+  PdfAttachmentBlot.blotName = 'pdfAttachment';
+  PdfAttachmentBlot.tagName = 'a';
+  PdfAttachmentBlot.className = 'pdf-attachment-block';
+  Quill.register(PdfAttachmentBlot, true);
+
+  const Block = Quill.import('blots/block');
+  
+  class ArabicBlock extends Block { }
+  ArabicBlock.blotName = 'arabicBlock';
+  ArabicBlock.tagName = 'div';
+  ArabicBlock.className = 'arabic-text-block';
+  Quill.register(ArabicBlock, true);
+
+  class CalloutInfo extends Block { }
+  CalloutInfo.blotName = 'calloutInfo';
+  CalloutInfo.tagName = 'div';
+  CalloutInfo.className = 'callout-info';
+  Quill.register(CalloutInfo, true);
+
+  class CalloutWarn extends Block { }
+  CalloutWarn.blotName = 'calloutWarn';
+  CalloutWarn.tagName = 'div';
+  CalloutWarn.className = 'callout-warn';
+  Quill.register(CalloutWarn, true);
+
+  class DividerBlot extends BlockEmbed { }
+  DividerBlot.blotName = 'divider';
+  DividerBlot.tagName = 'hr';
+  Quill.register(DividerBlot, true);
+
+  const ImageFormat = Quill.import('formats/image');
+  class FloatRightImageBlot extends ImageFormat {
+    static create(value) {
+      let node = super.create(value);
+      node.setAttribute('class', 'float-right-image');
+      return node;
+    }
+  }
+  FloatRightImageBlot.blotName = 'floatRightImage';
+  FloatRightImageBlot.tagName = 'img';
+  Quill.register(FloatRightImageBlot, true);
+
+  class AudioBlot extends BlockEmbed {
+    static create(value) {
+      let node = super.create();
+      node.setAttribute('controls', '');
+      node.setAttribute('src', value);
+      node.style.width = '100%';
+      node.style.maxWidth = '400px';
+      node.style.margin = '16px 0';
+      node.style.display = 'block';
+      return node;
+    }
+    static value(node) {
+      return node.getAttribute('src');
+    }
+  }
+  AudioBlot.blotName = 'audio';
+  AudioBlot.tagName = 'audio';
+  Quill.register(AudioBlot, true);
+}
+
 import { ARTICLES, DEFAULT_TAXONOMY } from "../../data/index.js"
 import { useContentCollection, useTaxonomySettings, bulkDeleteItems, bulkSaveItems } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
@@ -542,7 +655,20 @@ const CustomToolbar = () => (
       <button className="ql-strike" />
     </span>
     <span className="ql-formats">
+      <button className="ql-align" value="" title="ชิดซ้าย" />
+      <button className="ql-align" value="center" title="กึ่งกลาง" />
+      <button className="ql-align" value="right" title="ชิดขวา" />
+      <button className="ql-align" value="justify" title="กระจาย" />
+    </span>
+    <span className="ql-formats">
       <button className="ql-blockquote" />
+      <button className="ql-arabicBlock" title="จัดข้อความภาษาอาหรับ" />
+      <button className="ql-calloutInfo" title="กล่องข้อมูล (สีเขียว)" />
+      <button className="ql-calloutWarn" title="กล่องคำเตือน (สีแดง)" />
+    </span>
+    <span className="ql-formats">
+      <button className="ql-list" value="ordered" />
+      <button className="ql-list" value="bullet" />
     </span>
     <span className="ql-formats">
       <button className="ql-script" value="sub" />
@@ -551,17 +677,26 @@ const CustomToolbar = () => (
     <span className="ql-formats">
       <select className="ql-color" />
       <select className="ql-background" />
+      <button className="ql-highlightText" title="ไฮไลต์เน้นคำ (HL)" />
+      <button className="ql-dropCap" title="ตัวอักษรใหญ่ (Drop Cap)" />
     </span>
     <span className="ql-formats">
       <button className="ql-link" />
       <button className="ql-image" />
+      <button className="ql-insertFloatImage" title="แทรกรูปภาพชิดขวา" />
+      <button className="ql-insertAudio" title="แทรกไฟล์เสียง (Audio)" />
     </span>
     <span className="ql-formats">
       <button className="ql-clean" />
+      <button className="ql-insertDivider" title="แทรกเส้นคั่น (Divider)" />
+    </span>
+    <span className="ql-formats">
+      <button className="ql-numberCircle" title="ตัวเลขวงกลม (เช่น 01)" />
     </span>
     <span className="ql-formats">
       <button className="ql-insertFootnote" title="เพิ่มเชิงอรรถ (FN)" />
       <button className="ql-insertQuran" title="แทรกอัลกุรอาน (QR)" />
+      <button className="ql-insertPdf" title="แนบไฟล์ PDF" />
     </span>
   </div>
 );
@@ -574,6 +709,39 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
     toolbar: {
       container: "#admin-article-toolbar",
       handlers: {
+        insertDivider: function() {
+          const quill = this.quill;
+          const range = quill.getSelection(true);
+          quill.insertEmbed(range.index, 'divider', true, 'user');
+          quill.setSelection(range.index + 1);
+        },
+        insertPdf: function() {
+          const quill = this.quill;
+          const url = window.prompt("กรุณาใส่ลิงก์ไฟล์ PDF (URL):");
+          if (!url) return;
+          const title = window.prompt("หัวข้อไฟล์ (เช่น Arabic, English Translation) [เว้นว่างได้]:") || "PDF Document";
+          const pages = window.prompt("จำนวนหน้า (เช่น 2 pages) [เว้นว่างได้]:");
+
+          const range = quill.getSelection(true);
+          quill.insertEmbed(range.index, 'pdfAttachment', { url, title, pages }, 'user');
+          quill.setSelection(range.index + 1);
+        },
+        insertFloatImage: function() {
+          const quill = this.quill;
+          const url = window.prompt("กรุณาใส่ลิงก์รูปภาพ (URL):");
+          if (!url) return;
+          const range = quill.getSelection(true);
+          quill.insertEmbed(range.index, 'floatRightImage', url, 'user');
+          quill.setSelection(range.index + 1);
+        },
+        insertAudio: function() {
+          const quill = this.quill;
+          const url = window.prompt("กรุณาใส่ลิงก์ไฟล์เสียง (เช่น .mp3, .ogg URL):");
+          if (!url) return;
+          const range = quill.getSelection(true);
+          quill.insertEmbed(range.index, 'audio', url, 'user');
+          quill.setSelection(range.index + 1);
+        },
         insertQuran: function() {
           const quill = this.quill;
           const sura = window.prompt("กรุณาใส่เลขซูเราะห์ (เช่น 2 สำหรับอัล-บะเกาะเราะฮฺ):");
@@ -772,10 +940,20 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
             .ql-editor { min-height: 360px; font-size: 15px; font-family: inherit; line-height: 1.6; }
             .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid var(--br); background: #f8f9fa; }
             .ql-container.ql-snow { border: none; }
-            #admin-article-toolbar button.ql-insertFootnote, #admin-article-toolbar button.ql-insertQuran { width: auto; padding: 0 6px; }
+            #admin-article-toolbar button.ql-insertFootnote, #admin-article-toolbar button.ql-insertQuran, #admin-article-toolbar button.ql-numberCircle, #admin-article-toolbar button.ql-insertPdf, #admin-article-toolbar button.ql-highlightText, #admin-article-toolbar button.ql-insertDivider, #admin-article-toolbar button.ql-arabicBlock, #admin-article-toolbar button.ql-calloutInfo, #admin-article-toolbar button.ql-calloutWarn, #admin-article-toolbar button.ql-dropCap, #admin-article-toolbar button.ql-insertFloatImage, #admin-article-toolbar button.ql-insertAudio { width: auto; padding: 0 6px; }
             #admin-article-toolbar button.ql-insertFootnote::after { content: "FN"; font-weight: 700; font-size: 13px; color: var(--teal); }
             #admin-article-toolbar button.ql-insertQuran::after { content: "QR"; font-weight: 700; font-size: 13px; color: var(--teal); }
-            #admin-article-toolbar button.ql-insertFootnote:hover::after, #admin-article-toolbar button.ql-insertQuran:hover::after { color: var(--text); }
+            #admin-article-toolbar button.ql-numberCircle::after { content: "01"; font-weight: 700; font-size: 13px; color: var(--teal); border-radius: 50%; border: 1px solid var(--teal); padding: 1px 4px; }
+            #admin-article-toolbar button.ql-insertPdf::after { content: "PDF"; font-weight: 700; font-size: 13px; color: #dc2626; }
+            #admin-article-toolbar button.ql-highlightText::after { content: "HL"; font-weight: 700; font-size: 13px; color: #ca8a04; background: #fef08a; padding: 2px 4px; border-radius: 4px; }
+            #admin-article-toolbar button.ql-dropCap::after { content: "A"; font-weight: 700; font-size: 15px; font-family: serif; }
+            #admin-article-toolbar button.ql-insertDivider::after { content: "—"; font-weight: 700; font-size: 14px; color: var(--text); }
+            #admin-article-toolbar button.ql-arabicBlock::after { content: "ع"; font-weight: 700; font-size: 16px; color: var(--teal); }
+            #admin-article-toolbar button.ql-calloutInfo::after { content: "i"; font-weight: 700; font-size: 12px; color: #10b981; border: 1px solid #10b981; border-radius: 50%; padding: 0 4px; }
+            #admin-article-toolbar button.ql-calloutWarn::after { content: "!"; font-weight: 700; font-size: 12px; color: #ef4444; border: 1px solid #ef4444; border-radius: 50%; padding: 0 5px; }
+            #admin-article-toolbar button.ql-insertFloatImage::after { content: "IMG→"; font-weight: 700; font-size: 12px; color: var(--teal); }
+            #admin-article-toolbar button.ql-insertAudio::after { content: "♫"; font-weight: 700; font-size: 16px; color: var(--teal); }
+            #admin-article-toolbar button.ql-insertFootnote:hover::after, #admin-article-toolbar button.ql-insertQuran:hover::after, #admin-article-toolbar button.ql-numberCircle:hover::after, #admin-article-toolbar button.ql-insertPdf:hover::after, #admin-article-toolbar button.ql-highlightText:hover::after, #admin-article-toolbar button.ql-insertDivider:hover::after, #admin-article-toolbar button.ql-arabicBlock:hover::after, #admin-article-toolbar button.ql-calloutInfo:hover::after, #admin-article-toolbar button.ql-calloutWarn:hover::after, #admin-article-toolbar button.ql-dropCap:hover::after, #admin-article-toolbar button.ql-insertFloatImage:hover::after, #admin-article-toolbar button.ql-insertAudio:hover::after { color: var(--t2); }
           `}</style>
         </div>
       </div>

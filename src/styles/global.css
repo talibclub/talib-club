@@ -459,6 +459,113 @@ input[type="range"] {
   margin-right: 8px;
 }
 
+.text-highlight-yellow {
+  background-color: #fef08a;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* PDF Attachment Block */
+.article-body .pdf-attachment-block, .ql-editor .pdf-attachment-block {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  margin: 16px 0;
+  text-decoration: none !important;
+  color: inherit;
+  transition: opacity 0.2s;
+  max-width: 400px;
+}
+.article-body .pdf-attachment-block:hover, .ql-editor .pdf-attachment-block:hover {
+  opacity: 0.8;
+}
+.pdf-icon {
+  color: #dc2626; /* Red PDF color */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pdf-details {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.4;
+}
+.pdf-title {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 15px;
+}
+.pdf-action {
+  color: #2563eb; /* Blue action link color */
+  font-size: 13px;
+  font-weight: 600;
+}
+.pdf-meta {
+  color: var(--t3);
+  font-size: 12px;
+}
+
+.drop-cap {
+  float: left;
+  font-size: 3.5em;
+  line-height: 0.85;
+  margin: 0.1em 0.15em 0 0;
+  color: var(--teal);
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-weight: 700;
+}
+
+img.float-right-image {
+  float: right;
+  margin: 0 0 16px 24px;
+  max-width: 45%;
+  border-radius: 4px;
+}
+
+/* Editor Extended Formats */
+.arabic-text-block {
+  font-family: 'Amiri', 'Traditional Arabic', 'KFGQPC Uthman Taha Naskh', serif;
+  font-size: 1.6em;
+  text-align: right;
+  direction: rtl;
+  line-height: 1.8;
+  margin: 16px 0;
+  padding: 16px 20px;
+  background-color: rgba(20, 184, 166, 0.04);
+  border-right: 4px solid var(--teal);
+  border-radius: 8px 0 0 8px;
+  color: var(--text);
+}
+
+.callout-info {
+  background: #ecfdf5;
+  border-left: 4px solid #10b981;
+  padding: 16px;
+  margin: 16px 0;
+  border-radius: 0 8px 8px 0;
+  color: #065f46;
+  font-weight: 500;
+}
+
+.callout-warn {
+  background: #fef2f2;
+  border-left: 4px solid #ef4444;
+  padding: 16px;
+  margin: 16px 0;
+  border-radius: 0 8px 8px 0;
+  color: #991b1b;
+  font-weight: 500;
+}
+
+hr {
+  border: 0;
+  height: 1px;
+  background: var(--br);
+  margin: 24px 0;
+}
+
+
 .reader-size-sm {
   font-size: 14.5px
 }
