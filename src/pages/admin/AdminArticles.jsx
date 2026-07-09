@@ -639,6 +639,77 @@ export default function AdminArticles() {
   )
 }
 
+const QuillPromptModal = ({ isOpen, type, onClose, onSubmit }) => {
+  const [data, setData] = useState({ text1: '', text2: '', text3: '' });
+
+  useEffect(() => {
+    if (isOpen) setData({ text1: '', text2: '', text3: '' });
+  }, [isOpen, type]);
+
+  if (!isOpen) return null;
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') onSubmit(data);
+    if (e.key === 'Escape') onClose();
+  }
+
+  let title = '';
+  let input1 = null, input2 = null, input3 = null;
+
+  if (type === 'numberCircle') {
+    title = 'ตัวเลขวงกลม';
+    input1 = { label: 'กรุณาใส่ตัวเลข (เช่น 01, 02)', key: 'text1', placeholder: '01' };
+  } else if (type === 'pdf') {
+    title = 'แนบไฟล์ PDF';
+    input1 = { label: 'ลิงก์ไฟล์ PDF (URL)', key: 'text1', placeholder: 'https://...' };
+    input2 = { label: 'หัวข้อไฟล์ [เว้นว่างได้]', key: 'text2', placeholder: 'เช่น Arabic, English Translation' };
+    input3 = { label: 'จำนวนหน้า [เว้นว่างได้]', key: 'text3', placeholder: 'เช่น 2 pages' };
+  } else if (type === 'floatImage') {
+    title = 'แทรกรูปภาพชิดขวา';
+    input1 = { label: 'ลิงก์รูปภาพ (URL)', key: 'text1', placeholder: 'https://...' };
+  } else if (type === 'audio') {
+    title = 'แทรกไฟล์เสียง';
+    input1 = { label: 'ลิงก์ไฟล์เสียง (เช่น .mp3 URL)', key: 'text1', placeholder: 'https://...' };
+  } else if (type === 'quran') {
+    title = 'แทรกอัลกุรอาน';
+    input1 = { label: 'เลขซูเราะห์ (เช่น 2 สำหรับอัล-บะเกาะเราะฮฺ)', key: 'text1', placeholder: '2' };
+    input2 = { label: 'เลขอายะฮ์', key: 'text2', placeholder: '255' };
+  } else if (type === 'footnote') {
+    title = 'เพิ่มเชิงอรรถ (Footnote)';
+    input1 = { label: 'กรุณาพิมพ์คำอธิบายเชิงอรรถสำหรับจุดนี้', key: 'text1', placeholder: 'คำอธิบาย...' };
+  }
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: '#fff', padding: 24, borderRadius: 12, width: 400, maxWidth: '90%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+        <h3 style={{ margin: '0 0 16px 0', fontSize: 18, color: 'var(--text)' }}>{title}</h3>
+        {input1 && (
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: 'block', fontSize: 13, marginBottom: 4, color: 'var(--t2)' }}>{input1.label}</label>
+            <input type="text" className="input" autoFocus value={data.text1} onChange={e => setData({...data, text1: e.target.value})} onKeyDown={handleKeyDown} placeholder={input1.placeholder} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--br)', borderRadius: 6 }} />
+          </div>
+        )}
+        {input2 && (
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: 'block', fontSize: 13, marginBottom: 4, color: 'var(--t2)' }}>{input2.label}</label>
+            <input type="text" className="input" value={data.text2} onChange={e => setData({...data, text2: e.target.value})} onKeyDown={handleKeyDown} placeholder={input2.placeholder} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--br)', borderRadius: 6 }} />
+          </div>
+        )}
+        {input3 && (
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', fontSize: 13, marginBottom: 4, color: 'var(--t2)' }}>{input3.label}</label>
+            <input type="text" className="input" value={data.text3} onChange={e => setData({...data, text3: e.target.value})} onKeyDown={handleKeyDown} placeholder={input3.placeholder} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--br)', borderRadius: 6 }} />
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 24 }}>
+          <button className="btn btn-outline" onClick={onClose} style={{ padding: '8px 16px', borderRadius: 6 }}>ยกเลิก</button>
+          <button className="btn btn-teal" onClick={() => onSubmit(data)} style={{ padding: '8px 16px', borderRadius: 6 }}>ตกลง</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const CustomToolbar = () => (
   <div id="admin-article-toolbar">
     <span className="ql-formats">
@@ -655,16 +726,16 @@ const CustomToolbar = () => (
       <button className="ql-strike" />
     </span>
     <span className="ql-formats">
-      <button className="ql-align" value="" title="ชิดซ้าย" />
-      <button className="ql-align" value="center" title="กึ่งกลาง" />
-      <button className="ql-align" value="right" title="ชิดขวา" />
-      <button className="ql-align" value="justify" title="กระจาย" />
+      <button className="ql-align" value="" data-title="ชิดซ้าย" />
+      <button className="ql-align" value="center" data-title="กึ่งกลาง" />
+      <button className="ql-align" value="right" data-title="ชิดขวา" />
+      <button className="ql-align" value="justify" data-title="กระจาย" />
     </span>
     <span className="ql-formats">
       <button className="ql-blockquote" />
-      <button className="ql-arabicBlock" title="จัดข้อความภาษาอาหรับ" />
-      <button className="ql-calloutInfo" title="กล่องข้อมูล (สีเขียว)" />
-      <button className="ql-calloutWarn" title="กล่องคำเตือน (สีแดง)" />
+      <button className="ql-arabicBlock" data-title="จัดข้อความภาษาอาหรับ" />
+      <button className="ql-calloutInfo" data-title="กล่องข้อมูล (สีเขียว)" />
+      <button className="ql-calloutWarn" data-title="กล่องคำเตือน (สีแดง)" />
     </span>
     <span className="ql-formats">
       <button className="ql-list" value="ordered" />
@@ -677,26 +748,26 @@ const CustomToolbar = () => (
     <span className="ql-formats">
       <select className="ql-color" />
       <select className="ql-background" />
-      <button className="ql-highlightText" title="ไฮไลต์เน้นคำ (HL)" />
-      <button className="ql-dropCap" title="ตัวอักษรใหญ่ (Drop Cap)" />
+      <button className="ql-highlightText" data-title="ไฮไลต์เน้นคำ (HL)" />
+      <button className="ql-dropCap" data-title="ตัวอักษรใหญ่ (Drop Cap)" />
     </span>
     <span className="ql-formats">
       <button className="ql-link" />
       <button className="ql-image" />
-      <button className="ql-insertFloatImage" title="แทรกรูปภาพชิดขวา" />
-      <button className="ql-insertAudio" title="แทรกไฟล์เสียง (Audio)" />
+      <button className="ql-insertFloatImage" data-title="แทรกรูปภาพชิดขวา" />
+      <button className="ql-insertAudio" data-title="แทรกไฟล์เสียง (Audio)" />
     </span>
     <span className="ql-formats">
       <button className="ql-clean" />
-      <button className="ql-insertDivider" title="แทรกเส้นคั่น (Divider)" />
+      <button className="ql-insertDivider" data-title="แทรกเส้นคั่น (Divider)" />
     </span>
     <span className="ql-formats">
-      <button className="ql-numberCircle" title="ตัวเลขวงกลม (เช่น 01)" />
+      <button className="ql-numberCircle" data-title="ตัวเลขวงกลม (เช่น 01)" />
     </span>
     <span className="ql-formats">
-      <button className="ql-insertFootnote" title="เพิ่มเชิงอรรถ (FN)" />
-      <button className="ql-insertQuran" title="แทรกอัลกุรอาน (QR)" />
-      <button className="ql-insertPdf" title="แนบไฟล์ PDF" />
+      <button className="ql-insertFootnote" data-title="เพิ่มเชิงอรรถ (FN)" />
+      <button className="ql-insertQuran" data-title="แทรกอัลกุรอาน (QR)" />
+      <button className="ql-insertPdf" data-title="แนบไฟล์ PDF" />
     </span>
   </div>
 );
@@ -705,49 +776,121 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
   const set = (key, value) => setItem(prev => ({ ...prev, [key]: value }))
   const [uploadingImage, setUploadingImage] = useState(false)
   
+  const promptHandlerRef = useRef(null);
+  const [promptState, setPromptState] = useState(null);
+
+  useEffect(() => {
+    promptHandlerRef.current = (type) => new Promise(resolve => {
+      setPromptState({ type, resolve });
+    });
+  }, []);
+
+  const handlePromptClose = () => {
+    if (promptState?.resolve) promptState.resolve(null);
+    setPromptState(null);
+  };
+
+  const handlePromptSubmit = (data) => {
+    if (promptState?.resolve) promptState.resolve(data);
+    setPromptState(null);
+  };
+
   const quillModules = useMemo(() => ({
     toolbar: {
       container: "#admin-article-toolbar",
       handlers: {
+        numberCircle: async function() {
+          const quill = this.quill;
+          const range = quill.getSelection();
+          if (range && range.length > 0) {
+            const currentFormat = quill.getFormat(range);
+            quill.format('numberCircle', !currentFormat.numberCircle);
+          } else {
+            const data = await promptHandlerRef.current('numberCircle');
+            if (!data || !data.text1) return;
+            const insertRange = quill.getSelection(true);
+            quill.insertText(insertRange.index, data.text1, 'numberCircle', true);
+            quill.setSelection(insertRange.index + data.text1.length);
+          }
+        },
+        highlightText: function() {
+          const quill = this.quill;
+          const range = quill.getSelection();
+          if (range && range.length > 0) {
+            const currentFormat = quill.getFormat(range);
+            quill.format('highlightText', !currentFormat.highlightText);
+          } else {
+            window.alert("กรุณาคลุมดำข้อความที่ต้องการไฮไลต์ก่อนครับ");
+          }
+        },
+        dropCap: function() {
+          const quill = this.quill;
+          const range = quill.getSelection();
+          if (range && range.length > 0) {
+            const currentFormat = quill.getFormat(range);
+            quill.format('dropCap', !currentFormat.dropCap);
+          } else {
+            window.alert("กรุณาคลุมดำตัวอักษร 1 ตัวที่ต้องการทำ Drop Cap ก่อนครับ");
+          }
+        },
+        arabicBlock: function() {
+          const quill = this.quill;
+          const range = quill.getSelection(true);
+          const currentFormat = quill.getFormat(range);
+          quill.format('arabicBlock', !currentFormat.arabicBlock);
+        },
+        calloutInfo: function() {
+          const quill = this.quill;
+          const range = quill.getSelection(true);
+          const currentFormat = quill.getFormat(range);
+          quill.format('calloutInfo', !currentFormat.calloutInfo);
+        },
+        calloutWarn: function() {
+          const quill = this.quill;
+          const range = quill.getSelection(true);
+          const currentFormat = quill.getFormat(range);
+          quill.format('calloutWarn', !currentFormat.calloutWarn);
+        },
         insertDivider: function() {
           const quill = this.quill;
           const range = quill.getSelection(true);
           quill.insertEmbed(range.index, 'divider', true, 'user');
           quill.setSelection(range.index + 1);
         },
-        insertPdf: function() {
+        insertPdf: async function() {
           const quill = this.quill;
-          const url = window.prompt("กรุณาใส่ลิงก์ไฟล์ PDF (URL):");
-          if (!url) return;
-          const title = window.prompt("หัวข้อไฟล์ (เช่น Arabic, English Translation) [เว้นว่างได้]:") || "PDF Document";
-          const pages = window.prompt("จำนวนหน้า (เช่น 2 pages) [เว้นว่างได้]:");
+          const data = await promptHandlerRef.current('pdf');
+          if (!data || !data.text1) return;
+          const url = data.text1;
+          const title = data.text2 || "PDF Document";
+          const pages = data.text3;
 
           const range = quill.getSelection(true);
           quill.insertEmbed(range.index, 'pdfAttachment', { url, title, pages }, 'user');
           quill.setSelection(range.index + 1);
         },
-        insertFloatImage: function() {
+        insertFloatImage: async function() {
           const quill = this.quill;
-          const url = window.prompt("กรุณาใส่ลิงก์รูปภาพ (URL):");
-          if (!url) return;
+          const data = await promptHandlerRef.current('floatImage');
+          if (!data || !data.text1) return;
           const range = quill.getSelection(true);
-          quill.insertEmbed(range.index, 'floatRightImage', url, 'user');
+          quill.insertEmbed(range.index, 'floatRightImage', data.text1, 'user');
           quill.setSelection(range.index + 1);
         },
-        insertAudio: function() {
+        insertAudio: async function() {
           const quill = this.quill;
-          const url = window.prompt("กรุณาใส่ลิงก์ไฟล์เสียง (เช่น .mp3, .ogg URL):");
-          if (!url) return;
+          const data = await promptHandlerRef.current('audio');
+          if (!data || !data.text1) return;
           const range = quill.getSelection(true);
-          quill.insertEmbed(range.index, 'audio', url, 'user');
+          quill.insertEmbed(range.index, 'audio', data.text1, 'user');
           quill.setSelection(range.index + 1);
         },
-        insertQuran: function() {
+        insertQuran: async function() {
           const quill = this.quill;
-          const sura = window.prompt("กรุณาใส่เลขซูเราะห์ (เช่น 2 สำหรับอัล-บะเกาะเราะฮฺ):");
-          if (!sura) return;
-          const ayah = window.prompt(`กรุณาใส่เลขอายะฮ์ในซูเราะห์ที่ ${sura} (เช่น 255):`);
-          if (!ayah) return;
+          const data = await promptHandlerRef.current('quran');
+          if (!data || !data.text1 || !data.text2) return;
+          const sura = data.text1;
+          const ayah = data.text2;
 
           const range = quill.getSelection(true);
           const linkText = `[อัลกุรอาน ${sura}:${ayah}]`;
@@ -755,10 +898,11 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
           quill.insertText(range.index, linkText, 'link', `/quran?sura=${sura}&ayah=${ayah}`);
           quill.setSelection(range.index + linkText.length);
         },
-        insertFootnote: function() {
+        insertFootnote: async function() {
           const quill = this.quill;
-          const text = window.prompt("กรุณาพิมพ์คำอธิบายเชิงอรรถ (Footnote) สำหรับจุดนี้:");
-          if (!text) return;
+          const data = await promptHandlerRef.current('footnote');
+          if (!data || !data.text1) return;
+          const text = data.text1;
 
           const range = quill.getSelection(true);
           const content = quill.getText();

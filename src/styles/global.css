@@ -548,6 +548,31 @@ img.float-right-image {
   font-weight: 500;
 }
 
+/* Custom Toolbar Tooltips */
+#admin-article-toolbar button[data-title] {
+  position: relative;
+}
+#admin-article-toolbar button[data-title]:hover::before {
+  content: attr(data-title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #334155;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0;
+  animation: fadeInTooltip 0.2s forwards 0.3s;
+}
+@keyframes fadeInTooltip {
+  to { opacity: 1; }
+}
+
 .callout-warn {
   background: #fef2f2;
   border-left: 4px solid #ef4444;
