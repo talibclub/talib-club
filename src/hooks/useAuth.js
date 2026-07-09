@@ -76,7 +76,20 @@ export function useAuth() {
       .catch(err => console.error("Cannot finish Google redirect", err))
 
     let activeSeq = 0
-    return onAuthStateChanged(auth, async currentUser => {
+    
+    // Fallback timeout in case Firebase Auth is completely blocked by AdBlocker
+    const initTimeout = setTimeout(() => {
+      setLoading(prev => {
+        if (prev) {
+          console.warn("Firebase Auth initialization timed out (possibly blocked by extensions).")
+          return false
+        }
+        return prev
+      })
+    }, 6000)
+
+    const unsubscribe = onAuthStateChanged(auth, async currentUser => {
+      clearTimeout(initTimeout)
       const currentSeq = ++activeSeq
       setUser(currentUser)
       if (!currentUser) {
@@ -165,6 +178,11 @@ export function useAuth() {
         }
       }
     })
+    
+    return () => {
+      clearTimeout(initTimeout)
+      unsubscribe()
+    }
   }, [])
 
   const value = useMemo(() => ({
