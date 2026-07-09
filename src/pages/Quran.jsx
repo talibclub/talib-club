@@ -28,7 +28,12 @@ import AyahMenuModal from "./quran/components/AyahMenuModal.jsx"
 import BookmarkModal from "./quran/components/BookmarkModal.jsx"
 
 export default function Quran({ initialSura, initialAyah, authState }) {
-  const [selectedSura, setSelectedSura] = useState(() => normalizeSuraNumber(initialSura))
+  const [selectedSura, setSelectedSura] = useState(() => {
+    const url = new URL(window.location.href);
+    const suraParam = url.searchParams.get("sura");
+    if (suraParam) return normalizeSuraNumber(suraParam);
+    return normalizeSuraNumber(initialSura);
+  });
   const readingAreaRef = useRef(null)
 
   const scrollToReadingArea = () => {
@@ -47,7 +52,12 @@ export default function Quran({ initialSura, initialAyah, authState }) {
   const [scrollPercent, setScrollPercent] = useState(0)
   const [showScrollTop, setShowScrollTop] = useState(false)
   const [searchHasRun, setSearchHasRun] = useState(false)
-  const [targetScrollAyah, setTargetScrollAyah] = useState(() => normalizeAyahNumber(initialAyah))
+  const [targetScrollAyah, setTargetScrollAyah] = useState(() => {
+    const url = new URL(window.location.href);
+    const ayahParam = url.searchParams.get("ayah");
+    if (ayahParam) return normalizeAyahNumber(ayahParam);
+    return normalizeAyahNumber(initialAyah);
+  });
   const [reloadKey, setReloadKey] = useState(0)
   const [quranBenefits, setQuranBenefits] = useState(null)
 

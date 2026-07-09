@@ -20,9 +20,15 @@ function resolveDashboardView(initialView) {
 export default function MemberDashboard({ authState, go, initialView = "overview", ctx, theme }) {
   const [view, setCurrentView] = useState(() => resolveDashboardView(initialView))
   const [copied, setCopied] = useState("")
-  const [quranSura, setQuranSura] = useState(1)
-  const [quranAyah, setQuranAyah] = useState(null)
-
+  const [quranSura, setQuranSura] = useState(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    return Number(searchParams.get("sura") || ctx?.sura || 1)
+  })
+  const [quranAyah, setQuranAyah] = useState(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const ayah = searchParams.get("ayah") || ctx?.ayah
+    return ayah ? Number(ayah) : null
+  })
   const user = authState?.user
   const profile = authState?.profile || {}
   const name = profile.displayName || user?.displayName || user?.email || "สมาชิก"
