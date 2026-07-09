@@ -675,14 +675,13 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
 
         <Field label="บทคัดย่อ (แสดงหน้าการ์ด)" span><textarea value={item.excerpt || ""} onChange={e => set("excerpt", e.target.value)} rows={2} placeholder="เนื้อหาสรุปสั้นๆ..." /></Field>
         <Field label="Tags (คั่นด้วยลูกน้ำ ,)" span><input value={(item.tags || []).join(", ")} onChange={e => set("tags", e.target.value.split(",").map(tag => tag.trim()).filter(Boolean))} placeholder="เช่น ฟิกฮ์, อะกีดะฮ์" /></Field>
-        <Field label={
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>เนื้อหาบทความแบบเต็ม</span>
+        <div style={{ gridColumn: "1 / -1" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <span style={{ display: "block", fontSize: 13, color: "var(--t2)", fontWeight: 500 }}>เนื้อหาบทความแบบเต็ม</span>
             <span style={{ fontSize: 11, color: "var(--teal)", fontWeight: 400, background: "rgba(20,184,166,0.1)", padding: "4px 8px", borderRadius: 12 }}>
               <i className="ti ti-bulb" style={{ marginRight: 4 }}></i>รองรับทั้งรูปแบบใหม่ (WYSIWYG) และแบบข้อความดั้งเดิม
             </span>
           </div>
-        } span>
           <div style={{ background: "#fff", borderRadius: 8, overflow: "hidden", border: "1px solid var(--br)", minHeight: 400 }}>
             <ReactQuill 
               theme="snow"
@@ -698,7 +697,7 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
             .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid var(--br); background: #f8f9fa; }
             .ql-container.ql-snow { border: none; }
           `}</style>
-        </Field>
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
