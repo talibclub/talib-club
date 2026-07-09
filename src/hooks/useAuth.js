@@ -33,9 +33,16 @@ const POPUP_FALLBACK_CODES = new Set([
   "auth/popup-closed-by-user",
 ])
 
+const withTimeout = (promise, ms = 5000) => {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
+  ])
+}
+
 async function saveGoogleProfile(firebaseUser) {
   const ref = doc(db, "users", firebaseUser.uid)
-  const snap = await getDoc(ref)
+  const snap = await withTimeout(getDoc(ref))
   const payload = {
     role: snap.exists() ? snap.data()?.role || "member" : "member",
     displayName: firebaseUser.displayName || "",
@@ -97,7 +104,7 @@ export function useAuth() {
         } catch(e) {}
 
         if (!exists) {
-          const snap = await getDoc(ref)
+          const snap = await withTimeout(getDoc(ref))
           if (currentSeq !== activeSeq) return
           if (snap.exists()) {
             snapData = snap.data()
