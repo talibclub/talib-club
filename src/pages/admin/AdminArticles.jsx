@@ -5,7 +5,19 @@ import "react-quill/dist/quill.snow.css"
 const Quill = ReactQuill.Quill;
 if (Quill) {
   const Inline = Quill.import('blots/inline');
-  class NumberCircleBlot extends Inline { }
+  const Embed = Quill.import('blots/embed');
+
+  class NumberCircleBlot extends Embed {
+    static create(value) {
+      let node = super.create();
+      node.innerText = value;
+      node.setAttribute('contenteditable', 'false');
+      return node;
+    }
+    static value(node) {
+      return node.innerText;
+    }
+  }
   NumberCircleBlot.blotName = 'numberCircle';
   NumberCircleBlot.tagName = 'span';
   NumberCircleBlot.className = 'numberCircleBlue';
@@ -799,17 +811,15 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
       handlers: {
         numberCircle: async function() {
           const quill = this.quill;
-          const range = quill.getSelection();
-          if (range && range.length > 0) {
-            const currentFormat = quill.getFormat(range);
-            quill.format('numberCircle', !currentFormat.numberCircle);
-          } else {
-            const data = await promptHandlerRef.current('numberCircle');
-            if (!data || !data.text1) return;
-            const insertRange = quill.getSelection(true);
-            quill.insertText(insertRange.index, data.text1, 'numberCircle', true);
-            quill.setSelection(insertRange.index + data.text1.length);
-          }
+          const range = quill.getSelection(true) || { index: quill.getLength() };
+          
+          const data = await promptHandlerRef.current('numberCircle');
+          if (!data || !data.text1) return;
+          
+          // Re-get selection in case it was lost during prompt
+          const insertRange = quill.getSelection(true) || range;
+          quill.insertEmbed(insertRange.index, 'numberCircle', data.text1, 'user');
+          quill.setSelection(insertRange.index + 1); // Embeds have length of 1
         },
         highlightText: function() {
           const quill = this.quill;
@@ -1080,6 +1090,7 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
           </div>
           <style>{`
             .ql-editor { min-height: 360px; font-size: 15px; font-family: inherit; line-height: 1.6; }
+            .ql-editor p { margin-bottom: 22px; }
             .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid var(--br); background: #f8f9fa; }
             .ql-container.ql-snow { border: none; }
             #admin-article-toolbar button.ql-insertFootnote, #admin-article-toolbar button.ql-insertQuran, #admin-article-toolbar button.ql-numberCircle, #admin-article-toolbar button.ql-insertPdf, #admin-article-toolbar button.ql-highlightText, #admin-article-toolbar button.ql-insertDivider, #admin-article-toolbar button.ql-arabicBlock, #admin-article-toolbar button.ql-calloutInfo, #admin-article-toolbar button.ql-calloutWarn, #admin-article-toolbar button.ql-dropCap, #admin-article-toolbar button.ql-insertFloatImage, #admin-article-toolbar button.ql-insertAudio { width: auto; padding: 0 6px; }
