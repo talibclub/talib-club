@@ -772,10 +772,10 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
             .ql-editor { min-height: 360px; font-size: 15px; font-family: inherit; line-height: 1.6; }
             .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid var(--br); background: #f8f9fa; }
             .ql-container.ql-snow { border: none; }
-            .ql-snow .ql-toolbar button.ql-insertFootnote, .ql-snow .ql-toolbar button.ql-insertQuran { width: auto; padding: 0 6px; }
-            .ql-snow .ql-toolbar button.ql-insertFootnote::after { content: "FN"; font-weight: 700; font-size: 13px; color: var(--teal); }
-            .ql-snow .ql-toolbar button.ql-insertQuran::after { content: "QR"; font-weight: 700; font-size: 13px; color: var(--teal); }
-            .ql-snow .ql-toolbar button.ql-insertFootnote:hover::after, .ql-snow .ql-toolbar button.ql-insertQuran:hover::after { color: var(--text); }
+            #admin-article-toolbar button.ql-insertFootnote, #admin-article-toolbar button.ql-insertQuran { width: auto; padding: 0 6px; }
+            #admin-article-toolbar button.ql-insertFootnote::after { content: "FN"; font-weight: 700; font-size: 13px; color: var(--teal); }
+            #admin-article-toolbar button.ql-insertQuran::after { content: "QR"; font-weight: 700; font-size: 13px; color: var(--teal); }
+            #admin-article-toolbar button.ql-insertFootnote:hover::after, #admin-article-toolbar button.ql-insertQuran:hover::after { color: var(--text); }
           `}</style>
         </div>
       </div>
