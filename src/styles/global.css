@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap');
 
 /* --- 1. RESET & OVERFLOW LOCK --- */
 *,
@@ -427,6 +427,36 @@ input[type="range"] {
   font-size: inherit;
   font-weight: inherit;
   line-height: inherit
+}
+
+.article-body strong, .article-body b, .ql-editor strong, .ql-editor b {
+  font-weight: 700 !important;
+  color: var(--text);
+}
+
+.has-dropcap::first-letter,
+.article-body p.has-dropcap::first-letter {
+  float: left;
+  font-size: 3.8em;
+  line-height: 0.85;
+  margin: 0.1em 0.15em 0 0;
+  color: var(--teal);
+  font-family: serif;
+  font-weight: 700;
+}
+
+.numberCircleBlue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: var(--teal);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  margin-right: 8px;
 }
 
 .reader-size-sm {
