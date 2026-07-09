@@ -376,16 +376,30 @@ export default function Quran({ initialSura, initialAyah, authState }) {
     }
   }
 
-  const handleSelectPage = (pageNumber) => {
+  const handleSelectPage = async (pageNumber) => {
     const pNum = Number(pageNumber)
     if (isNaN(pNum) || pNum < 1 || pNum > 604) {
       toast.error("กรุณาระบุเลขหน้าตั้งแต่ 1 ถึง 604")
       return
     }
-    setMode("mushaf")
-    setSelectedPage(pNum)
+    
+    if (mode === "mushaf") {
+      setSelectedPage(pNum)
+      setTargetScrollAyah(null)
+    } else {
+      try {
+        const res = await fetch(`https://api.alquran.cloud/v1/page/${pNum}/quran-simple`)
+        const data = await res.json()
+        if (data.code === 200 && data.data?.ayahs?.length > 0) {
+          const firstAyah = data.data.ayahs[0]
+          setSelectedSura(firstAyah.surah.number)
+          setTargetScrollAyah(firstAyah.numberInSurah)
+        }
+      } catch (err) {
+        console.error("Failed to fetch page metadata", err)
+      }
+    }
     setPageInput("")
-    setTargetScrollAyah(null)
     if (isMobile) setIsMobileNavOpen(false)
     window.setTimeout(scrollToReadingArea, 80)
   }
