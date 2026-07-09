@@ -732,7 +732,7 @@ const QuillPromptModal = ({ isOpen, type, onClose, onSubmit }) => {
 }
 
 const CustomToolbar = React.memo(() => (
-  <div id="admin-article-toolbar">
+  <div id="admin-article-toolbar" className="ql-toolbar ql-snow">
     <span className="ql-formats">
       <select className="ql-header" defaultValue="">
         <option value="2" />
