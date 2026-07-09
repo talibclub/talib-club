@@ -35,6 +35,15 @@ if (Quill) {
   DropCapBlot.className = 'drop-cap';
   Quill.register(DropCapBlot, true);
 
+  class SoftBreakBlot extends Embed {
+    static create(value) {
+      return super.create(value);
+    }
+  }
+  SoftBreakBlot.blotName = 'softbreak';
+  SoftBreakBlot.tagName = 'br';
+  Quill.register(SoftBreakBlot, true);
+
   const BlockEmbed = Quill.import('blots/block/embed');
   class PdfAttachmentBlot extends BlockEmbed {
     static create(value) {
@@ -933,6 +942,18 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
           }
         }
       }
+    },
+    keyboard: {
+      bindings: {
+        shiftEnter: {
+          key: 13,
+          shiftKey: true,
+          handler: function(range, context) {
+            this.quill.insertEmbed(range.index, 'softbreak', true, 'user');
+            this.quill.setSelection(range.index + 1, 'silent');
+          }
+        }
+      }
     }
   }), []);
 
@@ -1076,7 +1097,7 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
               <i className="ti ti-bulb" style={{ marginRight: 4 }}></i>รองรับทั้งรูปแบบใหม่ (WYSIWYG) และแบบข้อความดั้งเดิม
             </span>
           </div>
-          <div style={{ background: "#fff", borderRadius: 8, overflow: "hidden", border: "1px solid var(--br)", minHeight: 400 }}>
+          <div style={{ background: "#fff", borderBottomLeftRadius: 8, borderBottomRightRadius: 8, border: "1px solid var(--br)", minHeight: 400 }}>
             <CustomToolbar />
             <ReactQuill 
               ref={reactQuillRef}
@@ -1091,7 +1112,7 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
           <style>{`
             .ql-editor { min-height: 360px; font-size: 15px; font-family: inherit; line-height: 1.6; }
             .ql-editor p { margin-bottom: 22px; }
-            .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid var(--br); background: #f8f9fa; }
+            .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid var(--br); background: #f8f9fa; position: sticky; top: 72px; z-index: 10; border-top-left-radius: 8px; border-top-right-radius: 8px; border: 1px solid var(--br); margin-top: -1px; margin-left: -1px; margin-right: -1px; }
             .ql-container.ql-snow { border: none; }
             #admin-article-toolbar button.ql-insertFootnote, #admin-article-toolbar button.ql-insertQuran, #admin-article-toolbar button.ql-numberCircle, #admin-article-toolbar button.ql-insertPdf, #admin-article-toolbar button.ql-highlightText, #admin-article-toolbar button.ql-insertDivider, #admin-article-toolbar button.ql-arabicBlock, #admin-article-toolbar button.ql-calloutInfo, #admin-article-toolbar button.ql-calloutWarn, #admin-article-toolbar button.ql-dropCap, #admin-article-toolbar button.ql-insertFloatImage, #admin-article-toolbar button.ql-insertAudio { width: auto; padding: 0 6px; }
             #admin-article-toolbar button.ql-insertFootnote::after { content: "FN"; font-weight: 700; font-size: 13px; color: var(--teal); }
