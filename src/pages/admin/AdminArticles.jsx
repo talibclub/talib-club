@@ -526,22 +526,53 @@ export default function AdminArticles() {
   )
 }
 
+const CustomToolbar = () => (
+  <div id="admin-article-toolbar">
+    <span className="ql-formats">
+      <select className="ql-header" defaultValue="">
+        <option value="2" />
+        <option value="3" />
+        <option value="" />
+      </select>
+    </span>
+    <span className="ql-formats">
+      <button className="ql-bold" />
+      <button className="ql-italic" />
+      <button className="ql-underline" />
+      <button className="ql-strike" />
+    </span>
+    <span className="ql-formats">
+      <button className="ql-blockquote" />
+    </span>
+    <span className="ql-formats">
+      <button className="ql-script" value="sub" />
+      <button className="ql-script" value="super" />
+    </span>
+    <span className="ql-formats">
+      <select className="ql-color" />
+      <select className="ql-background" />
+    </span>
+    <span className="ql-formats">
+      <button className="ql-link" />
+      <button className="ql-image" />
+    </span>
+    <span className="ql-formats">
+      <button className="ql-clean" />
+    </span>
+    <span className="ql-formats">
+      <button className="ql-insertFootnote" title="เพิ่มเชิงอรรถ (FN)" />
+      <button className="ql-insertQuran" title="แทรกอัลกุรอาน (QR)" />
+    </span>
+  </div>
+);
+
 function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
   const set = (key, value) => setItem(prev => ({ ...prev, [key]: value }))
   const [uploadingImage, setUploadingImage] = useState(false)
   
   const quillModules = useMemo(() => ({
     toolbar: {
-      container: [
-        [{ 'header': [2, 3, false] }],
-        ['bold', 'italic', 'underline', 'strike'],
-        ['blockquote'],
-        [{ 'script': 'sub'}, { 'script': 'super' }],
-        [{ 'color': [] }, { 'background': [] }],
-        ['link', 'image'],
-        ['clean'],
-        ['insertFootnote', 'insertQuran']
-      ],
+      container: "#admin-article-toolbar",
       handlers: {
         insertQuran: function() {
           const quill = this.quill;
@@ -727,6 +758,7 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
             </span>
           </div>
           <div style={{ background: "#fff", borderRadius: 8, overflow: "hidden", border: "1px solid var(--br)", minHeight: 400 }}>
+            <CustomToolbar />
             <ReactQuill 
               theme="snow"
               value={item.body || ""} 
