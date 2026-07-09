@@ -28,11 +28,20 @@ if ('serviceWorker' in navigator) {
       });
   });
 
-  // Automatically refresh page to load new version once service worker updates and activates
-  let refreshing = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (refreshing) return;
-    refreshing = true;
-    window.location.reload();
-  });
+  // Only auto-refresh in production to prevent infinite loops in Vite dev mode
+  if (import.meta.env.PROD) {
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+  } else {
+    // In development, unregister any existing service workers to avoid HMR conflicts
+    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+      for(let registration of registrations) {
+        registration.unregister();
+      }
+    });
+  }
 }
