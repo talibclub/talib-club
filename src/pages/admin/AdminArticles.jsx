@@ -744,6 +744,8 @@ const CustomToolbar = React.memo(() => (
       <button className="ql-bold" />
       <button className="ql-italic" />
       <button className="ql-underline" />
+      <button className="ql-align" value="" data-title="ชิดซ้าย" />
+      <button className="ql-align" value="center" data-title="กึ่งกลาง" />
       <button className="ql-align" value="right" data-title="ชิดขวา" />
       <button className="ql-align" value="justify" data-title="กระจาย" />
     </span>
@@ -816,6 +818,9 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
   }, []);
 
   const quillModules = useMemo(() => ({
+    clipboard: {
+      matchVisual: false
+    },
     toolbar: {
       container: "#admin-article-toolbar",
       handlers: {
