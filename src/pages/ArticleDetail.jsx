@@ -99,11 +99,12 @@ export default function ArticleDetail({ item, go, authState }) {
     }
 
     // 2. Fetch series articles if applicable
-    const isSeriesLocal = displayItem.type === "series" || displayItem.type === "ซีรีส์";
+    const seriesTypes = ["series", "ซีรีส์", "ซีรีย์", "ซีรี่ส์", "ซีรี่ย์"];
+    const isSeriesLocal = seriesTypes.includes(String(displayItem.type || "").toLowerCase());
     if (isSeriesLocal && displayItem.seriesId) {
       const seriesQ = query(
         collection(db, "content_articles"),
-        where("type", "in", ["series", "ซีรีส์"]),
+        where("type", "in", seriesTypes),
         where("seriesId", "==", displayItem.seriesId)
       )
       getDocs(seriesQ)
@@ -118,7 +119,7 @@ export default function ArticleDetail({ item, go, authState }) {
             console.error("Failed to load series articles from Firebase", err)
             // Fallback to static articles
             const staticSeries = ARTICLES.filter(
-              a => !a.deleted && (String(a.type).toLowerCase() === "series" || String(a.type) === "ซีรีส์") && String(a.seriesId || "").toLowerCase() === String(displayItem.seriesId).toLowerCase()
+              a => !a.deleted && seriesTypes.includes(String(a.type || "").toLowerCase()) && String(a.seriesId || "").toLowerCase() === String(displayItem.seriesId).toLowerCase()
             ).sort((a, b) => (a.part || 0) - (b.part || 0))
             setSeriesArticles(staticSeries)
           })

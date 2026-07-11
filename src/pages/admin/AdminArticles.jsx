@@ -168,7 +168,7 @@ const EMPTY = {
 const isSeriesType = (typeVal) => {
   if (!typeVal) return false;
   const str = String(typeVal).toLowerCase();
-  return str === "series" || str === "ซีรีส์";
+  return ["series", "ซีรีส์", "ซีรีย์", "ซีรี่ส์", "ซีรี่ย์"].includes(str);
 };
 
 export default function AdminArticles() {
