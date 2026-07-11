@@ -675,7 +675,12 @@ export default function ArticleDetail({ item, go, authState }) {
 
           <button 
             className="btn btn-outline hover-opacity"
-            onClick={() => setFabExpanded(!fabExpanded)}
+            onClick={() => {
+              if (fabExpanded) {
+                setShowFloatingTOC(false);
+              }
+              setFabExpanded(!fabExpanded);
+            }}
             title={fabExpanded ? "ซ่อนเมนู" : "แสดงเมนู"}
             style={{ width: 40, height: 40, borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)", border: "1px solid var(--br)", color: "var(--t3)", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", marginTop: fabExpanded ? 4 : 0 }}
           >
