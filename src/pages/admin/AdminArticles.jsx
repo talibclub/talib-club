@@ -976,6 +976,7 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
         }
       }
     }
+  };
   }, []);
 
   const handleUploadImage = async (e) => {

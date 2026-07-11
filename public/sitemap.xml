@@ -2,49 +2,43 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://talibclub.org/</loc>
-    <lastmod>2026-07-09</lastmod>
+    <lastmod>2026-07-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://talibclub.org/articles</loc>
-    <lastmod>2026-07-09</lastmod>
+    <lastmod>2026-07-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://talibclub.org/library</loc>
-    <lastmod>2026-07-09</lastmod>
+    <lastmod>2026-07-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://talibclub.org/media</loc>
-    <lastmod>2026-07-09</lastmod>
+    <lastmod>2026-07-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://talibclub.org/scholars</loc>
-    <lastmod>2026-07-09</lastmod>
+    <lastmod>2026-07-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://talibclub.org/donate</loc>
-    <lastmod>2026-07-09</lastmod>
+    <lastmod>2026-07-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://talibclub.org/article?id=10</loc>
     <lastmod>2026-07-08</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://talibclub.org/article?id=100</loc>
-    <lastmod>2026-06-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -206,7 +200,7 @@
   </url>
   <url>
     <loc>https://talibclub.org/article?id=33</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-07-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -272,7 +266,7 @@
   </url>
   <url>
     <loc>https://talibclub.org/article?id=4714acce-f9b1-421c-9d59-1000a2288708</loc>
-    <lastmod>2026-07-08</lastmod>
+    <lastmod>2026-07-09</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -314,49 +308,49 @@
   </url>
   <url>
     <loc>https://talibclub.org/article?id=5156004</loc>
-    <lastmod>2026-06-03</lastmod>
+    <lastmod>2026-07-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://talibclub.org/article?id=5156005</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-07-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://talibclub.org/article?id=5156006</loc>
-    <lastmod>2026-06-03</lastmod>
+    <lastmod>2026-07-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://talibclub.org/article?id=5156007</loc>
-    <lastmod>2026-06-03</lastmod>
+    <lastmod>2026-07-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://talibclub.org/article?id=5156008</loc>
-    <lastmod>2026-06-03</lastmod>
+    <lastmod>2026-07-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://talibclub.org/article?id=5156009</loc>
-    <lastmod>2026-06-03</lastmod>
+    <lastmod>2026-07-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://talibclub.org/article?id=5156010</loc>
-    <lastmod>2026-06-22</lastmod>
+    <lastmod>2026-07-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://talibclub.org/article?id=5156011</loc>
-    <lastmod>2026-06-03</lastmod>
+    <lastmod>2026-07-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -788,7 +782,7 @@
   </url>
   <url>
     <loc>https://talibclub.org/article?id=5156146</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-07-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
