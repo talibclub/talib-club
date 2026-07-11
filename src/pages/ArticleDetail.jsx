@@ -270,7 +270,7 @@ export default function ArticleDetail({ item, go, authState }) {
       // แปลง <li... > ให้กลายเป็นเลข 1. 2. 3. เพื่อให้ regex หาเจอเวลา Quill ทำ Auto-format เป็น Ordered List
       let liCounter = 1;
       let processedNotes = notesSection.replace(/<li[^>]*>/gi, () => `\n${liCounter++}. `);
-      const tempText = processedNotes.replace(/<\/p>|<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+      const tempText = processedNotes.replace(/<\/p>|<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;|&#160;|\u200B/gi, ' ');
       const noteLines = tempText.split('\n');
       noteLines.forEach(line => {
         const match = line.match(/^\s*(?:\[|\()?(\d+)(?:\.|\)|\])?\s+(.*)/);
