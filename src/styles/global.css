@@ -418,7 +418,6 @@ input[type="range"] {
   line-height: 2;
   color: var(--text);
   font-weight: 400;
-  white-space: pre-line
 }
 
 .article-body p {
