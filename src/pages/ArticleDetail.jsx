@@ -267,8 +267,10 @@ export default function ArticleDetail({ item, go, authState }) {
       body = body.replace(notesMatch[0], ""); // เอาออกจากเนื้อหาหลักก่อน
       
       // แปลงเนื้อหา note ให้เป็นบรรทัดๆ 
-      // เปลี่ยน </p>, <br> เป็น \n ก่อนแล้วลบแท็กที่เหลือทิ้ง
-      const tempText = notesSection.replace(/<\/p>|<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+      // แปลง <li... > ให้กลายเป็นเลข 1. 2. 3. เพื่อให้ regex หาเจอเวลา Quill ทำ Auto-format เป็น Ordered List
+      let liCounter = 1;
+      let processedNotes = notesSection.replace(/<li[^>]*>/gi, () => `\n${liCounter++}. `);
+      const tempText = processedNotes.replace(/<\/p>|<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
       const noteLines = tempText.split('\n');
       noteLines.forEach(line => {
         const match = line.match(/^\s*(?:\[|\()?(\d+)(?:\.|\)|\])?\s+(.*)/);
