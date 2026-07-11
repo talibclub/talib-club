@@ -1127,7 +1127,7 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
               value={item.body || ""} 
               onChange={val => set("body", val)}
               onChangeSelection={(range) => {
-                if (range && range.length > 0) lastSelectionRef.current = range;
+                if (range) lastSelectionRef.current = range;
               }}
               modules={quillModules}
               style={{ minHeight: 360 }}
