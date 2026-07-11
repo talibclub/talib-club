@@ -97,7 +97,8 @@ export default function ArticleDetail({ item, go, authState }) {
     }
 
     // 2. Fetch series articles if applicable (Check sessionStorage cache first)
-    if (displayItem.type === "series" && displayItem.seriesId) {
+    const isSeries = displayItem.type === "series" || displayItem.type === "ซีรีส์";
+    if (isSeries && displayItem.seriesId) {
       const cacheKeySeries = `talib_series_${displayItem.seriesId}`
       let cachedSeriesData = null
       try {
@@ -113,7 +114,7 @@ export default function ArticleDetail({ item, go, authState }) {
       } else {
         const seriesQ = query(
           collection(db, "content_articles"),
-          where("type", "==", "series"),
+          where("type", "in", ["series", "ซีรีส์"]),
           where("seriesId", "==", displayItem.seriesId)
         )
         getDocs(seriesQ)
@@ -131,7 +132,7 @@ export default function ArticleDetail({ item, go, authState }) {
             console.error("Failed to load series articles from Firebase", err)
             // Fallback to static articles
             const staticSeries = ARTICLES.filter(
-              a => !a.deleted && String(a.type).toLowerCase() === "series" && String(a.seriesId || "").toLowerCase() === String(displayItem.seriesId).toLowerCase()
+              a => !a.deleted && (String(a.type).toLowerCase() === "series" || String(a.type) === "ซีรีส์") && String(a.seriesId || "").toLowerCase() === String(displayItem.seriesId).toLowerCase()
             ).sort((a, b) => (a.part || 0) - (b.part || 0))
             setSeriesArticles(staticSeries)
           })
@@ -437,7 +438,7 @@ export default function ArticleDetail({ item, go, authState }) {
         
         <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
           <span style={{ padding: "4px 12px", background: "linear-gradient(135deg, var(--teal), #0d9488)", color: "#fff", borderRadius: 20, fontSize: 13, fontWeight: 500, boxShadow: "0 4px 10px rgba(20,184,166,0.3)" }}>{displayItem.category}</span>
-          {displayItem.type === "series" && <span style={{ padding: "4px 12px", background: "linear-gradient(135deg, var(--acc), #d97706)", color: "#fff", borderRadius: 20, fontSize: 13, fontWeight: 500, boxShadow: "0 4px 10px rgba(245,158,11,0.3)" }}>ซีรีส์ {displayItem.seriesId} ตอน {displayItem.part}</span>}
+          {isSeries && <span style={{ padding: "4px 12px", background: "linear-gradient(135deg, var(--acc), #d97706)", color: "#fff", borderRadius: 20, fontSize: 13, fontWeight: 500, boxShadow: "0 4px 10px rgba(245,158,11,0.3)" }}>ซีรีส์ {displayItem.seriesId} ตอนที่ {displayItem.part}</span>}
           {displayItem.type === "specific" && displayItem.seriesName && <span style={{ padding: "4px 12px", background: "linear-gradient(135deg, var(--acc), #d97706)", color: "#fff", borderRadius: 20, fontSize: 13, fontWeight: 500, boxShadow: "0 4px 10px rgba(245,158,11,0.3)" }}>{displayItem.seriesName}</span>}
         </div>
         <h1 className="article-title" style={{ position: "relative", zIndex: 1, fontSize: 32, lineHeight: 1.4, background: "linear-gradient(to right, var(--text), var(--teal))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
