@@ -816,14 +816,20 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
       });
     };
   }, []);
-
-  const quillModules = useMemo(() => ({
-    clipboard: {
-      matchVisual: false
-    },
-    toolbar: {
-      container: "#admin-article-toolbar",
-      handlers: {
+  const quillModules = useMemo(() => {
+    const Delta = Quill.import('delta');
+    return {
+      clipboard: {
+        matchVisual: false,
+        matchers: [
+          ['BR', function(node, delta) {
+            return new Delta().insert({ softbreak: true });
+          }]
+        ]
+      },
+      toolbar: {
+        container: "#admin-article-toolbar",
+        handlers: {
         numberCircle: async function() {
           const quill = this.quill;
           const range = lastSelectionRef.current || quill.getSelection(true) || { index: quill.getLength() };
