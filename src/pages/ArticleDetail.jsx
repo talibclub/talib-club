@@ -98,38 +98,22 @@ export default function ArticleDetail({ item, go, authState }) {
         })
     }
 
-    // 2. Fetch series articles if applicable (Check sessionStorage cache first)
+    // 2. Fetch series articles if applicable
     const isSeriesLocal = displayItem.type === "series" || displayItem.type === "ซีรีส์";
     if (isSeriesLocal && displayItem.seriesId) {
-      const cacheKeySeries = `talib_series_${displayItem.seriesId}`
-      let cachedSeriesData = null
-      try {
-        const cached = sessionStorage.getItem(cacheKeySeries)
-        if (cached) cachedSeriesData = JSON.parse(cached)
-      } catch (e) { }
-
-      if (cachedSeriesData) {
-        const docs = cachedSeriesData
-          .filter(a => !a.deleted)
-          .sort((a, b) => (a.part || 0) - (b.part || 0))
-        setSeriesArticles(docs)
-      } else {
-        const seriesQ = query(
-          collection(db, "content_articles"),
-          where("type", "in", ["series", "ซีรีส์"]),
-          where("seriesId", "==", displayItem.seriesId)
-        )
-        getDocs(seriesQ)
-          .then(snap => {
-            const docs = snap.docs.map(d => ({ ...d.data(), id: d.id }))
-            try {
-              sessionStorage.setItem(cacheKeySeries, JSON.stringify(docs))
-            } catch (e) { }
-            const sorted = docs
-              .filter(a => !a.deleted)
-              .sort((a, b) => (a.part || 0) - (b.part || 0))
-            setSeriesArticles(sorted)
-          })
+      const seriesQ = query(
+        collection(db, "content_articles"),
+        where("type", "in", ["series", "ซีรีส์"]),
+        where("seriesId", "==", displayItem.seriesId)
+      )
+      getDocs(seriesQ)
+        .then(snap => {
+          const docs = snap.docs.map(d => ({ ...d.data(), id: d.id }))
+          const sorted = docs
+            .filter(a => !a.deleted)
+            .sort((a, b) => (a.part || 0) - (b.part || 0))
+          setSeriesArticles(sorted)
+        })
           .catch(err => {
             console.error("Failed to load series articles from Firebase", err)
             // Fallback to static articles
@@ -251,9 +235,17 @@ export default function ArticleDetail({ item, go, authState }) {
   if (loadingArticles && !displayItem) {
     return <div className="article-page" style={{ textAlign: "center", padding: "100px 0" }}><i className="ti ti-loader-2 spin" style={{ fontSize: 32, color: "var(--teal)" }}></i></div>
   }
-  if (!displayItem) return null
-
   const [modalImage, setModalImage] = useState(null);
+  const [showFloatingTOC, setShowFloatingTOC] = useState(false);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 300);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   // ระบบแกะข้อความสร้างสารบัญ และจัดรูปแบบบทความ (รองรับทั้ง Plaintext เดิม และ HTML จาก Quill)
   const { toc, finalHtml } = useMemo(() => {
@@ -494,77 +486,6 @@ export default function ArticleDetail({ item, go, authState }) {
         </div>
       </div>
 
-      {toc.length > 0 && (
-        <div className="card" style={{ padding: "24px 28px", marginBottom: 32, background: "var(--bg2)", border: ".5px solid var(--br2)", borderRadius: 16 }}>
-          <style>{`
-            .toc-link {
-              transition: all 0.2s ease;
-            }
-            .toc-link:hover {
-              color: var(--teal) !important;
-              transform: translateX(4px);
-            }
-          `}</style>
-          <h3 style={{ fontSize: 16, marginBottom: 20, display: "flex", alignItems: "center", gap: 8, fontWeight: 600, color: "var(--text)" }}>
-            <i className="ti ti-list" style={{ color: "var(--teal)", fontSize: 18 }}></i> สารบัญเนื้อหา (Table Of Contents)
-          </h3>
-          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 12 }}>
-            {toc.map(t => {
-              const isH3 = t.level === 3;
-              return (
-                <li key={t.id} style={{ 
-                  paddingLeft: isH3 ? 24 : 0, 
-                  position: "relative",
-                  display: "flex",
-                  alignItems: "flex-start",
-                  lineHeight: 1.5
-                }}>
-                  {isH3 ? (
-                    <span style={{
-                      position: "absolute",
-                      left: 8,
-                      top: 0,
-                      width: 8,
-                      height: 10,
-                      borderLeft: "1.5px solid rgba(128,128,128,0.25)",
-                      borderBottom: "1.5px solid rgba(128,128,128,0.25)",
-                      borderBottomLeftRadius: 4,
-                    }} />
-                  ) : (
-                    <span style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: "50%",
-                      background: "var(--teal)",
-                      marginTop: 8,
-                      marginRight: 12,
-                      flexShrink: 0
-                    }} />
-                  )}
-                  <a 
-                    href={`#${t.id}`} 
-                    onClick={(e) => { 
-                      e.preventDefault(); 
-                      document.getElementById(t.id)?.scrollIntoView({ behavior: 'smooth' }); 
-                    }} 
-                    className="toc-link"
-                    style={{ 
-                      fontSize: isH3 ? 13 : 14, 
-                      color: isH3 ? "var(--t3)" : "var(--text)", 
-                      fontWeight: isH3 ? 300 : 500,
-                      textDecoration: "none",
-                      display: "inline-block"
-                    }}
-                  >
-                    {t.title}
-                  </a>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-
       <div 
         className={`${readerClass} animate-float-cute`} 
         style={{ scrollBehavior: "smooth", animationDelay: "0.4s", padding: "16px 20px" }}
@@ -687,9 +608,115 @@ export default function ArticleDetail({ item, go, authState }) {
             ) : (
               <img src={modalImage} alt="Reference" style={{ display: "block", maxWidth: "100%", maxHeight: "80vh", objectFit: "contain", borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }} />
             )}
+            <div style={{ position: "absolute", bottom: 20, left: "50%", transform: "translateX(-50%)", color: "#fff", background: "rgba(0,0,0,0.5)", padding: "4px 12px", borderRadius: 20, fontSize: 12 }}>
+            กดปุ่ม ESC เพื่อปิด
           </div>
         </div>
       )}
+
+      {/* Floating Action Buttons */}
+      <div style={{ position: "fixed", bottom: 24, right: 24, display: "flex", flexDirection: "column", gap: 12, zIndex: 900 }}>
+        {showBackToTop && (
+          <button 
+            className="btn btn-teal hover-wiggle"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            title="กลับขึ้นบนสุด"
+            style={{ width: 48, height: 48, borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(20,184,166,0.4)" }}
+          >
+            <i className="ti ti-arrow-up" style={{ fontSize: 24 }}></i>
+          </button>
+        )}
+        
+        {toc.length > 0 && (
+          <button 
+            className="btn btn-acc hover-wiggle"
+            onClick={() => setShowFloatingTOC(true)}
+            title="สารบัญ"
+            style={{ width: 48, height: 48, borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(245,158,11,0.4)" }}
+          >
+            <i className="ti ti-list" style={{ fontSize: 24 }}></i>
+          </button>
+        )}
+      </div>
+
+      {/* Floating TOC Modal */}
+      {showFloatingTOC && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setShowFloatingTOC(false)}>
+          <div 
+            style={{ background: "var(--bg)", width: "100%", maxWidth: 400, maxHeight: "80vh", borderRadius: 20, padding: 24, overflowY: "auto", position: "relative", boxShadow: "0 20px 40px rgba(0,0,0,0.2)" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 18, color: "var(--text)", display: "flex", alignItems: "center", gap: 8 }}>
+                <i className="ti ti-list" style={{ color: "var(--teal)", fontSize: 20 }}></i>
+                สารบัญเนื้อหา
+              </h3>
+              <button className="btn btn-outline" onClick={() => setShowFloatingTOC(false)} style={{ width: 32, height: 32, padding: 0, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <i className="ti ti-x" style={{ fontSize: 16 }}></i>
+              </button>
+            </div>
+            
+            <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 12 }}>
+              {toc.map(t => {
+                const isH3 = t.level === 3;
+                return (
+                  <li key={t.id} style={{ 
+                    paddingLeft: isH3 ? 24 : 0, 
+                    position: "relative",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    lineHeight: 1.5
+                  }}>
+                    {isH3 ? (
+                      <span style={{
+                        position: "absolute",
+                        left: 8,
+                        top: 0,
+                        width: 8,
+                        height: 10,
+                        borderLeft: "1.5px solid rgba(128,128,128,0.25)",
+                        borderBottom: "1.5px solid rgba(128,128,128,0.25)",
+                        borderBottomLeftRadius: 4,
+                      }} />
+                    ) : (
+                      <span style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: "var(--teal)",
+                        marginTop: 8,
+                        marginRight: 12,
+                        flexShrink: 0
+                      }} />
+                    )}
+                    <a 
+                      href={`#${t.id}`} 
+                      onClick={(e) => { 
+                        e.preventDefault(); 
+                        setShowFloatingTOC(false);
+                        document.getElementById(t.id)?.scrollIntoView({ behavior: 'smooth' }); 
+                      }} 
+                      style={{ 
+                        fontSize: isH3 ? 13 : 15, 
+                        color: isH3 ? "var(--t3)" : "var(--text)", 
+                        fontWeight: isH3 ? 300 : 500,
+                        textDecoration: "none",
+                        display: "inline-block",
+                        transition: "color 0.2s"
+                      }}
+                      onMouseOver={e => e.target.style.color = "var(--teal)"}
+                      onMouseOut={e => e.target.style.color = isH3 ? "var(--t3)" : "var(--text)"}
+                    >
+                      {t.title}
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
