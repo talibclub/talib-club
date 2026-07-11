@@ -240,9 +240,27 @@ export default function ArticleDetail({ item, go, authState }) {
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [fabExpanded, setFabExpanded] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : true);
 
+  const autoExpanded = useRef(false);
+
   useEffect(() => {
     const handleScroll = () => {
-      setShowBackToTop(window.scrollY > 300);
+      const pastThreshold = window.scrollY > 300;
+      setShowBackToTop(pastThreshold);
+      
+      // Auto expand FABs once when scrolling past threshold on mobile
+      if (pastThreshold && !autoExpanded.current && window.innerWidth < 768) {
+        setFabExpanded(true);
+        autoExpanded.current = true;
+      }
+      
+      // Reset auto-expand if they scroll back to top
+      if (!pastThreshold && autoExpanded.current) {
+        autoExpanded.current = false;
+        if (window.innerWidth < 768) {
+          setFabExpanded(false);
+          setShowFloatingTOC(false);
+        }
+      }
     };
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
