@@ -719,7 +719,7 @@ const QuillPromptModal = ({ isOpen, type, onClose, onSubmit }) => {
       label: 'ค้นหาซูเราะห์ (พิมพ์ชื่อหรือเลื่อนหา)', 
       key: 'text1', 
       inputType: 'datalist', 
-      options: SURA_LIST.map(s => ({ value: `${s.number}. ${s.name} (${s.englishNameTranslation})` })) 
+      options: SURA_LIST.map(s => ({ value: `${s.number}. ${s.englishName} - ${s.name} (${s.englishNameTranslation})` })) 
     };
     input2 = { label: 'เลขอายะฮ์', key: 'text2', placeholder: '255' };
   } else if (type === 'footnote') {
