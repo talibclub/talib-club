@@ -122,7 +122,6 @@ export default function ArticleDetail({ item, go, authState }) {
             ).sort((a, b) => (a.part || 0) - (b.part || 0))
             setSeriesArticles(staticSeries)
           })
-      }
     } else {
       setSeriesArticles([])
     }
@@ -610,6 +609,7 @@ export default function ArticleDetail({ item, go, authState }) {
             )}
             <div style={{ position: "absolute", bottom: 20, left: "50%", transform: "translateX(-50%)", color: "#fff", background: "rgba(0,0,0,0.5)", padding: "4px 12px", borderRadius: 20, fontSize: 12 }}>
             กดปุ่ม ESC เพื่อปิด
+            </div>
           </div>
         </div>
       )}
