@@ -53,6 +53,8 @@ export default function ArticleDetail({ item, go, authState }) {
     }
   }, [displayItem])
 
+  const isSeries = displayItem?.type === "series" || displayItem?.type === "ซีรีส์";
+
   useEffect(() => {
     if (!displayItem) return
 
@@ -97,8 +99,8 @@ export default function ArticleDetail({ item, go, authState }) {
     }
 
     // 2. Fetch series articles if applicable (Check sessionStorage cache first)
-    const isSeries = displayItem.type === "series" || displayItem.type === "ซีรีส์";
-    if (isSeries && displayItem.seriesId) {
+    const isSeriesLocal = displayItem.type === "series" || displayItem.type === "ซีรีส์";
+    if (isSeriesLocal && displayItem.seriesId) {
       const cacheKeySeries = `talib_series_${displayItem.seriesId}`
       let cachedSeriesData = null
       try {
