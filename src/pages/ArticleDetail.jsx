@@ -105,14 +105,13 @@ export default function ArticleDetail({ item, go, authState }) {
     if (isSeriesLocal && displayItem.seriesId) {
       const seriesQ = query(
         collection(db, "content_articles"),
-        where("type", "in", seriesTypes),
         where("seriesId", "==", displayItem.seriesId)
       )
       getDocs(seriesQ)
         .then(snap => {
           const docs = snap.docs.map(d => ({ ...d.data(), id: d.id }))
           const sorted = docs
-            .filter(a => !a.deleted)
+            .filter(a => !a.deleted && seriesTypes.includes(String(a.type || "").toLowerCase()))
             .sort((a, b) => (a.part || 0) - (b.part || 0))
           setSeriesArticles(sorted)
         })
@@ -506,7 +505,7 @@ export default function ArticleDetail({ item, go, authState }) {
                   }}
                 >
                   <i className="ti ti-chevron-right" style={{ fontSize: 12, marginTop: 3, opacity: 0.5, flexShrink: 0 }}></i>
-                  <span>{t.text}</span>
+                  <span>{t.title}</span>
                 </a>
               </li>
             ))}
