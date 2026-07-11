@@ -174,7 +174,18 @@ export default function AdminArticles() {
   const { items, loading, error, saveItem, deleteItem, isUsingFallback } = useContentCollection("articles", ARTICLES, null, adminQueryOptions)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
 
-  const [editing, setEdit] = useState(null)
+  const [editing, setEdit] = useState(() => {
+    try {
+      const draft = localStorage.getItem("talib_article_draft")
+      return draft ? JSON.parse(draft) : null
+    } catch { return null }
+  })
+
+  useEffect(() => {
+    if (editing) {
+      localStorage.setItem("talib_article_draft", JSON.stringify(editing))
+    }
+  }, [editing])
 
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
@@ -284,6 +295,7 @@ export default function AdminArticles() {
     setBusy(true)
     try {
       await saveItem(payload)
+      localStorage.removeItem("talib_article_draft")
       setEdit(null)
       notifySuccess("บันทึกบทความขึ้นเว็บไซต์เรียบร้อยแล้ว")
     } catch (err) {
@@ -409,7 +421,7 @@ export default function AdminArticles() {
   }
 
   if (editing) {
-    return <ArticleForm item={editing} setItem={setEdit} onSave={save} onCancel={() => setEdit(null)} taxonomy={taxonomy} busy={busy} />
+    return <ArticleForm item={editing} setItem={setEdit} onSave={save} onCancel={() => { localStorage.removeItem("talib_article_draft"); setEdit(null); }} taxonomy={taxonomy} busy={busy} />
   }
 
   return (
