@@ -236,6 +236,7 @@ export default function ArticleDetail({ item, go, authState }) {
     return <div className="article-page" style={{ textAlign: "center", padding: "100px 0" }}><i className="ti ti-loader-2 spin" style={{ fontSize: 32, color: "var(--teal)" }}></i></div>
   }
   const [modalImage, setModalImage] = useState(null);
+  const [showFloatingTOC, setShowFloatingTOC] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
 
   useEffect(() => {
@@ -643,16 +644,70 @@ export default function ArticleDetail({ item, go, authState }) {
       )}
 
       {/* Floating Action Buttons */}
-      {showBackToTop && createPortal(
+      {(showBackToTop || toc.length > 0) && createPortal(
         <div style={{ position: "fixed", bottom: 24, right: 24, display: "flex", flexDirection: "column", gap: 12, zIndex: 2147483647 }}>
-          <button 
-            className="btn btn-teal hover-wiggle"
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            title="กลับขึ้นบนสุด"
-            style={{ width: 48, height: 48, borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(20,184,166,0.4)" }}
+          {showBackToTop && (
+            <button 
+              className="btn btn-teal hover-wiggle"
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              title="กลับขึ้นบนสุด"
+              style={{ width: 48, height: 48, borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(20,184,166,0.4)" }}
+            >
+              <i className="ti ti-arrow-up" style={{ fontSize: 24 }}></i>
+            </button>
+          )}
+
+          {toc.length > 0 && (
+            <button 
+              className="btn btn-acc hover-wiggle"
+              onClick={() => setShowFloatingTOC(true)}
+              title="สารบัญเนื้อหา"
+              style={{ width: 48, height: 48, borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(245,158,11,0.4)" }}
+            >
+              <i className="ti ti-list" style={{ fontSize: 24 }}></i>
+            </button>
+          )}
+        </div>,
+        document.body
+      )}
+
+      {/* Floating TOC Panel (No dark overlay) */}
+      {showFloatingTOC && createPortal(
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 2147483646 }} onClick={() => setShowFloatingTOC(false)}>
+          <div 
+            className="animate-fade-in-up"
+            style={{ position: "absolute", bottom: 90, right: 24, background: "var(--bg)", width: 300, maxHeight: "60vh", borderRadius: 16, padding: 20, overflowY: "auto", boxShadow: "0 10px 40px rgba(0,0,0,0.15)", border: "1px solid var(--br)" }}
+            onClick={e => e.stopPropagation()}
           >
-            <i className="ti ti-arrow-up" style={{ fontSize: 24 }}></i>
-          </button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <h3 style={{ margin: 0, fontSize: 16, color: "var(--teal)", display: "flex", alignItems: "center", gap: 8 }}>
+                <i className="ti ti-list" style={{ fontSize: 18 }}></i>
+                สารบัญ
+              </h3>
+              <button className="btn btn-outline" onClick={() => setShowFloatingTOC(false)} style={{ width: 28, height: 28, padding: 0, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <i className="ti ti-x" style={{ fontSize: 14 }}></i>
+              </button>
+            </div>
+            <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
+              {toc.map((t, i) => (
+                <li key={i} style={{ paddingLeft: t.level === 3 ? 16 : 0 }}>
+                  <a
+                    href={`#${t.id}`}
+                    style={{ color: "var(--t2)", textDecoration: "none", fontSize: t.level === 2 ? 13 : 12, fontWeight: t.level === 2 ? 500 : 400, display: "inline-flex", alignItems: "flex-start", gap: 6 }}
+                    className="hover-opacity"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setShowFloatingTOC(false);
+                      document.getElementById(t.id)?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                  >
+                    <i className="ti ti-chevron-right" style={{ fontSize: 10, marginTop: 3, opacity: 0.5, flexShrink: 0 }}></i>
+                    <span>{t.title}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>,
         document.body
       )}
