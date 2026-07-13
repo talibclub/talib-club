@@ -221,13 +221,30 @@ export default function LibraryDetail({ item, go, authState }) {
           <h3 style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
             <i className="ti ti-device-desktop" style={{ color: "var(--t2)" }}></i> ตัวอย่างเนื้อหา (Preview)
           </h3>
-          <div style={{ borderRadius: 16, overflow: "hidden", border: ".5px solid var(--br2)", height: "70vh", minHeight: 500, background: "var(--bg2)" }}>
+          <div style={{ borderRadius: 16, overflow: "hidden", border: ".5px solid var(--br2)", height: "70vh", minHeight: 500, background: "var(--bg2)", marginBottom: 20 }}>
             <iframe 
               src={getPreviewUrl(displayItem.fileUrl)} 
               style={{ width: "100%", height: "100%", border: "none" }} 
               title="PDF Preview"
               allow="autoplay"
             ></iframe>
+          </div>
+          
+          <div className="card animate-float-cute" style={{ padding: 24, textAlign: "center", background: "linear-gradient(135deg, rgba(20,184,166,0.08), rgba(20,184,166,0.02))", border: "1px solid rgba(20,184,166,0.3)", boxShadow: "0 10px 30px rgba(20,184,166,0.1)" }}>
+             <h4 style={{ color: "var(--teal)", marginBottom: 8, fontSize: 18 }}>📖 สนใจเนื้อหาฉบับเต็ม?</h4>
+             <p style={{ fontSize: 13, color: "var(--t2)", marginBottom: 20, maxWidth: 400, margin: "0 auto 20px" }}>
+               คลิกดาวน์โหลดไฟล์ PDF เพื่อนำไปอ่านแบบออฟไลน์ หรือพิมพ์เป็นเอกสารสำหรับศึกษาต่อได้เลย
+             </p>
+             <a 
+               href={getDownloadUrl(displayItem.fileUrl)} 
+               target="_blank" 
+               rel="noreferrer" 
+               className="btn btn-teal hover-wiggle" 
+               onClick={handleDownloadClick}
+               style={{ display: "inline-flex", alignItems: "center", padding: "14px 32px", fontSize: 16, fontWeight: 600, textDecoration: "none", boxShadow: "0 8px 20px rgba(20,184,166,0.4)", borderRadius: 30 }}
+             >
+               <i className="ti ti-download" style={{ marginRight: 8, fontSize: 20 }}></i> ดาวน์โหลดไฟล์ PDF
+             </a>
           </div>
         </div>
       )}
