@@ -498,6 +498,9 @@ input[type="range"] {
   font-weight: 700;
   color: var(--text);
   font-size: 15px;
+  unicode-bidi: plaintext; /* Automatically detect RTL/LTR */
+  text-align: start;
+  font-family: 'Prompt', 'Noto Naskh Arabic', 'Noto Kufi Arabic', Tahoma, sans-serif;
 }
 .pdf-action {
   color: #2563eb; /* Blue action link color */
