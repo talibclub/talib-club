@@ -269,6 +269,10 @@ export default function ArticleDetail({ item, go, authState }) {
   // ระบบแกะข้อความสร้างสารบัญ และจัดรูปแบบบทความ (รองรับทั้ง Plaintext เดิม และ HTML จาก Quill)
   const { toc, finalHtml } = useMemo(() => {
     let body = displayItem.body || "";
+    
+    // Fix broken PDF SVG icons in older articles
+    body = body.replace(/<path\s+d="M11\s+15l-1\.9\s+6h1\.9"\s*\/>\s*<path\s+d="M9\s+15l1\.9\s+6"\s*\/>/g, '<path d="M11 15h1a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-1v-6z" />');
+
     let isHtml = /<[a-z][\s\S]*>/i.test(body);
     const tocList = [];
     
