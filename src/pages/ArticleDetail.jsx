@@ -296,16 +296,36 @@ export default function ArticleDetail({ item, go, authState }) {
       
       const noteLines = htmlText.split('\n');
       noteLines.forEach(line => {
+        if (!line.trim()) return;
         const plainLine = line.replace(/<[^>]+>/g, '').trim();
         const plainMatch = plainLine.match(/^\s*(?:\[|\()?(\d+)(?:\.|\)|\])?\s+(.*)/);
         if (plainMatch) {
           const num = plainMatch[1];
-          const htmlMatch = line.match(new RegExp(`^\\s*(?:<[^>]+>\\s*)*(?:\\[|\\()?${num}(?:\\.|\\)|\\])?\\s*(?:<[^>]+>\\s*)*(.*)`, 'i'));
-          if (htmlMatch) {
-            notesDict[num] = htmlMatch[1].trim();
-          } else {
-            notesDict[num] = plainMatch[2].trim();
-          }
+          // Use DOM to safely remove the number at the beginning while preserving all HTML tags (like <a>)
+          const div = document.createElement('div');
+          div.innerHTML = line;
+          let found = false;
+          const walk = (node) => {
+            if (found) return;
+            if (node.nodeType === 3) {
+               const text = node.nodeValue;
+               if (text.trim() === '') return; // Skip leading whitespace
+               const match = text.match(/^\s*(?:\[|\()?(\d+)(?:\.|\)|\])?\s*(.*)/);
+               if (match && match[1] === num) {
+                 node.nodeValue = match[2] || '';
+                 found = true;
+               } else {
+                 found = true; // Stop if first non-empty text isn't the number
+               }
+            } else if (node.nodeType === 1) {
+               for (let i = 0; i < node.childNodes.length; i++) {
+                 walk(node.childNodes[i]);
+                 if (found) break;
+               }
+            }
+          };
+          walk(div);
+          notesDict[num] = div.innerHTML.trim();
         }
       });
     }
