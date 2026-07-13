@@ -418,8 +418,18 @@ export default function ArticleDetail({ item, go, authState }) {
     if (notesMatch && Object.keys(notesDict).length > 0) {
        let notesHtml = '<div class="article-notes-section"><div class="notes-title">Footnotes / อ้างอิง</div>';
        for (const [key, val] of Object.entries(notesDict)) {
-         let noteText = val.replace(/\((Arabic text|ข้อความภาษาอาหรับ)\)/gi, '<a href="#">(Arabic text)</a>');
-         noteText = noteText.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>');
+          let noteText = val.replace(/(<a\b[^>]*>[\s\S]*?<\/a>)|(<[^>]+>)|(\((?:Arabic text|ข้อความภาษาอาหรับ)\))/gi, (match, aTag, otherTag, arabic) => {
+            if (aTag) return aTag;
+            if (otherTag) return otherTag;
+            if (arabic) return '<a href="#">(Arabic text)</a>';
+            return match;
+          });
+          noteText = noteText.replace(/(<a\b[^>]*>[\s\S]*?<\/a>)|(<[^>]+>)|(https?:\/\/[^\s<"']+)/gi, (match, aTag, otherTag, url) => {
+            if (aTag) return aTag;
+            if (otherTag) return otherTag;
+            if (url) return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+            return match;
+          });
          notesHtml += `<div class="article-note-item" id="note-${key}" style="transition: background-color 0.5s"><span class="article-note-badge">${key}</span><div>${noteText}</div></div>`;
        }
        notesHtml += '</div>';
