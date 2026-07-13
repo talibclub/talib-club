@@ -288,12 +288,24 @@ export default function ArticleDetail({ item, go, authState }) {
       // แปลง <li... > ให้กลายเป็นเลข 1. 2. 3. เพื่อให้ regex หาเจอเวลา Quill ทำ Auto-format เป็น Ordered List
       let liCounter = 1;
       let processedNotes = notesSection.replace(/<li[^>]*>/gi, () => `\n${liCounter++}. `);
-      const tempText = processedNotes.replace(/<\/p>|<br\s*\/?>|<\/h[1-6]>|<\/div>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;|&#160;|\u200B/gi, ' ');
-      const noteLines = tempText.split('\n');
+      
+      // เก็บ HTML ไว้ แต่เปลี่ยน tags ที่เป็น block ให้กลายเป็นบรรทัดใหม่
+      const htmlText = processedNotes.replace(/<\/p>|<br\s*\/?>|<\/h[1-6]>|<\/div>|<\/li>|<\/?ol[^>]*>|<\/?ul[^>]*>/gi, '\n')
+                                     .replace(/<p[^>]*>|<div[^>]*>|<h[1-6][^>]*>/gi, '')
+                                     .replace(/&nbsp;|&#160;|\u200B/gi, ' ');
+      
+      const noteLines = htmlText.split('\n');
       noteLines.forEach(line => {
-        const match = line.match(/^\s*(?:\[|\()?(\d+)(?:\.|\)|\])?\s+(.*)/);
-        if (match) {
-          notesDict[match[1]] = match[2].trim();
+        const plainLine = line.replace(/<[^>]+>/g, '').trim();
+        const plainMatch = plainLine.match(/^\s*(?:\[|\()?(\d+)(?:\.|\)|\])?\s+(.*)/);
+        if (plainMatch) {
+          const num = plainMatch[1];
+          const htmlMatch = line.match(new RegExp(`^\\s*(?:<[^>]+>\\s*)*(?:\\[|\\()?${num}(?:\\.|\\)|\\])?\\s*(?:<[^>]+>\\s*)*(.*)`, 'i'));
+          if (htmlMatch) {
+            notesDict[num] = htmlMatch[1].trim();
+          } else {
+            notesDict[num] = plainMatch[2].trim();
+          }
         }
       });
     }
