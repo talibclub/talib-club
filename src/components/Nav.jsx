@@ -60,9 +60,9 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
         }
 
         const [article, media, book, campaign] = await Promise.all([
-          fetchLatestDoc("content_articles", "createdAt").catch(() => null),
-          fetchLatestDoc("content_media", "createdAt").catch(() => null),
-          fetchLatestDoc("content_books", "createdAt").catch(() => null),
+          fetchLatestDoc("content_articles", "date").catch(() => null),
+          fetchLatestDoc("content_media", "date").catch(() => null),
+          fetchLatestDoc("content_books", "year").catch(() => null),
           fetchLatestDoc("book_campaigns", "createdAt").catch(() => null)
         ])
 

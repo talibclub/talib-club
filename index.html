@@ -11,17 +11,42 @@
   <meta name="theme-color" content="#0f6e56" />
   <!-- M10: Add meta description for SEO -->
   <meta name="description" content="Talib Club — แหล่งศึกษาอิสลามแนวทางสะลัฟ รวมบทความวิชาการ หนังสือ สื่อการเรียนรู้ และเครื่องมือติดตามการอ่าน" />
+  <meta name="robots" content="index, follow">
+  <meta property="og:site_name" content="Talib Club">
+  <meta property="og:locale" content="th_TH">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Talib Club | แหล่งศึกษาอิสลามแนวทางสะลัฟ">
+  <meta property="og:description" content="Talib Club — แหล่งศึกษาอิสลามแนวทางสะลัฟ รวมบทความวิชาการ หนังสือ สื่อการเรียนรู้ และเครื่องมือติดตามการอ่าน">
+  <meta property="og:url" content="https://talibclub.org">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="alternate" hreflang="th" href="https://talibclub.org">
   <link rel="apple-touch-icon" href="/icon-192.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Talib Club" />
   
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://firestore.googleapis.com">
+  <link rel="dns-prefetch" href="https://firestore.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet"/>
   <!-- M9: Lock Tabler Icons version to prevent unexpected breaking changes -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.6.0/dist/tabler-icons.min.css"/>
 </head>
 <body>
+  <noscript>
+    <div style="max-width:700px;margin:40px auto;padding:20px;font-family:'Prompt',sans-serif">
+      <h1>Talib Club — แหล่งศึกษาอิสลามแนวทางสะลัฟ</h1>
+      <p>คลังความรู้อิสลามวิชาการ สำหรับมุสลิมและผู้สนใจทุกท่าน รวมบทความวิชาการ หนังสือ สื่อการเรียนรู้ และทำเนียบนักวิชาการ</p>
+      <p>เว็บไซต์นี้ต้องเปิดใช้งาน JavaScript เพื่อการใช้งานเต็มรูปแบบ</p>
+      <nav>
+        <a href="/articles">บทความ</a> |
+        <a href="/library">ห้องสมุด</a> |
+        <a href="/media">มีเดีย</a> |
+        <a href="/scholars">ทำเนียบบุคคล</a> |
+        <a href="/donate">ร่วมบริจาค</a>
+      </nav>
+    </div>
+  </noscript>
   <!-- L3: Inline script to prevent theme flash (FOUT) before React hydration -->
   <script>
     try {

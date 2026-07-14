@@ -1,19 +1,17 @@
 User-agent: *
 Allow: /
-Allow: /articles
-Allow: /article?id=
-Allow: /library
-Allow: /library-detail?id=
-Allow: /media
-Allow: /media-detail?id=
-Allow: /scholars
-Allow: /donate
 Disallow: /admin
 Disallow: /staff
+Disallow: /staff-work
+Disallow: /staff-translation
+Disallow: /staff-members
 Disallow: /member
 Disallow: /quran
 Disallow: /reader
 Disallow: /auth
 Disallow: /tracking-system
+Disallow: /book-register
+Disallow: /openhouse
+Disallow: /openhouse-campus
 
 Sitemap: https://talibclub.org/sitemap.xml
