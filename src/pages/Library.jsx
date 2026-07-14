@@ -7,6 +7,7 @@ import { clampPage } from "../utils/pagination.js"
 import PaginationBar from "../components/PaginationBar.jsx"
 import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
+import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 
 // ฟังก์ชันดึงรูปปก
 function getDirectUrl(url) {
@@ -169,6 +170,11 @@ export default function Library({ go, authState, ctx }) {
 
   return (
     <div style={{ marginBottom: 28 }}>
+      <SEOHead
+        title="ห้องสมุดและตำราอิสลาม | Talib Club"
+        description="ดาวน์โหลด PDF หนังสือ ตำรา และวารสารอิสลามวิชาการ ฟรี จาก Talib Club"
+        canonical={`${BASE_URL}/library`}
+      />
       <h1 style={{ marginBottom: 8 }}>ห้องสมุด</h1>
       <p style={{ marginBottom: loading ? 4 : 24 }}>หนังสือ วารสาร และสื่อดาวน์โหลดทั้งหมดของ Talib Club</p>
       <ContentStatusBanner loading={loading} error={error} isUsingFallback={isUsingFallback} />

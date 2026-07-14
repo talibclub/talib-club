@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react"
 import { ARTICLES, BOOKS, MEDIA, SITE } from "../data/index.js"
+import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 import { useContentCollection, useSiteSettings, useCollectionCount } from "../lib/contentStore.js"
 import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
@@ -154,8 +155,40 @@ export default function Home({ go }) {
 
   return (
     <div>
+      <SEOHead
+        title="Talib Club | แหล่งศึกษาอิสลามแนวทางสะลัฟ"
+        description="คลังความรู้อิสลามวิชาการ สำหรับมุสลิมและผู้สนใจทุกท่าน รวมบทความ หนังสือ สื่อการเรียนรู้ และทำเนียบนักวิชาการ"
+        canonical={BASE_URL}
+        jsonLd={[
+          {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "name": "Talib Club",
+            "alternateName": "طالب كلوب",
+            "url": BASE_URL,
+            "inLanguage": "th",
+            "potentialAction": {
+              "@type": "SearchAction",
+              "target": { "@type": "EntryPoint", "urlTemplate": `${BASE_URL}/articles?search={search_term_string}` },
+              "query-input": "required name=search_term_string"
+            }
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "Talib Club",
+            "url": BASE_URL,
+            "logo": `${BASE_URL}/logo.png`,
+            "description": "คลังความรู้อิสลามวิชาการ สำหรับมุสลิมและผู้สนใจทุกท่าน",
+            "sameAs": [
+              "https://www.facebook.com/TalibPublisher",
+              "https://www.youtube.com/@talibpublusher"
+            ]
+          }
+        ]}
+      />
       {/* HERO */}
-      <div style={{ padding: "40px 0 36px", borderBottom: ".5px solid var(--br2)", marginBottom: 32 }}>
+      <header style={{ padding: "40px 0 36px", borderBottom: ".5px solid var(--br2)", marginBottom: 32 }}>
         <div className="badge badge-acc" style={{ marginBottom: 16 }}>
           <span style={{ width:5, height:5, background:"var(--teal)", borderRadius:"50%", display:"inline-block" }}></span>
           {site.location} · {site.tagline}
@@ -176,7 +209,7 @@ export default function Home({ go }) {
             <i className="ti ti-player-play" style={{ marginRight:6, fontSize:13 }}></i>คลังคลิป
           </button>
         </div>
-      </div>
+      </header>
 
       {/* AYAH */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>

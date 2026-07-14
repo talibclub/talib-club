@@ -9,6 +9,15 @@
       "destination": "/api/:path*"
     },
     {
+      "source": "/(article|articles|library|library-detail|media|media-detail|scholars|donate|)",
+      "has": [{
+        "type": "header",
+        "key": "user-agent",
+        "value": "(?i).*(Googlebot|bingbot|Baiduspider|YandexBot|facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|WhatsApp|LINE|Discordbot|TelegramBot).*"
+      }],
+      "destination": "/api/seo-prerender"
+    },
+    {
       "source": "/:path*",
       "destination": "/index.html"
     }

@@ -5,6 +5,7 @@ import { clampPage } from "../utils/pagination.js"
 import PaginationBar from "../components/PaginationBar.jsx"
 import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
+import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 
 export default function Media({ go, ctx }) {
   const mediaQueryOptions = useMemo(() => ({ live: false, limit: 200 }), [])
@@ -173,6 +174,11 @@ export default function Media({ go, ctx }) {
 
   return (
     <div>
+      <SEOHead
+        title="คลังสื่อการเรียนรู้อิสลาม | Talib Club"
+        description="รวมคลิปวิดีโอ พอดแคสต์ และสื่อการเรียนรู้อิสลามวิชาการ จาก YouTube, Spotify และอื่นๆ"
+        canonical={`${BASE_URL}/media`}
+      />
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ marginBottom: 8 }}>มีเดีย</h1>
         <p>วิดีโอ YouTube และพอดแคสต์ Spotify จาก Talib Club</p>

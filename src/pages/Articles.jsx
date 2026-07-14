@@ -6,6 +6,7 @@ import PaginationBar from "../components/PaginationBar.jsx"
 import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
 import ArticleCard from "../components/ArticleCard.jsx"
+import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 
 export default function Articles({ go, authState, ctx }) {
   // Keep the public article list fresh so it reflects the current Firestore state.
@@ -170,6 +171,11 @@ export default function Articles({ go, authState, ctx }) {
 
   return (
     <div>
+      <SEOHead
+        title="บทความวิชาการอิสลาม | Talib Club"
+        description="รวมบทความวิชาการอิสลามแนวทางสะลัฟ ครอบคลุมอากีดะฮ์ ฟิกฮ์ ซีเราะฮ์ ฮะดีษ ตัฟซีร และสังคมศาสตร์อิสลาม"
+        canonical={`${BASE_URL}/articles`}
+      />
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ marginBottom: 8 }}>บทความ</h1>
         <p>คลังบทความวิชาการอิสลาม จัดหมวดหมู่และซีรีส์ให้ค้นหาง่าย</p>

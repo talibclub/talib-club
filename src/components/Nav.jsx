@@ -48,80 +48,97 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
   const notificationRef = useRef(null)
 
   useEffect(() => {
-    async function fetchDynamicNotifications() {
+    let unsubs = []
+    async function setupDynamicNotifications() {
       try {
-        const { collection, query, orderBy, limit, getDocs } = await import("firebase/firestore")
+        const { collection, query, orderBy, limit, onSnapshot } = await import("firebase/firestore")
         const { db } = await import("../lib/firebase.js")
         
-        const fetchLatestDoc = async (colName, orderField) => {
-          const snap = await getDocs(query(collection(db, colName), orderBy(orderField, "desc"), limit(1)))
-          if (snap.empty) return null
-          return { id: snap.docs[0].id, ...snap.docs[0].data() }
+        const latestDocs = { article: null, media: null, book: null, campaign: null }
+
+        const updateNotifs = () => {
+          const newNotifs = []
+          const { article, media, book, campaign } = latestDocs
+          
+          if (article) {
+            newNotifs.push({
+              id: `art-${article.id}`,
+              title: "บทความวิชาการใหม่",
+              desc: `อ่านบทความล่าสุด: "${article.title}" โดย ${article.author || "Talib Club"}`,
+              time: article.date || "เมื่อเร็วๆ นี้",
+              icon: "ti-file-text",
+              color: "var(--teal)",
+              onClick: () => nav("article", article)
+            })
+          }
+          
+          if (media) {
+            newNotifs.push({
+              id: `media-${media.id}`,
+              title: "คลิปวิดีโอใหม่",
+              desc: `รับชม: "${media.title}"`,
+              time: media.date || "เมื่อเร็วๆ นี้",
+              icon: "ti-brand-youtube",
+              color: "#e05555",
+              onClick: () => nav("media-detail", media)
+            })
+          }
+          
+          if (book) {
+            newNotifs.push({
+              id: `book-${book.id}`,
+              title: "หนังสือและตำราใหม่",
+              desc: `ดาวน์โหลดผลงานล่าสุด: "${book.title}" หมวดหมู่ ${book.category}`,
+              time: "เมื่อเร็วๆ นี้",
+              icon: "ti-book",
+              color: "rgb(255, 179, 0)",
+              onClick: () => nav("library-detail", book)
+            })
+          }
+
+          if (campaign) {
+            newNotifs.push({
+              id: `camp-${campaign.id}`,
+              title: "แจกหนังสือ/ตำราใหม่",
+              desc: `แคมเปญใหม่: "${campaign.title || campaign.items?.[0]?.name || "แจกหนังสือฟรี"}" มารับได้เลย!`,
+              time: "เมื่อเร็วๆ นี้",
+              icon: "ti-gift",
+              color: "var(--teal)",
+              onClick: () => nav("books")
+            })
+          }
+          
+          setDynamicNotifications(newNotifs)
         }
 
-        const [article, media, book, campaign] = await Promise.all([
-          fetchLatestDoc("content_articles", "date").catch(() => null),
-          fetchLatestDoc("content_media", "date").catch(() => null),
-          fetchLatestDoc("content_books", "year").catch(() => null),
-          fetchLatestDoc("book_campaigns", "createdAt").catch(() => null)
-        ])
-
-        const newNotifs = []
-        
-        if (article) {
-          newNotifs.push({
-            id: `art-${article.id}`,
-            title: "บทความวิชาการใหม่",
-            desc: `อ่านบทความล่าสุด: "${article.title}" โดย ${article.author || "Talib Club"}`,
-            time: article.date || "เมื่อเร็วๆ นี้",
-            icon: "ti-file-text",
-            color: "var(--teal)",
-            onClick: () => nav("article", article)
-          })
-        }
-        
-        if (media) {
-          newNotifs.push({
-            id: `media-${media.id}`,
-            title: "คลิปวิดีโอใหม่",
-            desc: `รับชม: "${media.title}"`,
-            time: media.date || "เมื่อเร็วๆ นี้",
-            icon: "ti-brand-youtube",
-            color: "#e05555",
-            onClick: () => nav("media-detail", media)
-          })
-        }
-        
-        if (book) {
-          newNotifs.push({
-            id: `book-${book.id}`,
-            title: "หนังสือและตำราใหม่",
-            desc: `ดาวน์โหลดผลงานล่าสุด: "${book.title}" หมวดหมู่ ${book.category}`,
-            time: "เมื่อเร็วๆ นี้",
-            icon: "ti-book",
-            color: "rgb(255, 179, 0)",
-            onClick: () => nav("library-detail", book)
-          })
+        const watchLatestDoc = (colName, orderField, key) => {
+          const q = query(collection(db, colName), orderBy(orderField, "desc"), limit(1))
+          const unsub = onSnapshot(q, (snap) => {
+            if (snap.empty) {
+              latestDocs[key] = null
+            } else {
+              latestDocs[key] = { id: snap.docs[0].id, ...snap.docs[0].data() }
+            }
+            updateNotifs()
+          }, (err) => console.error("Error watching notifications:", err))
+          unsubs.push(unsub)
         }
 
-        if (campaign) {
-          newNotifs.push({
-            id: `camp-${campaign.id}`,
-            title: "แจกหนังสือ/ตำราใหม่",
-            desc: `แคมเปญใหม่: "${campaign.title || campaign.items?.[0]?.name || "แจกหนังสือฟรี"}" มารับได้เลย!`,
-            time: "เมื่อเร็วๆ นี้",
-            icon: "ti-gift",
-            color: "var(--teal)",
-            onClick: () => nav("books")
-          })
-        }
+        watchLatestDoc("content_articles", "date", "article")
+        watchLatestDoc("content_media", "date", "media")
+        watchLatestDoc("content_books", "year", "book")
+        watchLatestDoc("book_campaigns", "createdAt", "campaign")
         
-        setDynamicNotifications(newNotifs)
       } catch(e) {
-        console.error("Failed to fetch dynamic notifications:", e)
+        console.error("Failed to setup dynamic notifications:", e)
       }
     }
-    fetchDynamicNotifications()
+    
+    setupDynamicNotifications()
+    
+    return () => {
+      unsubs.forEach(unsub => unsub && unsub())
+    }
   }, [])
 
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react"
 import { DEFAULT_TAXONOMY, SCHOLARS } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
+import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 
 const ERA_LABELS = {
   1: "ยุคแรก (Salaf) ค.ศ. 600–900",
@@ -103,6 +104,11 @@ export default function Scholars() {
 
   return (
     <div>
+      <SEOHead
+        title="ทำเนียบอุลามาอ์และนักวิชาการอิสลาม | Talib Club"
+        description="รวบรวมประวัติและผลงานของอุลามาอ์ นักวิชาการ และนักปราชญ์อิสลามที่สำคัญ"
+        canonical={`${BASE_URL}/scholars`}
+      />
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ marginBottom: 8 }}>ทำเนียบบุคคลในอิสลาม</h1>
         <p style={{ color: "var(--t2)" }}>รวบรวมบุคคลและปราชญ์ในประวัติศาสตร์อิสลามแบ่งตามยุคสมัย พร้อมข้อมูลวิชาการ</p>

@@ -2,6 +2,7 @@ import React from "react"
 import { toast } from "react-hot-toast"
 import { SITE } from "../data/index.js"
 import { useSiteSettings } from "../lib/contentStore.js"
+import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 
 export default function Donation() {
   // ดึงข้อมูลการตั้งค่าเว็บล่าสุดจากฐานข้อมูล
@@ -39,13 +40,18 @@ export default function Donation() {
   }
 
   return (
-    <div style={{ maxWidth: 1000, margin: "40px auto", padding: "0 20px" }}>
-      <div style={{ marginBottom: 30 }}>
+    <div style={{ maxWidth: 800, margin: "0 auto", paddingBottom: 40 }}>
+      <SEOHead
+        title="ร่วมบริจาคสนับสนุน Talib Club | Talib Club"
+        description="ร่วมสมทบทุนเพื่อเผยแพร่ความรู้อิสลามวิชาการในภาษาไทย สนับสนุนการแปล จัดพิมพ์ และเผยแพร่หนังสืออิสลาม"
+        canonical={`${BASE_URL}/donate`}
+      />
+      <div style={{ marginBottom: 30, padding: "0 20px" }}>
         <h1 style={{ fontSize: 28, color: "var(--teal)", marginBottom: 8 }}>ร่วมสมทบทุน</h1>
         <p style={{ color: "var(--t2)", fontSize: 16 }}>เป็นส่วนหนึ่งในการทำงานดะวะฮฺของกลุ่มฏอลิบ</p>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 30 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 30, padding: "0 20px" }}>
         
         {/* ฝั่งซ้าย: บัญชีธนาคาร และ วัตถุประสงค์ */}
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>

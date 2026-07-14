@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react"
 import { useContentCollection, useContentDoc, saveContentItem } from "../lib/contentStore.js"
 import { MEDIA } from "../data/index.js"
+import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 
 export default function MediaDetail({ item: initialItem, go, authState }) {
   const uid = authState?.user?.uid;
@@ -19,11 +20,6 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
     return null
   }, [initialItem, remoteMedia])
 
-  useEffect(() => {
-    if (item?.title) {
-      document.title = `${item.title} | Talib Club`
-    }
-  }, [item])
 
   const spotifyEmbedSrc = useMemo(() => {
     let url = item?.spotifyUrl || "";
@@ -72,6 +68,15 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
 
   return (
     <div className="article-page" style={{ maxWidth: 800, margin: "0 auto", paddingBottom: 40, width: "100%" }}>
+      {item && (
+        <SEOHead
+          title={`${item.title} | Talib Club`}
+          description={item.description || item.series || `สื่อการเรียนรู้อิสลาม: ${item.title}`}
+          canonical={`${BASE_URL}/media-detail?id=${item.id}`}
+          ogType="article"
+          ogImage={item.thumbnailUrl || item.coverUrl}
+        />
+      )}
       {/* ปุ่มย้อนกลับ */}
       <button
         onClick={() => go("media", initialItem?.playlist ? {

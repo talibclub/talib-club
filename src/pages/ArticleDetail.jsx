@@ -7,6 +7,7 @@ import { collection, getDocs, query, where, serverTimestamp, limit } from "fireb
 import { db } from "../lib/firebase.js"
 import { bumpContentMetric } from "../utils/contentMetrics.js"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
+import SEOHead, { stripHtml, truncate, BASE_URL } from '../components/SEOHead.jsx'
 
 const READER_DEFAULTS = { size: "md", tone: "3" }
 const READER_STORAGE_KEY = "talibReaderPrefs"
@@ -48,11 +49,7 @@ export default function ArticleDetail({ item, go, authState }) {
     return null
   }, [item, remoteArticle])
 
-  useEffect(() => {
-    if (displayItem?.title) {
-      document.title = `${displayItem.title} | Talib Club`
-    }
-  }, [displayItem])
+
 
   const isSeries = displayItem?.type === "series" || displayItem?.type === "ซีรีส์";
 
@@ -478,7 +475,31 @@ export default function ArticleDetail({ item, go, authState }) {
   const readerClass = `article-body reader-size-${readerPrefs.size} reader-tone-${readerPrefs.tone}`
 
   return (
-    <div className="article-page animate-float-cute" style={{ maxWidth: 720, margin: "0 auto" }}>
+    <article className="article-page animate-float-cute" style={{ maxWidth: 720, margin: "0 auto" }}>
+      {displayItem && (
+        <SEOHead
+          title={`${displayItem.title} | Talib Club`}
+          description={truncate(stripHtml(displayItem.body || displayItem.excerpt || ''), 160)}
+          canonical={`${BASE_URL}/article?id=${displayItem.id}`}
+          ogImage={displayItem.coverUrl || null}
+          ogType="article"
+          jsonLd={{
+            "@context": "https://schema.org",
+            "@type": "Article",
+            "headline": displayItem.title,
+            "author": { "@type": "Person", "name": displayItem.author || "Talib Club" },
+            "datePublished": displayItem.date || undefined,
+            "image": displayItem.coverUrl || undefined,
+            "publisher": {
+              "@type": "Organization",
+              "name": "Talib Club",
+              "logo": { "@type": "ImageObject", "url": `${BASE_URL}/logo.png` }
+            },
+            "description": truncate(stripHtml(displayItem.body || ''), 200),
+            "mainEntityOfPage": { "@type": "WebPage", "@id": `${BASE_URL}/article?id=${displayItem.id}` }
+          }}
+        />
+      )}
       <button className="btn btn-outline" onClick={() => {
         if (displayItem?.fromFilters) {
           go("articles", displayItem.fromFilters)
@@ -506,7 +527,7 @@ export default function ArticleDetail({ item, go, authState }) {
 
         <div style={{ display: "flex", gap: 16, color: "var(--t3)", fontSize: 12, fontWeight: 300, flexWrap: "wrap", marginTop: 12 }}>
           <span><i className="ti ti-user" style={{ marginRight: 4, fontSize: 13 }}></i>{displayItem.author}</span>
-          <span><i className="ti ti-calendar" style={{ marginRight: 4, fontSize: 13 }}></i>{displayItem.date}</span>
+          <span><i className="ti ti-calendar" style={{ marginRight: 4, fontSize: 13 }}></i><time dateTime={displayItem.date}>{displayItem.date}</time></span>
           <span title="ผู้เข้าชม"><i className="ti ti-eye" style={{ marginRight: 4, fontSize: 13 }}></i>{(displayItem.views || 0).toLocaleString()}</span>
           <span title="แชร์"><i className="ti ti-share" style={{ marginRight: 4, fontSize: 13 }}></i>{(displayItem.shares || 0).toLocaleString()}</span>
         </div>
@@ -795,7 +816,7 @@ export default function ArticleDetail({ item, go, authState }) {
         document.body
       )}
 
-    </div>
+    </article>
   )
 }
 
