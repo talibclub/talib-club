@@ -221,7 +221,23 @@ export default function LibraryDetail({ item, go, authState }) {
           <h3 style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
             <i className="ti ti-device-desktop" style={{ color: "var(--t2)" }}></i> ตัวอย่างเนื้อหา (Preview)
           </h3>
-          <div style={{ borderRadius: 16, overflow: "hidden", border: ".5px solid var(--br2)", height: "70vh", minHeight: 500, background: "var(--bg2)", marginBottom: 20 }}>
+          <div style={{ position: "relative", borderRadius: 16, overflow: "hidden", border: ".5px solid var(--br2)", height: "70vh", minHeight: 500, background: "var(--bg2)", marginBottom: 20 }}>
+            {/* Transparent overlay to block Google Drive's native top-right toolbar (Pop-out/Download) */}
+            {displayItem.fileUrl && displayItem.fileUrl.includes('drive.google.com') && (
+              <div 
+                style={{ 
+                  position: "absolute", 
+                  top: 0, 
+                  right: 0, 
+                  width: "250px", 
+                  height: "60px", 
+                  zIndex: 10, 
+                  background: "transparent",
+                }} 
+                title="กรุณาดาวน์โหลดไฟล์เต็มผ่านปุ่มด้านล่าง"
+                onClick={() => alert('กรุณากดปุ่ม "ดาวน์โหลดไฟล์ PDF" สีเขียวด้านล่าง เพื่อบันทึกยอดดาวน์โหลดให้ทีมงานครับ 🙏')}
+              ></div>
+            )}
             <iframe 
               src={getPreviewUrl(displayItem.fileUrl)} 
               style={{ width: "100%", height: "100%", border: "none" }} 
