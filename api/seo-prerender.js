@@ -1,6 +1,7 @@
 import admin from './_firebase-admin.js';
+import { getFirestore } from 'firebase-admin/firestore';
 
-const db = admin.firestore();
+const db = getFirestore();
 
 function stripHtml(html) {
   if (!html) return '';
@@ -90,7 +91,7 @@ export default async function handler(req, res) {
     const path = url.pathname;
     const id = url.searchParams.get('id');
     const BASE_URL = 'https://talibclub.org';
-    const canonical = `${BASE_URL}${path}${id ? \`?id=\${id}\` : ''}`;
+    const canonical = `${BASE_URL}${path}${id ? `?id=${id}` : ''}`;
 
     let html = '';
 
@@ -148,7 +149,7 @@ export default async function handler(req, res) {
       
       let listHtml = '<h1>บทความวิชาการอิสลาม</h1><ul>';
       articles.forEach(a => {
-        listHtml += \`<li><a href="/article?id=\${a.id}">\${a.title}</a> - \${a.author}</li>\`;
+        listHtml += `<li><a href="/article?id=${a.id}">${a.title}</a> - ${a.author}</li>`;
       });
       listHtml += '</ul>';
 
