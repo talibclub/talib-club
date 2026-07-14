@@ -229,9 +229,7 @@ export default function ArticleDetail({ item, go, authState }) {
 
   const handlePrint = () => window.print();
 
-  if (loadingArticles && !displayItem) {
-    return <div className="article-page" style={{ textAlign: "center", padding: "100px 0" }}><i className="ti ti-loader-2 spin" style={{ fontSize: 32, color: "var(--teal)" }}></i></div>
-  }
+
   const [modalImage, setModalImage] = useState(null);
   const [showFloatingTOC, setShowFloatingTOC] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -265,7 +263,7 @@ export default function ArticleDetail({ item, go, authState }) {
 
   // ระบบแกะข้อความสร้างสารบัญ และจัดรูปแบบบทความ (รองรับทั้ง Plaintext เดิม และ HTML จาก Quill)
   const { toc, finalHtml } = useMemo(() => {
-    let body = displayItem.body || "";
+    let body = displayItem?.body || "";
     
     // Fix broken PDF SVG icons in older articles
     body = body.replace(/<path\s+d="M11\s+15l-1\.9\s+6h1\.9"\s*\/>\s*<path\s+d="M9\s+15l1\.9\s+6"\s*\/>/g, '<path d="M11 15h1a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-1v-6z" />');
@@ -434,7 +432,7 @@ export default function ArticleDetail({ item, go, authState }) {
     }
 
     return { toc: tocList, finalHtml: body };
-  }, [displayItem.body]);
+  }, [displayItem?.body]);
 
   // ระบบดักจับการคลิก (Smart Click Interceptor)
   const handleArticleClick = (e) => {
@@ -473,6 +471,10 @@ export default function ArticleDetail({ item, go, authState }) {
 
   const related = relatedArticles
   const readerClass = `article-body reader-size-${readerPrefs.size} reader-tone-${readerPrefs.tone}`
+
+  if (loadingArticles && !displayItem) {
+    return <div className="article-page" style={{ textAlign: "center", padding: "100px 0" }}><i className="ti ti-loader-2 spin" style={{ fontSize: 32, color: "var(--teal)" }}></i></div>
+  }
 
   return (
     <article className="article-page animate-float-cute" style={{ maxWidth: 720, margin: "0 auto" }}>

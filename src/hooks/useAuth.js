@@ -106,7 +106,7 @@ export function useAuth() {
         let exists = false;
         
         try {
-          const cached = sessionStorage.getItem(cacheKey);
+          const cached = localStorage.getItem(cacheKey);
           if (cached) {
             const parsed = JSON.parse(cached);
             if (Date.now() - parsed.timestamp < 5 * 60 * 1000) {
@@ -122,7 +122,7 @@ export function useAuth() {
           if (snap.exists()) {
             snapData = snap.data()
             exists = true;
-            try { sessionStorage.setItem(cacheKey, JSON.stringify({ data: snapData, timestamp: Date.now() })) } catch(e) {}
+            try { localStorage.setItem(cacheKey, JSON.stringify({ data: snapData, timestamp: Date.now() })) } catch(e) {}
           }
         } else {
           if (currentSeq !== activeSeq) return
@@ -145,7 +145,7 @@ export function useAuth() {
             const newData = { email, displayName, photoURL, updatedAt: serverTimestamp() };
             await setDoc(ref, newData, { merge: true }).catch(e => console.error("Sync profile to firestore failed", e))
             // Update cache
-            try { sessionStorage.setItem(cacheKey, JSON.stringify({ data: { ...snapData, email, displayName, photoURL }, timestamp: Date.now() })) } catch(e) {}
+            try { localStorage.setItem(cacheKey, JSON.stringify({ data: { ...snapData, email, displayName, photoURL }, timestamp: Date.now() })) } catch(e) {}
           }
           if (currentSeq !== activeSeq) return
           setProfile({
@@ -165,7 +165,7 @@ export function useAuth() {
           if (currentSeq !== activeSeq) return
           await setDoc(ref, nextProfile)
           if (currentSeq !== activeSeq) return
-          try { sessionStorage.setItem(cacheKey, JSON.stringify({ data: nextProfile, timestamp: Date.now() })) } catch(e) {}
+          try { localStorage.setItem(cacheKey, JSON.stringify({ data: nextProfile, timestamp: Date.now() })) } catch(e) {}
           setProfile({ ...nextProfile, createdAt: new Date() })
         }
       } catch (err) {
@@ -230,8 +230,8 @@ export function useAuth() {
         updatedAt: serverTimestamp(),
       }
       await setDoc(doc(db, "users", auth.currentUser.uid), nextProfile, { merge: true })
-      // H2: Invalidate sessionStorage cache so the updated profile is fetched fresh
-      try { sessionStorage.removeItem(`talib_user_profile_${auth.currentUser.uid}`) } catch(e) {}
+      // H2: Invalidate localStorage cache so the updated profile is fetched fresh
+      try { localStorage.removeItem(`talib_user_profile_${auth.currentUser.uid}`) } catch(e) {}
       setProfile(prev => ({ ...DEFAULT_PROFILE, ...(prev || {}), ...nextProfile }))
     },
     async updateUserPassword(newPassword) {
