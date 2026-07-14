@@ -115,7 +115,7 @@ export default function Articles({ go, authState, ctx }) {
   const totalPagesAll = Math.max(1, Math.ceil(sortedFiltered.length / ITEMS_PER_PAGE) || 1)
   const totalGeneralPages = Math.max(1, Math.ceil(filteredGeneral.length / ITEMS_PER_PAGE) || 1)
   const effectiveTotalPages = browseGeneralMode ? totalGeneralPages : totalPagesAll
-  const currentPage = clampPage(requestedPage, effectiveTotalPages)
+  const currentPage = (loading && sortedFiltered.length === 0) ? requestedPage : clampPage(requestedPage, effectiveTotalPages)
 
   const paginatedFiltered = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
@@ -123,10 +123,10 @@ export default function Articles({ go, authState, ctx }) {
   }, [sortedFiltered, currentPage])
 
   useEffect(() => {
-    if (requestedPage !== currentPage) {
+    if (!loading && requestedPage !== currentPage) {
       updateFilters({ page: currentPage })
     }
-  }, [currentPage, requestedPage, effectiveTotalPages])
+  }, [currentPage, requestedPage, loading, effectiveTotalPages])
 
   const paginatedGeneral = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE

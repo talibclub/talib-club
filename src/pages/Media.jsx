@@ -161,11 +161,11 @@ export default function Media({ go, ctx }) {
   }, [selectedPlaylist, searchClip, sortOrder])
 
   const totalPages = Math.max(1, Math.ceil(filteredClips.length / ITEMS_PER_PAGE) || 1)
-  const currentPage = clampPage(page, totalPages)
+  const currentPage = (loading && filteredClips.length === 0) ? page : clampPage(page, totalPages)
 
   useEffect(() => {
-    if (page !== currentPage) updateFilters({ page: currentPage })
-  }, [currentPage, page, totalPages])
+    if (!loading && page !== currentPage) updateFilters({ page: currentPage })
+  }, [currentPage, page, loading, totalPages])
 
   const currentItems = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE

@@ -158,15 +158,15 @@ export default function Library({ go, authState, ctx }) {
   }, [books, filter, categoryFilter, sourceFilter, search, sortBy])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1)
-  const currentPage = clampPage(requestedPage, totalPages)
+  const currentPage = (loading && filtered.length === 0) ? requestedPage : clampPage(requestedPage, totalPages)
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
   const currentItems = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE)
 
   useEffect(() => {
-    if (totalPages > 0 && requestedPage !== currentPage) {
+    if (!loading && totalPages > 0 && requestedPage !== currentPage) {
       updateFilters({ page: currentPage })
     }
-  }, [currentPage, requestedPage, totalPages])
+  }, [currentPage, requestedPage, loading, totalPages])
 
   return (
     <div style={{ marginBottom: 28 }}>

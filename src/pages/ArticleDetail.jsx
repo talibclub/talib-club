@@ -692,7 +692,7 @@ export default function ArticleDetail({ item, go, authState }) {
           <div className="sec-hd" style={{ marginBottom: 14 }}><span className="sec-title">บทความที่เกี่ยวข้อง</span></div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {related.map(r => (
-              <div key={r.id} className="card" style={{ padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }} onClick={() => go("article", r)}>
+              <div key={r.id} className="card" style={{ padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }} onClick={() => go("article", { ...r, fromFilters: displayItem?.fromFilters || item?.fromFilters })}>
                 <div>
                   <span className="tag tag-teal" style={{ marginRight: 8 }}>{r.category}</span>
                   <span style={{ fontSize: 13, color: "var(--text)", fontWeight: 400 }}>{r.title}</span>
