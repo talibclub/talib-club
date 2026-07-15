@@ -834,6 +834,7 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articles
   const set = (key, value) => setItem(prev => ({ ...prev, [key]: value }))
   const [uploadingImage, setUploadingImage] = useState(false)
   const [showMeta, setShowMeta] = useState(!item.id)
+  const [navDirection, setNavDirection] = useState(null)
   
   const promptHandlerRef = useRef(null);
   const [promptState, setPromptState] = useState(null);
@@ -1066,15 +1067,23 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articles
 
   const handlePrev = () => {
     if (hasPrev) {
-      const prev = articlesList[currentIndex - 1];
-      setItem({ ...prev, tags: [...(prev.tags || [])] });
+      setNavDirection('prev');
+      setTimeout(() => {
+        const prev = articlesList[currentIndex - 1];
+        setItem({ ...prev, tags: [...(prev.tags || [])] });
+        setNavDirection(null);
+      }, 20); // allow UI to repaint loading state before heavy Quills render
     }
   }
 
   const handleNext = () => {
     if (hasNext) {
-      const next = articlesList[currentIndex + 1];
-      setItem({ ...next, tags: [...(next.tags || [])] });
+      setNavDirection('next');
+      setTimeout(() => {
+        const next = articlesList[currentIndex + 1];
+        setItem({ ...next, tags: [...(next.tags || [])] });
+        setNavDirection(null);
+      }, 20);
     }
   }
 
@@ -1206,16 +1215,16 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articles
               <span style={{ fontSize: 13, color: "var(--t3)", padding: "0 8px" }}>
                 {currentIndex + 1} / {articlesList.length}
               </span>
-              <button type="button" className="btn btn-outline" onClick={handlePrev} disabled={!hasPrev || busy} style={{ padding: "6px 12px", fontSize: 13, background: "#fff" }}>
-                <i className="ti ti-chevron-left" style={{ marginRight: 4 }}></i> ก่อนหน้า
+              <button type="button" className="btn btn-outline" onClick={handlePrev} disabled={!hasPrev || busy || navDirection} style={{ padding: "6px 12px", fontSize: 13, background: "#fff", display: "flex", alignItems: "center" }}>
+                {navDirection === 'prev' ? <i className="ti ti-loader-2 spin" style={{ marginRight: 4 }}></i> : <i className="ti ti-chevron-left" style={{ marginRight: 4 }}></i>} ก่อนหน้า
               </button>
-              <button type="button" className="btn btn-outline" onClick={handleNext} disabled={!hasNext || busy} style={{ padding: "6px 12px", fontSize: 13, background: "#fff" }}>
-                ถัดไป <i className="ti ti-chevron-right" style={{ marginLeft: 4 }}></i>
+              <button type="button" className="btn btn-outline" onClick={handleNext} disabled={!hasNext || busy || navDirection} style={{ padding: "6px 12px", fontSize: 13, background: "#fff", display: "flex", alignItems: "center" }}>
+                ถัดไป {navDirection === 'next' ? <i className="ti ti-loader-2 spin" style={{ marginLeft: 4 }}></i> : <i className="ti ti-chevron-right" style={{ marginLeft: 4 }}></i>}
               </button>
             </div>
           )}
         </div>
-        <div style={{ background: "#fff", borderRadius: 8, border: "1px solid var(--br)", minHeight: 400 }}>
+        <div style={{ background: "#fff", borderRadius: 8, border: "1px solid var(--br)", minHeight: 400, opacity: navDirection ? 0.5 : 1, pointerEvents: navDirection ? "none" : "auto", transition: "opacity 0.2s" }}>
             <CustomToolbar />
             <ReactQuill 
               ref={reactQuillRef}
