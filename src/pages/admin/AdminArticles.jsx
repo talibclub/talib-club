@@ -423,7 +423,7 @@ export default function AdminArticles() {
   }
 
   if (editing) {
-    return <ArticleForm item={editing} setItem={setEdit} onSave={save} onCancel={() => { localStorage.removeItem("talib_article_draft"); setEdit(null); }} taxonomy={taxonomy} busy={busy} />
+    return <ArticleForm item={editing} setItem={setEdit} onSave={save} onCancel={() => { localStorage.removeItem("talib_article_draft"); setEdit(null); }} taxonomy={taxonomy} busy={busy} articlesList={sorted} />
   }
 
   return (
@@ -830,7 +830,7 @@ const CustomToolbar = React.memo(() => (
   </div>
 ), () => true);
 
-function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
+function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articlesList }) {
   const set = (key, value) => setItem(prev => ({ ...prev, [key]: value }))
   const [uploadingImage, setUploadingImage] = useState(false)
   
@@ -1059,9 +1059,42 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
     }
   }
 
+  const currentIndex = (articlesList || []).findIndex(a => a.id === item.id);
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex !== -1 && currentIndex < (articlesList || []).length - 1;
+
+  const handlePrev = () => {
+    if (hasPrev) {
+      const prev = articlesList[currentIndex - 1];
+      setItem({ ...prev, tags: [...(prev.tags || [])] });
+    }
+  }
+
+  const handleNext = () => {
+    if (hasNext) {
+      const next = articlesList[currentIndex + 1];
+      setItem({ ...next, tags: [...(next.tags || [])] });
+    }
+  }
+
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
-      <button className="btn btn-outline" style={{ marginBottom: 18 }} onClick={onCancel}><i className="ti ti-arrow-left" style={{ marginRight: 6 }}></i>กลับ</button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+        <button className="btn btn-outline" onClick={onCancel}><i className="ti ti-arrow-left" style={{ marginRight: 6 }}></i>กลับ</button>
+        {articlesList && currentIndex !== -1 && (
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn btn-outline" onClick={handlePrev} disabled={!hasPrev || busy} style={{ padding: "6px 12px", fontSize: 13, background: "var(--bg2)" }}>
+              <i className="ti ti-chevron-left" style={{ marginRight: 4 }}></i> ก่อนหน้า
+            </button>
+            <span style={{ display: "flex", alignItems: "center", fontSize: 13, color: "var(--t3)", padding: "0 8px" }}>
+              {currentIndex + 1} / {articlesList.length}
+            </span>
+            <button className="btn btn-outline" onClick={handleNext} disabled={!hasNext || busy} style={{ padding: "6px 12px", fontSize: 13, background: "var(--bg2)" }}>
+              ถัดไป <i className="ti ti-chevron-right" style={{ marginLeft: 4 }}></i>
+            </button>
+          </div>
+        )}
+      </div>
       <h2 style={{ marginBottom: 20 }}>{item.id ? "แก้ไขบทความ" : "เพิ่มบทความใหม่"}</h2>
 
       <div className="card" style={{ padding: 24, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
