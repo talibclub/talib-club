@@ -34,7 +34,7 @@ export default function Scholars() {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [era, setEra] = useState("0")
   const [field, setField] = useState("all")
-  
+
   const [aqFilter, setAqFilter] = useState("")
   const [mhFilter, setMhFilter] = useState("")
   const [mzFilter, setMzFilter] = useState("")
@@ -57,7 +57,7 @@ export default function Scholars() {
 
       const matchEra = era === "0" || mapEraValue(s.era) === mapEraValue(era)
       const matchField = field === "all" || (s.field && s.field.includes(field))
-      
+
       const matchAq = !aqFilter || s.aq === aqFilter
       const matchMh = !mhFilter || s.mh === mhFilter
       const matchMz = !mzFilter || s.mz === mzFilter
@@ -149,11 +149,11 @@ export default function Scholars() {
         </div>
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
-          style={{ 
-            padding: "0 18px", 
-            borderRadius: 24, 
-            background: showAdvanced ? "var(--teal)" : "var(--bg2)", 
-            color: showAdvanced ? "#fff" : "var(--text)", 
+          style={{
+            padding: "0 18px",
+            borderRadius: 24,
+            background: showAdvanced ? "var(--teal)" : "var(--bg2)",
+            color: showAdvanced ? "#fff" : "var(--text)",
             border: "none",
             cursor: "pointer",
             display: "flex",
@@ -247,59 +247,59 @@ export default function Scholars() {
         </div>
       ) : (
         eras.filter(item => item !== "0").map(eraNum => {
-        const eraScholars = filtered.filter(s => mapEraValue(s.era) === mapEraValue(eraNum))
-        if (eraScholars.length === 0) return null
-        const color = ERA_COLORS[eraNum] || "var(--teal)"
-        const visibleScholars = eraScholars.slice(0, visibleCounts[eraNum] || 12)
-        
-        return (
-          <div key={eraNum} style={{ marginBottom: 36 }}>
-            {/* Era Header */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-              <div style={{ width: 3, height: 28, background: color, borderRadius: 2, flexShrink: 0 }}></div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>
-                  {eraLabelMap[eraNum] || ERA_LABELS[eraNum] || `ยุคที่ ${eraNum}`}
+          const eraScholars = filtered.filter(s => mapEraValue(s.era) === mapEraValue(eraNum))
+          if (eraScholars.length === 0) return null
+          const color = ERA_COLORS[eraNum] || "var(--teal)"
+          const visibleScholars = eraScholars.slice(0, visibleCounts[eraNum] || 12)
+
+          return (
+            <div key={eraNum} style={{ marginBottom: 36 }}>
+              {/* Era Header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                <div style={{ width: 3, height: 28, background: color, borderRadius: 2, flexShrink: 0 }}></div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>
+                    {eraLabelMap[eraNum] || ERA_LABELS[eraNum] || `ยุคที่ ${eraNum}`}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>{eraScholars.length} ท่าน</div>
                 </div>
-                <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>{eraScholars.length} ท่าน</div>
               </div>
-            </div>
 
-            {/* Scholars Cards Grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
-              {visibleScholars.map(s => (
-                <ScholarCard
-                  key={s.id}
-                  s={s}
-                  color={color}
-                  getAqClass={getAqClass}
-                  getMhClass={getMhClass}
-                  getMzClass={getMzClass}
-                />
-              ))}
-            </div>
-
-            {/* SHOW MORE BUTTON */}
-            {eraScholars.length > visibleScholars.length && (
-              <div style={{ textAlign: "center", marginTop: 20 }}>
-                <button 
-                  onClick={() => setVisibleCounts(prev => ({ ...prev, [eraNum]: prev[eraNum] + 6 }))}
-                  style={{
-                    fontFamily: "'Prompt', sans-serif", fontSize: 11, fontWeight: 300,
-                    padding: "5px 16px", borderRadius: 20, border: ".5px solid var(--br)",
-                    cursor: "pointer", transition: "all .15s",
-                    background: "var(--card)", color: "var(--t2)"
-                  }}
-                  onMouseOver={e => { e.target.style.background = 'var(--acc)'; e.target.style.color = 'var(--bg)' }}
-                  onMouseOut={e => { e.target.style.background = 'var(--card)'; e.target.style.color = 'var(--t2)' }}
-                >
-                  แสดงเพิ่มเติม ({eraScholars.length - visibleScholars.length} ท่าน)
-                </button>
+              {/* Scholars Cards Grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
+                {visibleScholars.map(s => (
+                  <ScholarCard
+                    key={s.id}
+                    s={s}
+                    color={color}
+                    getAqClass={getAqClass}
+                    getMhClass={getMhClass}
+                    getMzClass={getMzClass}
+                  />
+                ))}
               </div>
-            )}
-          </div>
-        )
-      }))}
+
+              {/* SHOW MORE BUTTON */}
+              {eraScholars.length > visibleScholars.length && (
+                <div style={{ textAlign: "center", marginTop: 20 }}>
+                  <button
+                    onClick={() => setVisibleCounts(prev => ({ ...prev, [eraNum]: prev[eraNum] + 6 }))}
+                    style={{
+                      fontFamily: "'Prompt', sans-serif", fontSize: 11, fontWeight: 300,
+                      padding: "5px 16px", borderRadius: 20, border: ".5px solid var(--br)",
+                      cursor: "pointer", transition: "all .15s",
+                      background: "var(--card)", color: "var(--t2)"
+                    }}
+                    onMouseOver={e => { e.target.style.background = 'var(--acc)'; e.target.style.color = 'var(--bg)' }}
+                    onMouseOut={e => { e.target.style.background = 'var(--card)'; e.target.style.color = 'var(--t2)' }}
+                  >
+                    แสดงเพิ่มเติม ({eraScholars.length - visibleScholars.length} ท่าน)
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        }))}
 
       {!loading && filtered.length === 0 && <div className="empty">ไม่พบรายชื่อบุคคลที่ตรงกับการค้นหา</div>}
 
@@ -312,11 +312,11 @@ export default function Scholars() {
           ต้องการเสนอรายชื่อบุคคลเพิ่มเติม?
         </div>
         <p style={{ fontSize: 12, marginBottom: 14 }}>ติดต่อทีม Talib Club เพื่อเสนอรายชื่อบุคคลและผู้รู้เพิ่มเติม</p>
-        <a 
-          href="https://www.facebook.com/TalibClub" 
-          target="_blank" 
-          rel="noreferrer" 
-          className="btn btn-main" 
+        <a
+          href="https://www.facebook.com/TalibPublisher"
+          target="_blank"
+          rel="noreferrer"
+          className="btn btn-main"
           style={{ fontSize: 12, textDecoration: "none", display: "inline-block" }}
         >
           ติดต่อเรา
