@@ -833,6 +833,7 @@ const CustomToolbar = React.memo(() => (
 function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articlesList }) {
   const set = (key, value) => setItem(prev => ({ ...prev, [key]: value }))
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [showMeta, setShowMeta] = useState(!item.id)
   
   const promptHandlerRef = useRef(null);
   const [promptState, setPromptState] = useState(null);
@@ -1078,26 +1079,26 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articles
   }
 
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto" }}>
+    <div style={{ maxWidth: 840, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
         <button className="btn btn-outline" onClick={onCancel}><i className="ti ti-arrow-left" style={{ marginRight: 6 }}></i>กลับ</button>
-        {articlesList && currentIndex !== -1 && (
-          <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn btn-outline" onClick={handlePrev} disabled={!hasPrev || busy} style={{ padding: "6px 12px", fontSize: 13, background: "var(--bg2)" }}>
-              <i className="ti ti-chevron-left" style={{ marginRight: 4 }}></i> ก่อนหน้า
-            </button>
-            <span style={{ display: "flex", alignItems: "center", fontSize: 13, color: "var(--t3)", padding: "0 8px" }}>
-              {currentIndex + 1} / {articlesList.length}
-            </span>
-            <button className="btn btn-outline" onClick={handleNext} disabled={!hasNext || busy} style={{ padding: "6px 12px", fontSize: 13, background: "var(--bg2)" }}>
-              ถัดไป <i className="ti ti-chevron-right" style={{ marginLeft: 4 }}></i>
-            </button>
-          </div>
-        )}
+        <h2 style={{ margin: 0, fontSize: 20 }}>{item.id ? "แก้ไขบทความ" : "เพิ่มบทความใหม่"}</h2>
       </div>
-      <h2 style={{ marginBottom: 20 }}>{item.id ? "แก้ไขบทความ" : "เพิ่มบทความใหม่"}</h2>
 
-      <div className="card" style={{ padding: 24, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div className="card" style={{ marginBottom: 24, overflow: "hidden" }}>
+        <button 
+          type="button"
+          onClick={() => setShowMeta(!showMeta)}
+          style={{ width: "100%", padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", background: showMeta ? "var(--bg2)" : "#fff", border: "none", cursor: "pointer", textAlign: "left", borderBottom: showMeta ? "1px solid var(--br2)" : "none" }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600, color: "var(--text)", fontSize: 15 }}>
+            <i className="ti ti-adjustments-horizontal" style={{ color: "var(--teal)" }}></i> ข้อมูลทั่วไปของบทความ (ชื่อเรื่อง, หน้าปก, แท็ก)
+          </div>
+          <i className={`ti ti-chevron-${showMeta ? 'up' : 'down'}`} style={{ color: "var(--t3)" }}></i>
+        </button>
+
+        {showMeta && (
+          <div style={{ padding: 24, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <Field label="ชื่อบทความ *" span><input value={item.title || ""} onChange={e => set("title", e.target.value)} placeholder="ชื่อบทความ" /></Field>
         <Field label="ประเภท">
           <select value={item.type || "general"} onChange={e => set("type", e.target.value)}>
@@ -1186,14 +1187,35 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articles
 
         <Field label="บทคัดย่อ (แสดงหน้าการ์ด)" span><textarea value={item.excerpt || ""} onChange={e => set("excerpt", e.target.value)} rows={2} placeholder="เนื้อหาสรุปสั้นๆ..." /></Field>
         <Field label="Tags (คั่นด้วยลูกน้ำ ,)" span><input value={(item.tags || []).join(", ")} onChange={e => set("tags", e.target.value.split(",").map(tag => tag.trim()).filter(Boolean))} placeholder="เช่น ฟิกฮ์, อะกีดะฮ์" /></Field>
-        <div style={{ gridColumn: "1 / -1" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <span style={{ display: "block", fontSize: 13, color: "var(--t2)", fontWeight: 500 }}>เนื้อหาบทความแบบเต็ม</span>
-            <span style={{ fontSize: 11, color: "var(--teal)", fontWeight: 400, background: "rgba(20,184,166,0.1)", padding: "4px 8px", borderRadius: 12 }}>
-              <i className="ti ti-bulb" style={{ marginRight: 4 }}></i>รองรับทั้งรูปแบบใหม่ (WYSIWYG) และแบบข้อความดั้งเดิม
+          </div>
+        )}
+      </div>
+
+      <div style={{ gridColumn: "1 / -1", marginBottom: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
+          <div>
+            <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 16, color: "var(--text)", fontWeight: 600, marginBottom: 4 }}>
+              <i className="ti ti-file-text" style={{ color: "var(--teal)" }}></i> เนื้อหาบทความแบบเต็ม
+            </span>
+            <span style={{ fontSize: 12, color: "var(--t2)" }}>
+              รองรับทั้งรูปแบบใหม่ (WYSIWYG) และแบบข้อความดั้งเดิม
             </span>
           </div>
-          <div style={{ background: "#fff", borderBottomLeftRadius: 8, borderBottomRightRadius: 8, border: "1px solid var(--br)", minHeight: 400 }}>
+          {articlesList && currentIndex !== -1 && (
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span style={{ fontSize: 13, color: "var(--t3)", padding: "0 8px" }}>
+                {currentIndex + 1} / {articlesList.length}
+              </span>
+              <button type="button" className="btn btn-outline" onClick={handlePrev} disabled={!hasPrev || busy} style={{ padding: "6px 12px", fontSize: 13, background: "#fff" }}>
+                <i className="ti ti-chevron-left" style={{ marginRight: 4 }}></i> ก่อนหน้า
+              </button>
+              <button type="button" className="btn btn-outline" onClick={handleNext} disabled={!hasNext || busy} style={{ padding: "6px 12px", fontSize: 13, background: "#fff" }}>
+                ถัดไป <i className="ti ti-chevron-right" style={{ marginLeft: 4 }}></i>
+              </button>
+            </div>
+          )}
+        </div>
+        <div style={{ background: "#fff", borderRadius: 8, border: "1px solid var(--br)", minHeight: 400 }}>
             <CustomToolbar />
             <ReactQuill 
               ref={reactQuillRef}
