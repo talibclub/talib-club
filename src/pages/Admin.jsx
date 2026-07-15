@@ -28,6 +28,15 @@ export default function Admin({ go, authState, initialTab = "dashboard" }) {
   const activeTabObj = TABS.find(t => t.id === tab) || TABS[0]
   const currentUser = authState?.profile?.displayName || authState?.user?.displayName || ""
 
+  const handleClearCache = () => {
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith("talib_cache_")) {
+        localStorage.removeItem(key)
+      }
+    })
+    window.location.reload()
+  }
+
   useEffect(() => {
     if (initialTab && TABS.some(item => item.id === initialTab)) setTab(initialTab)
   }, [initialTab])
@@ -48,6 +57,9 @@ export default function Admin({ go, authState, initialTab = "dashboard" }) {
           <p style={{ marginTop: 12, color: "var(--t2)", fontSize: 15, lineHeight: 1.5, maxWidth: 600 }}>จัดการเนื้อหาและข้อมูลหลักของ Talib Club</p>
         </div>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", flexShrink: 0 }}>
+          <button className="btn btn-outline" onClick={handleClearCache} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 12 }} title="ล้างแคชเพื่อดึงข้อมูลใหม่ล่าสุด">
+            <i className="ti ti-refresh"></i> ล้างแคช
+          </button>
           <button className="btn btn-outline" onClick={() => go("staff")} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 12 }}>
             <i className="ti ti-arrow-left"></i> Staff
           </button>
