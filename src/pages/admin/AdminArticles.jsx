@@ -1252,7 +1252,6 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articles
             #admin-article-toolbar button.ql-insertFootnote:hover::after, #admin-article-toolbar button.ql-insertQuran:hover::after, #admin-article-toolbar button.ql-numberCircle:hover::after, #admin-article-toolbar button.ql-insertPdf:hover::after, #admin-article-toolbar button.ql-highlightText:hover::after, #admin-article-toolbar button.ql-insertDivider:hover::after, #admin-article-toolbar button.ql-arabicBlock:hover::after, #admin-article-toolbar button.ql-calloutInfo:hover::after, #admin-article-toolbar button.ql-calloutWarn:hover::after, #admin-article-toolbar button.ql-dropCap:hover::after, #admin-article-toolbar button.ql-insertFloatImage:hover::after, #admin-article-toolbar button.ql-insertAudio:hover::after { color: var(--t2); }
           `}</style>
         </div>
-      </div>
 
       <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
         <button className="btn btn-outline" onClick={onCancel}>ยกเลิก</button>
