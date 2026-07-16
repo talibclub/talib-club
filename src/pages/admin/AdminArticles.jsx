@@ -674,12 +674,15 @@ export default function AdminArticles() {
   )
 }
 
-const QuillPromptModal = ({ isOpen, type, onClose, onSubmit }) => {
+const QuillPromptModal = ({ isOpen, type, onClose, onSubmit, initialData }) => {
   const [data, setData] = useState({ text1: '', text2: '', text3: '' });
 
   useEffect(() => {
-    if (isOpen) setData({ text1: '', text2: '', text3: '' });
-  }, [isOpen, type]);
+    if (isOpen) {
+      if (initialData) setData({ ...initialData });
+      else setData({ text1: '', text2: '', text3: '' });
+    }
+  }, [isOpen, type, initialData]);
 
   const inputRef = useRef(null);
   useEffect(() => {
@@ -842,10 +845,11 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articles
   const lastSelectionRef = useRef(null);
 
   useEffect(() => {
-    promptHandlerRef.current = (type) => {
+    promptHandlerRef.current = (type, initialData = null) => {
       return new Promise((resolve) => {
         setPromptState({
           type,
+          initialData,
           onSubmit: (data) => {
             setPromptState(null);
             resolve(data);
@@ -1224,7 +1228,25 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articles
             </div>
           )}
         </div>
-        <div style={{ background: "#fff", borderRadius: 8, border: "1px solid var(--br)", minHeight: 400, opacity: navDirection ? 0.5 : 1, pointerEvents: navDirection ? "none" : "auto", transition: "opacity 0.2s" }}>
+        <div style={{ background: "#fff", borderRadius: 8, border: "1px solid var(--br)", minHeight: 400, opacity: navDirection ? 0.5 : 1, pointerEvents: navDirection ? "none" : "auto", transition: "opacity 0.2s" }}
+             onClick={(e) => {
+               const pdfNode = e.target.closest('.pdf-attachment-block');
+               if (pdfNode && reactQuillRef.current && promptHandlerRef.current) {
+                 e.preventDefault();
+                 const quill = reactQuillRef.current.getEditor();
+                 const blot = Quill.find(pdfNode);
+                 if (blot) {
+                   const index = quill.getIndex(blot);
+                   const currentVal = blot.constructor.value(pdfNode);
+                   promptHandlerRef.current('pdf', { text1: currentVal.url || '', text2: currentVal.title || '', text3: currentVal.pages || '' }).then(data => {
+                     if (data && data.text1) {
+                       quill.deleteText(index, 1, 'user');
+                       quill.insertEmbed(index, 'pdfAttachment', { url: data.text1, title: data.text2, pages: data.text3 }, 'user');
+                     }
+                   });
+                 }
+               }
+             }}>
             <CustomToolbar />
             <ReactQuill 
               ref={reactQuillRef}
@@ -1272,6 +1294,7 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articles
       <QuillPromptModal 
         isOpen={!!promptState}
         type={promptState?.type}
+        initialData={promptState?.initialData}
         onClose={promptState?.onClose || (() => setPromptState(null))}
         onSubmit={promptState?.onSubmit}
       />
