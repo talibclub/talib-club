@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { collection, query, orderBy, getDocs, doc, setDoc, deleteDoc, serverTimestamp, updateDoc } from "firebase/firestore"
+import { collection, query, orderBy, getDocs, doc, setDoc, deleteDoc, serverTimestamp, updateDoc, where } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { db, storage } from "../../lib/firebase.js"
 import toast from "react-hot-toast"
@@ -103,15 +103,27 @@ export default function AdminBookCampaigns() {
   }
 
   const handleDelete = async (id) => {
-    const confirmed = await confirmAction("ยืนยันการลบ", "คุณต้องการลบแคมเปญนี้ใช่หรือไม่? ข้อมูลการลงทะเบียนที่ผูกอยู่จะยังคงอยู่ในระบบแต่จะไม่แสดงผลหน้าเว็บ")
+    const confirmed = await confirmAction("ยืนยันการลบ", "คุณต้องการลบแคมเปญนี้ใช่หรือไม่? ข้อมูลการลงทะเบียนที่ผูกอยู่ทั้งหมดจะถูกลบทิ้งถาวรด้วย")
     if (!confirmed) return
+    const toastId = toast.loading("กำลังลบแคมเปญและข้อมูลที่เกี่ยวข้อง...")
     try {
+      // 1. Delete associated registrations
+      const regsQ = query(collection(db, "book_registrations"), where("campaignId", "==", id))
+      const regsSnap = await getDocs(regsQ)
+      await Promise.all(regsSnap.docs.map(d => deleteDoc(d.ref)))
+      
+      // 2. Delete holds subcollection
+      const holdsSnap = await getDocs(collection(db, `book_campaigns/${id}/holds`))
+      await Promise.all(holdsSnap.docs.map(d => deleteDoc(d.ref)))
+
+      // 3. Delete campaign itself
       await deleteDoc(doc(db, "book_campaigns", id))
+
       fetchCampaigns()
-      toast.success("ลบแคมเปญเรียบร้อยแล้ว")
+      toast.success("ลบแคมเปญและข้อมูลที่เกี่ยวข้องเรียบร้อยแล้ว", { id: toastId })
     } catch (err) {
       console.error(err)
-      toast.error("เกิดข้อผิดพลาดในการลบ")
+      toast.error("เกิดข้อผิดพลาดในการลบ", { id: toastId })
     }
   }
 
