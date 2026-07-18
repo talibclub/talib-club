@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { collection, query, where, getDocs, updateDoc, doc, serverTimestamp, setDoc, writeBatch } from "firebase/firestore"
+import { collection, query, where, getDocs, updateDoc, doc, serverTimestamp, setDoc, writeBatch, onSnapshot } from "firebase/firestore"
 import { db } from "../../lib/firebase.js"
 import { trackingDb } from "../../lib/trackingFirebase.js"
 import toast from "react-hot-toast"
@@ -11,6 +11,7 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
   const [filter, setFilter] = useState("all") // all, submitted, approved, shipped, rejected
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState([])
+  const [holds, setHolds] = useState([])
 
   const fetchRegistrations = async () => {
     setLoading(true)
@@ -33,6 +34,17 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
     if (campaign) {
       fetchRegistrations()
       setSelected([])
+      
+      const holdsRef = collection(db, "book_campaigns", campaign.id, "holds")
+      const q = query(holdsRef, where("status", "==", "reserved"))
+      const unsub = onSnapshot(q, (snap) => {
+        const now = Date.now()
+        const activeHolds = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(h => h.expiresAt && h.expiresAt.toMillis() > now)
+        setHolds(activeHolds)
+      })
+      return () => unsub()
     }
   }, [campaign])
 
@@ -218,9 +230,31 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
           <h2 style={{ margin: 0, fontSize: 20 }}>รายชื่อผู้ลงทะเบียน: {campaign.title}</h2>
         </div>
         <div style={{ fontSize: 14, color: "var(--t2)" }}>
-          ผู้ลงทะเบียนทั้งหมด <strong>{registrations.length}</strong> คน
+          กำลังล็อกคิว <strong>{holds.length}</strong> คิว | โอนสลิปแล้ว <strong>{registrations.length}</strong> คน
         </div>
       </div>
+
+      {holds.length > 0 && (
+        <div className="card" style={{ padding: 24, marginBottom: 24, border: "1px solid var(--amber)", background: "rgba(245, 166, 35, 0.05)" }}>
+          <h3 style={{ margin: "0 0 16px 0", fontSize: 16, color: "var(--amber)", display: "flex", alignItems: "center", gap: 8 }}>
+            <i className="ti ti-clock spin"></i> กำลังทำรายการจอง (ล็อกคิว)
+          </h3>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+            {holds.map(h => {
+              const minutesLeft = Math.ceil((h.expiresAt.toMillis() - Date.now()) / 60000)
+              return (
+                <div key={h.id} style={{ padding: "8px 12px", background: "var(--bg)", border: "1px solid var(--br)", borderRadius: 8, fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+                  <i className="ti ti-user" style={{ color: "var(--t3)" }}></i>
+                  <span style={{ fontWeight: 600 }}>{h.name || "ไม่ระบุชื่อ"}</span>
+                  <span className="badge" style={{ background: "var(--amber-bg)", color: "var(--amber)", fontSize: 11, padding: "2px 6px" }}>
+                    เหลือ {minutesLeft} นาที
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="card" style={{ padding: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 20 }}>

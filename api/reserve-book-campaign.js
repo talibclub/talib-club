@@ -40,6 +40,7 @@ export default async function handler(req, res) {
   try { token = await requireUser(req); } catch (error) { return send(res, error.status || 401, { error: error.message }); }
 
   const campaignId = String(parseBody(req).campaignId || "").trim().slice(0, 120);
+  const name = String(parseBody(req).name || "").trim().slice(0, 120);
   if (!campaignId) return send(res, 400, { error: "Missing campaignId" });
 
   try {
@@ -84,6 +85,7 @@ export default async function handler(req, res) {
       const expiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + timeLimit * 60 * 1000);
       tx.set(holdRef, {
         uid: token.uid,
+        name: name || token.name || token.email || "Unknown User",
         status: "reserved",
         expiresAt,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),

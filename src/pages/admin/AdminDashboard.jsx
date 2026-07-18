@@ -12,27 +12,44 @@ export default function AdminDashboard() {
     async function fetchData() {
       try {
         const usersSnap = await getDocs(collection(db, "users"))
-        const sessionsSnap = await getDocs(query(collection(db, "reading_sessions"), orderBy("timestamp", "desc"), limit(100)))
-        const campaignsSnap = await getDocs(collection(db, "campaign_registrations"))
+        const sessionsSnap = await getDocs(query(collection(db, "content_reading_sessions"), orderBy("timestamp", "desc"), limit(500)))
+        const campaignsSnap = await getDocs(collection(db, "book_registrations"))
 
         setStats({
           users: usersSnap.size,
-          sessions: sessionsSnap.size, // Note: We only fetched 100 for performance, ideally we use count() but this is fine for now
+          sessions: sessionsSnap.size, // Last 500 sessions
           campaigns: campaignsSnap.size
         })
 
-        // Generate some dummy chart data based on sessions
-        const articleCounts = {}
+        // Generate hourly usage chart data based on recent sessions
+        const hourlyCounts = {}
+        const now = new Date()
+        
+        // Initialize last 12 hours with 0
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date(now.getTime() - i * 60 * 60 * 1000)
+          const hourLabel = `${d.getHours().toString().padStart(2, '0')}:00`
+          hourlyCounts[hourLabel] = 0
+        }
+
         sessionsSnap.forEach(doc => {
           const data = doc.data()
-          const aId = data.articleId || "Unknown"
-          articleCounts[aId] = (articleCounts[aId] || 0) + 1
+          if (data.timestamp) {
+            const date = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp)
+            // Only count if within last 12 hours
+            if (now.getTime() - date.getTime() < 12 * 60 * 60 * 1000) {
+              const hourLabel = `${date.getHours().toString().padStart(2, '0')}:00`
+              if (hourlyCounts[hourLabel] !== undefined) {
+                hourlyCounts[hourLabel]++
+              }
+            }
+          }
         })
 
-        const formattedData = Object.keys(articleCounts).map(id => ({
-          name: id.substring(0, 10) + "...",
-          reads: articleCounts[id]
-        })).sort((a, b) => b.reads - a.reads).slice(0, 5)
+        const formattedData = Object.keys(hourlyCounts).map(hour => ({
+          name: hour,
+          reads: hourlyCounts[hour]
+        }))
 
         setChartData(formattedData)
       } catch (err) {
@@ -61,17 +78,17 @@ export default function AdminDashboard() {
           <div style={{ fontSize: 32, fontWeight: 700, color: "var(--text)" }}>{stats.users}</div>
         </div>
         <div className="card" style={{ padding: 20, textAlign: "center", borderTop: "4px solid #f5a623" }}>
-          <div style={{ fontSize: 13, color: "var(--t2)", marginBottom: 8 }}>การเข้าอ่านบทความล่าสุด</div>
+          <div style={{ fontSize: 13, color: "var(--t2)", marginBottom: 8 }}>การใช้งานล่าสุด (เซสชัน)</div>
           <div style={{ fontSize: 32, fontWeight: 700, color: "var(--text)" }}>{stats.sessions}</div>
         </div>
         <div className="card" style={{ padding: 20, textAlign: "center", borderTop: "4px solid #e05555" }}>
-          <div style={{ fontSize: 13, color: "var(--t2)", marginBottom: 8 }}>ยอดขอรับหนังสือ</div>
+          <div style={{ fontSize: 13, color: "var(--t2)", marginBottom: 8 }}>ยอดลงทะเบียนรับหนังสือ</div>
           <div style={{ fontSize: 32, fontWeight: 700, color: "var(--text)" }}>{stats.campaigns}</div>
         </div>
       </div>
 
       <div className="card" style={{ padding: 24 }}>
-        <h3 style={{ marginBottom: 20, fontSize: 16 }}>บทความยอดนิยม (Top 5 จาก 100 ครั้งล่าสุด)</h3>
+        <h3 style={{ marginBottom: 20, fontSize: 16 }}>สถิติการเข้าใช้งาน (12 ชั่วโมงย้อนหลัง)</h3>
         <div style={{ height: 300, width: "100%" }}>
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
@@ -83,13 +100,14 @@ export default function AdminDashboard() {
                   cursor={{ fill: "var(--bg2)" }}
                   contentStyle={{ background: "var(--card)", border: "1px solid var(--br)", borderRadius: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
                   itemStyle={{ color: "var(--teal)", fontWeight: 600 }}
+                  formatter={(value) => [value, 'ครั้ง']}
                 />
                 <Bar dataKey="reads" fill="var(--teal)" radius={[4, 4, 0, 0]} barSize={40} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
             <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t3)", fontSize: 14 }}>
-              ยังไม่มีข้อมูลการอ่าน
+              ยังไม่มีข้อมูลการใช้งานใน 12 ชั่วโมงที่ผ่านมา
             </div>
           )}
         </div>

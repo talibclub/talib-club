@@ -108,7 +108,7 @@ export default function BookRegistration({ go, ctx }) {
           "content-type": "application/json",
           "authorization": `Bearer ${idToken}`
         },
-        body: JSON.stringify({ campaignId })
+        body: JSON.stringify({ campaignId, name: formData.name })
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || "Could not reserve campaign")
