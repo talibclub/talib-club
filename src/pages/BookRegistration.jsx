@@ -276,6 +276,13 @@ export default function BookRegistration({ go, ctx }) {
             <div style={{ width: 32, height: 32, background: "var(--teal)", color: "#fff", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>1</div>
             <h2 style={{ margin: 0 }}>กรอกข้อมูลเพื่อจองสิทธิ์</h2>
           </div>
+          
+          {quotaInfo && quotaInfo.remaining <= 0 && (
+            <div style={{ background: "rgba(224,85,85,0.1)", color: "var(--red)", padding: 16, borderRadius: 8, marginBottom: 24, display: "flex", gap: 12, alignItems: "center" }}>
+              <i className="ti ti-alert-circle" style={{ fontSize: 24 }}></i>
+              <div><strong>โควตาเต็มแล้วในขณะนี้</strong> หากมีผู้สละสิทธิ์คุณจะสามารถกดจองได้อีกครั้ง ลองรีเฟรชหน้าเว็บเป็นระยะครับ</div>
+            </div>
+          )}
 
           <p style={{ color: "var(--t2)", fontSize: 14, marginBottom: 24 }}>
             กรุณากรอกข้อมูลให้ครบถ้วนเพื่อทำการ <strong>ล็อกโควตา</strong> หลังจากกดปุ่มยืนยัน ระบบจะให้เวลาคุณ <strong>{campaign.timeLimit} นาที</strong> ในการโอนเงินและแนบสลิป
@@ -309,8 +316,8 @@ export default function BookRegistration({ go, ctx }) {
           </div>
 
           <div style={{ marginTop: 32, display: "flex", justifyContent: "flex-end" }}>
-            <button type="submit" className="btn btn-teal" disabled={loading}>
-              {loading ? "กำลังเช็คโควตา..." : "ยืนยันเพื่อจองสิทธิ์"} <i className="ti ti-lock"></i>
+            <button type="submit" className="btn btn-teal" disabled={loading || (quotaInfo && quotaInfo.remaining <= 0)}>
+              {loading ? "กำลังเช็คโควตา..." : (quotaInfo && quotaInfo.remaining <= 0) ? "โควตาเต็มแล้ว" : "ยืนยันเพื่อจองสิทธิ์"} <i className="ti ti-lock"></i>
             </button>
           </div>
         </form>

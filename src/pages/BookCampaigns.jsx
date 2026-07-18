@@ -254,13 +254,23 @@ export default function BookCampaigns({ go }) {
                   )}
 
                   <div style={{ marginTop: "auto" }}>
-                    <button 
-                      className="premium-btn"
-                      onClick={() => go("book-register", { campaignId: c.id })}
-                      style={{ width: "100%", justifyContent: "center" }}
-                    >
-                      ลงทะเบียนรับสิทธิ์ทันที <i className="ti ti-arrow-right"></i>
-                    </button>
+                    {quotas[c.id] && quotas[c.id].remaining <= 0 ? (
+                      <button 
+                        className="premium-btn"
+                        disabled
+                        style={{ width: "100%", justifyContent: "center", background: "var(--bg3)", color: "var(--t3)", boxShadow: "none", cursor: "not-allowed" }}
+                      >
+                        โควตาเต็มแล้ว <i className="ti ti-lock"></i>
+                      </button>
+                    ) : (
+                      <button 
+                        className="premium-btn"
+                        onClick={() => go("book-register", { campaignId: c.id })}
+                        style={{ width: "100%", justifyContent: "center" }}
+                      >
+                        ลงทะเบียนรับสิทธิ์ทันที <i className="ti ti-arrow-right"></i>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
