@@ -1,4 +1,4 @@
-import admin, { verifyIdToken } from './_firebase-admin.js';
+import admin, { verifyIdToken } from './_firebase-admin.mjs';
 
 const SOURCE = "https://abuiyaad.com/"
 const STAFF_ROLES = new Set(["staff", "admin", "owner"])

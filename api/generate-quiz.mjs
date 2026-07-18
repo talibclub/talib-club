@@ -1,4 +1,4 @@
-import { verifyIdToken } from './_firebase-admin.js';
+import { verifyIdToken } from './_firebase-admin.mjs';
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"

@@ -1,4 +1,4 @@
-import admin, { verifyIdToken } from "./_firebase-admin.js";
+import admin, { verifyIdToken } from "./_firebase-admin.mjs";
 
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://talibclub.org";
 
