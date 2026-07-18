@@ -3,7 +3,7 @@ import { collection, query, where, getDocs, updateDoc, doc, serverTimestamp, set
 import { db } from "../../lib/firebase.js"
 import { trackingDb } from "../../lib/trackingFirebase.js"
 import toast from "react-hot-toast"
-import { confirmAction } from "../../utils/feedback.jsx"
+import { confirmAction, promptAction } from "../../utils/feedback.jsx"
 
 export default function CampaignRegistrationsViewer({ campaign, onBack }) {
   const [registrations, setRegistrations] = useState([])
@@ -88,7 +88,7 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
   }
 
   const handleAddTrackingNumber = async (reg) => {
-    const trackNum = prompt("กรุณากรอกเลขพัสดุ (Tracking Number) สำหรับออเดอร์นี้:")
+    const trackNum = await promptAction({ title: "Add tracking number", message: "Enter the tracking number for this order", placeholder: "Tracking Number", confirmText: "Save" })
     if (!trackNum || trackNum.trim() === "") return
 
     const confirmed = await confirmAction(`ยืนยันการใส่เลขพัสดุ ${trackNum} และส่งต่อให้ระบบ Tracking ใช่หรือไม่?`)

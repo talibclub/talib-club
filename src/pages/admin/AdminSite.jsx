@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react"
 import { SITE, ARTICLES, BOOKS, MEDIA, SCHOLARS } from "../../data/index.js"
 import { useSiteSettings, CONTENT_COLLECTIONS } from "../../lib/contentStore.js"
-import { notifyError, notifySuccess } from "../../utils/feedback.jsx"
+import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
 import { db } from "../../lib/firebase.js"
 import { collection, doc, setDoc, getDocs, serverTimestamp } from "firebase/firestore"
 
@@ -101,7 +101,7 @@ export default function AdminSite() {
   }
 
   async function runSeeding() {
-    if (!window.confirm(`ยืนยันการเริ่มอัปโหลดข้อมูลเข้าสู่ Firebase? (โหมด: ${forceOverwrite ? "เขียนทับข้อมูลทั้งหมด" : "อัปโหลดเฉพาะข้อมูลใหม่"})`)) {
+    if (!await confirmAction({ title: "Confirm upload", message: `ยืนยันการเริ่มอัปโหลดข้อมูลเข้าสู่ Firebase? (โหมด: ${forceOverwrite ? "เขียนทับข้อมูลทั้งหมด" : "อัปโหลดเฉพาะข้อมูลใหม่"})` })) {
       return
     }
 

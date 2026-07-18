@@ -125,13 +125,62 @@ function ConfirmDialog({ title, message, confirmText, cancelText, danger, onReso
   )
 }
 
-export function confirmAction({
+
+function PromptDialog({ title, message, placeholder, confirmText, cancelText, onResolve }) {
+  const [value, setValue] = useState("")
+  const [visible, setVisible] = useState(false)
+
+  const handleClose = (result) => {
+    setVisible(false)
+    setTimeout(() => onResolve(result), 200)
+  }
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setVisible(true))
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") handleClose(null)
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [])
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0, 0, 0, 0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999999, opacity: visible ? 1 : 0, transition: "opacity 0.2s ease-in-out", fontFamily: "'Prompt', sans-serif" }}
+      onClick={() => handleClose(null)}
+    >
+      <form
+        style={{ width: 380, maxWidth: "calc(100vw - 32px)", background: "var(--card)", color: "var(--text)", border: ".5px solid var(--br2)", borderRadius: 16, boxShadow: "0 24px 60px rgba(0,0,0,.28)", padding: 20, transform: visible ? "translateY(0) scale(1)" : "translateY(16px) scale(0.95)", transition: "transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)" }}
+        onClick={event => event.stopPropagation()}
+        onSubmit={(event) => {
+          event.preventDefault()
+          const trimmed = value.trim()
+          if (trimmed) handleClose(trimmed)
+        }}
+      >
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>{title}</div>
+        {message && <div style={{ fontSize: 13, color: "var(--t2)", lineHeight: 1.6, marginBottom: 14 }}>{message}</div>}
+        <input autoFocus value={value} onChange={event => setValue(event.target.value)} placeholder={placeholder} />
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+          <button type="button" className="btn btn-outline" onClick={() => handleClose(null)} style={{ padding: "8px 16px", borderRadius: 20 }}>{cancelText}</button>
+          <button type="submit" className="btn btn-teal" style={{ padding: "8px 16px", borderRadius: 20 }}>{confirmText}</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+export function confirmAction(options = {}) {
+  const {
   title = "ยืนยันการดำเนินการ",
   message = "ต้องการดำเนินการต่อใช่ไหม?",
   confirmText = "ยืนยัน",
   cancelText = "ยกเลิก",
   danger = false,
-} = {}) {
+} = typeof options === "string" ? { message: options } : options
   return new Promise(resolve => {
     const appEl = document.querySelector(".app")
     const container = document.createElement("div")
@@ -155,6 +204,39 @@ export function confirmAction({
         confirmText={confirmText}
         cancelText={cancelText}
         danger={danger}
+        onResolve={cleanup}
+      />
+    )
+  })
+}
+
+
+export function promptAction({
+  title = "Enter a value",
+  message = "",
+  placeholder = "",
+  confirmText = "Confirm",
+  cancelText = "Cancel",
+} = {}) {
+  return new Promise(resolve => {
+    const appEl = document.querySelector(".app")
+    const container = document.createElement("div")
+    ;(appEl || document.body).appendChild(container)
+    const root = createRoot(container)
+
+    function cleanup(value) {
+      root.unmount()
+      container.remove()
+      resolve(value)
+    }
+
+    root.render(
+      <PromptDialog
+        title={title}
+        message={message}
+        placeholder={placeholder}
+        confirmText={confirmText}
+        cancelText={cancelText}
         onResolve={cleanup}
       />
     )

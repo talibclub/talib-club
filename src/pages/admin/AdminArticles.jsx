@@ -904,7 +904,7 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articles
             const currentFormat = quill.getFormat(range);
             quill.formatText(range.index, range.length, 'highlightText', !currentFormat.highlightText, 'user');
           } else {
-            window.alert("กรุณาคลุมข้อความที่ต้องการไฮไลต์ก่อนครับ");
+            notifyError("กรุณาคลุมข้อความที่ต้องการไฮไลต์ก่อนครับ");
           }
         },
         dropCap: function() {
@@ -914,7 +914,7 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articles
             const currentFormat = quill.getFormat(range);
             quill.formatText(range.index, range.length, 'dropCap', !currentFormat.dropCap, 'user');
           } else {
-            window.alert("กรุณาคลุมตัวอักษร 1 ตัวที่ต้องการทำ Drop Cap ก่อนครับ");
+            notifyError("กรุณาคลุมตัวอักษร 1 ตัวที่ต้องการทำ Drop Cap ก่อนครับ");
           }
         },
         arabicBlock: function() {

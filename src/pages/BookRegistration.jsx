@@ -3,6 +3,7 @@ import { doc, getDoc } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { db, storage } from "../lib/firebase.js"
 import { useAuth } from "../hooks/useAuth.js"
+import toast from "react-hot-toast"
 
 export default function BookRegistration({ go, ctx }) {
   const authState = useAuth()
@@ -94,7 +95,7 @@ export default function BookRegistration({ go, ctx }) {
     // Ensure phone is 10 digits
     const phoneClean = formData.phone.replace(/\D/g, '')
     if (phoneClean.length !== 10) {
-      alert("กรุณากรอกเบอร์โทรศัพท์ให้ครบ 10 หลัก")
+      toast.error("กรุณากรอกเบอร์โทรศัพท์ให้ครบ 10 หลัก")
       return
     }
 
@@ -123,7 +124,7 @@ export default function BookRegistration({ go, ctx }) {
       setStep(2)
     } catch (err) {
       console.error(err)
-      alert("เกิดข้อผิดพลาด กรุณาลองใหม่")
+      toast.error(err instanceof Error && err.message ? err.message : "เกิดข้อผิดพลาด กรุณาลองใหม่")
     } finally {
       setLoading(false)
     }
@@ -132,7 +133,7 @@ export default function BookRegistration({ go, ctx }) {
   const handleUploadAndSubmit = async (e) => {
     e.preventDefault()
     if (!slipFile) {
-      alert("กรุณาแนบสลิปโอนเงิน")
+      toast.error("กรุณาแนบสลิปโอนเงิน")
       return
     }
 
@@ -170,7 +171,7 @@ export default function BookRegistration({ go, ctx }) {
       setStep(3)
     } catch (err) {
       console.error(err)
-      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล")
+      toast.error(err instanceof Error && err.message ? err.message : "เกิดข้อผิดพลาดในการบันทึกข้อมูล")
     } finally {
       setUploading(false)
     }

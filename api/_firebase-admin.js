@@ -1,25 +1,32 @@
-import admin from 'firebase-admin';
+import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 
-if (!admin.getApps().length) {
+if (!getApps().length) {
   try {
-    // Initialize with service account JSON if provided in env
     if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-      });
+      initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) });
     } else {
-      // Fallback to default initialization (works in some Vercel/GCP environments automatically)
-      admin.initializeApp();
+      initializeApp();
     }
   } catch (error) {
-    console.error('Firebase admin initialization error:', error);
+    console.error("Firebase admin initialization error:", error);
   }
 }
 
+export const getAdminFirestore = () => getFirestore();
+
 export const verifyIdToken = async (token) => {
   if (!token) throw new Error("No token provided");
-  return await admin.auth().verifyIdToken(token);
+  return getAuth().verifyIdToken(token);
 };
 
-export default admin;
+// Compatibility surface for existing API handlers while using Firebase Admin's ESM-safe APIs.
+const firestore = () => getFirestore();
+firestore.FieldValue = FieldValue;
+firestore.Timestamp = Timestamp;
+
+export default {
+  auth: () => getAuth(),
+  firestore,
+};

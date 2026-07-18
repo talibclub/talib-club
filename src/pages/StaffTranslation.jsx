@@ -3,7 +3,7 @@ import { createPortal } from "react-dom"
 import { collection, doc, getDocs, serverTimestamp, writeBatch } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
 import { useAuth } from "../hooks/useAuth.js"
-import { notifyError, notifySuccess } from "../utils/feedback.jsx"
+import { confirmAction, notifyError, notifySuccess } from "../utils/feedback.jsx"
 import { buildPageRange } from "../utils/pagination.js"
 
 const COLLECTION = "translation_abuiyaad"
@@ -142,8 +142,8 @@ export default function StaffTranslation({ go }) {
     setWorkspaceDirty(false)
   }
 
-  function closeWorkspace() {
-    if (workspaceDirty && !window.confirm("มีการแก้ไขที่ยังไม่ได้บันทึก ต้องการออกจากพื้นที่แปลหรือไม่?")) {
+  async function closeWorkspace() {
+    if (workspaceDirty && !await confirmAction({ title: "Confirm exit", message: "มีการแก้ไขที่ยังไม่ได้บันทึก ต้องการออกจากพื้นที่แปลหรือไม่?" })) {
       return
     }
     setActiveWorkspaceItem(null)
