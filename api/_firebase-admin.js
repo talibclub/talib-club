@@ -1,6 +1,6 @@
-const { cert, getApps, initializeApp } = require("firebase-admin/app");
-const { getAuth } = require("firebase-admin/auth");
-const { FieldValue, getFirestore, Timestamp } = require("firebase-admin/firestore");
+import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 
 if (!getApps().length) {
   try {
@@ -14,9 +14,9 @@ if (!getApps().length) {
   }
 }
 
-const getAdminFirestore = () => getFirestore();
+export const getAdminFirestore = () => getFirestore();
 
-const verifyIdToken = async (token) => {
+export const verifyIdToken = async (token) => {
   if (!token) throw new Error("No token provided");
   return getAuth().verifyIdToken(token);
 };
@@ -26,7 +26,7 @@ const firestore = () => getFirestore();
 firestore.FieldValue = FieldValue;
 firestore.Timestamp = Timestamp;
 
-module.exports = {
+export default {
   auth: () => getAuth(),
   firestore,
   verifyIdToken,
