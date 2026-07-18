@@ -1,5 +1,5 @@
 import webpush from 'web-push';
-import admin, { verifyIdToken } from './_firebase-admin.mjs';
+import admin, { verifyIdToken } from './_firebase-admin.js';
 
 const publicKey = process.env.VITE_VAPID_PUBLIC_KEY;
 const privateKey = process.env.VAPID_PRIVATE_KEY;
