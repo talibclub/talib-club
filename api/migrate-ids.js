@@ -40,12 +40,22 @@ export default async function handler(req, res) {
         const data = doc.data();
         const oldId = doc.id;
         
-        // UUID is 36 chars with 4 hyphens. Firestore auto-id is 20 chars alphanumeric.
-        const isFirestoreId = oldId.length === 20 && !oldId.includes('-');
-        const isUUID = oldId.length === 36 && oldId.split('-').length === 5;
+        let baseSlug = "";
+        if (data.seriesId && data.part) {
+           baseSlug = String(data.seriesId).trim().toLowerCase().replace(/[\s_]+/g, '-').replace(/[^\w\u0E00-\u0E7F\-]/g, '');
+           baseSlug = `${baseSlug}-${data.part}`;
+        } else {
+           const base = data.title || data.name || data.subject || "";
+           baseSlug = base.trim().toLowerCase().replace(/[\s_]+/g, '-').replace(/[^\w\u0E00-\u0E7F\-]/g, '');
+        }
+
+        if (baseSlug && oldId.startsWith(baseSlug)) {
+           continue; // Already migrated
+        }
         
-        if (!isFirestoreId && !isUUID) {
-          continue;
+        // If it doesn't have a baseSlug (e.g. no title) and is already a random ID, just leave it.
+        if (!baseSlug && (oldId.length === 20 || oldId.length === 36)) {
+           continue;
         }
         
         let newId = generateDocId(data);
