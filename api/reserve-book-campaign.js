@@ -67,12 +67,20 @@ export default async function handler(req, res) {
         }
       }
 
-      const activeHolds = campaignRef.collection("holds")
-        .where("status", "==", "reserved")
-        .where("expiresAt", ">", admin.firestore.Timestamp.now());
+      const activeHolds = campaignRef.collection("holds").where("status", "==", "reserved");
       const activeHoldsSnap = await tx.get(activeHolds);
+      
+      let activeCount = 0;
+      const nowMs = Date.now();
+      activeHoldsSnap.forEach(doc => {
+        const d = doc.data();
+        if (d.expiresAt && d.expiresAt.toMillis() > nowMs) {
+          activeCount++;
+        }
+      });
+      
       const completedHoldsSnap = await tx.get(campaignRef.collection("holds").where("status", "==", "completed"));
-      if (activeHoldsSnap.size + completedHoldsSnap.size >= quota) throw new Error("Campaign quota is full");
+      if (activeCount + completedHoldsSnap.size >= quota) throw new Error("Campaign quota is full");
 
       const expiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + timeLimit * 60 * 1000);
       tx.set(holdRef, {
