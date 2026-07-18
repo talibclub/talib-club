@@ -1,4 +1,4 @@
-import admin, { verifyIdToken } from "./_firebase-admin.js";
+const { default: admin, verifyIdToken } = require("./_firebase-admin.js");
 
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://talibclub.org";
 
@@ -31,7 +31,7 @@ async function requireUser(req) {
   return verifyIdToken(authHeader.substring(7));
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   const method = req.method || req.httpMethod;
   if (method === "OPTIONS") return send(res, 200, { ok: true });
   if (method !== "POST") return send(res, 405, { error: "Method Not Allowed" });
