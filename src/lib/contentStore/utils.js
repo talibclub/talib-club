@@ -54,18 +54,22 @@ export function getMs(val) {
 }
 
 export function byNewest(a, b) {
-  const timeA = getMs(a.createdAt) || getMs(a.updatedAt) || getMs(a.date)
-  const timeB = getMs(b.createdAt) || getMs(b.updatedAt) || getMs(b.date)
-  if (timeA && timeB) {
-    if (timeA !== timeB) return timeB - timeA // Newer first
-  } else if (timeA || timeB) {
-    return timeA ? -1 : 1
+  // First, compare by explicit 'date' field (which represents the logical publish date)
+  // We use parseDateStringToMs directly if it's a YYYY-MM-DD string, or getMs
+  const dateA = typeof a.date === "string" ? parseDateStringToMs(a.date) : getMs(a.date)
+  const dateB = typeof b.date === "string" ? parseDateStringToMs(b.date) : getMs(b.date)
+
+  if (dateA && dateB && dateA !== dateB) {
+    return dateB - dateA
   }
 
-  // Fall back to date field if available
-  const dateA = String(a.date || "")
-  const dateB = String(b.date || "")
-  if (dateA !== dateB) return dateB.localeCompare(dateA)
+  // If explicit dates are the same (or both missing), compare by exact creation/update time
+  const timeA = getMs(a.createdAt) || getMs(a.updatedAt) || dateA
+  const timeB = getMs(b.createdAt) || getMs(b.updatedAt) || dateB
+  
+  if (timeA && timeB && timeA !== timeB) {
+    return timeB - timeA
+  }
 
   return String(b.id || "").localeCompare(String(a.id || ""))
 }

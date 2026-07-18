@@ -102,13 +102,28 @@ export function invalidateCollectionCache(collectionName) {
     }
   }
 
+  // Clear countCache
+  for (const [key, val] of Object.entries(CONTENT_COLLECTIONS)) {
+    if (val === collectionName) {
+      countCache.delete(`count_${key}`)
+    }
+  }
+
   // Clear from localStorage
   try {
     const keysToRemove = []
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i)
-      if (k && k.startsWith(LOCAL_STORAGE_CACHE_PREFIX) && k.includes(`"collectionName":"${collectionName}"`)) {
-        keysToRemove.push(k)
+      if (k && k.startsWith(LOCAL_STORAGE_CACHE_PREFIX)) {
+        if (k.includes(`"collectionName":"${collectionName}"`)) {
+          keysToRemove.push(k)
+        } else {
+          for (const [key, val] of Object.entries(CONTENT_COLLECTIONS)) {
+            if (val === collectionName && k === LOCAL_STORAGE_CACHE_PREFIX + `count_${key}`) {
+              keysToRemove.push(k)
+            }
+          }
+        }
       }
     }
     keysToRemove.forEach(k => localStorage.removeItem(k))
