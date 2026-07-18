@@ -28,11 +28,19 @@ function generateDocId(item) {
 export default async function handler(req, res) {
   try {
     const db = admin.firestore();
-    const collections = ["articles", "library", "media", "scholars", "book_campaigns"];
+    // Use the actual Firestore collection names here:
+    const collections = [
+      { name: "content_articles", metaKey: "articles" },
+      { name: "content_books", metaKey: "books" },
+      { name: "content_media", metaKey: "media" },
+      { name: "content_scholars", metaKey: "scholars" },
+      { name: "book_campaigns", metaKey: "book_campaigns" }
+    ];
     
     const logs = [];
     
-    for (const colName of collections) {
+    for (const col of collections) {
+      const colName = col.name;
       logs.push(`Processing collection: ${colName}...`);
       const snap = await db.collection(colName).get();
       
@@ -99,7 +107,7 @@ export default async function handler(req, res) {
     const metaPayload = {};
     const now = Date.now();
     for (const col of collections) {
-      metaPayload[col] = now;
+      metaPayload[col.metaKey] = now;
     }
     await db.collection("site_settings").doc("content_meta").set(metaPayload, { merge: true });
     
