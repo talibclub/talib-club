@@ -1,11 +1,12 @@
 import webpush from 'web-push';
-import { verifyIdToken } from './_firebase-admin.js';
+import admin, { verifyIdToken } from './_firebase-admin.js';
 
 const publicKey = process.env.VITE_VAPID_PUBLIC_KEY;
 const privateKey = process.env.VAPID_PRIVATE_KEY;
 
 // C5: Restrict CORS to actual domain instead of wildcard
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://talib.club';
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://talibclub.org';
+const STAFF_ROLES = new Set(['staff', 'admin', 'owner']);
 
 function setCorsHeaders(res) {
   if (typeof res.setHeader === 'function') {
@@ -23,7 +24,25 @@ if (publicKey && privateKey) {
   );
 }
 
-// verifyFirebaseIdToken removed in favor of firebase-admin
+async function requireStaff(idToken) {
+  const decodedToken = await verifyIdToken(idToken);
+  const uid = decodedToken.uid;
+  if (!uid) {
+    const err = new Error('Unauthorized: Invalid authentication token');
+    err.status = 401;
+    throw err;
+  }
+
+  const userSnap = await admin.firestore().doc(`users/${uid}`).get();
+  const role = userSnap.exists ? userSnap.data()?.role : null;
+  if (!STAFF_ROLES.has(role)) {
+    const err = new Error('Forbidden: Staff access required');
+    err.status = 403;
+    throw err;
+  }
+
+  return decodedToken;
+}
 
 export default async function handler(req, res) {
   // Support standard Vercel response formatting
@@ -56,8 +75,8 @@ export default async function handler(req, res) {
   if (typeof body === 'string') {
     try {
       body = JSON.parse(body);
-    } catch (e) {
-      // ignore
+    } catch {
+      // Ignore invalid JSON bodies; validation below will reject missing fields.
     }
   }
 
@@ -84,16 +103,10 @@ export default async function handler(req, res) {
   if (!idToken) {
     return sendResponse(401, { error: 'Unauthorized: Missing authentication token' });
   }
-  let decodedToken;
   try {
-    decodedToken = await verifyIdToken(idToken);
+    await requireStaff(idToken);
   } catch (err) {
-    return sendResponse(401, { error: `Unauthorized: Invalid authentication token. ${err.message}` });
-  }
-
-  const uid = decodedToken.uid;
-  if (!uid) {
-    return sendResponse(401, { error: 'Unauthorized: Invalid authentication token' });
+    return sendResponse(err.status || 401, { error: err.message || 'Unauthorized: Invalid authentication token' });
   }
 
   const { subscriptions, payload } = body || {};

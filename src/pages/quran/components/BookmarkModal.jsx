@@ -1,5 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import DOMPurify from "dompurify"
 import { stripTajweedTags } from '../utils/quranUtils.js';
 
 export default function BookmarkModal({
@@ -63,7 +64,7 @@ export default function BookmarkModal({
                 margin: "8px 0",
                 lineHeight: 1.6,
                 color: "var(--quran-text)"
-              }} dangerouslySetInnerHTML={{ __html: tajweedEnabled ? activeBookmarkModal.arabicText : stripTajweedTags(activeBookmarkModal.arabicText) }} />
+              }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(tajweedEnabled ? activeBookmarkModal.arabicText : stripTajweedTags(activeBookmarkModal.arabicText), { ADD_TAGS: ["tajweed"] }) }} />
               <div style={{ fontSize: 12, color: "var(--quran-t2)", lineHeight: 1.45, textAlign: "left" }}>
                 {activeBookmarkModal.translation}
               </div>

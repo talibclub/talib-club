@@ -48,21 +48,26 @@ if (Quill) {
   const BlockEmbed = Quill.import('blots/block/embed');
   class PdfAttachmentBlot extends BlockEmbed {
     static create(value) {
-      let node = super.create();
-      node.setAttribute('href', value.url || '#');
+      const node = super.create();
+      let href = '#';
+      try {
+        const parsedUrl = new URL(value?.url || '');
+        if (parsedUrl.protocol === 'https:' || parsedUrl.protocol === 'http:') href = parsedUrl.href;
+      } catch {
+        // Leave the attachment link disabled when its URL is invalid.
+      }
+      node.setAttribute('href', href);
       node.setAttribute('target', '_blank');
+      node.setAttribute('rel', 'noopener noreferrer');
       node.setAttribute('contenteditable', 'false');
-      
       node.innerHTML = `
-        <div class="pdf-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M5 12v-7a2 2 0 0 1 2 -2h7l5 5v4" /><path d="M5 18h1.5a1.5 1.5 0 0 0 0 -3h-1.5v6" /><path d="M17 18h2" /><path d="M20 15h-3v6" /><path d="M11 15h1a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-1v-6z" /></svg>
-        </div>
-        <div class="pdf-details">
-          <div class="pdf-title">${value.title || 'PDF Document'}</div>
-          <div class="pdf-action">View PDF File</div>
-          ${value.pages ? `<div class="pdf-meta">${value.pages}</div>` : ''}
-        </div>
+        <div class="pdf-icon"><svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v4a1 1 0 0 0 1 1h4" /></svg></div>
+        <div class="pdf-details"><div class="pdf-title"></div><div class="pdf-action">View PDF File</div><div class="pdf-meta"></div></div>
       `;
+      node.querySelector('.pdf-title').textContent = String(value?.title || 'PDF Document');
+      const meta = node.querySelector('.pdf-meta');
+      if (value?.pages) meta.textContent = String(value.pages);
+      else meta.remove();
       return node;
     }
 
@@ -1003,11 +1008,8 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articles
           quill.setSelection(insertRange.index + `[${nextNum}]`.length + 1);
           
           const html = quill.root.innerHTML;
-          if (!html.includes('Notes')) {
-            quill.clipboard.dangerouslyPasteHTML(quill.getLength(), `<p><br></p><h2>Notes</h2><p>${nextNum}. ${text}</p>`);
-          } else {
-            quill.clipboard.dangerouslyPasteHTML(quill.getLength(), `<p>${nextNum}. ${text}</p>`);
-          }
+          const notePrefix = html.includes('Notes') ? '' : '\nNotes\n';
+          quill.insertText(quill.getLength(), `${notePrefix}${nextNum}. ${text}`);
         }
       }
     },

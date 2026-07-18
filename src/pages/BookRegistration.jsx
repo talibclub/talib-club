@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { doc, getDoc, setDoc, collection, getCountFromServer, query, where, serverTimestamp, Timestamp } from "firebase/firestore"
+import { doc, getDoc } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { db, storage } from "../lib/firebase.js"
 import { useAuth } from "../hooks/useAuth.js"
@@ -56,38 +56,7 @@ export default function BookRegistration({ go, ctx }) {
             phone: user.phone || "" // assuming phone might exist
           }))
 
-          // Check existing hold
-          const holdSnap = await getDoc(doc(db, "book_campaigns", campaignId, "holds", user.uid))
-          if (holdSnap.exists()) {
-            const holdData = holdSnap.data()
-            if (holdData.status === "completed") {
-              setStep(3) // Already finished
-              return
-            } else if (holdData.status === "reserved") {
-              const exp = holdData.expiresAt.toDate()
-              if (exp > new Date()) {
-                // Still holding
-                setExpiresAt(exp)
-                setStep(2)
-                return
-              }
-              // Expired hold, can try to reserve again
-            }
-          }
 
-          // Check quota if they haven't held it yet
-          const completedQ = query(collection(db, "book_campaigns", campaignId, "holds"), where("status", "==", "completed"))
-          const completedSnap = await getCountFromServer(completedQ)
-          const completedCount = completedSnap.data().count
-
-          const reservedQ = query(collection(db, "book_campaigns", campaignId, "holds"), where("expiresAt", ">", new Date()))
-          const reservedSnap = await getCountFromServer(reservedQ)
-          const reservedCount = reservedSnap.data().count
-
-          if (completedCount + reservedCount >= campData.quota) {
-            setStep(0)
-            setErrorMsg("โควตาเต็มแล้วครับ หากมีผู้สละสิทธิ์ โควตาจะเด้งกลับมาในระบบโดยอัตโนมัติ")
-          }
         }
       } catch (err) {
         console.error(err)
@@ -131,27 +100,25 @@ export default function BookRegistration({ go, ctx }) {
 
     setLoading(true)
     try {
-      // Re-check quota just in case
-      const completedQ = query(collection(db, "book_campaigns", campaignId, "holds"), where("status", "==", "completed"))
-      const completedSnap = await getCountFromServer(completedQ)
-      
-      const reservedQ = query(collection(db, "book_campaigns", campaignId, "holds"), where("expiresAt", ">", new Date()))
-      const reservedSnap = await getCountFromServer(reservedQ)
-      
-      if (completedSnap.data().count + reservedSnap.data().count >= campaign.quota) {
-        setStep(0)
-        setErrorMsg("เสียใจด้วยครับ โควตาเพิ่งเต็มไปเมื่อสักครู่นี้")
-        setLoading(false)
+      const idToken = await user.getIdToken()
+      const response = await fetch("/api/reserve-book-campaign", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ campaignId })
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || "Could not reserve campaign")
+
+      if (data.hold?.status === "completed") {
+        setStep(3)
         return
       }
 
-      // Secure the hold!
-      const expDate = new Date(Date.now() + (campaign.timeLimit * 60 * 1000))
-      await setDoc(doc(db, "book_campaigns", campaignId, "holds", user.uid), {
-        status: "reserved",
-        expiresAt: expDate
-      })
-
+      const expDate = new Date(data.hold?.expiresAt)
+      if (Number.isNaN(expDate.getTime())) throw new Error("Invalid reservation expiry")
       setExpiresAt(expDate)
       setStep(2)
     } catch (err) {
@@ -178,25 +145,27 @@ export default function BookRegistration({ go, ctx }) {
       await uploadBytes(storageRef, slipFile)
       const slipUrl = await getDownloadURL(storageRef)
 
-      // Create registration data
-      await setDoc(doc(db, "book_registrations", `${campaignId}_${user.uid}`), {
-        campaignId,
-        uid: user.uid,
-        name: formData.name,
-        phone: formData.phone,
-        address: formData.address,
-        zipcode: formData.zipcode,
-        contact: formData.contact,
-        slipUrl,
-        status: "submitted",
-        createdAt: serverTimestamp()
+      const idToken = await user.getIdToken()
+      const res = await fetch("/api/submit-book-registration", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          campaignId,
+          name: formData.name,
+          phone: formData.phone,
+          address: formData.address,
+          zipcode: formData.zipcode,
+          contact: formData.contact,
+          slipUrl,
+        })
       })
-
-      // Update hold status
-      await setDoc(doc(db, "book_campaigns", campaignId, "holds", user.uid), {
-        status: "completed",
-        expiresAt: serverTimestamp() // no longer relevant
-      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || `Registration failed (${res.status})`)
+      }
 
       setStep(3)
     } catch (err) {

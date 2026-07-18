@@ -1,8 +1,43 @@
-import { verifyIdToken } from './_firebase-admin.js';
+import admin, { verifyIdToken } from './_firebase-admin.js';
+
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://talibclub.org";
+const STAFF_ROLES = new Set(["staff", "admin", "owner"]);
+
+function parseBody(req) {
+  if (!req.body) return {};
+  if (typeof req.body === "string") {
+    try {
+      return JSON.parse(req.body);
+    } catch {
+      return {};
+    }
+  }
+  return req.body;
+}
+
+async function requireStaff(req) {
+  const authHeader = req.headers?.authorization || req.headers?.Authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    const err = new Error("Unauthorized: Missing token");
+    err.status = 401;
+    throw err;
+  }
+
+  const decodedToken = await verifyIdToken(authHeader.substring(7));
+  const userSnap = await admin.firestore().doc(`users/${decodedToken.uid}`).get();
+  const role = userSnap.exists ? userSnap.data()?.role : null;
+  if (!STAFF_ROLES.has(role)) {
+    const err = new Error("Forbidden: Staff access required");
+    err.status = 403;
+    throw err;
+  }
+
+  return decodedToken;
+}
 
 export default async function handler(req, res) {
   // Set CORS headers
-  res.setHeader("Access-Control-Allow-Origin", process.env.ALLOWED_ORIGIN || "https://talib.club");
+  res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
@@ -15,20 +50,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' })
   }
 
-  // Authentication
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Unauthorized: Missing token" });
+  try {
+    await requireStaff(req);
+  } catch (err) {
+    return res.status(err.status || 401).json({ error: err.message });
   }
 
-  // Temporarily bypass strict Firebase Admin token verification
-  // since the Service Account JSON wasn't configured on the server.
-  // We still require a Bearer token to prevent casual spam.
-  if (authHeader.split("Bearer ")[1].length < 10) {
-    return res.status(401).json({ error: "Unauthorized: Invalid token format" });
-  }
-
-  const { message } = req.body
+  const { message } = parseBody(req)
   if (!message) {
     return res.status(400).json({ error: 'Message is required' })
   }
@@ -45,8 +73,7 @@ export default async function handler(req, res) {
   
   const payload = {
     chat_id: chatId,
-    text: message,
-    parse_mode: "HTML"
+    text: String(message).slice(0, 3500)
   }
 
   if (topicId) {

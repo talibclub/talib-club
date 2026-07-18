@@ -1,22 +1,24 @@
-import { verifyIdToken } from './_firebase-admin.js';
+import admin, { verifyIdToken } from './_firebase-admin.js';
 
 const OPENAI_URL = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1/chat/completions"
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://talibclub.org"
+const STAFF_ROLES = new Set(["staff", "admin", "owner"])
 
 function send(res, status, data) {
   if (typeof res.setHeader === "function") {
-    res.setHeader("Access-Control-Allow-Origin", "*")
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS, GET")
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type")
+    res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS")
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
   }
   if (typeof res.status === "function") return res.status(status).json(data)
   return {
     statusCode: status,
     headers: {
       "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
     },
     body: JSON.stringify(data),
   }
@@ -122,6 +124,31 @@ async function translateWithOpenAI(elements, apiKey) {
   }
 }
 
+async function requireStaff(req) {
+  const authHeader = req.headers?.authorization || req.headers?.Authorization
+  let idToken = null
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    idToken = authHeader.substring(7)
+  }
+
+  if (!idToken) {
+    const err = new Error("Unauthorized: Missing authentication token")
+    err.status = 401
+    throw err
+  }
+
+  const decodedToken = await verifyIdToken(idToken)
+  const userSnap = await admin.firestore().doc(`users/${decodedToken.uid}`).get()
+  const role = userSnap.exists ? userSnap.data()?.role : null
+  if (!STAFF_ROLES.has(role)) {
+    const err = new Error("Forbidden: Staff access required")
+    err.status = 403
+    throw err
+  }
+
+  return decodedToken
+}
+
 async function translateWithAnthropic(elements, apiKey) {
   const response = await fetch(ANTHROPIC_URL, {
     method: "POST",
@@ -206,7 +233,7 @@ async function translateWithGemini(elements, apiKey, modelName = "gemini-2.5-fla
     if (i % 2 === 1) { // It is a tag
       const isStartTag = token.startsWith("<") && !token.startsWith("</") && !token.endsWith("/>")
       const isEndTag = token.startsWith("</")
-      const tagName = token.replace(/[<>\/]/g, "").split(/\s+/)[0].toLowerCase()
+      const tagName = token.replace(/[<>/]/g, "").split(/\s+/)[0].toLowerCase()
 
       if (isStartTag) {
         if (tagName === "p") {
@@ -254,40 +281,27 @@ async function translateWithGemini(elements, apiKey, modelName = "gemini-2.5-fla
   return result.join("")
 }
 
-// verifyFirebaseIdToken removed in favor of firebase-admin
 export default async function handler(req, res) {
   const method = req.method || req.httpMethod
   if (method === "OPTIONS") return send(res, 200, { ok: true })
-  if (method !== "POST" && method !== "GET") return send(res, 405, { error: "Method Not Allowed" })
+  if (method !== "POST") return send(res, 405, { error: "Method Not Allowed" })
 
-  const params = method === "GET" ? req.query : parseBody(req)
+  try {
+    await requireStaff(req)
+  } catch (err) {
+    return send(res, err.status || 401, { error: err.message })
+  }
+
+  const params = parseBody(req)
   const { url } = params
   if (!url) {
     return send(res, 400, { error: "Missing article URL" })
   }
 
-  const authHeader = req.headers?.authorization || req.headers?.Authorization
-  let idToken = null
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    idToken = authHeader.substring(7)
-  }
-
-  if (!idToken) {
-    return send(res, 401, { error: "Unauthorized: Missing authentication token" })
-  }
-
-  // Temporarily bypass strict Firebase Admin token verification
-  // since the Service Account JSON wasn't configured on the server.
-  if (idToken.length < 10) {
-    return send(res, 401, { error: "Unauthorized: Invalid token format" });
-  }
-
-  // Firebase check removed temporarily.
-
   let parsedUrl
   try {
     parsedUrl = new URL(url)
-  } catch (err) {
+  } catch {
     return send(res, 400, { error: "Invalid URL format" })
   }
 
@@ -340,9 +354,9 @@ export default async function handler(req, res) {
     // 4. Translate using LLM (Try OpenAI, then Anthropic, else fail)
     let translationResult = null
     let source = ""
-    const openaiKey = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY
-    const anthropicKey = process.env.ANTHROPIC_API_KEY || process.env.VITE_ANTHROPIC_API_KEY
-    const geminiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY
+    const openaiKey = process.env.OPENAI_API_KEY
+    const anthropicKey = process.env.ANTHROPIC_API_KEY
+    const geminiKey = process.env.GEMINI_API_KEY
     let lastError = null;
 
     if (openaiKey) {

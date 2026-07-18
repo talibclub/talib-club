@@ -1008,6 +1008,15 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { getFirestore, collection, doc, getDocs, writeBatch, updateDoc, deleteDoc, Timestamp, query, where, or, limit }
   from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Expose functions to global scope for inline event handlers
 Object.assign(window, {
   showPage, switchTab, doLogin, doLogout, checkAdminAccess,
@@ -1495,9 +1504,9 @@ function renderExtractTable(rows) {
     const zipStyle = r.postalCode ? '' : 'color:var(--red);font-style:italic';
     return `<tr>
       <td>${i+1}</td>
-      <td class="mono-cell">${r.tracking}</td>
-      <td style="${zipStyle}">${r.postalCode || '(ไม่พบ)'}</td>
-      <td style="font-size:.8rem;color:var(--g6)">${r.recipientName || '-'}</td>
+      <td class="mono-cell">${escapeHtml(r.tracking)}</td>
+      <td style="${zipStyle}">${escapeHtml(r.postalCode || '-')}</td>
+      <td style="font-size:.8rem;color:var(--g6)">${escapeHtml(r.recipientName || '-')}</td>
       <td>${typeLabel}</td>
     </tr>`;
   }).join('');
@@ -2413,7 +2422,7 @@ function renderPrepRecords(recs) {
     const addrZip = `${r.address||'-'} ${r.postalCode||''}`.trim();
     return `<tr>
       <td style="text-align:center"><input type="checkbox" class="chk-prep-row chk-box" value="${r.id}"></td>
-      <td>${i+1}</td><td>${r.fullName||'-'}</td><td>${r.phone||'-'}</td>
+      <td>${i+1}</td><td>${r.fullName||'-'}</td><td>${escapeHtml(r.phone||'-')}</td>
       <td><div style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${addrZip}">${addrZip}</div></td>
       <td style="color:var(--amber2);font-weight:600">${r.bonusNote||'-'}</td>
       <td style="white-space:nowrap">
@@ -2559,9 +2568,9 @@ async function doRecipientSearch() {
       return;
     }
     result.innerHTML = found.map(r => {
-      const bon = r.bonusNote ? `<div class="bonus-banner"><span class="bonus-icon">🎉</span><span>${r.bonusNote}</span></div>` : '';
+      const bon = r.bonusNote ? `<div class="bonus-banner"><span class="bonus-icon">🎉</span><span>${escapeHtml(r.bonusNote)}</span></div>` : '';
       return `<div class="result-card teal">${bon}
-        <div class="rl">ชื่อ-นามสกุล</div><div class="rv" style="margin-bottom:14px">${r.fullName}</div>
+        <div class="rl">ชื่อ-นามสกุล</div><div class="rv" style="margin-bottom:14px">${escapeHtml(r.fullName)}</div>
         <div class="rt" style="font-size:1rem;text-align:center;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);padding:16px;margin-bottom:0">
           ✅ ท่านมีรายชื่อในระบบ<br><span style="font-size:.85rem;font-weight:400;opacity:.9">รอทางเราจัดเตรียมและจัดส่งให้ครับ</span></div></div>`;
     }).join('');
@@ -2595,10 +2604,10 @@ function renderRecords(recs) {
     return `<tr>
       <td style="text-align:center"><input type="checkbox" class="chk-manage-row chk-box" value="${r.id}"></td>
       <td>${i+1}</td>
-      <td>${r.fullName||'-'}${r.bonusNote?`<br><span style="font-size:.75rem;color:#d97706">🎁 ${r.bonusNote}</span>`:''}</td>
-      <td>${r.phone||'-'}</td>
-      <td class="mono">${r.trackingNumber||'-'}</td>
-      <td>${r.postalCode||'-'}</td><td>${r.city||'-'}</td>
+      <td>${escapeHtml(r.fullName||'-')}${r.bonusNote?`<br><span style="font-size:.75rem;color:#d97706">🎁 ${escapeHtml(r.bonusNote)}</span>`:''}</td>
+      <td>${escapeHtml(r.phone||'-')}</td>
+      <td class="mono">${escapeHtml(r.trackingNumber||'-')}</td>
+      <td>${escapeHtml(r.postalCode||'-')}</td><td>${escapeHtml(r.city||'-')}</td>
       <td style="font-size:.75rem;color:var(--g6)">${d}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-ghost btn-xs" onclick="openEditModal('${r.id}')">✏️</button>
@@ -2764,18 +2773,18 @@ async function doSearch() {
     }
     result.innerHTML = grouped.map(g => {
       const personBonus = g.tracks.find(t => t.bonus)?.bonus || '';
-      const bonHtml = personBonus ? `<div class="bonus-banner"><span class="bonus-icon">🎉</span><span>${personBonus}</span></div>` : '';
+      const bonHtml = personBonus ? `<div class="bonus-banner"><span class="bonus-icon">🎉</span><span>${escapeHtml(personBonus)}</span></div>` : '';
       const multiLabel = g.tracks.length > 1 ? `<div style="font-size:.78rem;background:rgba(255,255,255,.12);border-radius:6px;padding:5px 10px;margin-bottom:10px;opacity:.9">📦 พบ ${g.tracks.length} พัสดุสำหรับท่าน</div>` : '';
       const trackItems = g.tracks.map((t,idx) => `
         <div style="${g.tracks.length>1?'background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:14px;margin-bottom:10px':''}">
           ${g.tracks.length>1 ? `<div class="rl" style="margin-bottom:4px">พัสดุที่ ${idx+1}</div>` : '<div class="rl">เลข Tracking พัสดุ</div>'}
-          <div class="rt">${t.tracking}</div>
+          <div class="rt">${escapeHtml(t.tracking)}</div>
           <div class="result-actions">
-            <button class="btn btn-copy" onclick="copyTrack('${t.tracking}')">📋 คัดลอกเลข Track</button>
-            <a class="btn btn-track" href="https://track.thailandpost.co.th/?trackNumber=${t.tracking}" target="_blank">🔗 ติดตามพัสดุ</a>
+            <button class="btn btn-copy" onclick="copyTrack(this.dataset.tracking)" data-tracking="${escapeHtml(t.tracking)}">📋 คัดลอกเลข Track</button>
+            <a class="btn btn-track" href="https://track.thailandpost.co.th/?trackNumber=${encodeURIComponent(t.tracking)}" target="_blank">🔗 ติดตามพัสดุ</a>
           </div>
         </div>`).join('');
-      return `<div class="result-card">${bonHtml}<div class="rl">ชื่อ-นามสกุล</div><div class="rv">${g.fullName}</div>${multiLabel}${trackItems}</div>`;
+      return `<div class="result-card">${bonHtml}<div class="rl">ชื่อ-นามสกุล</div><div class="rv">${escapeHtml(g.fullName)}</div>${multiLabel}${trackItems}</div>`;
     }).join('');
   } catch(e) { loading.classList.add('hidden'); console.error(e); toast('เกิดข้อผิดพลาด','err'); }
 }

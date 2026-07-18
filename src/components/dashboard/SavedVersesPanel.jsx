@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react"
 import toast from 'react-hot-toast'
+import DOMPurify from "dompurify"
 import { useUserCollection } from "../../lib/contentStore.js"
 import { confirmAction } from "../../utils/feedback.jsx"
 
@@ -53,7 +54,7 @@ const VerseDisplay = ({ item }) => {
             lineHeight: 2.2,
             color: "var(--text)"
           }}
-          dangerouslySetInnerHTML={{ __html: data.arabic.replace(/\u25cc/g, "").replace(/\u0672/g, "\u0670") }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(data.arabic.replace(/\u25cc/g, "").replace(/\u0672/g, "\u0670"), { ADD_TAGS: ["tajweed"] }) }}
         />
       )}
       
@@ -65,7 +66,7 @@ const VerseDisplay = ({ item }) => {
       
       {data.tafsir && (
         <div style={{ fontSize: 13, color: "var(--t3)", lineHeight: 1.6 }}>
-          <strong style={{ color: "var(--text)" }}>ตัฟซีรย่อ:</strong> <span dangerouslySetInnerHTML={{ __html: data.tafsir }} />
+          <strong style={{ color: "var(--text)" }}>ตัฟซีรย่อ:</strong> <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(data.tafsir) }} />
         </div>
       )}
     </div>

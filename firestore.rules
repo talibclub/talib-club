@@ -24,6 +24,18 @@ service cloud.firestore {
       return isAdmin();
     }
 
+    function isSignedInUser(uid) {
+      return signedIn() && uid == request.auth.uid;
+    }
+
+    function ownsExistingDocument() {
+      return signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    function keepsOwnership() {
+      return request.resource.data.uid == request.auth.uid;
+    }
+
     // --- Users Collection Rules ---
     match /users/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || isStaff());
@@ -67,19 +79,22 @@ service cloud.firestore {
     match /content_bookmarks/{docId} {
       allow read: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
       allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if ownsExistingDocument() && keepsOwnership();
+      allow delete: if ownsExistingDocument();
     }
 
     match /content_bookshelf/{docId} {
       allow read: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
       allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if ownsExistingDocument() && keepsOwnership();
+      allow delete: if ownsExistingDocument();
     }
 
     match /content_reading_sessions/{docId} {
       allow read: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
       allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if ownsExistingDocument() && keepsOwnership();
+      allow delete: if ownsExistingDocument();
     }
 
     match /content_reading_streaks/{docId} {
@@ -91,7 +106,8 @@ service cloud.firestore {
     match /content_quran_bookmarks/{docId} {
       allow read: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
       allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if ownsExistingDocument() && keepsOwnership();
+      allow delete: if ownsExistingDocument();
     }
 
     match /content_quran_last_read/{docId} {
@@ -103,14 +119,18 @@ service cloud.firestore {
     match /content_history/{docId} {
       allow read: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
       allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if ownsExistingDocument() && keepsOwnership();
+      allow delete: if ownsExistingDocument();
     }
 
     // --- Push Notification Subscriptions (C3: was missing) ---
     match /push_subscriptions/{docId} {
       allow read: if isStaff();
-      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(["subscription", "endpoint", "uid", "userId", "isStaff", "updatedAt"]);
+      allow update: if ownsExistingDocument() && keepsOwnership();
+      allow delete: if ownsExistingDocument();
     }
 
     // --- Staff Portal Collections ---
@@ -133,13 +153,13 @@ service cloud.firestore {
 
     // --- Logistics Tracking Collections ---
     match /records/{docId} {
-      allow get: if true;
+      allow get: if isStaff();
       allow list: if isStaff() || (signedIn() && request.query.limit != null && request.query.limit <= 5);
       allow write: if isStaff();
     }
 
     match /recipients/{docId} {
-      allow get: if true;
+      allow get: if isStaff();
       allow list: if isStaff() || (signedIn() && request.query.limit != null && request.query.limit <= 5);
       allow write: if isStaff();
     }
@@ -163,17 +183,14 @@ service cloud.firestore {
     }
 
     match /book_campaigns/{campaignId}/holds/{holdId} {
-      allow read: if true;
-      allow create: if request.auth != null && holdId == request.auth.uid;
-      allow update: if request.auth != null && holdId == request.auth.uid;
-      allow delete: if isStaff();
+      allow read, write: if isStaff();
     }
 
     match /book_registrations/{docId} {
-      allow create: if signedIn();
+      allow create: if isStaff();
       allow get: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
-      allow list: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
-      allow update: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
+      allow list: if isStaff();
+      allow update: if isStaff();
       allow delete: if isStaff();
     }
   }

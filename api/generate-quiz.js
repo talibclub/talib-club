@@ -3,7 +3,7 @@ import { verifyIdToken } from './_firebase-admin.js';
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://talib.club"
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://talibclub.org"
 
 function send(res, status, data) {
   if (typeof res.setHeader === "function") {

@@ -62,6 +62,24 @@ function truncate(text, maxLen = 160) {
   return clean.substring(0, maxLen - 3).trim() + '...';
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function stringifyJsonForHtml(value) {
+  return JSON.stringify(value)
+    .replace(/</g, '\u003c')
+    .replace(/>/g, '\u003e')
+    .replace(/&/g, '\u0026')
+    .replace(new RegExp(String.fromCharCode(0x2028), 'g'), '\u2028')
+    .replace(new RegExp(String.fromCharCode(0x2029), 'g'), '\u2029');
+}
+
 function generateHtml({ title, description, canonical, ogImage, ogType = 'website', jsonLd, bodyContent }) {
   const SITE_NAME = 'Talib Club';
   
@@ -70,24 +88,24 @@ function generateHtml({ title, description, canonical, ogImage, ogType = 'websit
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
-  <meta name="description" content="${description}">
-  <link rel="canonical" href="${canonical}">
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(description)}">
+  <link rel="canonical" href="${escapeHtml(canonical)}">
   
-  <meta property="og:title" content="${title}">
-  <meta property="og:description" content="${description}">
-  <meta property="og:url" content="${canonical}">
-  <meta property="og:type" content="${ogType}">
+  <meta property="og:title" content="${escapeHtml(title)}">
+  <meta property="og:description" content="${escapeHtml(description)}">
+  <meta property="og:url" content="${escapeHtml(canonical)}">
+  <meta property="og:type" content="${escapeHtml(ogType)}">
   <meta property="og:site_name" content="${SITE_NAME}">
   <meta property="og:locale" content="th_TH">
-  ${ogImage ? `<meta property="og:image" content="${ogImage}">` : ''}
+  ${ogImage ? `<meta property="og:image" content="${escapeHtml(ogImage)}">` : ''}
   
   <meta name="twitter:card" content="${ogImage ? 'summary_large_image' : 'summary'}">
-  <meta name="twitter:title" content="${title}">
-  <meta name="twitter:description" content="${description}">
-  ${ogImage ? `<meta name="twitter:image" content="${ogImage}">` : ''}
+  <meta name="twitter:title" content="${escapeHtml(title)}">
+  <meta name="twitter:description" content="${escapeHtml(description)}">
+  ${ogImage ? `<meta name="twitter:image" content="${escapeHtml(ogImage)}">` : ''}
   
-  ${jsonLd ? `<script type="application/ld+json">\n${JSON.stringify(jsonLd)}\n</script>` : ''}
+  ${jsonLd ? `<script type="application/ld+json">\n${stringifyJsonForHtml(jsonLd)}\n</script>` : ''}
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -115,7 +133,7 @@ function generateHtml({ title, description, canonical, ogImage, ogType = 'websit
   </main>
   <script>
     if (!navigator.userAgent.match(/bot|crawler|spider|crawling|facebookexternalhit|line-poker/i)) {
-      window.location.replace('${new URL(canonical).pathname}${new URL(canonical).search}');
+      window.location.replace(${JSON.stringify(`${new URL(canonical).pathname}${new URL(canonical).search}`).replace(/</g, '\u003c')});
     }
   </script>
 </body>
@@ -175,10 +193,10 @@ export default async function handler(req, res) {
           },
           bodyContent: `
             <article>
-              <h1>${article.title}</h1>
-              ${article.coverUrl ? `<img src="${article.coverUrl}" alt="${article.title}">` : ''}
-              <p><strong>ผู้เขียน:</strong> ${article.author || '-'} | <strong>วันที่:</strong> <time>${article.date || '-'}</time></p>
-              <div>${article.body || plainBody}</div>
+              <h1>${escapeHtml(article.title)}</h1>
+              ${article.coverUrl ? `<img src="${escapeHtml(article.coverUrl)}" alt="${escapeHtml(article.title)}">` : ''}
+              <p><strong>ผู้เขียน:</strong> ${escapeHtml(article.author || '-')} | <strong>วันที่:</strong> <time>${escapeHtml(article.date || '-')}</time></p>
+              <div>${escapeHtml(plainBody)}</div>
             </article>
           `
         });
@@ -187,7 +205,7 @@ export default async function handler(req, res) {
       const articles = await getLatestArticles();
       let listHtml = '<h1>บทความวิชาการอิสลาม</h1><ul>';
       articles.forEach(a => {
-        listHtml += `<li><a href="/article?id=${a.id}">${a.title}</a> - ${a.author}</li>`;
+        listHtml += `<li><a href="/article?id=${encodeURIComponent(a.id)}">${escapeHtml(a.title)}</a> - ${escapeHtml(a.author || '')}</li>`;
       });
       listHtml += '</ul>';
 
@@ -214,9 +232,9 @@ export default async function handler(req, res) {
           },
           bodyContent: `
             <article>
-              <h1>${book.title}</h1>
-              ${book.coverUrl ? `<img src="${book.coverUrl}" alt="${book.title}">` : ''}
-              <p>${book.description || ''}</p>
+              <h1>${escapeHtml(book.title)}</h1>
+              ${book.coverUrl ? `<img src="${escapeHtml(book.coverUrl)}" alt="${escapeHtml(book.title)}">` : ''}
+              <p>${escapeHtml(book.description || '')}</p>
             </article>
           `
         });
@@ -238,9 +256,9 @@ export default async function handler(req, res) {
           },
           bodyContent: `
             <article>
-              <h1>${media.title}</h1>
-              ${(media.thumbnailUrl || media.coverUrl) ? `<img src="${media.thumbnailUrl || media.coverUrl}" alt="${media.title}">` : ''}
-              <p>${media.description || media.series || ''}</p>
+              <h1>${escapeHtml(media.title)}</h1>
+              ${(media.thumbnailUrl || media.coverUrl) ? `<img src="${escapeHtml(media.thumbnailUrl || media.coverUrl)}" alt="${escapeHtml(media.title)}">` : ''}
+              <p>${escapeHtml(media.description || media.series || '')}</p>
             </article>
           `
         });

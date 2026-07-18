@@ -1,19 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { collection, getDocs, writeBatch, doc, updateDoc, deleteDoc, Timestamp, query, where, or, limit } from "firebase/firestore";
+import { collection, getDocs, writeBatch, doc, updateDoc, Timestamp, query, where, or, limit } from "firebase/firestore";
 import { trackingDb as db } from "../lib/trackingFirebase.js";
-import { canAccessTrackingAdmin, verifyTrackingAdminPassword } from "../utils/trackingAuth.js";
 import { formatFirebaseDate } from "../utils/format.js";
 import { exportCSV } from "../utils/csvTracking.js";
 
-const TRACKING_AUTH_KEY = "talib_tracking_admin_v2";
-
 export default function Tracking({ authState }) {
   // --- View & Routing State ---
-  const [view, setView] = useState("home"); 
+  const [view, setView] = useState("home");
+  const isTrackingStaff = Boolean(authState?.isStaff);
   const [adminTab, setAdminTab] = useState(1);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [adminPassword, setAdminPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [secretClicks, setSecretClicks] = useState(0);
 
@@ -45,8 +42,7 @@ export default function Tracking({ authState }) {
       script.id = "papa-parse-script";
       document.head.appendChild(script);
     }
-    const savedPassword = sessionStorage.getItem(TRACKING_AUTH_KEY);
-    if (canAccessTrackingAdmin(authState) || (savedPassword && verifyTrackingAdminPassword(savedPassword))) {
+    if (isTrackingStaff) {
       setIsAdminAuthenticated(true);
       setView("admin-dashboard");
     }
@@ -56,21 +52,14 @@ export default function Tracking({ authState }) {
         delete window.Papa;
       }
     };
-  }, [authState?.isStaff]);
+  }, [isTrackingStaff]);
 
   useEffect(() => {
-    if (canAccessTrackingAdmin(authState)) {
+    if (isTrackingStaff) {
       setIsAdminAuthenticated(true);
     }
-  }, [authState?.isStaff]);
+  }, [isTrackingStaff]);
 
-
-  // Fetch Data when tabs change
-  useEffect(() => {
-    if (!isAdminAuthenticated) return;
-    if (adminTab === 2) fetchRecipients();
-    if (adminTab === 4) fetchRecords();
-  }, [adminTab, isAdminAuthenticated]);
 
   // ==========================================
   // ★ CUSTOM DIALOG MANAGER (แทนที่ window.alert/confirm)
@@ -102,7 +91,7 @@ export default function Tracking({ authState }) {
   // ==========================================
   // ★ FIREBASE FETCHING
   // ==========================================
-  const sortDataLikeCSV = (data) => {
+  const sortDataLikeCSV = useCallback((data) => {
     return data.sort((a, b) => {
       const tA = a.createdAt?.toMillis() || 0;
       const tB = b.createdAt?.toMillis() || 0;
@@ -113,9 +102,9 @@ export default function Tracking({ authState }) {
       // เรียงล็อตใหม่ไว้บนสุด
       return tB - tA;
     });
-  };
+  }, []);
 
-  const fetchRecipients = async () => {
+  const fetchRecipients = useCallback(async () => {
     setIsLoading(true);
     try {
       const snap = await getDocs(collection(db, "recipients"));
@@ -124,9 +113,9 @@ export default function Tracking({ authState }) {
       setSelectedRecipients([]);
     } catch (e) { console.error(e); }
     setIsLoading(false);
-  };
+  }, [sortDataLikeCSV]);
 
-  const fetchRecords = async () => {
+  const fetchRecords = useCallback(async () => {
     setIsLoading(true);
     try {
       const snap = await getDocs(collection(db, "records"));
@@ -135,7 +124,15 @@ export default function Tracking({ authState }) {
       setSelectedRecords([]);
     } catch (e) { console.error(e); }
     setIsLoading(false);
-  };
+  }, [sortDataLikeCSV]);
+
+  // Fetch data after its stable callbacks have been initialized.
+  useEffect(() => {
+    if (!isAdminAuthenticated) return;
+    if (adminTab === 2) fetchRecipients();
+    if (adminTab === 4) fetchRecords();
+  }, [adminTab, isAdminAuthenticated, fetchRecipients, fetchRecords]);
+
 
   // ==========================================
   // ★ PUBLIC SEARCH (หน้าบ้านผู้ใช้)
@@ -157,7 +154,6 @@ export default function Tracking({ authState }) {
     setIsLoading(true);
     setUserSearchResult(null);
     try {
-      const targetCol = mode === "recipient" ? "recipients" : "records";
       const qClean = rawQuery;
       const qPhone = rawQuery.replace(/[-\s]/g, ""); // digits only
       const qTrack = rawQuery.replace(/\s/g, "").toUpperCase();
@@ -466,7 +462,7 @@ export default function Tracking({ authState }) {
           {userSearchResult === "NOT_FOUND" && (
             <div className="empty card" style={{ border: "1px dashed var(--br)", padding: "48px 24px" }}>
               <div style={{ fontSize: "40px", marginBottom: "12px" }}>📭</div>
-              <p style={{ color: "var(--text)", fontWeight: "500", fontSize: "16px" }}>ไม่พบข้อมูลสำหรับ "{userQuery}"</p>
+              <p style={{ color: "var(--text)", fontWeight: "500", fontSize: "16px" }}>ไม่พบข้อมูลสำหรับ &quot;{userQuery}&quot;</p>
             </div>
           )}
 
@@ -516,22 +512,15 @@ export default function Tracking({ authState }) {
             <div style={{ fontSize: "40px", marginBottom: "16px" }}>🔐</div>
             <h1 style={{ fontSize: "24px", marginBottom: "8px", fontWeight: "600", color: "var(--teal)" }}>Admin Dashboard</h1>
             <p style={{ color: "var(--t2)", fontSize: "13px", marginBottom: "24px" }}>จัดการข้อมูลแบบครบวงจร</p>
-            <input type="password" className="inp" placeholder="Password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} style={{ marginBottom: "16px", textAlign: "center" }} />
             <button className="btn btn-main style-full" style={{ width: "100%", background: "var(--teal)", color: "white" }} onClick={async () => {
-              if (canAccessTrackingAdmin(authState)) {
-                setIsAdminAuthenticated(true);
-                setView("admin-dashboard");
-              } else if (verifyTrackingAdminPassword(adminPassword)) {
-                setIsAdminAuthenticated(true);
-                sessionStorage.setItem(TRACKING_AUTH_KEY, adminPassword);
-                setView("admin-dashboard");
-              } else if (!import.meta.env.VITE_TRACKING_ADMIN_PASSWORD) {
-                await myAlert("กรุณาเข้าสู่ระบบ เฉพาะสตาฟเท่านั้น");
-              } else {
-                await myAlert("รหัสผ่านไม่ถูกต้อง");
-              }
-            }}>เข้าสู่ระบบ</button>
-            {canAccessTrackingAdmin(authState) && (
+               if (isTrackingStaff) {
+                 setIsAdminAuthenticated(true);
+                 setView("admin-dashboard");
+               } else {
+                 await myAlert("Staff access is required.");
+               }
+             }}>เข้าสู่ระบบ</button>
+            {isTrackingStaff && (
               <p style={{ fontSize: 11, color: "var(--teal)", marginTop: 12 }}>บัญชีสตาฟที่ล็อกอินอยู่สามารถเข้าแอดมินได้โดยไม่ต้องใส่รหัส</p>
             )}
             <button className="btn btn-outline btn-sm" style={{ width: "100%", marginTop: "12px", border: "none" }} onClick={() => setView("home")}>← กลับหน้าหลัก</button>
@@ -553,7 +542,7 @@ export default function Tracking({ authState }) {
                  <p style={{ fontSize: "12px", opacity: 0.8, margin: 0 }}>จัดการข้อมูลแบบครบวงจร</p>
                </div>
             </div>
-            <button onClick={() => { setIsAdminAuthenticated(false); sessionStorage.removeItem(TRACKING_AUTH_KEY); localStorage.removeItem(TRACKING_AUTH_KEY); localStorage.removeItem("talib_admin_auth"); setView("home"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.3)", color: "white", padding: "6px 16px", borderRadius: "20px", cursor: "pointer", fontSize: "13px" }}>ออกจากระบบแอดมิน</button>
+            <button onClick={() => { setIsAdminAuthenticated(false); localStorage.removeItem("talib_admin_auth"); setView("home"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.3)", color: "white", padding: "6px 16px", borderRadius: "20px", cursor: "pointer", fontSize: "13px" }}>ออกจากระบบแอดมิน</button>
           </div>
 
           {/* Admin Tabs */}
@@ -677,7 +666,7 @@ export default function Tracking({ authState }) {
                <div style={{ border: "2px dashed var(--br)", borderRadius: "12px", padding: "60px 24px", textAlign: "center", background: "var(--bg2)", cursor: "pointer", transition: "all 0.2s" }} onClick={() => document.getElementById('csv-records').click()}>
                  <div style={{ fontSize: "48px", marginBottom: "16px" }}>📄</div>
                  <div style={{ fontWeight: "700", color: "var(--teal)", fontSize: "16px", marginBottom: "8px" }}>คลิกเพื่อเลือกไฟล์ Google Sheet (CSV)</div>
-                 <div style={{ fontSize: "13px", color: "var(--t2)" }}>ให้แน่ใจว่าในไฟล์มีคอลัมน์ "เลข Tracking" หรือ "Tracking"</div>
+                 <div style={{ fontSize: "13px", color: "var(--t2)" }}>ให้แน่ใจว่าในไฟล์มีคอลัมน์ &quot;เลข Tracking&quot; หรือ &quot;Tracking&quot;</div>
                  <input id="csv-records" type="file" accept=".csv" className="hidden" style={{ display: 'none' }} onChange={(e) => handleCSVUpload(e, "records")} />
                </div>
                

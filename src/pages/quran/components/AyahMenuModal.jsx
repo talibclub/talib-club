@@ -1,5 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import DOMPurify from "dompurify"
 import { useAudio } from '../../../context/AudioContext.jsx';
 import { SURA_LIST } from '../../../data/surahs.js';
 import { stripTajweedTags } from '../utils/quranUtils.js';
@@ -76,7 +77,7 @@ export default function AyahMenuModal({
               overflowY: "auto",
               direction: "rtl"
             }} dangerouslySetInnerHTML={{
-              __html: tajweedEnabled ? (activeAyahMenu.verse?.arabic_text_tajweed || activeAyahMenu.arabicText || "") : stripTajweedTags(activeAyahMenu.verse?.arabic_text_tajweed || activeAyahMenu.arabicText || "")
+              __html: DOMPurify.sanitize(tajweedEnabled ? (activeAyahMenu.verse?.arabic_text_tajweed || activeAyahMenu.arabicText || "") : stripTajweedTags(activeAyahMenu.verse?.arabic_text_tajweed || activeAyahMenu.arabicText || ""), { ADD_TAGS: ["tajweed"] })
             }} />
 
             {/* Play/Pause Button for this verse */}

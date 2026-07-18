@@ -264,7 +264,9 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
     if (localPayload.createdAt) localPayload.createdAt = Date.now()
 
     let backupRemoteItems = null
-    let backupCacheItems = null
+    const backupCacheEntries = new Map(
+      [...collectionCache.entries()].filter(([key]) => key.includes(`"collectionName":"${collectionName}"`))
+    )
     setRemoteItems(prev => {
       backupRemoteItems = prev
       const list = prev || []
@@ -287,14 +289,10 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
     } catch (err) {
       // Rollback on failure
       setRemoteItems(backupRemoteItems)
-      if (backupCacheItems) {
-        for (const [key, entry] of collectionCache.entries()) {
-          if (key.includes(`"collectionName":"${collectionName}"`)) {
-             collectionCache.set(key, { ...entry, items: backupCacheItems })
-             if (PUBLIC_COLLECTIONS.includes(collectionName)) {
-               try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: backupCacheItems, at: Date.now() })) } catch (e) { }
-             }
-          }
+      for (const [key, entry] of backupCacheEntries) {
+        collectionCache.set(key, entry)
+        if (PUBLIC_COLLECTIONS.includes(collectionName)) {
+          try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: entry.items, at: Date.now() })) } catch (e) { }
         }
       }
       throw err
@@ -304,7 +302,9 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
 
   const deleteItem = useCallback(async (id) => {
     let backupRemoteItems = null
-    let backupCacheItems = null
+    const backupCacheEntries = new Map(
+      [...collectionCache.entries()].filter(([key]) => key.includes(`"collectionName":"${collectionName}"`))
+    )
     // 🟢 Optimistic Update: มาร์กเป็น deleted: true บนหน้าจอก่อนทันที (เพื่อแก้ปัญหา Fallback Merge ย้อนกลับมาแสดง)
     setRemoteItems(prev => {
       backupRemoteItems = prev
@@ -342,14 +342,10 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
       await updateCollectionMetadata(collectionName)
     } catch (err) {
       setRemoteItems(backupRemoteItems)
-      if (backupCacheItems) {
-        for (const [key, entry] of collectionCache.entries()) {
-          if (key.includes(`"collectionName":"${collectionName}"`)) {
-             collectionCache.set(key, { ...entry, items: backupCacheItems })
-             if (PUBLIC_COLLECTIONS.includes(collectionName)) {
-               try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: backupCacheItems, at: Date.now() })) } catch (e) { }
-             }
-          }
+      for (const [key, entry] of backupCacheEntries) {
+        collectionCache.set(key, entry)
+        if (PUBLIC_COLLECTIONS.includes(collectionName)) {
+          try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: entry.items, at: Date.now() })) } catch (e) { }
         }
       }
       throw err

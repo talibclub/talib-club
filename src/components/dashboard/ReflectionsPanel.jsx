@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useMemo, useRef } from "react"
 import { createPortal } from "react-dom"
+import DOMPurify from "dompurify"
 import toast from 'react-hot-toast'
 import { useContentCollection, useUserCollection } from "../../lib/contentStore.js"
 import { confirmAction } from "../../utils/feedback.jsx"
@@ -464,11 +465,16 @@ function ExportCardModal({ note, onClose, theme }) {
           {/* We wrap the content we want to copy/print in a div with ref */}
           <div ref={cardRef}>
             {note.type === "quran" && note.arabicText && (
-              <div className="arabic" dangerouslySetInnerHTML={{ __html: note.arabicText }} />
+              <div
+                className="arabic"
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(note.arabicText, { ADD_TAGS: ["tajweed"] })
+                }}
+              />
             )}
 
             <div className="quote-text">
-              "{note.notes}"
+              &quot;{note.notes}&quot;
             </div>
 
             <div className="divider" />

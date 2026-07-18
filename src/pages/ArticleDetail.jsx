@@ -1,9 +1,10 @@
 import { useEffect, useState, useMemo, useRef } from "react"
 import { createPortal } from "react-dom"
 import toast from "react-hot-toast"
+import DOMPurify from "dompurify"
 import { ARTICLES, SERIES } from "../data/index.js"
-import { useContentCollection, useContentDoc, CONTENT_COLLECTIONS, saveContentItem } from "../lib/contentStore.js"
-import { collection, getDocs, query, where, serverTimestamp, limit } from "firebase/firestore"
+import { useContentCollection, useContentDoc, saveContentItem } from "../lib/contentStore.js"
+import { collection, getDocs, query, where, limit } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
 import { bumpContentMetric } from "../utils/contentMetrics.js"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
@@ -14,13 +15,6 @@ const READER_STORAGE_KEY = "talibReaderPrefs"
 const READER_SIZE_LABELS = { sm: "ก-", md: "ก", lg: "ก+" }
 const READER_TONE_LABELS = { 1: "1", 2: "2", 3: "3", 4: "4", 5: "5" }
 
-function sanitizeArticleForStore(article) {
-  if (!article) return article
-  const clean = { ...article }
-  delete clean.fromFilters
-  delete clean.viewMode
-  return clean
-}
 
 export default function ArticleDetail({ item, go, authState }) {
   const uid = authState?.user?.uid;
@@ -62,7 +56,9 @@ export default function ArticleDetail({ item, go, authState }) {
     try {
       const cached = sessionStorage.getItem(cacheKeyRelated)
       if (cached) cachedRelatedData = JSON.parse(cached)
-    } catch (e) { }
+    } catch {
+      /* Ignore invalid related-article cache. */
+    }
 
     if (cachedRelatedData) {
       const docs = cachedRelatedData
@@ -80,7 +76,9 @@ export default function ArticleDetail({ item, go, authState }) {
           const docs = snap.docs.map(d => ({ ...d.data(), id: d.id }))
           try {
             sessionStorage.setItem(cacheKeyRelated, JSON.stringify(docs))
-          } catch (e) { }
+          } catch {
+              /* Ignore sessionStorage quota errors. */
+            }
           const filtered = docs
             .filter(a => String(a.id) !== String(displayItem.id) && !a.deleted)
             .slice(0, 3)
@@ -434,6 +432,26 @@ export default function ArticleDetail({ item, go, authState }) {
     return { toc: tocList, finalHtml: body };
   }, [displayItem?.body]);
 
+  const safeFinalHtml = useMemo(() => DOMPurify.sanitize(finalHtml, {
+    ADD_TAGS: ["svg", "path"],
+    ADD_ATTR: [
+      "class",
+      "style",
+      "target",
+      "rel",
+      "data-footnote",
+      "data-sura",
+      "data-ayah",
+      "viewBox",
+      "fill",
+      "stroke",
+      "stroke-width",
+      "stroke-linecap",
+      "stroke-linejoin",
+      "d",
+    ],
+  }), [finalHtml]);
+
   // ระบบดักจับการคลิก (Smart Click Interceptor)
   const handleArticleClick = (e) => {
     const a = e.target.closest('a');
@@ -606,7 +624,7 @@ export default function ArticleDetail({ item, go, authState }) {
         className={`${readerClass} animate-float-cute`} 
         style={{ scrollBehavior: "smooth", animationDelay: "0.4s", padding: "16px 20px" }}
         onClick={handleArticleClick}
-        dangerouslySetInnerHTML={{ __html: finalHtml }} 
+        dangerouslySetInnerHTML={{ __html: safeFinalHtml }}
       />
 
       {displayItem.tags && displayItem.tags.length > 0 && (
@@ -654,7 +672,7 @@ export default function ArticleDetail({ item, go, authState }) {
       {seriesArticles.length > 0 && (
         <div className="card" style={{ padding: "20px 24px", marginTop: 32, background: "var(--teal-bg)", border: ".5px solid rgba(15,110,86,0.2)" }}>
           <h3 style={{ fontSize: 14, marginBottom: 14, display: "flex", alignItems: "center", gap: 8, color: "var(--teal)", fontWeight: 600 }}>
-            <i className="ti ti-list-numbers" style={{ fontSize: 18 }}></i> ตอนทั้งหมดในซีรีส์ "{seriesName}" ({seriesArticles.length} ตอน)
+            <i className="ti ti-list-numbers" style={{ fontSize: 18 }}></i> ตอนทั้งหมดในซีรีส์ &quot;{seriesName}&quot; ({seriesArticles.length} ตอน)
           </h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
             {seriesArticles.map(a => {

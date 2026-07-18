@@ -1,6 +1,7 @@
-import { verifyIdToken } from './_firebase-admin.js';
+import admin, { verifyIdToken } from './_firebase-admin.js';
 
 const SOURCE = "https://abuiyaad.com/"
+const STAFF_ROLES = new Set(["staff", "admin", "owner"])
 
 function decodeEntities(value = "") {
   return value
@@ -48,14 +49,36 @@ function extractLinks(html, baseUrl) {
     try {
       const url = new URL(decodeEntities(match[1]), baseUrl).href.split("#")[0]
       links.push({ title, url })
-    } catch {}
+    } catch {
+      // Ignore malformed links from the source page.
+    }
   }
   return links
 }
 
+async function requireStaff(req) {
+  const authHeader = req.headers?.authorization || req.headers?.Authorization
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    const err = new Error("Unauthorized: Missing token")
+    err.status = 401
+    throw err
+  }
+
+  const decodedToken = await verifyIdToken(authHeader.substring(7))
+  const userSnap = await admin.firestore().doc(`users/${decodedToken.uid}`).get()
+  const role = userSnap.exists ? userSnap.data()?.role : null
+  if (!STAFF_ROLES.has(role)) {
+    const err = new Error("Forbidden: Staff access required")
+    err.status = 403
+    throw err
+  }
+
+  return decodedToken
+}
+
 export default async function handler(req, res) {
   // Set CORS headers
-  res.setHeader("Access-Control-Allow-Origin", process.env.ALLOWED_ORIGIN || "https://talib.club");
+  res.setHeader("Access-Control-Allow-Origin", process.env.ALLOWED_ORIGIN || "https://talibclub.org");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
@@ -63,20 +86,10 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // Authentication
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Unauthorized: Missing token" });
-  }
-
   try {
-    const token = authHeader.split("Bearer ")[1];
-    const decodedToken = await verifyIdToken(token);
-    if (decodedToken.role !== 'staff' && decodedToken.role !== 'admin' && decodedToken.role !== 'owner') {
-      return res.status(403).json({ error: "Forbidden: Staff access required" });
-    }
+    await requireStaff(req)
   } catch (error) {
-    return res.status(401).json({ error: "Unauthorized: Invalid token" });
+    return res.status(error.status || 401).json({ error: error.message || "Unauthorized: Invalid token" });
   }
 
   try {
@@ -100,7 +113,7 @@ export default async function handler(req, res) {
           headers: { "user-agent": "TalibClubTranslationTracker/1.0" },
           signal: controller.signal
         });
-      } catch (err) {
+      } catch {
         clearTimeout(timeout);
         continue; // skip on timeout or network error
       }
