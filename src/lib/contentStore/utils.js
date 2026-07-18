@@ -104,3 +104,21 @@ export function stableStringify(obj) {
 export function getQueryCacheKey(collectionName, uid, limitCount, orderByField, orderDirection) {
   return stableStringify({ collectionName, uid: uid || null, limitCount, orderByField, orderDirection })
 }
+
+export function generateDocId(item) {
+  if (!item) return Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+  
+  const base = item.title || item.name || item.subject || "";
+  if (base) {
+    const slug = base.trim().toLowerCase()
+      .replace(/[\s_]+/g, '-')
+      .replace(/[^\w\u0E00-\u0E7F\-]/g, '');
+    
+    if (slug) {
+      const rand = Math.random().toString(36).substring(2, 7);
+      return `${slug}-${rand}`;
+    }
+  }
+  
+  return Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+}

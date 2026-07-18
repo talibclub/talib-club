@@ -3,7 +3,7 @@ import { collection, doc, getDoc, getDocs, onSnapshot, serverTimestamp, setDoc, 
 import { db } from "../firebase.js"
 import { getOfflineItem } from "../offlineStore.js"
 import { CONTENT_COLLECTIONS, USER_SPECIFIC_COLLECTIONS, PUBLIC_COLLECTIONS, LOCAL_STORAGE_CACHE_PREFIX } from "./constants.js"
-import { cleanForFirestore, getMs, byNewest, mergeWithFallback, getQueryCacheKey } from "./utils.js"
+import { cleanForFirestore, getMs, byNewest, mergeWithFallback, getQueryCacheKey, generateDocId } from "./utils.js"
 import { 
   collectionCache, countCache, inFlightRequests, setWithLimit,
   readCachedCollection, writeCachedCollection, readLocalStorageCacheEntry, invalidateCollectionCache,
@@ -245,7 +245,7 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
   }, [stableFallbackItems, loading, remoteItems])
 
   const saveItem = useCallback(async (item) => {
-    const id = String(item.id || crypto.randomUUID())
+    const id = String(item.id || generateDocId(item))
     const payload = {
       ...cleanForFirestore(item),
       id,
@@ -367,7 +367,7 @@ export async function saveContentItem(name, item, uid = null) {
   if (!collectionName) throw new Error(`Unknown content collection: ${name}`)
 
   const isUserSpecific = USER_SPECIFIC_COLLECTIONS.includes(name)
-  const id = String(item.id || crypto.randomUUID())
+  const id = String(item.id || generateDocId(item))
   const payload = {
     ...cleanForFirestore(item),
     id,
@@ -497,7 +497,7 @@ export async function bulkSaveItems(name, items, uid = null) {
   let failed = 0
   const now = serverTimestamp()
   const payloads = items.map(item => {
-    const id = String(item.id || crypto.randomUUID())
+    const id = String(item.id || generateDocId(item))
     const payload = {
       ...cleanForFirestore(item),
       id,
@@ -716,7 +716,7 @@ export function useUserCollection(name, uid) {
 
   const saveItem = useCallback(async (item) => {
     if (!collectionName) return
-    const id = String(item.id || crypto.randomUUID())
+    const id = String(item.id || generateDocId(item))
     const payload = {
       ...cleanForFirestore(item),
       id,
