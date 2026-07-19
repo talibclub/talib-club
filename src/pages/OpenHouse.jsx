@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { Helmet } from "react-helmet-async"
+import SEOHead from "../components/SEOHead.jsx"
 import { collection, query, orderBy, getDocs } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
 import "../styles/openhouse.css"
@@ -81,9 +81,7 @@ export default function OpenHouse({ go }) {
 
   return (
     <div className="openhouse-container">
-      <Helmet>
-        <title>แหล่งเรียนรู้ | Talib</title>
-      </Helmet>
+      <SEOHead title="แหล่งเรียนรู้ | Talib" />
       
       {/* Immersive Background */}
       <div className="openhouse-bg"></div>

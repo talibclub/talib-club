@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { Helmet } from "react-helmet-async"
+import SEOHead from "../components/SEOHead.jsx"
 import { collection, query, orderBy, getDocs, doc, getDoc, where, limit } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
 import "../styles/openhouse.css"
@@ -88,9 +88,7 @@ export default function OpenHouseCampus({ go, ctx }) {
 
   return (
     <div className="openhouse-container">
-      <Helmet>
-        <title>{booth?.name ? `${booth.name} | แหล่งเรียนรู้` : 'แหล่งเรียนรู้ | Talib'}</title>
-      </Helmet>
+      <SEOHead title={booth?.name ? `${booth.name} | แหล่งเรียนรู้` : 'แหล่งเรียนรู้ | Talib'} />
       {/* Immersive Background mapped to booth theme */}
       <div className="openhouse-bg" style={{ 
         background: `radial-gradient(circle at top right, ${booth.themeColor}20 0%, transparent 50%), radial-gradient(circle at bottom left, var(--teal-bg) 0%, transparent 50%)`,
@@ -169,7 +167,7 @@ export default function OpenHouseCampus({ go, ctx }) {
               {networkBooths.map(net => (
                 <div 
                   key={net.id} 
-                  className="net-card"
+                  className="net-card network-badge-hover"
                   onClick={() => {
                     const targetId = net.slug || net.id;
                     go("openhouse-campus", { boothId: targetId });
@@ -181,7 +179,6 @@ export default function OpenHouseCampus({ go, ctx }) {
                     transition: "all 0.2s ease",
                     boxShadow: "0 4px 12px rgba(0,0,0,0.03)"
                   }}
-                  className="network-badge-hover"
                 >
                   <div style={{ width: 24, height: 24, borderRadius: 6, background: net.themeColor || "var(--teal)", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {net.logoUrl ? <img src={net.logoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <i className="ti ti-building" style={{ fontSize: 12, color: "#fff" }}></i>}
