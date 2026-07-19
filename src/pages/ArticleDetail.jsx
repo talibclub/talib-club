@@ -265,6 +265,9 @@ export default function ArticleDetail({ item, go, authState }) {
     
     // Fix broken PDF SVG icons in older articles
     body = body.replace(/<path\s+d="M11\s+15l-1\.9\s+6h1\.9"\s*\/>\s*<path\s+d="M9\s+15l1\.9\s+6"\s*\/>/g, '<path d="M11 15h1a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-1v-6z" />');
+    
+    // Fix missing document body path in PDF SVG icons
+    body = body.replace(/(<path\s+d="M14\s+3v4a1\s+1\s+0\s+0\s+0\s+1\s+1h4"\s*\/?>(?!\s*<path\s+d="M17\s+21))/g, '$1<path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />');
 
     // Auto-convert legacy plain text to HTML paragraphs and line breaks
     if (body && !body.includes('<p') && !body.includes('<div') && !body.includes('<br')) {
