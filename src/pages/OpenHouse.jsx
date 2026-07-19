@@ -21,7 +21,7 @@ export default function OpenHouse({ go }) {
       try {
         const q = query(collection(db, "openhouse_booths"), orderBy("order", "asc"))
         const snap = await getDocs(q)
-        const allBooths = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        const allBooths = snap.docs.map(d => ({ ...d.data(), id: d.id }))
         
         setBooths(allBooths)
         
@@ -68,8 +68,9 @@ export default function OpenHouse({ go }) {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const enterBooth = (boothId) => {
-    go("openhouse-campus", { boothId })
+  const enterBooth = (booth) => {
+    const targetId = booth.slug || booth.id
+    go("openhouse-campus", { boothId: targetId })
   }
 
   const goBackToZones = () => {
@@ -132,7 +133,7 @@ export default function OpenHouse({ go }) {
                     const plats = b.platforms || (b.platform ? [b.platform] : [])
                     return plats.includes(selectedPlatform.id)
                   }).map(booth => (
-                    <div key={booth.id} className="booth-card" onClick={() => enterBooth(booth.id)}>
+                    <div key={booth.id} className="booth-card" onClick={() => enterBooth(booth)}>
                       <div className="booth-color-top" style={{ background: booth.themeColor || "var(--teal)" }}></div>
                       <div className="booth-logo-wrapper">
                         {booth.logoUrl ? (

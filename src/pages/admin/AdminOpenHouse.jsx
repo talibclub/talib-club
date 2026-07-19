@@ -28,7 +28,7 @@ export default function AdminOpenHouse() {
   useEffect(() => {
     const q = query(collection(db, "openhouse_booths"), orderBy("order", "asc"))
     const unsub = onSnapshot(q, (snap) => {
-      setBooths(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      setBooths(snap.docs.map(d => ({ ...d.data(), id: d.id })))
       setLoading(false)
     }, (err) => {
       console.error("Fetch booths error", err)
@@ -41,7 +41,7 @@ export default function AdminOpenHouse() {
     if (!activeBooth) return
     const q = query(collection(db, `openhouse_booths/${activeBooth.id}/campuses`), orderBy("order", "asc"))
     const unsub = onSnapshot(q, (snap) => {
-      setCampuses(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      setCampuses(snap.docs.map(d => ({ ...d.data(), id: d.id })))
     }, (err) => {
       console.error("Fetch campuses error", err)
     })

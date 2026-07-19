@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { collection, query, orderBy, getDocs, doc, getDoc } from "firebase/firestore"
+import { collection, query, orderBy, getDocs, doc, getDoc, where, limit } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
 import "../styles/openhouse.css"
 
@@ -25,14 +25,26 @@ export default function OpenHouseCampus({ go, ctx }) {
         
         let boothData = null;
         if (boothSnap.exists()) {
-          boothData = { id: boothSnap.id, ...boothSnap.data() }
+          boothData = { ...boothSnap.data(), id: boothSnap.id }
+        } else {
+          // Try fetching by slug
+          const slugQuery = query(collection(db, "openhouse_booths"), where("slug", "==", boothId), limit(1))
+          const slugSnap = await getDocs(slugQuery)
+          if (!slugSnap.empty) {
+            boothData = { ...slugSnap.docs[0].data(), id: slugSnap.docs[0].id }
+          }
+        }
+        
+        if (boothData) {
           setBooth(boothData)
         } else {
           go("openhouse")
           return
         }
+        
+        const realId = boothData.id;
         // Fetch Campuses (Buildings)
-        const q = query(collection(db, `openhouse_booths/${boothId}/campuses`), orderBy("order", "asc"))
+        const q = query(collection(db, `openhouse_booths/${realId}/campuses`), orderBy("order", "asc"))
         const campusSnap = await getDocs(q)
         setCampuses(campusSnap.docs.map(d => ({ id: d.id, ...d.data() })))
         
@@ -153,7 +165,11 @@ export default function OpenHouseCampus({ go, ctx }) {
               {networkBooths.map(net => (
                 <div 
                   key={net.id} 
-                  onClick={() => go("openhouse-campus", { boothId: net.id })}
+                  className="net-card"
+                  onClick={() => {
+                    const targetId = net.slug || net.id;
+                    go("openhouse-campus", { boothId: targetId });
+                  }}
                   style={{ 
                     display: "flex", alignItems: "center", gap: 8, 
                     background: "var(--bg2)", padding: "8px 16px", borderRadius: 12, 
