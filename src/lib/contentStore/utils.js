@@ -80,13 +80,19 @@ export function mergeWithFallback(fallbackItems, remoteItems) {
   const byId = new Map(fallbackItems.map(item => [String(item.id), item]))
   remoteItems.forEach(item => {
     const id = String(item.id)
+    
+    // Remove the old fallback item if it has been migrated to a new ID
+    if (item.old_id && byId.has(String(item.old_id))) {
+      byId.delete(String(item.old_id))
+    }
+    
     if (item.deleted) {
       byId.delete(id)
       return
     }
     byId.set(id, { ...(byId.get(id) || {}), ...item })
   })
-  return [...byId.values()]
+  return Array.from(byId.values())
 }
 
 export function stableStringify(obj) {
