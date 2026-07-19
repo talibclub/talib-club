@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react"
+import { Helmet } from "react-helmet-async"
 import { collection, query, orderBy, getDocs, doc, getDoc, where, limit } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
 import "../styles/openhouse.css"
@@ -87,6 +88,9 @@ export default function OpenHouseCampus({ go, ctx }) {
 
   return (
     <div className="openhouse-container">
+      <Helmet>
+        <title>{booth?.name ? `${booth.name} | แหล่งเรียนรู้` : 'แหล่งเรียนรู้ | Talib'}</title>
+      </Helmet>
       {/* Immersive Background mapped to booth theme */}
       <div className="openhouse-bg" style={{ 
         background: `radial-gradient(circle at top right, ${booth.themeColor}20 0%, transparent 50%), radial-gradient(circle at bottom left, var(--teal-bg) 0%, transparent 50%)`,
