@@ -61,13 +61,13 @@ export default function AdminDashboard() {
           }
         }
 
-        const sessionsSnap = await getDocs(query(collection(db, "content_reading_sessions"), where("timestamp", ">=", startDate), orderBy("timestamp", "asc")))
+        const sessionsSnap = await getDocs(query(collection(db, "site_visits"), where("createdAt", ">=", startDate), orderBy("createdAt", "asc")))
         const usersSnapList = await getDocs(query(collection(db, "users"), where("createdAt", ">=", startDate), orderBy("createdAt", "asc")))
 
         sessionsSnap.forEach(doc => {
           const data = doc.data()
-          if (data.timestamp) {
-            const date = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp)
+          if (data.createdAt) {
+            const date = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt)
             const key = timeRange === "1y" ? `${date.getMonth()+1}/${date.getFullYear().toString().slice(2)}` : formatKey(date)
             if (counts[key] !== undefined) {
               counts[key].reads++
@@ -134,7 +134,7 @@ export default function AdminDashboard() {
           <div style={{ fontSize: 32, fontWeight: 700, color: "var(--text)" }}>{loading ? "..." : stats.newUsers}</div>
         </div>
         <div className="card" style={{ padding: 20, textAlign: "center", borderTop: "4px solid #8e44ad" }}>
-          <div style={{ fontSize: 13, color: "var(--t2)", marginBottom: 8 }}>บันทึกการอ่าน ({timeRangeLabel})</div>
+          <div style={{ fontSize: 13, color: "var(--t2)", marginBottom: 8 }}>การเข้าชมเว็บ ({timeRangeLabel})</div>
           <div style={{ fontSize: 32, fontWeight: 700, color: "var(--text)" }}>{loading ? "..." : stats.sessions}</div>
         </div>
         <div className="card" style={{ padding: 20, textAlign: "center", borderTop: "4px solid #e05555" }}>
@@ -188,7 +188,7 @@ export default function AdminDashboard() {
                   formatter={(value, name) => [value + ' ครั้ง/คน', name]}
                 />
                 <Bar dataKey="users" name="สมาชิกใหม่" fill="#f5a623" radius={[4, 4, 0, 0]} barSize={20} />
-                <Bar dataKey="reads" name="บันทึกการอ่าน" fill="var(--teal)" radius={[4, 4, 0, 0]} barSize={20} />
+                <Bar dataKey="reads" name="การเข้าชมเว็บ" fill="var(--teal)" radius={[4, 4, 0, 0]} barSize={20} />
               </BarChart>
             </ResponsiveContainer>
           ) : (

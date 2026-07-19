@@ -114,6 +114,27 @@ export default function App() {
     syncServerTime()
   }, [])
 
+  // Site Visit Tracker
+  useEffect(() => {
+    const logVisit = async () => {
+      try {
+        if (!sessionStorage.getItem("talib_visited_session")) {
+          sessionStorage.setItem("talib_visited_session", "true")
+          const { addDoc, collection, serverTimestamp } = await import("firebase/firestore")
+          const { db } = await import("./lib/firebase.js")
+          await addDoc(collection(db, "site_visits"), {
+            createdAt: serverTimestamp(),
+            userAgent: navigator.userAgent,
+            path: window.location.pathname
+          })
+        }
+      } catch (err) {
+        console.error("Failed to log visit:", err)
+      }
+    }
+    logVisit()
+  }, [])
+
   useEffect(() => {
     window.__isStaff = authState?.isStaff;
   }, [authState?.isStaff])
