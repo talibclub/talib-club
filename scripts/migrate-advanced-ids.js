@@ -34,8 +34,19 @@ function getCategorySlug(type, item) {
   }
   switch (type) {
     case 'articles': {
+      // If it has a valid series field (not 'all' and not empty), treat it as a series regardless of 'type' field
+      // because old data might not have type='series' set.
+      if (item.series && item.series !== 'all' && item.series.trim() !== '') {
+        return item.series.toLowerCase();
+      }
+      
       const artType = (item.type || 'general').toLowerCase();
-      if (artType === 'series' && item.series) return item.series.toLowerCase();
+      // If it is 'general' or 'specific', use the category as prefix for better SEO/URLs
+      // (e.g. aqeedah-1 instead of general-1), but for new types like 'refute' or 'qa', use the type.
+      if (artType === 'general' || artType === 'specific') {
+         return (item.category && item.category !== 'all') ? item.category.toLowerCase() : artType;
+      }
+      
       return artType;
     }
     case 'books':
@@ -53,23 +64,10 @@ function getCategorySlug(type, item) {
   }
 }
 
-// Strip Thai characters from slug, keep only English/numbers/hyphens
 function sanitizeSlug(slug) {
   if (!slug) return 'unknown';
-  // Remove Thai unicode range and other non-ascii
   let clean = slug.replace(/[\u0E00-\u0E7F]/g, '').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
   return clean || 'unknown';
-}
-
-function needsMigration(docId) {
-  if (/^\d+$/.test(docId)) return true;
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}/.test(docId)) return true;
-  if (docId.includes('-') && /[A-Z]/.test(docId.split('-')[0])) return true;
-  // Has Thai characters
-  if (/[\u0E00-\u0E7F]/.test(docId)) return true;
-  // Has special characters not allowed
-  if (/[^a-z0-9-]/.test(docId)) return true;
-  return false;
 }
 
 const localCounters = {};
@@ -95,9 +93,8 @@ async function saveAllCounters() {
 }
 
 async function migrate() {
-  console.log('=== Starting Full Migration ===\n');
+  console.log('=== Starting STRICT Full Migration ===\n');
   
-  // Reset counters
   console.log('Resetting old counters...');
   const counterSnap = await db.collection('counters').get();
   if (counterSnap.docs.length > 0) {
@@ -118,36 +115,35 @@ async function migrate() {
     const alreadyGood = [];
     
     for (const docSnap of snap.docs) {
-      if (needsMigration(docSnap.id)) {
-        toMigrate.push(docSnap);
+      const data = docSnap.data();
+      const expectedSlug = sanitizeSlug(getCategorySlug(coll.type, data));
+      const currentId = docSnap.id;
+      
+      const match = currentId.match(/^([a-z0-9-]+)-(\d+)$/);
+      
+      if (!match || match[1] !== expectedSlug) {
+        toMigrate.push({ docSnap, expectedSlug });
       } else {
-        alreadyGood.push(docSnap);
+        alreadyGood.push({ docSnap, expectedSlug, seq: parseInt(match[2], 10) });
         skipped++;
       }
     }
 
-    // Account for existing good IDs in counters
-    for (const docSnap of alreadyGood) {
-      const match = docSnap.id.match(/^(.+)-(\d+)$/);
-      if (match) {
-        const counterKey = `${coll.name}_${match[1]}`;
-        const num = parseInt(match[2], 10);
-        if (localCounters[counterKey] === undefined || localCounters[counterKey] < num) {
-          localCounters[counterKey] = num;
-        }
+    for (const item of alreadyGood) {
+      const counterKey = `${coll.name}_${item.expectedSlug}`;
+      if (localCounters[counterKey] === undefined || localCounters[counterKey] < item.seq) {
+        localCounters[counterKey] = item.seq;
       }
     }
 
-    for (const docSnap of toMigrate) {
+    for (const item of toMigrate) {
+      const { docSnap, expectedSlug } = item;
       const oldId = docSnap.id;
       const data = docSnap.data();
       const originalId = data.old_id || oldId;
       
-      let slug = getCategorySlug(coll.type, data);
-      slug = sanitizeSlug(slug);
-      
-      const nextSeq = await getNextSeq(coll.name, slug);
-      const newId = `${slug}-${nextSeq}`;
+      const nextSeq = await getNextSeq(coll.name, expectedSlug);
+      const newId = `${expectedSlug}-${nextSeq}`;
 
       console.log(`  ${oldId} -> ${newId}`);
 
@@ -175,7 +171,6 @@ async function migrate() {
   console.log('\nSaving counters...');
   await saveAllCounters();
 
-  // Foreign keys
   console.log('\n--- Foreign Keys ---');
 
   const bSnap = await db.collection('content_bookmarks').get();

@@ -26,11 +26,16 @@ export function getItemCategoryKey(name, item) {
 
   switch (name) {
     case 'articles': {
-      const type = (item.type || 'general').toLowerCase();
-      // Series use seriesId as prefix
-      if (type === 'series' && item.series) return item.series.toLowerCase();
-      // Other types use type as prefix (general, specific, refute, qa, etc.)
-      return type;
+      if (item.series && item.series !== 'all' && item.series.trim() !== '') {
+        return item.series.toLowerCase();
+      }
+      
+      const artType = (item.type || 'general').toLowerCase();
+      if (artType === 'general' || artType === 'specific') {
+         return (item.category && item.category !== 'all') ? item.category.toLowerCase() : artType;
+      }
+      
+      return artType;
     }
     case 'books':
       return (item.type || 'book').toLowerCase();
