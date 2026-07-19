@@ -4,7 +4,7 @@ import { db } from "../../lib/firebase.js"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({ users: 0, sessions: 0, campaigns: 0 })
+  const [stats, setStats] = useState({ users: 0, sessions: 0, newUsers: 0, campaigns: 0 })
   const [chartData, setChartData] = useState([])
   const [loading, setLoading] = useState(true)
   const [timeRange, setTimeRange] = useState("12h")
@@ -52,16 +52,17 @@ export default function AdminDashboard() {
         if (timeRange === "1y") {
           for (let i = 11; i >= 0; i--) {
             const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-            counts[`${d.getMonth()+1}/${d.getFullYear().toString().slice(2)}`] = 0
+            counts[`${d.getMonth()+1}/${d.getFullYear().toString().slice(2)}`] = { reads: 0, users: 0 }
           }
         } else {
           for (let i = intervals - 1; i >= 0; i--) {
             const d = new Date(now.getTime() - i * intervalMs)
-            counts[formatKey(d)] = 0
+            counts[formatKey(d)] = { reads: 0, users: 0 }
           }
         }
 
         const sessionsSnap = await getDocs(query(collection(db, "content_reading_sessions"), where("timestamp", ">=", startDate), orderBy("timestamp", "asc")))
+        const usersSnapList = await getDocs(query(collection(db, "users"), where("createdAt", ">=", startDate), orderBy("createdAt", "asc")))
 
         sessionsSnap.forEach(doc => {
           const data = doc.data()
@@ -69,19 +70,32 @@ export default function AdminDashboard() {
             const date = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp)
             const key = timeRange === "1y" ? `${date.getMonth()+1}/${date.getFullYear().toString().slice(2)}` : formatKey(date)
             if (counts[key] !== undefined) {
-              counts[key]++
+              counts[key].reads++
+            }
+          }
+        })
+
+        usersSnapList.forEach(doc => {
+          const data = doc.data()
+          if (data.createdAt) {
+            const date = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt)
+            const key = timeRange === "1y" ? `${date.getMonth()+1}/${date.getFullYear().toString().slice(2)}` : formatKey(date)
+            if (counts[key] !== undefined) {
+              counts[key].users++
             }
           }
         })
 
         const formattedData = Object.keys(counts).map(k => ({
           name: k,
-          reads: counts[k]
+          reads: counts[k].reads,
+          users: counts[k].users
         }))
 
         setStats({
           users: usersSnap.data().count,
           sessions: sessionsSnap.size, 
+          newUsers: usersSnapList.size,
           campaigns: campaignsSnap.data().count
         })
 
@@ -116,7 +130,11 @@ export default function AdminDashboard() {
           <div style={{ fontSize: 32, fontWeight: 700, color: "var(--text)" }}>{loading ? "..." : stats.users}</div>
         </div>
         <div className="card" style={{ padding: 20, textAlign: "center", borderTop: "4px solid #f5a623" }}>
-          <div style={{ fontSize: 13, color: "var(--t2)", marginBottom: 8 }}>การใช้งาน ({timeRangeLabel})</div>
+          <div style={{ fontSize: 13, color: "var(--t2)", marginBottom: 8 }}>สมาชิกใหม่ ({timeRangeLabel})</div>
+          <div style={{ fontSize: 32, fontWeight: 700, color: "var(--text)" }}>{loading ? "..." : stats.newUsers}</div>
+        </div>
+        <div className="card" style={{ padding: 20, textAlign: "center", borderTop: "4px solid #8e44ad" }}>
+          <div style={{ fontSize: 13, color: "var(--t2)", marginBottom: 8 }}>บันทึกการอ่าน ({timeRangeLabel})</div>
           <div style={{ fontSize: 32, fontWeight: 700, color: "var(--text)" }}>{loading ? "..." : stats.sessions}</div>
         </div>
         <div className="card" style={{ padding: 20, textAlign: "center", borderTop: "4px solid #e05555" }}>
@@ -127,7 +145,7 @@ export default function AdminDashboard() {
 
       <div className="card" style={{ padding: 24, position: "relative" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
-          <h3 style={{ fontSize: 16, margin: 0 }}>สถิติการเข้าใช้งาน</h3>
+          <h3 style={{ fontSize: 16, margin: 0 }}>สถิติการใช้งาน และ สมาชิกใหม่</h3>
           <select 
             value={timeRange} 
             onChange={e => setTimeRange(e.target.value)}
@@ -166,10 +184,11 @@ export default function AdminDashboard() {
                 <Tooltip 
                   cursor={{ fill: "var(--bg2)" }}
                   contentStyle={{ background: "var(--card)", border: "1px solid var(--br)", borderRadius: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
-                  itemStyle={{ color: "var(--teal)", fontWeight: 600 }}
-                  formatter={(value) => [value, 'ครั้ง']}
+                  itemStyle={{ fontWeight: 600 }}
+                  formatter={(value, name) => [value + ' ครั้ง/คน', name]}
                 />
-                <Bar dataKey="reads" fill="var(--teal)" radius={[4, 4, 0, 0]} barSize={40} />
+                <Bar dataKey="users" name="สมาชิกใหม่" fill="#f5a623" radius={[4, 4, 0, 0]} barSize={20} />
+                <Bar dataKey="reads" name="บันทึกการอ่าน" fill="var(--teal)" radius={[4, 4, 0, 0]} barSize={20} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
