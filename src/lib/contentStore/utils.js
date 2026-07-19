@@ -108,7 +108,7 @@ export function stableStringify(obj) {
 }
 
 export function getQueryCacheKey(collectionName, uid, limitCount, orderByField, orderDirection) {
-  return stableStringify({ collectionName, uid: uid || null, limitCount, orderByField, orderDirection })
+  return stableStringify({ v: 2, collectionName, uid: uid || null, limitCount, orderByField, orderDirection })
 }
 
 export function generateDocId(item) {
