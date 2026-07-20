@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Image as KonvaImage, Path, Group, Circle, Text, Rect, Transformer } from 'react-konva';
 import Draggable from 'react-draggable';
-import { PenTool, Highlighter, Eraser, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, Pencil, Pointer } from 'lucide-react';
+import { PenTool, Highlighter, Eraser, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, FileStack, LayoutList, Check, Lock, MousePointerClick, Move3d } from 'lucide-react';
 import useImage from 'use-image';
 import getStroke from 'perfect-freehand';
 import toast from 'react-hot-toast';
@@ -685,59 +685,94 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
 
   const [showPageSettings, setShowPageSettings] = useState(false);
   const [showPageManager, setShowPageManager] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showEraserSettings, setShowEraserSettings] = useState(false);
+  const [showLassoSettings, setShowLassoSettings] = useState(false);
+  const [showShapeSettings, setShowShapeSettings] = useState(false);
+  const [recordingTimer, setRecordingTimer] = useState(0);
 
   return (
+    <>
+    <style>{`
+      .hide-scroll::-webkit-scrollbar {
+        display: none;
+      }
+      .hide-scroll {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    `}</style>
     <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: '#F3F4F6', display: 'flex', flexDirection: 'column' }}>
       
-      {/* Huawei Notes Top Navigation Bar */}
+      {/* Huawei Notes Top Navigation Bar (Fixed App Header) */}
       {!isMobile && (
-         <div style={{ height: 56, flexShrink: 0, width: '100%', background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', zIndex: 50, borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+         <div style={{ height: 56, flexShrink: 0, width: '100%', background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', zIndex: 50, borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                <button onClick={() => window.history.back()} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#111827', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <ChevronLeft size={24} strokeWidth={1.5} />
                </button>
-               <span style={{ fontSize: 16, fontWeight: 600, color: '#111827' }}>{activeBook?.book?.title || 'สมุดโน้ต'}</span>
+               <button style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#111827', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 500 }}>
+                  <span style={{ marginRight: 4 }}>i</span>
+               </button>
             </div>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
-               <button onClick={() => setShowSearch(!showSearch)} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: '#4B5563', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Search size={20} strokeWidth={1.5} />
+               <button onClick={() => setShowAddMenu(!showAddMenu)} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: showAddMenu ? '#F3F4F6' : 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+                  <Plus size={24} strokeWidth={1.5} />
                </button>
-               <button onClick={() => setShowPageManager(true)} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: '#4B5563', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <SquareSquare size={20} strokeWidth={1.5} />
-               </button>
-               <button onClick={saveNotebook} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: '#4B5563', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Save size={20} strokeWidth={1.5} />
-               </button>
-               <button onClick={exportPage} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: '#4B5563', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Download size={20} strokeWidth={1.5} />
-               </button>
-               <button onClick={() => setShowPageSettings(!showPageSettings)} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: showPageSettings ? '#F3F4F6' : 'transparent', color: showPageSettings ? '#111827' : '#4B5563', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-                  <Settings size={20} strokeWidth={1.5} />
+               
+               <button onClick={() => setShowSearch(!showSearch)} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Search size={22} strokeWidth={1.5} />
                </button>
 
-               {/* Page Settings Popover */}
-               {showPageSettings && (
-                 <div style={{ position: 'absolute', top: 56, right: 0, zIndex: 60, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: 16, borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 260 }}>
-                    <h4 style={{ margin: '0 0 12px 0', fontSize: 14, color: '#111827' }}>ลวดลายกระดาษ</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-                       {['blank', 'lines', 'grid', 'dots'].map(pt => (
-                         <button key={pt} onClick={() => updatePage(currentPageIndex, p => { p.paperType = pt; pushHistory(); })} style={{ padding: '8px', borderRadius: 8, border: currentPage.paperType === pt ? '2px solid #111827' : '1px solid #E5E7EB', background: 'transparent', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#4B5563' }}>
-                           {pt === 'blank' ? 'กระดาษเปล่า' : pt === 'lines' ? 'เส้นบรรทัด' : pt === 'grid' ? 'ตาราง (Grid)' : 'จุด (Dots)'}
-                         </button>
-                       ))}
-                    </div>
-                    <h4 style={{ margin: '0 0 12px 0', fontSize: 14, color: '#111827' }}>สีพื้นหลังกระดาษ</h4>
-                    <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-                       {['white', 'yellow', 'dark'].map(pc => (
-                         <button key={pc} onClick={() => updatePage(currentPageIndex, p => { p.paperColor = pc; pushHistory(); })} style={{ width: 32, height: 32, borderRadius: '50%', border: currentPage.paperColor === pc ? '2px solid #111827' : '1px solid #E5E7EB', background: pc === 'yellow' ? '#FEF3C7' : pc === 'dark' ? '#1F2937' : 'white', cursor: 'pointer' }} />
-                       ))}
-                    </div>
-                    
-                    <div style={{ height: 1, background: '#E5E7EB', margin: '12px 0' }}></div>
-                    
-                    <button onClick={clearPage} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #E5E7EB', background: 'white', color: '#4B5563', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 8 }}>ลบเนื้อหาในหน้านี้</button>
-                    <button onClick={deletePage} disabled={pages.length <= 1} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: 'none', background: '#FEE2E2', color: '#EF4444', cursor: pages.length <= 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, opacity: pages.length <= 1 ? 0.5 : 1 }}>ลบหน้านี้ทิ้ง</button>
+               <button style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Columns size={22} strokeWidth={1.5} />
+               </button>
+
+               <button onClick={() => setShowMoreMenu(!showMoreMenu)} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: showMoreMenu ? '#F3F4F6' : 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+                  <LayoutGrid size={22} strokeWidth={1.5} />
+               </button>
+
+               {/* Add Menu Dropdown */}
+               {showAddMenu && (
+                 <div style={{ position: 'absolute', top: 56, right: 120, zIndex: 60, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: 8, borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 220, display: 'flex', flexDirection: 'column' }}>
+                    <button style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
+                       <FilePlus size={20} strokeWidth={1.5} color="#4B5563" /> หน้าใหม่
+                    </button>
+                    <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>
+                    <button style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
+                       <FileStack size={20} strokeWidth={1.5} color="#4B5563" /> เพิ่มไฟล์แนบ
+                    </button>
+                    <button onClick={() => { document.getElementById('image-upload').click(); setShowAddMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
+                       <ImageIcon size={20} strokeWidth={1.5} color="#4B5563" /> นำเข้ารูปภาพ
+                    </button>
+                    <button onClick={() => { document.getElementById('pdf-upload').click(); setShowAddMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
+                       <FileText size={20} strokeWidth={1.5} color="#4B5563" /> นำเข้า PDF
+                    </button>
+                 </div>
+               )}
+
+               {/* More Menu Dropdown */}
+               {showMoreMenu && (
+                 <div style={{ position: 'absolute', top: 56, right: 0, zIndex: 60, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: 8, borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 280, display: 'flex', flexDirection: 'column' }}>
+                    <button onClick={() => setShowPageSettings(true)} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
+                       <Settings size={20} strokeWidth={1.5} color="#4B5563" /> เปลี่ยนแม่แบบกระดาษ
+                    </button>
+                    <button style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
+                       <Bookmark size={20} strokeWidth={1.5} color="#4B5563" /> เพิ่มไปยังเค้าร่าง
+                    </button>
+                    <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>
+                    <button onClick={clearPage} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
+                       <Eraser size={20} strokeWidth={1.5} color="#4B5563" /> ล้างหน้า
+                    </button>
+                    <button onClick={deletePage} disabled={pages.length <= 1} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: pages.length <= 1 ? '#D1D5DB' : '#EF4444', cursor: pages.length <= 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
+                       <Minus size={20} strokeWidth={1.5} color={pages.length <= 1 ? '#D1D5DB' : '#EF4444'} /> ลบหน้า
+                    </button>
+                    <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>
+                    <button style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
+                       <Lock size={20} strokeWidth={1.5} color="#4B5563" /> เพิ่มการล็อค
+                    </button>
                  </div>
                )}
             </div>
@@ -839,83 +874,190 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
       {/* Huawei Notes Unified Draggable Floating Toolbar (Tablet & Desktop) */}
       {!isMobile && (
         <Draggable handle=".huawei-drag-handle">
-          <div style={{ position: 'absolute', bottom: 32, left: '50%', transform: 'translateX(-50%)', zIndex: 60, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: '6px 8px', borderRadius: 16, display: 'flex', gap: 4, boxShadow: '0 10px 40px rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.05)', flexWrap: 'nowrap', alignItems: 'center' }}>
+          <div style={{ position: 'absolute', top: 64, left: '50%', transform: 'translateX(-50%)', zIndex: 60, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: '6px 8px', borderRadius: 16, display: 'flex', gap: 4, boxShadow: '0 10px 40px rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.05)', flexWrap: 'nowrap', alignItems: 'center', width: 'auto', maxWidth: '95vw' }}>
             
             <div className="huawei-drag-handle" style={{ cursor: 'grab', color: '#D1D5DB', display: 'flex', alignItems: 'center', padding: '0 8px' }}>
               <GripHorizontal size={16} strokeWidth={2} />
             </div>
             
-            <button onClick={undo} disabled={!canUndo} style={{ width: 36, height: 36, borderRadius: 8, border: 'none', background: 'transparent', color: canUndo ? '#4B5563' : '#D1D5DB', cursor: canUndo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={undo} disabled={!canUndo} style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: 'transparent', color: canUndo ? '#4B5563' : '#D1D5DB', cursor: canUndo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Undo2 size={20} strokeWidth={1.5} />
             </button>
-            <button onClick={redo} disabled={!canRedo} style={{ width: 36, height: 36, borderRadius: 8, border: 'none', background: 'transparent', color: canRedo ? '#4B5563' : '#D1D5DB', cursor: canRedo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={redo} disabled={!canRedo} style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: 'transparent', color: canRedo ? '#4B5563' : '#D1D5DB', cursor: canRedo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Redo2 size={20} strokeWidth={1.5} />
             </button>
             
-            <div style={{ width: 1, background: '#E5E7EB', margin: '0 6px', height: 24 }}></div>
+            <div style={{ width: 1, background: '#E5E7EB', margin: '0 6px', height: 24, flexShrink: 0 }}></div>
             
-            {[
-              { id: 'pan', icon: Pointer },
-              { id: 'pen', icon: PenTool },
-              { id: 'pencil', icon: Pencil },
-              { id: 'highlighter', icon: Highlighter },
-              { id: 'eraser', icon: Eraser },
-              { id: 'lasso', icon: Lasso },
-              { id: 'text', icon: Type }
-            ].map(t => (
-               <button 
-                 key={t.id}
-                 onClick={() => { setTool(t.id); if (t.id === tool && (t.id === 'pen' || t.id === 'highlighter' || t.id === 'text' || t.id === 'shape')) setShowToolSettings(!showToolSettings); else setShowToolSettings(true); }}
-                 style={{ width: 40, height: 40, borderRadius: 8, border: 'none', background: tool === t.id ? '#F3F4F6' : 'transparent', color: tool === t.id ? '#111827' : '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', position: 'relative' }}
-               >
-                 <t.icon size={20} strokeWidth={1.5} />
-                 {tool === t.id && (t.id === 'pen' || t.id === 'pencil' || t.id === 'highlighter' || t.id === 'text' || t.id === 'eraser' || t.id === 'lasso') && <div style={{ position: 'absolute', bottom: 4, width: 16, height: 2, borderRadius: 2, background: '#111827' }}></div>}
-               </button>
-            ))}
+            <div style={{ display: 'flex', gap: 4, overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }} className="hide-scroll">
+               {[
+                 { id: 'pan', icon: Pointer },
+                 { id: 'pen', icon: PenTool },
+                 { id: 'pencil', icon: Pencil },
+                 { id: 'highlighter', icon: Highlighter },
+                 { id: 'eraser', icon: Eraser },
+                 { id: 'lasso', icon: Lasso },
+                 { id: 'text', icon: Type },
+                 { id: 'shape', icon: Square },
+                 { id: 'image', icon: ImageIcon },
+                 { id: 'pdf', icon: FileText },
+                 { id: 'sticker', icon: StickyNote },
+                 { id: 'laser', icon: Move3d },
+                 { id: 'mic', icon: Mic }
+               ].map(t => (
+                  <button 
+                    key={t.id}
+                    onClick={() => {
+                       if (t.id === 'image') document.getElementById('image-upload').click();
+                       else if (t.id === 'pdf') document.getElementById('pdf-upload').click();
+                       else if (t.id === 'mic') toggleRecording();
+                       else {
+                          setTool(t.id); 
+                          if (t.id === tool && ['pen', 'pencil', 'highlighter', 'text', 'shape', 'eraser', 'lasso'].includes(t.id)) setShowToolSettings(!showToolSettings); 
+                          else setShowToolSettings(true);
+                       }
+                    }}
+                    style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 8, border: 'none', background: tool === t.id && !['image','pdf','mic'].includes(t.id) ? '#E0E7FF' : 'transparent', color: tool === t.id && !['image','pdf','mic'].includes(t.id) ? '#3B82F6' : (t.id === 'mic' && isRecording ? '#EF4444' : '#4B5563'), cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', position: 'relative' }}
+                  >
+                    <t.icon size={20} strokeWidth={1.5} />
+                    {tool === t.id && !['image','pdf','mic'].includes(t.id) && <div style={{ position: 'absolute', bottom: 4, width: 16, height: 2, borderRadius: 2, background: '#3B82F6' }}></div>}
+                    {t.id === 'mic' && isRecording && <div style={{ position: 'absolute', top: -6, right: -12, fontSize: 10, fontWeight: 700, color: '#EF4444', background: '#FEE2E2', padding: '2px 4px', borderRadius: 4 }}>00:01</div>}
+                  </button>
+               ))}
+            </div>
             
-            <div style={{ width: 1, background: '#E5E7EB', margin: '0 6px', height: 24 }}></div>
+            <div style={{ width: 1, background: '#E5E7EB', margin: '0 6px', height: 24, flexShrink: 0 }}></div>
             
-            <button onClick={() => document.getElementById('image-upload').click()} style={{ width: 40, height: 40, borderRadius: 8, border: 'none', background: 'transparent', color: '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ImageIcon size={20} strokeWidth={1.5} />
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, paddingRight: 8 }}>
+               {/* Squiggly line preview */}
+               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={penColor} strokeWidth={penSize > 10 ? 3 : penSize > 5 ? 2 : 1} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: penOpacity }}>
+                  <path d="M4 12c2-4 6-4 8 0s6 4 8 0" />
+               </svg>
+               {/* 3 Recent Colors */}
+               <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#1D4ED8', outline: penColor === '#1D4ED8' ? '2px solid #3B82F6' : 'none', outlineOffset: 2, cursor: 'pointer' }} onClick={() => setPenColor('#1D4ED8')}></div>
+               <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#111827', outline: penColor === '#111827' ? '2px solid #3B82F6' : 'none', outlineOffset: 2, cursor: 'pointer' }} onClick={() => setPenColor('#111827')}></div>
+            </div>
             
-            <button onClick={toggleRecording} style={{ width: 40, height: 40, borderRadius: 8, border: 'none', background: isRecording ? '#FEE2E2' : 'transparent', color: isRecording ? '#EF4444' : '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', animation: isRecording ? 'pulse 1.5s infinite' : 'none' }}>
-              <Mic size={20} strokeWidth={1.5} />
-            </button>
-            
-            {/* Huawei Glassmorphism Popover for Tool Settings (Attached ABOVE Pill since Pill is at bottom) */}
-            {showToolSettings && (tool === 'pen' || tool === 'pencil' || tool === 'highlighter' || tool === 'text' || tool === 'shape') && (
-              <div style={{ position: 'absolute', bottom: '100%', marginBottom: 12, left: '50%', transform: 'translateX(-50%)', background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: '16px 20px', borderRadius: 16, boxShadow: '0 -12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 280, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Tool Settings Popover (Huawei Style) */}
+            {showToolSettings && ['pen', 'pencil', 'highlighter', 'shape', 'eraser', 'lasso'].includes(tool) && (
+              <div style={{ position: 'absolute', top: '100%', marginTop: 12, left: '50%', transform: 'translateX(-50%)', background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(20px)', padding: 0, borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 280, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                  
-                 {/* Thickness / Size Slider */}
-                 <div>
-                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                     <span style={{ fontSize: 13, fontWeight: 500, color: '#4B5563' }}>ความหนา (Thickness)</span>
-                     <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{penSize}px</span>
-                   </div>
-                   <input type="range" min="1" max="48" step="1" value={penSize} onChange={(e) => setPenSize(parseInt(e.target.value))} style={{ width: '100%', accentColor: '#111827' }} />
+                 <div style={{ padding: '16px 0 12px', textAlign: 'center', fontSize: 15, fontWeight: 600, color: '#111827', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                    {tool === 'pen' ? 'ปากกาลูกลื่น' : tool === 'pencil' ? 'ดินสอ HB' : tool === 'highlighter' ? 'ปากกาเน้นข้อความ' : tool === 'eraser' ? 'ยางลบ' : tool === 'lasso' ? 'แลสโซ' : 'รูปทรง'}
                  </div>
                  
-                 {/* Opacity Slider */}
-                 {(tool === 'pen' || tool === 'pencil' || tool === 'highlighter' || tool === 'shape') && (
-                 <div>
-                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                     <span style={{ fontSize: 13, fontWeight: 500, color: '#4B5563' }}>ความโปร่งใส (Opacity)</span>
-                     <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{Math.round(penOpacity * 100)}%</span>
-                   </div>
-                   <input type="range" min="0.1" max="1" step="0.05" value={penOpacity} onChange={(e) => setPenOpacity(parseFloat(e.target.value))} style={{ width: '100%', accentColor: '#111827' }} />
+                 <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    {/* Pen Types */}
+                    {['pen', 'pencil'].includes(tool) && (
+                       <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
+                          <PenTool size={28} strokeWidth={1} color={tool === 'pen' ? '#3B82F6' : '#9CA3AF'} />
+                          <Pencil size={28} strokeWidth={1} color={tool === 'pencil' ? '#3B82F6' : '#9CA3AF'} />
+                          <MousePointerClick size={28} strokeWidth={1} color="#9CA3AF" />
+                          <Type size={28} strokeWidth={1} color="#9CA3AF" />
+                       </div>
+                    )}
+                    
+                    {/* Thickness Wedge Slider */}
+                    {!['lasso'].includes(tool) && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#111827', width: 20 }}>{penSize}</span>
+                      <div style={{ flex: 1, position: 'relative', height: 24, display: 'flex', alignItems: 'center' }}>
+                         <div style={{ position: 'absolute', left: 0, right: 0, height: '100%', clipPath: 'polygon(0 50%, 100% 0, 100% 100%)', background: '#E5E7EB' }}></div>
+                         <input type="range" min="1" max="48" step="1" value={penSize} onChange={(e) => setPenSize(parseInt(e.target.value))} style={{ width: '100%', position: 'absolute', opacity: 0, cursor: 'pointer' }} />
+                         <div style={{ position: 'absolute', left: `${(penSize/48)*100}%`, width: 16, height: 16, borderRadius: '50%', background: 'white', border: '1px solid #D1D5DB', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', transform: 'translate(-50%, 0)', pointerEvents: 'none' }}></div>
+                      </div>
+                    </div>
+                    )}
+                    
+                    {/* Opacity Checkerboard Slider */}
+                    {['pen', 'pencil', 'highlighter', 'shape'].includes(tool) && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#111827', width: 32 }}>{Math.round(penOpacity * 100)}%</span>
+                      <div style={{ flex: 1, position: 'relative', height: 16, borderRadius: 8, background: 'repeating-conic-gradient(#E5E7EB 0% 25%, white 0% 50%) 50% / 12px 12px', border: '1px solid #E5E7EB', display: 'flex', alignItems: 'center' }}>
+                         <div style={{ position: 'absolute', left: 0, right: 0, height: '100%', borderRadius: 8, background: `linear-gradient(90deg, transparent, ${penColor})` }}></div>
+                         <input type="range" min="0.1" max="1" step="0.05" value={penOpacity} onChange={(e) => setPenOpacity(parseFloat(e.target.value))} style={{ width: '100%', position: 'absolute', opacity: 0, cursor: 'pointer' }} />
+                         <div style={{ position: 'absolute', left: `${penOpacity*100}%`, width: 16, height: 16, borderRadius: '50%', background: 'white', border: '1px solid #D1D5DB', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', transform: 'translate(-50%, 0)', pointerEvents: 'none' }}></div>
+                      </div>
+                    </div>
+                    )}
+                    
+                    {/* Color Palette */}
+                    {['pen', 'pencil', 'highlighter', 'shape'].includes(tool) && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      {['#3B82F6', '#1D4ED8', '#111827', '#10B981', '#8B5CF6', '#06B6D4', '#EF4444'].map(c => (
+                         <div key={c} onClick={() => setPenColor(c)} style={{ width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer', outline: penColor === c ? '2px solid #3B82F6' : 'none', outlineOffset: 2, transition: 'all 0.1s' }} />
+                      ))}
+                    </div>
+                    )}
+                    
+                    {/* Custom Toggles per tool */}
+                    {tool === 'highlighter' && (
+                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #F3F4F6', paddingTop: 16 }}>
+                          <span style={{ fontSize: 14, color: '#4B5563' }}>เส้นตรง</span>
+                          <div style={{ width: 44, height: 24, borderRadius: 12, background: '#3B82F6', position: 'relative', cursor: 'pointer' }}>
+                             <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, right: 2 }}></div>
+                          </div>
+                       </div>
+                    )}
+
+                    {tool === 'shape' && (
+                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #F3F4F6', paddingTop: 16 }}>
+                          <span style={{ fontSize: 14, color: '#4B5563' }}>หยุดชั่วคราวเพื่อสิ้นสุดการสร้างรูปร่าง</span>
+                          <div style={{ width: 44, height: 24, borderRadius: 12, background: '#3B82F6', position: 'relative', cursor: 'pointer' }}>
+                             <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, right: 2 }}></div>
+                          </div>
+                       </div>
+                    )}
+                    
+                    {tool === 'eraser' && (
+                       <>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 14, color: '#4B5563' }}>ลบเส้น</span>
+                          <div style={{ width: 44, height: 24, borderRadius: 12, background: '#E5E7EB', position: 'relative', cursor: 'pointer' }}><div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, left: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}></div></div>
+                       </div>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 14, color: '#4B5563' }}>ลบเฉพาะปากกาเน้นข้อความ</span>
+                          <div style={{ width: 44, height: 24, borderRadius: 12, background: '#E5E7EB', position: 'relative', cursor: 'pointer' }}><div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, left: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}></div></div>
+                       </div>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #F3F4F6', paddingTop: 16 }}>
+                          <span style={{ fontSize: 14, color: '#4B5563' }}>ไวต่อแรงกด</span>
+                          <div style={{ width: 44, height: 24, borderRadius: 12, background: '#3B82F6', position: 'relative', cursor: 'pointer' }}><div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, right: 2 }}></div></div>
+                       </div>
+                       </>
+                    )}
+
+                    {tool === 'lasso' && (
+                       <>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 14, color: '#4B5563' }}>รูปภาพ</span>
+                          <div style={{ width: 44, height: 24, borderRadius: 12, background: '#3B82F6', position: 'relative', cursor: 'pointer' }}><div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, right: 2 }}></div></div>
+                       </div>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 14, color: '#4B5563' }}>กล่องข้อความ</span>
+                          <div style={{ width: 44, height: 24, borderRadius: 12, background: '#3B82F6', position: 'relative', cursor: 'pointer' }}><div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, right: 2 }}></div></div>
+                       </div>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 14, color: '#4B5563' }}>เอกสารแนบ</span>
+                          <div style={{ width: 44, height: 24, borderRadius: 12, background: '#3B82F6', position: 'relative', cursor: 'pointer' }}><div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, right: 2 }}></div></div>
+                       </div>
+                       </>
+                    )}
                  </div>
+                 
+                 {/* Footer Toggle */}
+                 {['pen', 'pencil', 'highlighter'].includes(tool) && (
+                    <div style={{ background: '#F9FAFB', padding: '12px 20px', borderTop: '1px solid rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <span style={{ fontSize: 14, color: '#4B5563' }}>แสดงแถบรายการโปรด</span>
+                       <div style={{ width: 44, height: 24, borderRadius: 12, background: '#E5E7EB', position: 'relative', cursor: 'pointer' }}>
+                          <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, left: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}></div>
+                       </div>
+                    </div>
                  )}
-                 
-                 {/* Color Palette (Tightly Packed) */}
-                 <div>
-                   <span style={{ fontSize: 13, fontWeight: 500, color: '#4B5563', display: 'block', marginBottom: 12 }}>สี (Color)</span>
-                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                     {colors.slice(0, 10).map(c => (
-                        <div key={c} onClick={() => setPenColor(c)} style={{ width: 28, height: 28, borderRadius: '50%', background: c, cursor: 'pointer', border: c === '#FFFFFF' ? '1px solid #E5E7EB' : 'none', outline: penColor === c ? '2px solid #111827' : 'none', outlineOffset: 2, transition: 'all 0.1s' }} />
-                     ))}
-                   </div>
-                 </div>
+                 {tool === 'eraser' && (
+                    <div style={{ background: '#F9FAFB', padding: '12px 20px', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+                       <button style={{ width: '100%', padding: '10px', borderRadius: 24, border: '1px solid #E5E7EB', background: 'white', color: '#3B82F6', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>ล้างเส้น</button>
+                    </div>
+                 )}
               </div>
             )}
           </div>
