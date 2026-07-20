@@ -24,7 +24,25 @@ export default async function handler(req) {
     }
 
     // Attempt to download the PDF from the target URL
-    const response = await fetch(targetUrl);
+    let response = await fetch(targetUrl);
+
+    // Bypass Google Drive Virus Scan Warning
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('text/html') && targetUrl.includes('drive.google.com')) {
+      const text = await response.text();
+      const match = text.match(/confirm=([a-zA-Z0-9_-]+)/);
+      if (match) {
+        const confirmToken = match[1];
+        const joinChar = targetUrl.includes('?') ? '&' : '?';
+        const newUrl = targetUrl + joinChar + 'confirm=' + confirmToken;
+        response = await fetch(newUrl);
+      } else {
+        return new Response('Failed to bypass Google Drive virus scan. No confirm token found.', {
+          status: 500,
+          headers: { 'Access-Control-Allow-Origin': '*' }
+        });
+      }
+    }
 
     if (!response.ok) {
       return new Response(`Failed to fetch PDF: ${response.status} ${response.statusText}`, {
