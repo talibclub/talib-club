@@ -30,7 +30,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   const [loadingPdf, setLoadingPdf] = useState(false);
   const [showModeSelection, setShowModeSelection] = useState(activeBook?.book?.fileUrl ? true : false);
   
-  const [tool, setTool] = useState('pen'); // 'pen', 'eraser', 'pan'
+  const [tool, setTool] = useState('pen'); // 'pen', 'pencil', 'highlighter', 'eraser', 'pan'
   
   const colors = [
     '#111827', '#EF4444', '#F97316', '#F59E0B', '#84CC16', '#10B981', '#06B6D4', 
@@ -39,9 +39,21 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   const sizes = [2, 4, 6, 8, 12, 16, 24];
   const [penColor, setPenColor] = useState('#111827');
   const [penSize, setPenSize] = useState(4);
+  const [penOpacity, setPenOpacity] = useState(1);
   
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  
+  // History State
+  const pagesRef = useRef(pages);
+  const undoStack = useRef([]);
+  const redoStack = useRef([]);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  
+  useEffect(() => {
+    pagesRef.current = pages;
+  }, [pages]);
   
   // Audio Recording State
   const [isRecording, setIsRecording] = useState(false);
@@ -215,6 +227,54 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
     };
   };
 
+  const pushHistory = () => {
+    undoStack.current.push(pagesRef.current);
+    if (undoStack.current.length > 50) undoStack.current.shift();
+    redoStack.current = [];
+    setCanUndo(true);
+    setCanRedo(false);
+  };
+
+  const undo = () => {
+    if (undoStack.current.length === 0) return;
+    const previousState = undoStack.current.pop();
+    redoStack.current.push(pagesRef.current);
+    setPages(previousState);
+    setCanUndo(undoStack.current.length > 0);
+    setCanRedo(true);
+  };
+
+  const redo = () => {
+    if (redoStack.current.length === 0) return;
+    const nextState = redoStack.current.pop();
+    undoStack.current.push(pagesRef.current);
+    setPages(nextState);
+    setCanUndo(true);
+    setCanRedo(redoStack.current.length > 0);
+  };
+
+  const clearPage = () => {
+    pushHistory();
+    updatePage(currentPageIndex, (page) => {
+       page.lines = [];
+       page.stickers = [];
+       page.images = [];
+    });
+    toast.success('ล้างหน้ากระดาษเรียบร้อย');
+  };
+
+  const deletePage = () => {
+    if (pages.length <= 1) return toast.error("ไม่สามารถลบหน้าสุดท้ายได้");
+    pushHistory();
+    setPages(prev => {
+       const newPages = [...prev];
+       newPages.splice(currentPageIndex, 1);
+       return newPages;
+    });
+    setCurrentPageIndex(Math.max(0, currentPageIndex - 1));
+    toast.success('ลบหน้ากระดาษแล้ว');
+  };
+
   const getPointerPosRelativeToPage = () => {
     const stage = stageRef.current;
     if (!stage) return null;
@@ -238,9 +298,11 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
     const pos = getPointerPosRelativeToPage();
     if (!pos) return;
     
+    pushHistory();
+    
     isDrawing.current = true;
     updatePage(currentPageIndex, (page) => {
-       page.lines.push({ tool, color: penColor, size: penSize, points: [pos.x, pos.y, pos.x, pos.y] });
+       page.lines.push({ tool, color: penColor, size: penSize, opacity: penOpacity, points: [pos.x, pos.y, pos.x, pos.y] });
     });
   };
 
@@ -282,6 +344,27 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
     });
   };
   
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+      const objectUrl = URL.createObjectURL(file);
+      pushHistory();
+      updatePage(currentPageIndex, (page) => {
+         if (!page.images) page.images = [];
+         page.images.push({
+           id: `img-${Date.now()}`,
+           src: objectUrl,
+           x: 100,
+           y: 100,
+           width: 300,
+           height: 300
+         });
+      });
+      toast.success('แทรกรูปภาพเรียบร้อย');
+    }
+    e.target.value = null;
+  };
+
   const getSvgPathFromStroke = (stroke) => {
     if (!stroke.length) return "";
     const d = stroke.reduce((acc, [x0, y0], i, arr) => {
@@ -293,7 +376,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
     return d.join(" ");
   };
 
-  const currentPage = pages[currentPageIndex] || { width: 800, height: 1130, lines: [], stickers: [] };
+  const currentPage = pages[currentPageIndex] || { width: 800, height: 1130, lines: [], stickers: [], images: [] };
   const pageX = Math.max(0, (dimensions.width - currentPage.width * scale) / 2 / scale);
   const pageY = 20; 
 
@@ -319,6 +402,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
       )}
 
       <input type="file" id="pdf-upload" accept="application/pdf" style={{ display: 'none' }} onChange={handleFileUpload} />
+      <input type="file" id="image-upload" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
 
       {loadingPdf && (
          <div style={{ position: 'absolute', inset: 0, zIndex: 10, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -328,16 +412,31 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
       )}
 
       {/* Floating Toolbar */}
-      <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 5, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(12px)', padding: '8px', borderRadius: 100, display: 'flex', gap: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.1)', border: '1px solid var(--br2)' }}>
-        <button onClick={() => setTool('pen')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'pen' ? 'var(--teal)' : 'transparent', color: tool === 'pen' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+      <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 5, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(12px)', padding: '8px', borderRadius: 100, display: 'flex', gap: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.1)', border: '1px solid var(--br2)', flexWrap: 'wrap', justifyContent: 'center', maxWidth: '90%' }}>
+        
+        {/* Undo / Redo */}
+        <button onClick={undo} disabled={!canUndo} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: canUndo ? 'var(--text)' : 'var(--br2)', cursor: canUndo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+          <i className="ti ti-arrow-back-up" style={{ fontSize: 20 }}></i>
+        </button>
+        <button onClick={redo} disabled={!canRedo} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: canRedo ? 'var(--text)' : 'var(--br2)', cursor: canRedo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+          <i className="ti ti-arrow-forward-up" style={{ fontSize: 20 }}></i>
+        </button>
+        
+        <div style={{ width: 1, background: 'var(--br2)', margin: '0 4px', height: 24 }}></div>
+        
+        {/* Tools */}
+        <button onClick={() => setTool('pencil')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'pencil' ? 'var(--teal)' : 'transparent', color: tool === 'pencil' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
           <i className="ti ti-pencil" style={{ fontSize: 20 }}></i>
+        </button>
+        <button onClick={() => setTool('pen')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'pen' ? 'var(--teal)' : 'transparent', color: tool === 'pen' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+          <i className="ti ti-ballpen" style={{ fontSize: 20 }}></i>
         </button>
         <button onClick={() => setTool('highlighter')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'highlighter' ? '#F59E0B' : 'transparent', color: tool === 'highlighter' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
           <i className="ti ti-highlight" style={{ fontSize: 20 }}></i>
         </button>
         
-        {(tool === 'pen' || tool === 'highlighter') && (
-          <div style={{ display: 'flex', gap: 6, background: '#F3F4F6', padding: '6px 12px', borderRadius: 100, alignItems: 'center', marginLeft: 4, marginRight: 4, flexWrap: 'wrap', maxWidth: 300, justifyContent: 'center' }}>
+        {(tool === 'pen' || tool === 'pencil' || tool === 'highlighter') && (
+          <div style={{ display: 'flex', gap: 6, background: '#F3F4F6', padding: '6px 12px', borderRadius: 100, alignItems: 'center', marginLeft: 4, marginRight: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
             {colors.map(c => (
               <div 
                  key={c}
@@ -345,27 +444,21 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
                  style={{ width: 20, height: 20, borderRadius: '50%', background: c, cursor: 'pointer', border: penColor === c ? '2px solid white' : '1px solid rgba(0,0,0,0.1)', outline: penColor === c ? '2px solid var(--teal)' : 'none' }}
               />
             ))}
-            {/* Custom Color Input */}
             <div style={{ position: 'relative', width: 20, height: 20, borderRadius: '50%', overflow: 'hidden', cursor: 'pointer', border: '1px solid rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)' }}>
-               <input 
-                 type="color" 
-                 value={penColor}
-                 onChange={(e) => setPenColor(e.target.value)}
-                 style={{ position: 'absolute', opacity: 0, width: '200%', height: '200%', cursor: 'pointer' }}
-               />
+               <input type="color" value={penColor} onChange={(e) => setPenColor(e.target.value)} style={{ position: 'absolute', opacity: 0, width: '200%', height: '200%', cursor: 'pointer' }} />
             </div>
             
             <div style={{ width: 1, background: '#D1D5DB', margin: '0 4px', height: 16 }}></div>
             
             {sizes.map(s => (
-              <div 
-                 key={s}
-                 onClick={() => setPenSize(s)}
-                 style={{ width: 24, height: 24, borderRadius: '50%', background: penSize === s ? 'white' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: penSize === s ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
-              >
+              <div key={s} onClick={() => setPenSize(s)} style={{ width: 24, height: 24, borderRadius: '50%', background: penSize === s ? 'white' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: penSize === s ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
                  <div style={{ width: s, height: s, borderRadius: '50%', background: penSize === s ? 'var(--teal)' : '#9CA3AF' }}></div>
               </div>
             ))}
+            
+            <div style={{ width: 1, background: '#D1D5DB', margin: '0 4px', height: 16 }}></div>
+            
+            <input type="range" min="0.1" max="1" step="0.1" value={penOpacity} onChange={(e) => setPenOpacity(parseFloat(e.target.value))} style={{ width: 60 }} title="Opacity" />
           </div>
         )}
 
@@ -375,12 +468,25 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
         <button onClick={() => setTool('pan')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'pan' ? '#E5E7EB' : 'transparent', color: tool === 'pan' ? '#374151' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
           <i className="ti ti-hand-stop" style={{ fontSize: 20 }}></i>
         </button>
+        
         <div style={{ width: 1, background: 'var(--br2)', margin: '0 4px', height: 24 }}></div>
-        <button onClick={() => document.getElementById('pdf-upload').click()} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'var(--blue-light)', color: 'var(--blue-dark)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-          <i className="ti ti-upload" style={{ fontSize: 20 }}></i>
+        
+        {/* Insert Options */}
+        <button onClick={() => document.getElementById('image-upload').click()} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'var(--blue-light)', color: 'var(--blue-dark)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+          <i className="ti ti-photo-plus" style={{ fontSize: 20 }}></i>
         </button>
         <button onClick={toggleRecording} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: isRecording ? 'var(--red)' : 'var(--orange-light)', color: isRecording ? 'white' : 'var(--orange-dark)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', animation: isRecording ? 'pulse 1.5s infinite' : 'none' }}>
           <i className={isRecording ? "ti ti-player-stop-filled" : "ti ti-microphone"} style={{ fontSize: 20 }}></i>
+        </button>
+        
+        <div style={{ width: 1, background: 'var(--br2)', margin: '0 4px', height: 24 }}></div>
+        
+        {/* Page Actions */}
+        <button onClick={clearPage} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} title="ล้างหน้ากระดาษ">
+          <i className="ti ti-clear-all" style={{ fontSize: 20 }}></i>
+        </button>
+        <button onClick={deletePage} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: 'var(--red)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} title="ลบหน้ากระดาษ">
+          <i className="ti ti-trash" style={{ fontSize: 20 }}></i>
         </button>
       </div>
       
@@ -440,7 +546,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
         y={position.y}
         style={{ cursor: tool === 'pan' ? 'grab' : 'crosshair' }}
       >
-        {/* Background Layer (Paper + PDF) */}
+        {/* Background Layer (Paper + PDF + Images) */}
         <Layer>
           <Group x={pageX} y={pageY}>
             {/* Page Paper Background */}
@@ -450,6 +556,25 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
             {currentPage.src && (
                <PDFPageImage src={currentPage.src} width={currentPage.width} height={currentPage.height} />
             )}
+            
+            {/* Images */}
+            {currentPage.images && currentPage.images.map((img) => (
+              <Group 
+                key={img.id}
+                x={img.x}
+                y={img.y}
+                draggable={tool === 'pan'}
+                onDragEnd={(e) => {
+                  const { x, y } = e.target.position();
+                  updatePage(currentPageIndex, (page) => {
+                    const i = page.images.find(im => im.id === img.id);
+                    if(i) { i.x = x; i.y = y; }
+                  });
+                }}
+              >
+                 <PDFPageImage src={img.src} width={img.width} height={img.height} />
+              </Group>
+            ))}
           </Group>
         </Layer>
         
@@ -465,12 +590,13 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
               
               const isHighlighter = line.tool === 'highlighter';
               const isEraser = line.tool === 'eraser';
+              const isPencil = line.tool === 'pencil';
               
               const strokeOptions = { 
                  size: isEraser ? 24 : isHighlighter ? (line.size || 4) * 3 : (line.size || 4), 
-                 thinning: isHighlighter ? 0 : 0.5, // Highlighters usually don't thin
-                 smoothing: 0.5, 
-                 streamline: 0.5 
+                 thinning: (isHighlighter || isPencil) ? 0 : 0.5,
+                 smoothing: isPencil ? 0.2 : 0.5, 
+                 streamline: isPencil ? 0.2 : 0.5 
               };
               
               const stroke = getStroke(pointPairs, strokeOptions);
@@ -479,7 +605,6 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
               let fillStr = line.color || '#111827';
               if (isEraser) fillStr = 'black';
               
-              // Highlighter uses mix-blend-mode multiply equivalent
               let compositeOp = 'source-over';
               if (isEraser) compositeOp = 'destination-out';
               else if (isHighlighter) compositeOp = 'multiply';
@@ -489,7 +614,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
                   key={i}
                   data={pathData}
                   fill={fillStr}
-                  opacity={isHighlighter ? 0.5 : 1}
+                  opacity={isHighlighter ? 0.5 : (line.opacity || 1)}
                   globalCompositeOperation={compositeOp}
                   lineCap="round"
                   lineJoin="round"
