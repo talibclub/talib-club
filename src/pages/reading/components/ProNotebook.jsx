@@ -105,7 +105,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   }, [notebookId, uid]);
   
   const [loadingPdf, setLoadingPdf] = useState(false);
-  const [showModeSelection, setShowModeSelection] = useState(activeBook?.book?.fileUrl ? true : false);
+  const [showModeSelection, setShowModeSelection] = useState(false);
   
   const [tool, setTool] = useState('pen'); // 'pen', 'pencil', 'highlighter', 'eraser', 'pan', 'text', 'laser', 'shape', 'lasso'
   const [shapeType, setShapeType] = useState('rect'); // 'rect', 'circle', 'line'
@@ -135,7 +135,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   const [laserLines, setLaserLines] = useState([]);
   const [editingTextId, setEditingTextId] = useState(null);
   const [editingTextValue, setEditingTextValue] = useState("");
+  const isEditingText = useRef(false);
   const textareaRef = useRef(null);
+  
+  const [editingStickerId, setEditingStickerId] = useState(null);
+  const [editingStickerValue, setEditingStickerValue] = useState("");
   
   const [lassoRect, setLassoRect] = useState(null);
   const [selectedLassoLines, setSelectedLassoLines] = useState([]);
@@ -227,6 +231,25 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     return () => observer.disconnect();
   }, []);
 
+  // Auto-fit scale on mount and resize
+  useEffect(() => {
+    if (dimensions.width > 0 && dimensions.height > 0) {
+       const currentPage = pages[currentPageIndex] || { width: 800, height: 1130 };
+       const padding = isMobile ? 10 : 20;
+       const availableWidth = dimensions.width - (padding * 2);
+       
+       let newScale = availableWidth / currentPage.width;
+       if (newScale > 1.5) newScale = 1.5;
+       if (newScale < 0.1) newScale = 0.1;
+       
+       setScale(newScale);
+       
+       const scaledHeight = currentPage.height * newScale;
+       const yPos = scaledHeight < dimensions.height ? (dimensions.height - scaledHeight) / 2 : 40;
+       setPosition({ x: 0, y: yPos });
+    }
+  }, [dimensions.width, currentPageIndex, isMobile]);
+
   // Update a specific page's data safely
   const updatePage = (index, updater) => {
     setPages((prev) => {
@@ -262,19 +285,19 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
       const pdf = await loadingTask.promise;
       const numPages = Math.min(pdf.numPages, 30);
       
-      const extractedPages = [];
-      toast.loading(`กำลังแยกหน้า PDF (${numPages} หน้า)...`, { id: 'pdf-load' });
+      toast.loading(`กำลังแยกหน้า PDF (0/${numPages})...`, { id: 'pdf-load' });
       
       for (let i = 1; i <= numPages; i++) {
+        toast.loading(`กำลังแยกหน้า PDF (${i}/${numPages})...`, { id: 'pdf-load' });
         const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 2.0 }); 
+        const viewport = page.getViewport({ scale: isMobile ? 1.2 : 2.0 }); 
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
         canvas.width = viewport.width;
         canvas.height = viewport.height;
         
         await page.render({ canvasContext: context, viewport }).promise;
-        const dataUrl = canvas.toDataURL('image/png');
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85); // Use JPEG instead of PNG for memory optimization on large PDFs
         
         // Calculate display dimensions fitting screen width
         const displayWidth = dimensions.width > 0 ? dimensions.width - 40 : viewport.width;
@@ -515,6 +538,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   };
 
   const handlePointerDown = (e) => {
+    // If clicking on lasso group, don't bake, just return so they can drag it
+    if (tool === 'lasso' && e.target.name() === 'lasso-group') return;
+
     checkDeselect(e);
   
     if (readonly || tool === 'pan' || isSpaceDown) return;
@@ -524,6 +550,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     const relativeTime = isRecording && recordingStartTimeRef.current ? Date.now() - recordingStartTimeRef.current : null;
     
     if (tool === 'text') {
+       if (editingTextId) {
+           // Save current text before creating new one
+           updatePage(currentPageIndex, (page) => {
+              const txt = page.texts.find(tx => tx.id === editingTextId);
+              if (txt) txt.text = editingTextValue;
+           });
+       }
        const newText = { id: `text-${Date.now()}`, text: '', x: pos.x, y: pos.y, color: penColor, size: penSize * 4 };
        pushHistory();
        updatePage(currentPageIndex, (page) => {
@@ -532,6 +565,20 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
        });
        setEditingTextId(newText.id);
        setEditingTextValue(newText.text);
+       isEditingText.current = true;
+       return;
+    }
+    
+    if (tool === 'sticker') {
+       const stickerColor = ['#FEF08A', '#FBCFE8', '#BAE6FD', '#BBF7D0'].includes(penColor) ? penColor : '#FEF08A';
+       const newSticker = { id: `sticker-${Date.now()}`, x: pos.x, y: pos.y, color: stickerColor, text: '' };
+       pushHistory();
+       updatePage(currentPageIndex, (page) => {
+          if (!page.stickers) page.stickers = [];
+          page.stickers.push(newSticker);
+       });
+       setEditingStickerId(newSticker.id);
+       setEditingStickerValue('');
        return;
     }
     
@@ -675,6 +722,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   // --- Multi-Touch Pan & Zoom ---
   const lastCenter = useRef(null);
   const lastDist = useRef(null);
+  
+  useEffect(() => {
+    // Re-render when scale changes for textarea positioning
+  }, [scale, position]);
 
   const handleTouchMove = (e) => {
     e.evt.preventDefault();
@@ -1015,17 +1066,17 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
 
       {/* Huawei Notes Unified Draggable Floating Toolbar (Tablet & Desktop) */}
       {!isMobile && !readonly && (
-        <Draggable handle=".huawei-drag-handle">
-          <div style={{ position: 'absolute', top: 64, left: '50%', transform: 'translateX(-50%)', zIndex: 60, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: '6px 8px', borderRadius: 16, display: 'flex', gap: 4, boxShadow: '0 10px 40px rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.05)', flexWrap: 'nowrap', alignItems: 'center', width: 'auto', maxWidth: '95vw' }}>
+        <Draggable handle=".huawei-drag-handle" cancel=".cancel-drag" defaultPosition={{ x: 0, y: 0 }} bounds="parent">
+          <div style={{ position: 'absolute', top: 24, left: '50%', marginLeft: -300, zIndex: 60, background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(20px)', padding: '6px 8px', borderRadius: 16, display: 'flex', gap: 4, boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', flexWrap: 'nowrap', alignItems: 'center', width: 'auto', maxWidth: '95vw' }}>
+             
+             <div className="huawei-drag-handle" style={{ cursor: 'grab', color: '#9CA3AF', display: 'flex', alignItems: 'center', padding: '0 8px' }}>
+                <GripVertical size={20} strokeWidth={2} />
+             </div>
             
-            <div className="huawei-drag-handle" style={{ cursor: 'grab', color: '#D1D5DB', display: 'flex', alignItems: 'center', padding: '0 8px' }}>
-              <GripHorizontal size={16} strokeWidth={2} />
-            </div>
-            
-            <button onClick={undo} disabled={!canUndo} style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: 'transparent', color: canUndo ? '#4B5563' : '#D1D5DB', cursor: canUndo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={undo} disabled={!canUndo} className="cancel-drag" style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: 'transparent', color: canUndo ? '#4B5563' : '#D1D5DB', cursor: canUndo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Undo2 size={20} strokeWidth={1.5} />
             </button>
-            <button onClick={redo} disabled={!canRedo} style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: 'transparent', color: canRedo ? '#4B5563' : '#D1D5DB', cursor: canRedo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={redo} disabled={!canRedo} className="cancel-drag" style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: 'transparent', color: canRedo ? '#4B5563' : '#D1D5DB', cursor: canRedo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Redo2 size={20} strokeWidth={1.5} />
             </button>
             
@@ -1049,6 +1100,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                ].map(t => (
                   <button 
                     key={t.id}
+                    className="cancel-drag"
                     onClick={() => {
                        if (t.id === 'image') document.getElementById('image-upload').click();
                        else if (t.id === 'pdf') document.getElementById('pdf-upload').click();
@@ -1075,9 +1127,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={penColor} strokeWidth={penSize > 10 ? 3 : penSize > 5 ? 2 : 1} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: penOpacity }}>
                   <path d="M4 12c2-4 6-4 8 0s6 4 8 0" />
                </svg>
-               {/* 3 Recent Colors */}
-               <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#1D4ED8', outline: penColor === '#1D4ED8' ? '2px solid #3B82F6' : 'none', outlineOffset: 2, cursor: 'pointer' }} onClick={() => setPenColor('#1D4ED8')}></div>
-               <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#111827', outline: penColor === '#111827' ? '2px solid #3B82F6' : 'none', outlineOffset: 2, cursor: 'pointer' }} onClick={() => setPenColor('#111827')}></div>
+               {/* 4 Recent Colors */}
+               <div className="cancel-drag" style={{ width: 20, height: 20, borderRadius: '50%', background: '#EF4444', outline: penColor === '#EF4444' ? '2px solid #3B82F6' : 'none', outlineOffset: 2, cursor: 'pointer' }} onClick={() => setPenColor('#EF4444')}></div>
+               <div className="cancel-drag" style={{ width: 20, height: 20, borderRadius: '50%', background: '#10B981', outline: penColor === '#10B981' ? '2px solid #3B82F6' : 'none', outlineOffset: 2, cursor: 'pointer' }} onClick={() => setPenColor('#10B981')}></div>
+               <div className="cancel-drag" style={{ width: 20, height: 20, borderRadius: '50%', background: '#1D4ED8', outline: penColor === '#1D4ED8' ? '2px solid #3B82F6' : 'none', outlineOffset: 2, cursor: 'pointer' }} onClick={() => setPenColor('#1D4ED8')}></div>
+               <div className="cancel-drag" style={{ width: 20, height: 20, borderRadius: '50%', background: '#111827', outline: penColor === '#111827' ? '2px solid #3B82F6' : 'none', outlineOffset: 2, cursor: 'pointer' }} onClick={() => setPenColor('#111827')}></div>
             </div>
             
             {/* Tool Settings Popover (Huawei Style) */}
@@ -1085,17 +1139,24 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
               <div style={{ position: 'absolute', top: '100%', marginTop: 12, left: '50%', transform: 'translateX(-50%)', background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(20px)', padding: 0, borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 280, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                  
                  <div style={{ padding: '16px 0 12px', textAlign: 'center', fontSize: 15, fontWeight: 600, color: '#111827', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                    {tool === 'pen' ? 'ปากกาลูกลื่น' : tool === 'pencil' ? 'ดินสอ HB' : tool === 'highlighter' ? 'ปากกาเน้นข้อความ' : tool === 'eraser' ? 'ยางลบ' : tool === 'lasso' ? 'แลสโซ' : 'รูปทรง'}
+                    {tool === 'pen' ? 'ปากกาลูกลื่น' : tool === 'pencil' ? 'ดินสอ HB' : tool === 'highlighter' ? 'ปากกาเน้นข้อความ' : tool === 'eraser' ? 'ยางลบ' : tool === 'lasso' ? 'แลสโซ' : tool === 'sticker' ? 'โพสต์อิท' : 'รูปทรง'}
                  </div>
                  
                  <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 20 }}>
-                    {/* Pen Types */}
-                    {['pen', 'pencil'].includes(tool) && (
-                       <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
-                          <PenTool size={28} strokeWidth={1} color={tool === 'pen' ? '#3B82F6' : '#9CA3AF'} />
-                          <Pencil size={28} strokeWidth={1} color={tool === 'pencil' ? '#3B82F6' : '#9CA3AF'} />
-                          <MousePointerClick size={28} strokeWidth={1} color="#9CA3AF" />
-                          <Type size={28} strokeWidth={1} color="#9CA3AF" />
+
+                    
+                    {/* Shapes */}
+                    {tool === 'shape' && (
+                       <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', background: '#F3F4F6', padding: 8, borderRadius: 12 }}>
+                          <button onClick={() => setShapeType('rect')} className="cancel-drag" style={{ padding: 8, borderRadius: 8, border: 'none', background: shapeType === 'rect' ? 'white' : 'transparent', boxShadow: shapeType === 'rect' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none', cursor: 'pointer' }}>
+                             <Square size={24} color={shapeType === 'rect' ? '#3B82F6' : '#4B5563'} strokeWidth={1.5} />
+                          </button>
+                          <button onClick={() => setShapeType('circle')} className="cancel-drag" style={{ padding: 8, borderRadius: 8, border: 'none', background: shapeType === 'circle' ? 'white' : 'transparent', boxShadow: shapeType === 'circle' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none', cursor: 'pointer' }}>
+                             <Circle size={24} color={shapeType === 'circle' ? '#3B82F6' : '#4B5563'} strokeWidth={1.5} />
+                          </button>
+                          <button onClick={() => setShapeType('line')} className="cancel-drag" style={{ padding: 8, borderRadius: 8, border: 'none', background: shapeType === 'line' ? 'white' : 'transparent', boxShadow: shapeType === 'line' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none', cursor: 'pointer' }}>
+                             <Minus size={24} color={shapeType === 'line' ? '#3B82F6' : '#4B5563'} strokeWidth={1.5} />
+                          </button>
                        </div>
                     )}
                     
@@ -1127,7 +1188,16 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                     {['pen', 'pencil', 'highlighter', 'shape'].includes(tool) && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       {['#3B82F6', '#1D4ED8', '#111827', '#10B981', '#8B5CF6', '#06B6D4', '#EF4444'].map(c => (
-                         <div key={c} onClick={() => setPenColor(c)} style={{ width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer', outline: penColor === c ? '2px solid #3B82F6' : 'none', outlineOffset: 2, transition: 'all 0.1s' }} />
+                         <div key={c} className="cancel-drag" onClick={() => setPenColor(c)} style={{ width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer', outline: penColor === c ? '2px solid #3B82F6' : 'none', outlineOffset: 2, transition: 'all 0.1s' }} />
+                      ))}
+                    </div>
+                    )}
+                    
+                    {/* Sticker Palette */}
+                    {tool === 'sticker' && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      {['#FEF08A', '#FBCFE8', '#BAE6FD', '#BBF7D0'].map(c => (
+                         <div key={c} className="cancel-drag" onClick={() => setPenColor(c)} style={{ width: 32, height: 32, borderRadius: 8, background: c, cursor: 'pointer', outline: penColor === c ? '2px solid #3B82F6' : 'none', outlineOffset: 2, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }} />
                       ))}
                     </div>
                     )}
@@ -1297,12 +1367,28 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                 name="object"
                 x={img.x}
                 y={img.y}
+                scaleX={img.scaleX || 1}
+                scaleY={img.scaleY || 1}
+                rotation={img.rotation || 0}
                 draggable={tool === 'pan'}
                 onDragEnd={(e) => {
                   const { x, y } = e.target.position();
                   updatePage(currentPageIndex, (page) => {
                     const i = page.images.find(im => im.id === img.id);
                     if(i) { i.x = x; i.y = y; }
+                  });
+                }}
+                onTransformEnd={(e) => {
+                  const node = e.target;
+                  updatePage(currentPageIndex, (page) => {
+                    const i = page.images.find(im => im.id === img.id);
+                    if(i) {
+                       i.x = node.x();
+                       i.y = node.y();
+                       i.scaleX = node.scaleX();
+                       i.scaleY = node.scaleY();
+                       i.rotation = node.rotation();
+                    }
                   });
                 }}
                 onClick={() => { if (tool === 'pan' || tool === 'lasso') selectShape(img.id); }}
@@ -1319,6 +1405,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
               const shapeProps = {
                  key: s.id, id: s.id, name: "object",
                  x: s.x1, y: s.y1, stroke: s.color, strokeWidth: s.size, opacity: s.opacity,
+                 scaleX: s.scaleX || 1, scaleY: s.scaleY || 1, rotation: s.rotation || 0,
                  draggable: tool === 'pan',
                  onClick: () => { if (tool === 'pan' || tool === 'lasso') selectShape(s.id); },
                  onTap: () => { if (tool === 'pan' || tool === 'lasso') selectShape(s.id); },
@@ -1329,6 +1416,19 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                        if (shp) {
                           const dx = x - shp.x1; const dy = y - shp.y1;
                           shp.x1 += dx; shp.x2 += dx; shp.y1 += dy; shp.y2 += dy;
+                       }
+                    });
+                 },
+                 onTransformEnd: (e) => {
+                    const node = e.target;
+                    updatePage(currentPageIndex, (page) => {
+                       const shp = page.shapes.find(sh => sh.id === s.id);
+                       if (shp) {
+                          shp.x1 = node.x();
+                          shp.y1 = node.y();
+                          shp.scaleX = node.scaleX();
+                          shp.scaleY = node.scaleY();
+                          shp.rotation = node.rotation();
                        }
                     });
                  }
@@ -1428,8 +1528,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
             )}
             
             {/* Lasso Selected Group */}
+            {/* Lasso Selection Box */}
             {selectedLassoLines.length > 0 && (
                <Group 
+                 name="lasso-group"
                  draggable
                  x={lassoGroupPos.x}
                  y={lassoGroupPos.y}
@@ -1518,42 +1620,93 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                 )}
               </Group>
             ))}
-          </Group>
-        </Layer>
-        
-        {/* Stickers Layer */}
-        <Layer>
-          <Group x={pageX} y={pageY}>
-            {/* Audio Stickers */}
-            {currentPage.stickers.map((sticker) => (
-               <Group 
-                 key={sticker.id}
-                 id={sticker.id}
-                 name="object"
-                 x={sticker.x}
-                 y={sticker.y}
-                 draggable={tool === 'pan'}
-                 onDragEnd={(e) => {
-                   const { x, y } = e.target.position();
-                   updatePage(currentPageIndex, (page) => {
-                     const s = page.stickers.find(st => st.id === sticker.id);
-                     if(s) { s.x = x; s.y = y; }
-                   });
-                 }}
-                 onClick={() => {
-                    if (tool === 'pan' || tool === 'lasso') selectShape(sticker.id);
-                    else playAudioSticker(currentPageIndex, sticker.id, sticker.audioUrl);
-                 }}
-                 onTap={() => {
-                    if (tool === 'pan' || tool === 'lasso') selectShape(sticker.id);
-                    else playAudioSticker(currentPageIndex, sticker.id, sticker.audioUrl);
-                 }}
-               >
-                 <Circle radius={24} fill={sticker.isPlaying ? '#10B981' : '#F59E0B'} shadowColor="rgba(0,0,0,0.2)" shadowBlur={10} shadowOffsetY={4} />
-                 <Text text="🎤" fontSize={24} x={-12} y={-12} />
-                 {sticker.isPlaying && <Circle radius={24} stroke="#10B981" strokeWidth={4} dash={[10, 5]} />}
-               </Group>
-            ))}
+            
+            {/* Stickers */}
+            {currentPage.stickers && currentPage.stickers.map(st => {
+              if (st.audioUrl) {
+                // Audio Sticker
+                return (
+                  <Group 
+                    key={st.id}
+                    id={st.id}
+                    name="object"
+                    x={st.x}
+                    y={st.y}
+                    scaleX={st.scaleX || 1}
+                    scaleY={st.scaleY || 1}
+                    rotation={st.rotation || 0}
+                    draggable={tool === 'pan'}
+                    onDragEnd={(e) => {
+                      updatePage(currentPageIndex, (page) => {
+                        const s = page.stickers.find(sticker => sticker.id === st.id);
+                        if (s) { s.x = e.target.x(); s.y = e.target.y(); }
+                      });
+                    }}
+                    onTransformEnd={(e) => {
+                      const node = e.target;
+                      updatePage(currentPageIndex, (page) => {
+                        const s = page.stickers.find(sticker => sticker.id === st.id);
+                        if (s) {
+                           s.x = node.x(); s.y = node.y();
+                           s.scaleX = node.scaleX(); s.scaleY = node.scaleY(); s.rotation = node.rotation();
+                        }
+                      });
+                    }}
+                    onClick={() => {
+                       if (tool === 'pan' || tool === 'lasso') selectShape(st.id);
+                       else playAudioSticker(currentPageIndex, st.id, st.audioUrl);
+                    }}
+                    onTap={() => {
+                       if (tool === 'pan' || tool === 'lasso') selectShape(st.id);
+                       else playAudioSticker(currentPageIndex, st.id, st.audioUrl);
+                    }}
+                  >
+                    <Circle radius={24} fill={st.isPlaying ? '#10B981' : '#F59E0B'} shadowColor="rgba(0,0,0,0.2)" shadowBlur={10} shadowOffsetY={4} />
+                    <Text text="🎤" fontSize={24} x={-12} y={-12} />
+                    {st.isPlaying && <Circle radius={24} stroke="#10B981" strokeWidth={4} dash={[10, 5]} />}
+                  </Group>
+                );
+              }
+              
+              // Sticky Note
+              return (
+                <Group 
+                  key={st.id} 
+                  id={st.id} 
+                  name="object"
+                  x={st.x} 
+                  y={st.y} 
+                  scaleX={st.scaleX || 1}
+                  scaleY={st.scaleY || 1}
+                  rotation={st.rotation || 0}
+                  draggable={tool === 'pan' || tool === 'sticker'} 
+                  onDragEnd={(e) => {
+                    updatePage(currentPageIndex, (page) => {
+                       const sticker = page.stickers.find(s => s.id === st.id);
+                       if (sticker) { sticker.x = e.target.x(); sticker.y = e.target.y(); }
+                    });
+                  }}
+                  onTransformEnd={(e) => {
+                    const node = e.target;
+                    updatePage(currentPageIndex, (page) => {
+                       const sticker = page.stickers.find(s => s.id === st.id);
+                       if (sticker) {
+                          sticker.x = node.x(); sticker.y = node.y();
+                          sticker.scaleX = node.scaleX(); sticker.scaleY = node.scaleY(); sticker.rotation = node.rotation();
+                       }
+                    });
+                  }}
+                  onDblClick={(e) => { e.cancelBubble = true; setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); }}
+                  onTap={(e) => { e.cancelBubble = true; setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); }}
+                >
+                  <Rect width={150} height={150} fill={st.color} shadowColor="rgba(0,0,0,0.15)" shadowBlur={10} shadowOffsetY={4} cornerRadius={4} />
+                  <Rect width={150} height={20} fill="rgba(0,0,0,0.05)" cornerRadius={[4, 4, 0, 0]} />
+                  {editingStickerId !== st.id && st.text && (
+                     <Text text={st.text} x={10} y={24} width={130} height={116} fontSize={16} fill="#111827" fontFamily="Kanit, sans-serif" />
+                  )}
+                </Group>
+              );
+            })}
           </Group>
         </Layer>
         
@@ -1587,6 +1740,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
              value={editingTextValue}
              onChange={(e) => setEditingTextValue(e.target.value)}
              onBlur={() => {
+                if (!isEditingText.current) return;
+                isEditingText.current = false;
+                
                 if (editingTextValue.trim() === '') {
                    updatePage(currentPageIndex, (page) => {
                       page.texts = page.texts.filter(tx => tx.id !== editingTextId);
