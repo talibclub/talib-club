@@ -4,11 +4,8 @@ import 'tldraw/tldraw.css';
 import toast from 'react-hot-toast';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
-import { AudioShapeUtil } from './AudioShapeUtil.jsx';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
-
-const customShapeUtils = [AudioShapeUtil];
 
 export default function ProNotebook({ bookId, uid, activeBook }) {
   const [mode, setMode] = useState(activeBook?.book?.fileUrl ? 'annotate' : 'blank'); 
@@ -112,27 +109,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
         key={mode}
         persistenceKey={`tldraw-notebook-${uid}-${bookId}-${mode}`} 
         onMount={handleMount} 
-        shapeUtils={customShapeUtils}
       />
-      {tldrawEditor && (
-        <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 100 }}>
-          <button 
-            className="btn btn-teal" 
-            onClick={() => {
-              const camera = tldrawEditor.getCamera();
-              tldrawEditor.createShape({
-                id: createShapeId(),
-                type: 'audio',
-                x: -camera.x + window.innerWidth / 4 - 80,
-                y: -camera.y + window.innerHeight / 4 - 24,
-              });
-            }}
-            style={{ padding: '8px 16px', borderRadius: 24, display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.15)' }}
-          >
-            <i className="ti ti-microphone"></i> เพิ่มสติกเกอร์อัดเสียง
-          </button>
-        </div>
-      )}
     </div>
   );
 }
