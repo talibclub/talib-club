@@ -92,8 +92,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
         toast.success('โหลดหน้าหนังสือลงกระดานสำเร็จ!', { id: 'pdf-load' });
       } catch (err) {
         console.error("PDF Load Error", err);
-        toast.error('ดึงข้อมูล PDF ไม่สำเร็จ (อาจติด Permissions) จะใช้สมุดเปล่าแทน', { id: 'pdf-load', duration: 4000 });
-        setMode('blank'); // Fallback to blank note
+        toast.error('ดึงข้อมูล PDF ไม่สำเร็จ จะใช้เป็นกระดานเปล่าแทน', { id: 'pdf-load', duration: 4000 });
       } finally {
         setLoadingPdf(false);
       }
