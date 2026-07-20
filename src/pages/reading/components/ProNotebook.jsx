@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Image as KonvaImage, Path, Group, Circle, Text, Rect, Transformer } from 'react-konva';
+import { PenTool, Highlighter, Eraser, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap } from 'lucide-react';
 import useImage from 'use-image';
 import getStroke from 'perfect-freehand';
 import toast from 'react-hot-toast';
@@ -54,6 +55,15 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   const [pages, setPages] = useState([{ id: 'page-default', src: null, width: 800, height: 1130, lines: [], stickers: [], images: [], texts: [], shapes: [], paperType: 'lines', paperColor: 'white' }]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  const isMobile = windowWidth < 768;
+  const isDesktop = windowWidth >= 1024;
+  
   const saveKey = `talib_notebook_${bookId || 'default'}`;
   
   useEffect(() => {
@@ -75,6 +85,8 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   
   const [tool, setTool] = useState('pen'); // 'pen', 'pencil', 'highlighter', 'eraser', 'pan', 'text', 'laser', 'shape', 'lasso'
   const [shapeType, setShapeType] = useState('rect'); // 'rect', 'circle', 'line'
+  
+  const [showToolSettings, setShowToolSettings] = useState(false);
   
   const [laserLines, setLaserLines] = useState([]);
   const [editingTextId, setEditingTextId] = useState(null);
@@ -644,23 +656,104 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   const [showPageManager, setShowPageManager] = useState(false);
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--br2)', background: '#E5E7EB' }}>
+    <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--gray-light)', display: 'flex' }}>
       
-      {showModeSelection && (
+      {isDesktop && (
+        <div style={{ width: 64, height: '100%', background: '#111827', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 0', zIndex: 10, boxShadow: '2px 0 10px rgba(0,0,0,0.1)', flexShrink: 0 }}>
+          <div style={{ color: 'white', marginBottom: 24, fontSize: 12, fontWeight: 700 }}>TALIB</div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', alignItems: 'center' }}>
+            {[
+              { id: 'pan', icon: MousePointer2 },
+              { id: 'lasso', icon: Lasso },
+              { id: 'pen', icon: PenTool },
+              { id: 'highlighter', icon: Highlighter },
+              { id: 'laser', icon: Zap },
+              { id: 'shape', icon: Square },
+              { id: 'text', icon: Type },
+              { id: 'eraser', icon: Eraser },
+            ].map(t => (
+               <button 
+                 key={t.id}
+                 onClick={() => { setTool(t.id); if (t.id === tool && (t.id === 'pen' || t.id === 'highlighter' || t.id === 'shape' || t.id === 'text')) setShowToolSettings(!showToolSettings); else setShowToolSettings(true); }} 
+                 style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: tool === t.id ? 'rgba(255,255,255,0.15)' : 'transparent', color: tool === t.id ? '#10B981' : '#9CA3AF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', position: 'relative' }}
+               >
+                 <t.icon size={22} strokeWidth={tool === t.id ? 2.5 : 2} />
+                 {tool === t.id && (t.id === 'pen' || t.id === 'highlighter' || t.id === 'shape' || t.id === 'text') && <div style={{ position: 'absolute', right: 4, bottom: 4, width: 4, height: 4, borderRadius: '50%', background: '#10B981' }}></div>}
+               </button>
+            ))}
+          </div>
+          
+          <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+            <button onClick={() => document.getElementById('image-upload').click()} style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: 'transparent', color: '#9CA3AF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+              <ImageIcon size={22} />
+            </button>
+            <button onClick={toggleRecording} style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: isRecording ? 'rgba(239, 68, 68, 0.2)' : 'transparent', color: isRecording ? '#EF4444' : '#9CA3AF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', animation: isRecording ? 'pulse 1.5s infinite' : 'none' }}>
+              <Mic size={22} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Expanded Desktop Tool Settings Panel */}
+      {isDesktop && showToolSettings && (tool === 'pen' || tool === 'pencil' || tool === 'highlighter' || tool === 'laser' || tool === 'text' || tool === 'shape') && (
+        <div style={{ width: 280, height: '100%', background: 'white', borderRight: '1px solid var(--br2)', display: 'flex', flexDirection: 'column', padding: 24, zIndex: 9, flexShrink: 0, boxShadow: '2px 0 10px rgba(0,0,0,0.05)' }}>
+           <h3 style={{ fontSize: 16, fontWeight: 600, color: '#111827', margin: '0 0 24px 0', textTransform: 'capitalize' }}>{tool === 'pen' ? 'Pen Options' : tool === 'highlighter' ? 'Highlighter' : tool === 'shape' ? 'Shapes' : tool === 'text' ? 'Text' : 'Settings'}</h3>
+           
+           <label style={{ fontSize: 13, fontWeight: 500, color: '#4B5563', marginBottom: 8 }}>Size</label>
+           <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+             {sizes.map(s => (
+                <div key={s} onClick={() => setPenSize(s)} style={{ width: 32, height: 32, borderRadius: '50%', background: penSize === s ? '#F3F4F6' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: penSize === s ? '1px solid #D1D5DB' : '1px solid transparent' }}>
+                   <div style={{ width: s, height: s, borderRadius: '50%', background: penSize === s ? '#111827' : '#9CA3AF' }}></div>
+                </div>
+             ))}
+           </div>
+           
+           {tool === 'shape' && (
+              <>
+                 <label style={{ fontSize: 13, fontWeight: 500, color: '#4B5563', marginBottom: 8 }}>Shape Type</label>
+                 <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+                    <button onClick={() => setShapeType('rect')} style={{ flex: 1, padding: 8, borderRadius: 8, border: shapeType === 'rect' ? '2px solid #10B981' : '1px solid #D1D5DB', background: 'white', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Square size={20} color={shapeType === 'rect' ? '#10B981' : '#4B5563'} /></button>
+                    <button onClick={() => setShapeType('circle')} style={{ flex: 1, padding: 8, borderRadius: 8, border: shapeType === 'circle' ? '2px solid #10B981' : '1px solid #D1D5DB', background: 'white', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><CircleIcon size={20} color={shapeType === 'circle' ? '#10B981' : '#4B5563'} /></button>
+                    <button onClick={() => setShapeType('line')} style={{ flex: 1, padding: 8, borderRadius: 8, border: shapeType === 'line' ? '2px solid #10B981' : '1px solid #D1D5DB', background: 'white', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}><Minus size={20} color={shapeType === 'line' ? '#10B981' : '#4B5563'} /></button>
+                 </div>
+              </>
+           )}
+
+           <label style={{ fontSize: 13, fontWeight: 500, color: '#4B5563', marginBottom: 8 }}>Color</label>
+           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 24 }}>
+             {colors.map(c => (
+                <div key={c} onClick={() => setPenColor(c)} style={{ width: 32, height: 32, borderRadius: '50%', background: c, cursor: 'pointer', border: penColor === c ? '2px solid white' : '1px solid rgba(0,0,0,0.1)', outline: penColor === c ? '2px solid #10B981' : 'none', margin: 'auto' }} />
+             ))}
+           </div>
+           
+           <label style={{ fontSize: 13, fontWeight: 500, color: '#4B5563', marginBottom: 8 }}>Opacity</label>
+           <input type="range" min="0.1" max="1" step="0.1" value={penOpacity} onChange={(e) => setPenOpacity(parseFloat(e.target.value))} style={{ width: '100%', accentColor: '#10B981' }} />
+        </div>
+      )}
+
+      <div style={{ flex: 1, position: 'relative' }}>
+      
+      {showModeSelection && !isMobile && (
          <div style={{ position: 'absolute', inset: 0, zIndex: 20, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-           <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>เริ่มต้นใช้งานสมุดโน้ต</h3>
-           <p style={{ fontSize: 14, color: 'var(--t2)', marginBottom: 32, textAlign: 'center' }}>คุณต้องการปูพื้นหลังกระดานด้วย PDF หรือไม่?</p>
+           <h3 style={{ fontSize: 24, fontWeight: 600, color: '#111827', marginBottom: 8 }}>Start your visual thinking</h3>
+           <p style={{ fontSize: 15, color: '#4B5563', marginBottom: 32, textAlign: 'center' }}>Choose a starting canvas for your notebook.</p>
            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
-             <button onClick={() => setShowModeSelection(false)} style={{ padding: '12px 24px', borderRadius: 12, border: '1px solid var(--br2)', background: 'white', color: 'var(--text)', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
-               <i className="ti ti-notebook" style={{ fontSize: 20 }}></i> ใช้กระดานเปล่า
+             <button onClick={() => setShowModeSelection(false)} style={{ padding: '12px 24px', borderRadius: 12, border: '1px solid var(--br2)', background: 'white', color: '#111827', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
+               <SquareSquare size={20} /> Blank Canvas
              </button>
-             <button onClick={() => document.getElementById('pdf-upload').click()} style={{ padding: '12px 24px', borderRadius: 12, border: '1px solid var(--teal)', background: 'white', color: 'var(--teal)', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
-               <i className="ti ti-upload" style={{ fontSize: 20 }}></i> อัปโหลดไฟล์ PDF เอง
-             </button>
-             <button onClick={() => startLoadingPDF(null)} style={{ padding: '12px 24px', borderRadius: 12, border: 'none', background: 'var(--teal)', color: 'white', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(0, 169, 143, 0.2)' }}>
-               <i className="ti ti-link" style={{ fontSize: 20 }}></i> ดึงจากลิงก์หนังสือ
+             <button onClick={() => document.getElementById('pdf-upload').click()} style={{ padding: '12px 24px', borderRadius: 12, border: '1px solid #10B981', background: 'white', color: '#10B981', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
+               <Download size={20} /> Upload PDF
              </button>
            </div>
+         </div>
+      )}
+      
+      {isMobile && (
+         <div style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
+           <MonitorPlay size={48} color="#10B981" style={{ marginBottom: 16 }} />
+           <h3 style={{ fontSize: 20, fontWeight: 700, color: '#111827', marginBottom: 8 }}>หน้าจอเล็กเกินไป</h3>
+           <p style={{ fontSize: 15, color: '#4B5563' }}>กรุณาเปิดแอปนี้บน Tablet หรือ Computer (Desktop) เพื่อใช้งานระบบจดโน้ตแบบสมบูรณ์</p>
          </div>
       )}
 
@@ -680,8 +773,8 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
                 >
                   <div style={{ width: '100%', aspectRatio: '800/1130', background: p.paperColor === 'yellow' ? '#FEF3C7' : p.paperColor === 'dark' ? '#1F2937' : 'white', border: '1px solid var(--br2)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
                     {p.src && <img src={p.src} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="pdf page" />}
-                    {!p.src && p.paperType !== 'blank' && <i className={`ti ti-grid-dots`} style={{ fontSize: 24, color: 'var(--t2)', opacity: 0.3 }}></i>}
-                    {p.lines.length > 0 && <i className="ti ti-pencil" style={{ position: 'absolute', bottom: 4, right: 4, color: 'var(--teal)', fontSize: 16 }}></i>}
+                    {!p.src && p.paperType !== 'blank' && <SquareSquare size={24} color="#9CA3AF" opacity={0.3} />}
+                    {p.lines.length > 0 && <PenTool size={16} color="#10B981" style={{ position: 'absolute', bottom: 4, right: 4 }} />}
                   </div>
                   <span style={{ marginTop: 8, fontSize: 13, fontWeight: 600, color: 'var(--t2)' }}>หน้า {i + 1}</span>
                 </div>
@@ -727,133 +820,85 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
 
       {loadingPdf && (
          <div style={{ position: 'absolute', inset: 0, zIndex: 10, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-           <i className="ti ti-loader-2 spin" style={{ fontSize: 36, color: 'var(--teal)', marginBottom: 16 }}></i>
-           <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>กำลังดึงหน้า PDF มาลงกระดาน...</span>
+           <span style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>Loading PDF...</span>
          </div>
       )}
 
-      {/* Floating Toolbar */}
-      <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 5, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(12px)', padding: '8px', borderRadius: 100, display: 'flex', gap: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.1)', border: '1px solid var(--br2)', flexWrap: 'wrap', justifyContent: 'center', maxWidth: '95%' }}>
-        
-        {/* Main Actions */}
-        <button onClick={() => setShowSearch(!showSearch)} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: showSearch ? 'var(--teal)' : 'transparent', color: showSearch ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-          <i className="ti ti-search" style={{ fontSize: 20 }}></i>
-        </button>
-        <button onClick={saveNotebook} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} title="บันทึก">
-          <i className="ti ti-device-floppy" style={{ fontSize: 20 }}></i>
-        </button>
-        <button onClick={exportPage} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} title="ส่งออกเป็นรูปภาพ">
-          <i className="ti ti-photo-down" style={{ fontSize: 20 }}></i>
-        </button>
-        
-        <div style={{ width: 1, background: 'var(--br2)', margin: '0 4px', height: 24 }}></div>
-        
-        {/* Undo / Redo */}
-        <button onClick={undo} disabled={!canUndo} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: canUndo ? 'var(--text)' : 'var(--br2)', cursor: canUndo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-          <i className="ti ti-arrow-back-up" style={{ fontSize: 20 }}></i>
-        </button>
-        <button onClick={redo} disabled={!canRedo} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: canRedo ? 'var(--text)' : 'var(--br2)', cursor: canRedo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-          <i className="ti ti-arrow-forward-up" style={{ fontSize: 20 }}></i>
-        </button>
-        
-        <div style={{ width: 1, background: 'var(--br2)', margin: '0 4px', height: 24 }}></div>
-        
-        {/* Tools */}
-        <button onClick={() => setTool('pencil')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'pencil' ? 'var(--teal)' : 'transparent', color: tool === 'pencil' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-          <i className="ti ti-pencil" style={{ fontSize: 20 }}></i>
-        </button>
-        <button onClick={() => setTool('pen')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'pen' ? 'var(--teal)' : 'transparent', color: tool === 'pen' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-          <i className="ti ti-ballpen" style={{ fontSize: 20 }}></i>
-        </button>
-        <button onClick={() => setTool('highlighter')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'highlighter' ? '#F59E0B' : 'transparent', color: tool === 'highlighter' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-          <i className="ti ti-highlight" style={{ fontSize: 20 }}></i>
-        </button>
-        <button onClick={() => setTool('laser')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'laser' ? 'var(--red)' : 'transparent', color: tool === 'laser' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-          <i className="ti ti-flare" style={{ fontSize: 20 }}></i>
-        </button>
-        <button onClick={() => setTool('shape')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'shape' ? '#8B5CF6' : 'transparent', color: tool === 'shape' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-          <i className="ti ti-shape" style={{ fontSize: 20 }}></i>
-        </button>
-        <button onClick={() => setTool('text')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'text' ? 'var(--blue)' : 'transparent', color: tool === 'text' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-          <i className="ti ti-typography" style={{ fontSize: 20 }}></i>
-        </button>
-        <button onClick={() => setTool('lasso')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'lasso' ? 'var(--teal)' : 'transparent', color: tool === 'lasso' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} title="Lasso Tool">
-          <i className="ti ti-lasso" style={{ fontSize: 20 }}></i>
-        </button>
-        
-        {(tool === 'pen' || tool === 'pencil' || tool === 'highlighter' || tool === 'laser' || tool === 'text' || tool === 'shape') && (
-          <div style={{ display: 'flex', gap: 6, background: '#F3F4F6', padding: '6px 12px', borderRadius: 100, alignItems: 'center', marginLeft: 4, marginRight: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
-            {colors.map(c => (
-              <div 
-                 key={c}
-                 onClick={() => setPenColor(c)}
-                 style={{ width: 20, height: 20, borderRadius: '50%', background: c, cursor: 'pointer', border: penColor === c ? '2px solid white' : '1px solid rgba(0,0,0,0.1)', outline: penColor === c ? '2px solid var(--teal)' : 'none' }}
-              />
-            ))}
-            <div style={{ position: 'relative', width: 20, height: 20, borderRadius: '50%', overflow: 'hidden', cursor: 'pointer', border: '1px solid rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)' }}>
-               <input type="color" value={penColor} onChange={(e) => setPenColor(e.target.value)} style={{ position: 'absolute', opacity: 0, width: '200%', height: '200%', cursor: 'pointer' }} />
-            </div>
+      {/* Huawei Notes style Top Pill Toolbar for Tablet (Hidden on Desktop & Mobile) */}
+      {!isDesktop && !isMobile && (
+        <>
+          <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 5, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(16px)', padding: '6px', borderRadius: 100, display: 'flex', gap: 4, boxShadow: '0 8px 32px rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.05)', flexWrap: 'nowrap', alignItems: 'center' }}>
             
-            {tool === 'shape' && (
-              <>
-                <div style={{ width: 1, background: '#D1D5DB', margin: '0 4px', height: 16 }}></div>
-                <button onClick={() => setShapeType('rect')} style={{ width: 24, height: 24, borderRadius: 4, border: '1px solid currentColor', background: shapeType === 'rect' ? 'var(--teal)' : 'transparent', color: shapeType === 'rect' ? 'white' : 'var(--t2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}></button>
-                <button onClick={() => setShapeType('circle')} style={{ width: 24, height: 24, borderRadius: '50%', border: '1px solid currentColor', background: shapeType === 'circle' ? 'var(--teal)' : 'transparent', color: shapeType === 'circle' ? 'white' : 'var(--t2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}></button>
-                <button onClick={() => setShapeType('line')} style={{ width: 24, height: 24, borderRadius: 4, border: 'none', background: shapeType === 'line' ? 'var(--teal)' : 'transparent', color: shapeType === 'line' ? 'white' : 'var(--t2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                  <i className="ti ti-minus" style={{ fontSize: 16 }}></i>
-                </button>
-              </>
-            )}
-
-            <div style={{ width: 1, background: '#D1D5DB', margin: '0 4px', height: 16 }}></div>
+            <button onClick={undo} disabled={!canUndo} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'transparent', color: canUndo ? '#4B5563' : '#D1D5DB', cursor: canUndo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Undo2 size={18} />
+            </button>
+            <button onClick={redo} disabled={!canRedo} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'transparent', color: canRedo ? '#4B5563' : '#D1D5DB', cursor: canRedo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Redo2 size={18} />
+            </button>
             
-            {sizes.map(s => (
-              <div key={s} onClick={() => setPenSize(s)} style={{ width: 24, height: 24, borderRadius: '50%', background: penSize === s ? 'white' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: penSize === s ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
-                 <div style={{ width: s, height: s, borderRadius: '50%', background: penSize === s ? 'var(--teal)' : '#9CA3AF' }}></div>
-              </div>
+            <div style={{ width: 1, background: '#E5E7EB', margin: '0 2px', height: 20 }}></div>
+            
+            {[
+              { id: 'pan', icon: MousePointer2 },
+              { id: 'pen', icon: PenTool },
+              { id: 'highlighter', icon: Highlighter },
+              { id: 'eraser', icon: Eraser },
+              { id: 'text', icon: Type },
+              { id: 'lasso', icon: Lasso }
+            ].map(t => (
+               <button 
+                 key={t.id}
+                 onClick={() => { setTool(t.id); if (t.id === tool) setShowToolSettings(!showToolSettings); else setShowToolSettings(true); }}
+                 style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: tool === t.id ? '#F3F4F6' : 'transparent', color: tool === t.id ? '#111827' : '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', position: 'relative' }}
+               >
+                 <t.icon size={18} />
+                 {tool === t.id && (t.id === 'pen' || t.id === 'highlighter' || t.id === 'text') && <div style={{ position: 'absolute', bottom: 4, width: 4, height: 4, borderRadius: '50%', background: '#111827' }}></div>}
+               </button>
             ))}
             
-            <div style={{ width: 1, background: '#D1D5DB', margin: '0 4px', height: 16 }}></div>
+            <div style={{ width: 1, background: '#E5E7EB', margin: '0 2px', height: 20 }}></div>
             
-            <input type="range" min="0.1" max="1" step="0.1" value={penOpacity} onChange={(e) => setPenOpacity(parseFloat(e.target.value))} style={{ width: 60 }} title="Opacity" />
+            <button onClick={() => document.getElementById('image-upload').click()} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'transparent', color: '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ImageIcon size={18} />
+            </button>
+            
+            <button onClick={toggleRecording} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: isRecording ? '#FEE2E2' : 'transparent', color: isRecording ? '#EF4444' : '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', animation: isRecording ? 'pulse 1.5s infinite' : 'none' }}>
+              <Mic size={18} />
+            </button>
           </div>
-        )}
 
-        <button onClick={() => setTool('eraser')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'eraser' ? 'var(--red)' : 'transparent', color: tool === 'eraser' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-          <i className="ti ti-eraser" style={{ fontSize: 20 }}></i>
-        </button>
-        <button onClick={() => setTool('pan')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'pan' ? '#E5E7EB' : 'transparent', color: tool === 'pan' ? '#374151' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-          <i className="ti ti-hand-stop" style={{ fontSize: 20 }}></i>
-        </button>
-        
-        <div style={{ width: 1, background: 'var(--br2)', margin: '0 4px', height: 24 }}></div>
-        
-        {/* Insert Options */}
-        <button onClick={() => document.getElementById('image-upload').click()} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'var(--blue-light)', color: 'var(--blue-dark)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-          <i className="ti ti-photo-plus" style={{ fontSize: 20 }}></i>
-        </button>
-        <button onClick={toggleRecording} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: isRecording ? 'var(--red)' : 'var(--orange-light)', color: isRecording ? 'white' : 'var(--orange-dark)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', animation: isRecording ? 'pulse 1.5s infinite' : 'none' }}>
-          <i className={isRecording ? "ti ti-player-stop-filled" : "ti ti-microphone"} style={{ fontSize: 20 }}></i>
-        </button>
-        
-        <div style={{ width: 1, background: 'var(--br2)', margin: '0 4px', height: 24 }}></div>
-        
-        {/* Page Actions */}
-        <button onClick={clearPage} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} title="ล้างหน้ากระดาษ">
-          <i className="ti ti-clear-all" style={{ fontSize: 20 }}></i>
-        </button>
-        <button onClick={deletePage} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: 'var(--red)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} title="ลบหน้ากระดาษ">
-          <i className="ti ti-trash" style={{ fontSize: 20 }}></i>
-        </button>
-      </div>
+          {/* Huawei Glassmorphism Popover for Tool Settings */}
+          {showToolSettings && (tool === 'pen' || tool === 'highlighter' || tool === 'text') && (
+            <div style={{ position: 'absolute', top: 64, left: '50%', transform: 'translateX(-50%)', zIndex: 6, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(16px)', padding: 16, borderRadius: 16, boxShadow: '0 10px 40px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 220 }}>
+               <label style={{ fontSize: 12, fontWeight: 500, color: '#6B7280', marginBottom: 8, display: 'block' }}>Size</label>
+               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+                 {sizes.map(s => (
+                    <div key={s} onClick={() => setPenSize(s)} style={{ width: 28, height: 28, borderRadius: '50%', background: penSize === s ? '#F3F4F6' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: penSize === s ? '1px solid #D1D5DB' : '1px solid transparent' }}>
+                       <div style={{ width: s, height: s, borderRadius: '50%', background: penSize === s ? '#111827' : '#9CA3AF' }}></div>
+                    </div>
+                 ))}
+               </div>
+               
+               <label style={{ fontSize: 12, fontWeight: 500, color: '#6B7280', marginBottom: 8, display: 'block' }}>Color</label>
+               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
+                 {colors.map(c => (
+                    <div key={c} onClick={() => setPenColor(c)} style={{ width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer', border: penColor === c ? '2px solid white' : '1px solid rgba(0,0,0,0.1)', outline: penColor === c ? '2px solid #10B981' : 'none', margin: 'auto' }} />
+                 ))}
+               </div>
+            </div>
+          )}
+        </>
+      )}
       
-      {/* Goodnotes Pagination Controls */}
-      <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 5, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)', padding: '8px 16px', borderRadius: 100, display: 'flex', alignItems: 'center', gap: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.1)', border: '1px solid var(--br2)' }}>
+      {/* Universal Pagination & Actions (Bottom) */}
+      {!isMobile && (
+        <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 5, background: 'white', padding: '6px 12px', borderRadius: 100, display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.05)' }}>
+
         
         <button 
           onClick={() => setShowPageManager(true)}
           style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'var(--gray-light)', color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-          <i className="ti ti-layout-grid" style={{ fontSize: 20 }}></i>
+          <Settings size={18} />
         </button>
         
         <div style={{ width: 1, height: 24, background: 'var(--br2)' }}></div>
@@ -862,7 +907,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
           onClick={() => setCurrentPageIndex(Math.max(0, currentPageIndex - 1))}
           disabled={currentPageIndex === 0}
           style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'transparent', cursor: currentPageIndex === 0 ? 'default' : 'pointer', opacity: currentPageIndex === 0 ? 0.3 : 1 }}>
-          <i className="ti ti-chevron-left" style={{ fontSize: 20 }}></i>
+          <ChevronLeft size={20} />
         </button>
         
         <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', minWidth: 60, textAlign: 'center' }}>
@@ -873,7 +918,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
           onClick={() => setCurrentPageIndex(Math.min(pages.length - 1, currentPageIndex + 1))}
           disabled={currentPageIndex === pages.length - 1}
           style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'transparent', cursor: currentPageIndex === pages.length - 1 ? 'default' : 'pointer', opacity: currentPageIndex === pages.length - 1 ? 0.3 : 1 }}>
-          <i className="ti ti-chevron-right" style={{ fontSize: 20 }}></i>
+          <ChevronRight size={20} />
         </button>
 
         <div style={{ width: 1, height: 24, background: 'var(--br2)' }}></div>
@@ -882,7 +927,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
           <button 
             onClick={() => setShowPageSettings(!showPageSettings)}
             style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: showPageSettings ? 'var(--teal)' : 'transparent', color: showPageSettings ? 'white' : 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-            <i className="ti ti-settings" style={{ fontSize: 20 }}></i>
+            <Settings size={18} />
           </button>
           
           {showPageSettings && (
@@ -917,10 +962,11 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
             setCurrentPageIndex(currentPageIndex + 1);
           }}
           style={{ padding: '6px 12px', borderRadius: 100, border: 'none', background: 'var(--teal-light)', color: 'var(--teal-dark)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600, fontSize: 13, transition: 'all 0.2s' }}>
-          <i className="ti ti-file-plus" style={{ fontSize: 16 }}></i>
+          <FilePlus size={16} />
           แทรกหน้าเปล่า
         </button>
       </div>
+      )}
 
       <Stage
         ref={stageRef}
@@ -1296,6 +1342,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
            />
          );
       })()}
+      </div>{/* End flex-1 Canvas Container */}
     </div>
   );
 }
