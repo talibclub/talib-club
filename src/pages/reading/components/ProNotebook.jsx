@@ -54,6 +54,22 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   const [pages, setPages] = useState([{ id: 'page-default', src: null, width: 800, height: 1130, lines: [], stickers: [], images: [], texts: [], shapes: [], paperType: 'lines', paperColor: 'white' }]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   
+  const saveKey = `talib_notebook_${bookId || 'default'}`;
+  
+  useEffect(() => {
+     const saved = localStorage.getItem(saveKey);
+     if (saved) {
+        try {
+           const parsed = JSON.parse(saved);
+           if (parsed && parsed.length > 0) {
+              setPages(parsed);
+           }
+        } catch (e) {
+           console.error("Load save failed", e);
+        }
+     }
+  }, [bookId]);
+  
   const [loadingPdf, setLoadingPdf] = useState(false);
   const [showModeSelection, setShowModeSelection] = useState(activeBook?.book?.fileUrl ? true : false);
   
@@ -68,6 +84,22 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   const [lassoRect, setLassoRect] = useState(null);
   const [selectedLassoLines, setSelectedLassoLines] = useState([]);
   const [lassoGroupPos, setLassoGroupPos] = useState({ x: 0, y: 0 });
+  
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  const searchResults = React.useMemo(() => {
+     if (!searchQuery.trim()) return [];
+     const results = [];
+     pages.forEach((p, i) => {
+        p.texts?.forEach(t => {
+           if (t.text.toLowerCase().includes(searchQuery.toLowerCase())) {
+              results.push({ pageIndex: i, text: t.text, id: t.id });
+           }
+        });
+     });
+     return results;
+  }, [searchQuery, pages]);
   
   const colors = [
     '#111827', '#EF4444', '#F97316', '#F59E0B', '#84CC16', '#10B981', '#06B6D4', 
@@ -317,6 +349,24 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
     });
     setCurrentPageIndex(Math.max(0, currentPageIndex - 1));
     toast.success('ลบหน้ากระดาษแล้ว');
+  };
+
+  const saveNotebook = () => {
+     localStorage.setItem(saveKey, JSON.stringify(pages));
+     toast.success("บันทึกสมุดโน้ตเรียบร้อยแล้ว!", { icon: '💾' });
+  };
+  
+  const exportPage = () => {
+     const stage = stageRef.current;
+     if (!stage) return;
+     const dataURL = stage.toDataURL({ pixelRatio: 2 });
+     const link = document.createElement('a');
+     link.download = `notebook-page-${currentPageIndex + 1}.png`;
+     link.href = dataURL;
+     document.body.appendChild(link);
+     link.click();
+     document.body.removeChild(link);
+     toast.success("ดาวน์โหลดรูปภาพสำเร็จ!", { icon: '🖼️' });
   };
 
   const getPointerPosRelativeToPage = () => {
@@ -598,6 +648,38 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
            </div>
          </div>
       )}
+       
+       {showSearch && (
+         <div style={{ position: 'absolute', top: 80, right: 24, zIndex: 40, background: 'white', padding: 16, borderRadius: 16, boxShadow: '0 10px 40px rgba(0,0,0,0.15)', border: '1px solid var(--br2)', width: 300, display: 'flex', flexDirection: 'column' }}>
+           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+             <h4 style={{ margin: 0, fontSize: 16, color: 'var(--text)' }}>ค้นหาในสมุดโน้ต</h4>
+             <button onClick={() => setShowSearch(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--t2)' }}><i className="ti ti-x"></i></button>
+           </div>
+           <input 
+             type="text" 
+             autoFocus
+             placeholder="พิมพ์ข้อความที่ต้องการค้นหา..." 
+             value={searchQuery} 
+             onChange={e => setSearchQuery(e.target.value)}
+             style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid var(--br2)', fontSize: 14, outline: 'none', marginBottom: 12 }} 
+           />
+           <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+             {searchResults.length === 0 && searchQuery.trim() !== "" && (
+                <div style={{ padding: 12, textAlign: 'center', color: 'var(--t2)', fontSize: 13 }}>ไม่พบผลลัพธ์</div>
+             )}
+             {searchResults.map((res, i) => (
+                <div 
+                  key={i}
+                  onClick={() => { setCurrentPageIndex(res.pageIndex); setShowSearch(false); }}
+                  style={{ padding: 12, background: 'var(--gray-light)', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text)' }}
+                >
+                  <div style={{ fontWeight: 600, color: 'var(--teal)', marginBottom: 4 }}>หน้า {res.pageIndex + 1}</div>
+                  <div>{res.text}</div>
+                </div>
+             ))}
+           </div>
+         </div>
+       )}
 
       <input type="file" id="pdf-upload" accept="application/pdf" style={{ display: 'none' }} onChange={handleFileUpload} />
       <input type="file" id="image-upload" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
@@ -610,7 +692,20 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
       )}
 
       {/* Floating Toolbar */}
-      <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 5, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(12px)', padding: '8px', borderRadius: 100, display: 'flex', gap: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.1)', border: '1px solid var(--br2)', flexWrap: 'wrap', justifyContent: 'center', maxWidth: '90%' }}>
+      <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 5, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(12px)', padding: '8px', borderRadius: 100, display: 'flex', gap: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.1)', border: '1px solid var(--br2)', flexWrap: 'wrap', justifyContent: 'center', maxWidth: '95%' }}>
+        
+        {/* Main Actions */}
+        <button onClick={() => setShowSearch(!showSearch)} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: showSearch ? 'var(--teal)' : 'transparent', color: showSearch ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+          <i className="ti ti-search" style={{ fontSize: 20 }}></i>
+        </button>
+        <button onClick={saveNotebook} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} title="บันทึก">
+          <i className="ti ti-device-floppy" style={{ fontSize: 20 }}></i>
+        </button>
+        <button onClick={exportPage} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} title="ส่งออกเป็นรูปภาพ">
+          <i className="ti ti-photo-down" style={{ fontSize: 20 }}></i>
+        </button>
+        
+        <div style={{ width: 1, background: 'var(--br2)', margin: '0 4px', height: 24 }}></div>
         
         {/* Undo / Redo */}
         <button onClick={undo} disabled={!canUndo} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: canUndo ? 'var(--text)' : 'var(--br2)', cursor: canUndo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
