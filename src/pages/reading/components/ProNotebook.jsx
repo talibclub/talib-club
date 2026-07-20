@@ -51,13 +51,23 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   const stageRef = useRef(null);
   
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
-  const [pages, setPages] = useState([{ id: 'page-default', src: null, width: 800, height: 1130, lines: [], stickers: [], images: [], paperType: 'lines', paperColor: 'white' }]);
+  const [pages, setPages] = useState([{ id: 'page-default', src: null, width: 800, height: 1130, lines: [], stickers: [], images: [], texts: [], shapes: [], paperType: 'lines', paperColor: 'white' }]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   
   const [loadingPdf, setLoadingPdf] = useState(false);
   const [showModeSelection, setShowModeSelection] = useState(activeBook?.book?.fileUrl ? true : false);
   
-  const [tool, setTool] = useState('pen'); // 'pen', 'pencil', 'highlighter', 'eraser', 'pan'
+  const [tool, setTool] = useState('pen'); // 'pen', 'pencil', 'highlighter', 'eraser', 'pan', 'text', 'laser', 'shape', 'lasso'
+  const [shapeType, setShapeType] = useState('rect'); // 'rect', 'circle', 'line'
+  
+  const [laserLines, setLaserLines] = useState([]);
+  const [editingTextId, setEditingTextId] = useState(null);
+  const [editingTextValue, setEditingTextValue] = useState("");
+  const textareaRef = useRef(null);
+  
+  const [lassoRect, setLassoRect] = useState(null);
+  const [selectedLassoLines, setSelectedLassoLines] = useState([]);
+  const [lassoGroupPos, setLassoGroupPos] = useState({ x: 0, y: 0 });
   
   const colors = [
     '#111827', '#EF4444', '#F97316', '#F59E0B', '#84CC16', '#10B981', '#06B6D4', 
@@ -166,6 +176,8 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
           lines: [],
           stickers: [],
           images: [],
+          texts: [],
+          shapes: [],
           paperType: 'blank',
           paperColor: 'white'
         });
@@ -289,6 +301,8 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
        page.lines = [];
        page.stickers = [];
        page.images = [];
+       page.texts = [];
+       page.shapes = [];
     });
     toast.success('ล้างหน้ากระดาษเรียบร้อย');
   };
@@ -328,6 +342,54 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
     const pos = getPointerPosRelativeToPage();
     if (!pos) return;
     
+    if (tool === 'text') {
+       const newText = { id: `text-${Date.now()}`, text: 'พิมพ์ข้อความที่นี่...', x: pos.x, y: pos.y, color: penColor, size: penSize * 4 };
+       pushHistory();
+       updatePage(currentPageIndex, (page) => {
+          if (!page.texts) page.texts = [];
+          page.texts.push(newText);
+       });
+       setEditingTextId(newText.id);
+       setEditingTextValue(newText.text);
+       return;
+    }
+    
+    if (tool === 'lasso') {
+       if (selectedLassoLines.length > 0) {
+          // Bake back the moved lines
+          pushHistory();
+          updatePage(currentPageIndex, (page) => {
+             const translatedLines = selectedLassoLines.map(l => ({
+                ...l,
+                points: l.points.map((pt, i) => i % 2 === 0 ? pt + lassoGroupPos.x : pt + lassoGroupPos.y)
+             }));
+             page.lines = page.lines.concat(translatedLines);
+          });
+          setSelectedLassoLines([]);
+          setLassoGroupPos({x: 0, y: 0});
+          setLassoRect(null);
+       }
+       isDrawing.current = true;
+       setLassoRect({ x: pos.x, y: pos.y, w: 0, h: 0 });
+       return;
+    }
+    
+    if (tool === 'laser') {
+       isDrawing.current = true;
+       setLaserLines(prev => [...prev, { id: Date.now(), color: penColor, size: penSize, points: [pos.x, pos.y, pos.x, pos.y] }]);
+       return;
+    }
+    
+    if (tool === 'shape') {
+       isDrawing.current = true;
+       pushHistory();
+       updatePage(currentPageIndex, (page) => {
+          if (!page.shapes) page.shapes = [];
+          page.shapes.push({ id: `shape-${Date.now()}`, type: shapeType, x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y, color: penColor, size: penSize, opacity: penOpacity });
+       });
+       return;
+    }
+    
     pushHistory();
     
     isDrawing.current = true;
@@ -341,6 +403,35 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
     const pos = getPointerPosRelativeToPage();
     if (!pos) return;
     
+    if (tool === 'laser') {
+       setLaserLines(prev => {
+          const newLines = [...prev];
+          const lastLine = { ...newLines[newLines.length - 1] };
+          if (lastLine) {
+             lastLine.points = lastLine.points.concat([pos.x, pos.y]);
+             newLines[newLines.length - 1] = lastLine;
+          }
+          return newLines;
+       });
+       return;
+    }
+    if (tool === 'lasso') {
+       if (lassoRect && isDrawing.current) {
+          setLassoRect(prev => ({ ...prev, w: pos.x - prev.x, h: pos.y - prev.y }));
+       }
+       return;
+    }
+    
+    if (tool === 'shape') {
+       updatePage(currentPageIndex, (page) => {
+          const lastShape = { ...page.shapes[page.shapes.length - 1] };
+          lastShape.x2 = pos.x;
+          lastShape.y2 = pos.y;
+          page.shapes[page.shapes.length - 1] = lastShape;
+       });
+       return;
+    }
+    
     updatePage(currentPageIndex, (page) => {
        const lastLine = { ...page.lines[page.lines.length - 1] };
        lastLine.points = lastLine.points.concat([pos.x, pos.y]);
@@ -349,6 +440,54 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   };
 
   const handlePointerUp = () => {
+    if (tool === 'lasso' && isDrawing.current && lassoRect) {
+       isDrawing.current = false;
+       const rx1 = Math.min(lassoRect.x, lassoRect.x + lassoRect.w);
+       const ry1 = Math.min(lassoRect.y, lassoRect.y + lassoRect.h);
+       const rx2 = Math.max(lassoRect.x, lassoRect.x + lassoRect.w);
+       const ry2 = Math.max(lassoRect.y, lassoRect.y + lassoRect.h);
+       
+       const currentPage = pages[currentPageIndex];
+       if (currentPage && (Math.abs(lassoRect.w) > 5 || Math.abs(lassoRect.h) > 5)) {
+          let inside = [];
+          let outside = [];
+          currentPage.lines.forEach(line => {
+             let isInside = false;
+             for(let i = 0; i < line.points.length; i+=2) {
+                const px = line.points[i];
+                const py = line.points[i+1];
+                if (px >= rx1 && px <= rx2 && py >= ry1 && py <= ry2) {
+                   isInside = true; break;
+                }
+             }
+             if (isInside) inside.push(line);
+             else outside.push(line);
+          });
+          
+          if (inside.length > 0) {
+             setSelectedLassoLines(inside);
+             setLassoGroupPos({x: 0, y: 0});
+             pushHistory();
+             updatePage(currentPageIndex, (page) => { page.lines = outside; });
+          } else {
+             setLassoRect(null);
+          }
+       } else {
+          setLassoRect(null);
+       }
+       return;
+    }
+    
+    if (tool === 'laser' && isDrawing.current) {
+       isDrawing.current = false;
+       const lastId = laserLines[laserLines.length - 1]?.id;
+       if (lastId) {
+          setTimeout(() => {
+             setLaserLines(prev => prev.filter(l => l.id !== lastId));
+          }, 1500);
+       }
+       return;
+    }
     isDrawing.current = false;
   };
 
@@ -406,7 +545,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
     return d.join(" ");
   };
 
-  const currentPage = pages[currentPageIndex] || { width: 800, height: 1130, lines: [], stickers: [], images: [] };
+  const currentPage = pages[currentPageIndex] || { width: 800, height: 1130, lines: [], stickers: [], images: [], texts: [], shapes: [] };
   const pageX = Math.max(0, (dimensions.width - currentPage.width * scale) / 2 / scale);
   const pageY = 20; 
 
@@ -493,8 +632,20 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
         <button onClick={() => setTool('highlighter')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'highlighter' ? '#F59E0B' : 'transparent', color: tool === 'highlighter' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
           <i className="ti ti-highlight" style={{ fontSize: 20 }}></i>
         </button>
+        <button onClick={() => setTool('laser')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'laser' ? 'var(--red)' : 'transparent', color: tool === 'laser' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+          <i className="ti ti-flare" style={{ fontSize: 20 }}></i>
+        </button>
+        <button onClick={() => setTool('shape')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'shape' ? '#8B5CF6' : 'transparent', color: tool === 'shape' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+          <i className="ti ti-shape" style={{ fontSize: 20 }}></i>
+        </button>
+        <button onClick={() => setTool('text')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'text' ? 'var(--blue)' : 'transparent', color: tool === 'text' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+          <i className="ti ti-typography" style={{ fontSize: 20 }}></i>
+        </button>
+        <button onClick={() => setTool('lasso')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'lasso' ? 'var(--teal)' : 'transparent', color: tool === 'lasso' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} title="Lasso Tool">
+          <i className="ti ti-lasso" style={{ fontSize: 20 }}></i>
+        </button>
         
-        {(tool === 'pen' || tool === 'pencil' || tool === 'highlighter') && (
+        {(tool === 'pen' || tool === 'pencil' || tool === 'highlighter' || tool === 'laser' || tool === 'text' || tool === 'shape') && (
           <div style={{ display: 'flex', gap: 6, background: '#F3F4F6', padding: '6px 12px', borderRadius: 100, alignItems: 'center', marginLeft: 4, marginRight: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
             {colors.map(c => (
               <div 
@@ -507,6 +658,17 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
                <input type="color" value={penColor} onChange={(e) => setPenColor(e.target.value)} style={{ position: 'absolute', opacity: 0, width: '200%', height: '200%', cursor: 'pointer' }} />
             </div>
             
+            {tool === 'shape' && (
+              <>
+                <div style={{ width: 1, background: '#D1D5DB', margin: '0 4px', height: 16 }}></div>
+                <button onClick={() => setShapeType('rect')} style={{ width: 24, height: 24, borderRadius: 4, border: '1px solid currentColor', background: shapeType === 'rect' ? 'var(--teal)' : 'transparent', color: shapeType === 'rect' ? 'white' : 'var(--t2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}></button>
+                <button onClick={() => setShapeType('circle')} style={{ width: 24, height: 24, borderRadius: '50%', border: '1px solid currentColor', background: shapeType === 'circle' ? 'var(--teal)' : 'transparent', color: shapeType === 'circle' ? 'white' : 'var(--t2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}></button>
+                <button onClick={() => setShapeType('line')} style={{ width: 24, height: 24, borderRadius: 4, border: 'none', background: shapeType === 'line' ? 'var(--teal)' : 'transparent', color: shapeType === 'line' ? 'white' : 'var(--t2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                  <i className="ti ti-minus" style={{ fontSize: 16 }}></i>
+                </button>
+              </>
+            )}
+
             <div style={{ width: 1, background: '#D1D5DB', margin: '0 4px', height: 16 }}></div>
             
             {sizes.map(s => (
@@ -609,7 +771,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
         
         <button 
           onClick={() => {
-            const newPage = { id: `blank-${Date.now()}`, src: null, width: dimensions.width > 0 ? dimensions.width - 40 : 800, height: 1130, lines: [], stickers: [], images: [], paperType: currentPage.paperType, paperColor: currentPage.paperColor };
+            const newPage = { id: `blank-${Date.now()}`, src: null, width: dimensions.width > 0 ? dimensions.width - 40 : 800, height: 1130, lines: [], stickers: [], images: [], texts: [], shapes: [], paperType: currentPage.paperType, paperColor: currentPage.paperColor };
             pushHistory();
             setPages((prev) => {
               const p = [...prev];
@@ -727,6 +889,125 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
                 />
               );
             })}
+            {/* Laser Lines */}
+            {laserLines.map((line, i) => {
+              const pointPairs = [];
+              for(let p = 0; p < line.points.length; p+=2) { pointPairs.push([line.points[p], line.points[p+1]]); }
+              const stroke = getStroke(pointPairs, { size: line.size || 4, thinning: 0.5, smoothing: 0.5, streamline: 0.5 });
+              const pathData = getSvgPathFromStroke(stroke);
+              return (
+                <Group key={`laser-${line.id}`}>
+                   <Path data={pathData} fill={line.color || 'red'} opacity={0.3} shadowColor={line.color || 'red'} shadowBlur={15} shadowOpacity={1} />
+                   <Path data={pathData} fill="white" />
+                </Group>
+              );
+            })}
+            
+            {/* Shapes */}
+            {currentPage.shapes && currentPage.shapes.map((s, i) => {
+              const width = s.x2 - s.x1;
+              const height = s.y2 - s.y1;
+              if (s.type === 'rect') {
+                 return <Rect key={s.id} x={s.x1} y={s.y1} width={width} height={height} stroke={s.color} strokeWidth={s.size} opacity={s.opacity} dash={s.isDashed ? [10, 5] : []} />;
+              } else if (s.type === 'circle') {
+                 const radius = Math.sqrt(width * width + height * height);
+                 return <Circle key={s.id} x={s.x1} y={s.y1} radius={radius} stroke={s.color} strokeWidth={s.size} opacity={s.opacity} />;
+              } else if (s.type === 'line') {
+                 return <Path key={s.id} data={`M ${s.x1} ${s.y1} L ${s.x2} ${s.y2}`} stroke={s.color} strokeWidth={s.size} opacity={s.opacity} lineCap="round" lineJoin="round" />;
+              }
+              return null;
+            })}
+            
+            {/* Lasso Selection Rect */}
+            {tool === 'lasso' && lassoRect && selectedLassoLines.length === 0 && (
+               <Rect x={lassoRect.x} y={lassoRect.y} width={lassoRect.w} height={lassoRect.h} stroke="var(--teal)" strokeWidth={1} dash={[5, 5]} fill="rgba(0, 169, 143, 0.1)" />
+            )}
+            
+            {/* Lasso Selected Group */}
+            {selectedLassoLines.length > 0 && (
+               <Group 
+                 draggable
+                 x={lassoGroupPos.x}
+                 y={lassoGroupPos.y}
+                 onDragEnd={(e) => {
+                    setLassoGroupPos({ x: e.target.x(), y: e.target.y() });
+                 }}
+               >
+                  {lassoRect && (
+                     <Rect x={lassoRect.x} y={lassoRect.y} width={lassoRect.w} height={lassoRect.h} stroke="var(--teal)" strokeWidth={2} dash={[5, 5]} />
+                  )}
+                  {selectedLassoLines.map((line, i) => {
+                     const pointPairs = [];
+                     for(let p = 0; p < line.points.length; p+=2) { pointPairs.push([line.points[p], line.points[p+1]]); }
+                     
+                     const isHighlighter = line.tool === 'highlighter';
+                     const isEraser = line.tool === 'eraser';
+                     const isPencil = line.tool === 'pencil';
+                     
+                     const strokeOptions = { 
+                        size: isEraser ? 24 : isHighlighter ? (line.size || 4) * 3 : (line.size || 4), 
+                        thinning: (isHighlighter || isPencil) ? 0 : 0.5,
+                        smoothing: isPencil ? 0.2 : 0.5, 
+                        streamline: isPencil ? 0.2 : 0.5 
+                     };
+                     
+                     const stroke = getStroke(pointPairs, strokeOptions);
+                     const pathData = getSvgPathFromStroke(stroke);
+                     
+                     let fillStr = line.color || '#111827';
+                     if (isEraser) fillStr = 'black';
+                     
+                     return (
+                       <Path
+                         key={`lasso-line-${i}`}
+                         data={pathData}
+                         fill={fillStr}
+                         opacity={isHighlighter ? 0.5 : (line.opacity || 1)}
+                         globalCompositeOperation={isHighlighter ? 'multiply' : 'source-over'}
+                         lineCap="round"
+                         lineJoin="round"
+                       />
+                     );
+                  })}
+               </Group>
+            )}
+          </Group>
+        </Layer>
+        
+        {/* Texts Layer */}
+        <Layer>
+          <Group x={pageX} y={pageY}>
+            {currentPage.texts && currentPage.texts.map((t) => (
+              <Group
+                key={t.id}
+                x={t.x}
+                y={t.y}
+                draggable={tool === 'pan' || tool === 'text'}
+                onDragEnd={(e) => {
+                   const { x, y } = e.target.position();
+                   updatePage(currentPageIndex, (page) => {
+                     const txt = page.texts.find(tx => tx.id === t.id);
+                     if(txt) { txt.x = x; txt.y = y; }
+                   });
+                }}
+                onClick={() => {
+                   if (tool === 'text') {
+                     setEditingTextId(t.id);
+                     setEditingTextValue(t.text);
+                   }
+                }}
+                onTap={() => {
+                   if (tool === 'text') {
+                     setEditingTextId(t.id);
+                     setEditingTextValue(t.text);
+                   }
+                }}
+              >
+                {editingTextId !== t.id && (
+                  <Text text={t.text} fontSize={t.size} fill={t.color} fontFamily="Kanit, sans-serif" padding={4} />
+                )}
+              </Group>
+            ))}
           </Group>
         </Layer>
         
@@ -758,6 +1039,57 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
           </Group>
         </Layer>
       </Stage>
+
+      {/* Floating Textarea for inline editing */}
+      {editingTextId && (() => {
+         const t = currentPage.texts.find(tx => tx.id === editingTextId);
+         if (!t) return null;
+         
+         const absoluteX = (t.x + pageX) * scale + position.x;
+         const absoluteY = (t.y + pageY) * scale + position.y;
+         
+         return (
+           <textarea
+             ref={textareaRef}
+             autoFocus
+             value={editingTextValue}
+             onChange={(e) => setEditingTextValue(e.target.value)}
+             onBlur={() => {
+                if (editingTextValue.trim() === '') {
+                   updatePage(currentPageIndex, (page) => {
+                      page.texts = page.texts.filter(tx => tx.id !== editingTextId);
+                   });
+                } else {
+                   updatePage(currentPageIndex, (page) => {
+                      const txt = page.texts.find(tx => tx.id === editingTextId);
+                      if (txt) txt.text = editingTextValue;
+                   });
+                }
+                setEditingTextId(null);
+             }}
+             style={{
+                position: 'absolute',
+                top: absoluteY,
+                left: absoluteX,
+                margin: 0,
+                padding: 4,
+                border: '1px dashed var(--teal)',
+                background: 'rgba(255,255,255,0.8)',
+                color: t.color,
+                fontSize: `${t.size * scale}px`,
+                fontFamily: 'Kanit, sans-serif',
+                lineHeight: 1.2,
+                outline: 'none',
+                resize: 'none',
+                minWidth: 200,
+                minHeight: 100,
+                overflow: 'hidden',
+                zIndex: 100,
+                borderRadius: 4
+             }}
+           />
+         );
+      })()}
     </div>
   );
 }
