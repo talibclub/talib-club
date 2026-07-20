@@ -14,7 +14,7 @@
     "dotenv": "^17.4.2",
     "firebase": "^10.0.0",
     "firebase-admin": "13.5.0",
-    "konva": "^10.3.0",
+    "konva": "^9.3.22",
     "pdfjs-dist": "^6.1.200",
     "perfect-freehand": "^1.2.3",
     "react": "^18.2.0",
