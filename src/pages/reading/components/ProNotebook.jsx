@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Stage, Layer, Image as KonvaImage, Path, Group, Circle, Text, Rect, Transformer } from 'react-konva';
+import { Stage, Layer, Image as KonvaImage, Path, Group, Circle, Text, Rect, Transformer, RegularPolygon, Line } from 'react-konva';
 import Draggable from 'react-draggable';
-import { PenTool, Highlighter, Eraser, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, GripVertical, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, FileStack, LayoutList, Check, Lock, MousePointerClick, Move3d } from 'lucide-react';
+import { PenTool, Highlighter, Eraser, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, GripVertical, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, FileStack, LayoutList, Check, Lock, MousePointerClick, Move3d, Triangle } from 'lucide-react';
 import useImage from 'use-image';
 import getStroke from 'perfect-freehand';
 import toast from 'react-hot-toast';
@@ -138,6 +138,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   const isEditingText = useRef(false);
   const textareaRef = useRef(null);
   
+  useEffect(() => {
+     if (editingTextId && textareaRef.current) {
+        setTimeout(() => {
+           textareaRef.current?.focus();
+        }, 50);
+     }
+  }, [editingTextId]);
+
   const [editingStickerId, setEditingStickerId] = useState(null);
   const [editingStickerValue, setEditingStickerValue] = useState("");
   
@@ -205,6 +213,33 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   useEffect(() => {
     pagesRef.current = pages;
   }, [pages]);
+
+  useEffect(() => {
+    if (readonly || !pages || pages.length === 0) return;
+    
+    // Simple debounce to auto-save to firebase
+    const timer = setTimeout(() => {
+       saveNotebook(true); // isAuto = true
+    }, 5000); // 5 seconds debounce
+    
+    return () => clearTimeout(timer);
+  }, [pages, readonly]);
+
+  useEffect(() => {
+     if (tool !== 'lasso' && selectedLassoLines.length > 0) {
+        pushHistory();
+        updatePage(currentPageIndex, (page) => {
+           const translatedLines = selectedLassoLines.map(l => ({
+              ...l,
+              points: l.points.map((pt, i) => i % 2 === 0 ? pt + lassoGroupPos.x : pt + lassoGroupPos.y)
+           }));
+           page.lines = page.lines.concat(translatedLines);
+        });
+        setSelectedLassoLines([]);
+        setLassoGroupPos({x: 0, y: 0});
+        setLassoRect(null);
+     }
+  }, [tool]);
   
   // Audio Recording State
   const [isRecording, setIsRecording] = useState(false);
@@ -333,8 +368,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (file && file.type === 'application/pdf') {
-      if (file.size > 10 * 1024 * 1024) {
-         toast.error('ไฟล์ PDF มีขนาดใหญ่เกิน 10MB');
+      if (file.size > 50 * 1024 * 1024) {
+         toast.error('ไฟล์ PDF มีขนาดใหญ่เกิน 50MB');
          return;
       }
       toast.loading('กำลังอัปโหลด PDF ไปยังคลาวด์...', { id: 'pdf-upload' });
@@ -480,9 +515,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     toast.success('ลบหน้ากระดาษแล้ว');
   };
 
-  const saveNotebook = async () => {
+  const saveNotebook = async (isAuto = false) => {
      if (readonly) return;
-     toast.loading("กำลังบันทึกขึ้นคลาวด์...", { id: "cloud-save" });
+     if (!isAuto) toast.loading("กำลังบันทึกลงคลาวด์...", { id: "cloud-save" });
      try {
         await uploadNotebookData(uid, notebookId, pages);
         
@@ -491,11 +526,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
         await setDoc(metadataRef, {
            uid,
            bookId: notebookId,
-           title: activeBook?.book?.title || 'สมุดโน้ตส่วนตัว',
+           title: activeBook?.book?.title || 'สมุดโน้ต',
            updatedAt: serverTimestamp(),
            coverColor: 'red',
         }, { merge: true });
-
         // Backup locally
         localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pages));
         toast.success("บันทึกคลาวด์เรียบร้อย!", { id: "cloud-save", icon: '💾' });
@@ -505,7 +539,29 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
         toast.error("บันทึกคลาวด์ล้มเหลว (เซฟลงเครื่องแล้ว)", { id: "cloud-save" });
      }
   };
+  const handleAddPage = () => {
+    const currentPage = pages[currentPageIndex] || {};
+    const newPage = { id: `blank-${Date.now()}`, src: null, width: dimensions.width > 0 ? dimensions.width - 40 : 800, height: 1130, lines: [], stickers: [], images: [], texts: [], shapes: [], paperType: currentPage.paperType || 'blank', paperColor: currentPage.paperColor || '#ffffff', isBookmarked: false };
+    pushHistory();
+    setPages((prev) => {
+      const p = [...prev];
+      p.splice(currentPageIndex + 1, 0, newPage);
+      return p;
+    });
+    setCurrentPageIndex(currentPageIndex + 1);
+    setShowAddMenu(false);
+  };
   
+  const toggleBookmark = () => {
+    pushHistory();
+    updatePage(currentPageIndex, (page) => {
+       page.isBookmarked = !page.isBookmarked;
+    });
+    setShowMoreMenu(false);
+    toast.success(pages[currentPageIndex]?.isBookmarked ? "ลบบุ๊คมาร์กแล้ว" : "เพิ่มบุ๊คมาร์กแล้ว");
+  };
+
+
   const exportPage = () => {
      const stage = stageRef.current;
      if (!stage) return;
@@ -539,7 +595,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
 
   const handlePointerDown = (e) => {
     // If clicking on lasso group, don't bake, just return so they can drag it
-    if (tool === 'lasso' && e.target.name() === 'lasso-group') return;
+    const targetName = e.target.name();
+    const parentName = e.target.getParent()?.name();
+    if (tool === 'lasso' && (targetName === 'lasso-group' || parentName === 'lasso-group')) {
+       return;
+    }
 
     checkDeselect(e);
   
@@ -596,6 +656,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
           setSelectedLassoLines([]);
           setLassoGroupPos({x: 0, y: 0});
           setLassoRect(null);
+          return; // Allow single tap to clear selection
        }
        isDrawing.current = true;
        setLassoRect({ x: pos.x, y: pos.y, w: 0, h: 0 });
@@ -890,7 +951,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: '#F3F4F6', display: 'flex', flexDirection: 'column' }}>
       
       {/* Huawei Notes Top Navigation Bar (Fixed App Header) */}
-      {!isMobile && (
          <div style={{ height: 56, flexShrink: 0, width: '100%', background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', zIndex: 50, borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                <button onClick={() => window.history.back()} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#111827', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -912,7 +972,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                       <Search size={22} strokeWidth={1.5} />
                    </button>
 
-                   <button style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                   <button onClick={() => setShowPageManager(!showPageManager)} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: showPageManager ? '#F3F4F6' : 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
                       <Columns size={22} strokeWidth={1.5} />
                    </button>
 
@@ -930,11 +990,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                {/* Add Menu Dropdown */}
                {showAddMenu && !readonly && (
                  <div style={{ position: 'absolute', top: 56, right: 120, zIndex: 60, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: 8, borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 220, display: 'flex', flexDirection: 'column' }}>
-                    <button style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
+                    <button onClick={handleAddPage} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
                        <FilePlus size={20} strokeWidth={1.5} color="#4B5563" /> หน้าใหม่
                     </button>
                     <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>
-                    <button style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
+                    <button onClick={() => { setShowPageSettings(true); setShowAddMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
                        <FileStack size={20} strokeWidth={1.5} color="#4B5563" /> เพิ่มไฟล์แนบ
                     </button>
                     <button onClick={() => { document.getElementById('image-upload').click(); setShowAddMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
@@ -943,6 +1003,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                     <button onClick={() => { document.getElementById('pdf-upload').click(); setShowAddMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
                        <FileText size={20} strokeWidth={1.5} color="#4B5563" /> นำเข้า PDF
                     </button>
+
                  </div>
                )}
 
@@ -952,8 +1013,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                     <button onClick={() => setShowPageSettings(true)} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
                        <Settings size={20} strokeWidth={1.5} color="#4B5563" /> เปลี่ยนแม่แบบกระดาษ
                     </button>
-                    <button style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Bookmark size={20} strokeWidth={1.5} color="#4B5563" /> เพิ่มไปยังเค้าร่าง
+                    <button onClick={toggleBookmark} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
+                       <Bookmark size={20} strokeWidth={1.5} color={pages[currentPageIndex]?.isBookmarked ? "#F59E0B" : "#4B5563"} fill={pages[currentPageIndex]?.isBookmarked ? "#F59E0B" : "none"} /> {pages[currentPageIndex]?.isBookmarked ? "ลบบุ๊คมาร์ก" : "บุ๊คมาร์กหน้า"}
                     </button>
                     <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>
                     <button onClick={clearPage} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
@@ -970,11 +1031,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                )}
             </div>
          </div>
-      )}
 
       <div ref={containerRef} style={{ flex: 1, position: 'relative', display: 'flex' }}>
       
-      {showModeSelection && !isMobile && (
+      {showModeSelection && (
          <div style={{ position: 'absolute', inset: 0, zIndex: 20, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
            <h3 style={{ fontSize: 24, fontWeight: 600, color: '#111827', marginBottom: 8 }}>Start your visual thinking</h3>
            <p style={{ fontSize: 15, color: '#4B5563', marginBottom: 32, textAlign: 'center' }}>Choose a starting canvas for your notebook.</p>
@@ -1064,14 +1124,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
          </div>
       )}
 
-      {/* Huawei Notes Unified Draggable Floating Toolbar (Tablet & Desktop) */}
-      {!isMobile && !readonly && (
-        <Draggable handle=".huawei-drag-handle" cancel=".cancel-drag" defaultPosition={{ x: 0, y: 0 }} bounds="parent">
-          <div style={{ position: 'absolute', top: 24, left: '50%', marginLeft: -300, zIndex: 60, background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(20px)', padding: '6px 8px', borderRadius: 16, display: 'flex', gap: 4, boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', flexWrap: 'nowrap', alignItems: 'center', width: 'auto', maxWidth: '95vw' }}>
-             
-             <div className="huawei-drag-handle" style={{ cursor: 'grab', color: '#9CA3AF', display: 'flex', alignItems: 'center', padding: '0 8px' }}>
-                <GripVertical size={20} strokeWidth={2} />
-             </div>
+      {/* Docked Toolbar (Scrollable horizontally on smaller screens) */}
+      {!readonly && (
+          <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 60, background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(20px)', padding: '6px 8px', borderRadius: 16, display: 'flex', gap: 4, boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', flexWrap: 'nowrap', alignItems: 'center', width: 'max-content', maxWidth: 'calc(100vw - 32px)', overflowX: 'auto' }} className="hide-scroll">
             
             <button onClick={undo} disabled={!canUndo} className="cancel-drag" style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: 'transparent', color: canUndo ? '#4B5563' : '#D1D5DB', cursor: canUndo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Undo2 size={20} strokeWidth={1.5} />
@@ -1096,7 +1151,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                  { id: 'pdf', icon: FileText },
                  { id: 'sticker', icon: StickyNote },
                  { id: 'save', icon: Save },
-                 { id: 'laser', icon: Move3d },
+                 { id: 'laser', icon: Zap },
                  { id: 'mic', icon: Mic }
                ].map(t => (
                   <button 
@@ -1148,16 +1203,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                     
                     {/* Shapes */}
                     {tool === 'shape' && (
-                       <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', background: '#F3F4F6', padding: 8, borderRadius: 12 }}>
-                          <button onClick={() => setShapeType('rect')} className="cancel-drag" style={{ padding: 8, borderRadius: 8, border: 'none', background: shapeType === 'rect' ? 'white' : 'transparent', boxShadow: shapeType === 'rect' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none', cursor: 'pointer' }}>
-                             <Square size={24} color={shapeType === 'rect' ? '#3B82F6' : '#4B5563'} strokeWidth={1.5} />
-                          </button>
-                          <button onClick={() => setShapeType('circle')} className="cancel-drag" style={{ padding: 8, borderRadius: 8, border: 'none', background: shapeType === 'circle' ? 'white' : 'transparent', boxShadow: shapeType === 'circle' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none', cursor: 'pointer' }}>
-                             <Circle size={24} color={shapeType === 'circle' ? '#3B82F6' : '#4B5563'} strokeWidth={1.5} />
-                          </button>
-                          <button onClick={() => setShapeType('line')} className="cancel-drag" style={{ padding: 8, borderRadius: 8, border: 'none', background: shapeType === 'line' ? 'white' : 'transparent', boxShadow: shapeType === 'line' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none', cursor: 'pointer' }}>
-                             <Minus size={24} color={shapeType === 'line' ? '#3B82F6' : '#4B5563'} strokeWidth={1.5} />
-                          </button>
+                       <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
+                          <Square size={28} strokeWidth={1} color={shapeType === 'rect' ? '#3B82F6' : '#9CA3AF'} className="cancel-drag" style={{cursor:'pointer'}} onClick={() => setShapeType('rect')} />
+                          <Circle size={28} strokeWidth={1} color={shapeType === 'circle' ? '#3B82F6' : '#9CA3AF'} className="cancel-drag" style={{cursor:'pointer'}} onClick={() => setShapeType('circle')} />
+                          <Triangle size={28} strokeWidth={1} color={shapeType === 'triangle' ? '#3B82F6' : '#9CA3AF'} className="cancel-drag" style={{cursor:'pointer'}} onClick={() => setShapeType('triangle')} />
+                          <Minus size={28} strokeWidth={1} color={shapeType === 'line' ? '#3B82F6' : '#9CA3AF'} className="cancel-drag" style={{cursor:'pointer'}} onClick={() => setShapeType('line')} />
                        </div>
                     )}
                     
@@ -1185,7 +1235,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                     </div>
                     )}
                     
-                    {/* Color Palette */}
                     {['pen', 'pencil', 'highlighter', 'shape'].includes(tool) && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       {['#3B82F6', '#1D4ED8', '#111827', '#10B981', '#8B5CF6', '#06B6D4', '#EF4444'].map(c => (
@@ -1258,14 +1307,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                  </div>
                  
                  {/* Footer Toggle */}
-                 {['pen', 'pencil', 'highlighter'].includes(tool) && (
-                    <div style={{ background: '#F9FAFB', padding: '12px 20px', borderTop: '1px solid rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <span style={{ fontSize: 14, color: '#4B5563' }}>แสดงแถบรายการโปรด</span>
-                       <div style={{ width: 44, height: 24, borderRadius: 12, background: '#E5E7EB', position: 'relative', cursor: 'pointer' }}>
-                          <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, left: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}></div>
-                       </div>
-                    </div>
-                 )}
+                 {/* Removed Favorites toggle */}
                  {tool === 'eraser' && (
                     <div style={{ background: '#F9FAFB', padding: '12px 20px', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
                        <button style={{ width: '100%', padding: '10px', borderRadius: 24, border: '1px solid #E5E7EB', background: 'white', color: '#3B82F6', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>ล้างเส้น</button>
@@ -1274,7 +1316,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
               </div>
             )}
           </div>
-        </Draggable>
       )}
       
       {/* Small Page Indicator (Huawei Style) */}
@@ -1465,11 +1506,27 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
               const isEraser = line.tool === 'eraser';
               const isPencil = line.tool === 'pencil';
               
+              if (isPencil) {
+                 return (
+                    <Line
+                       key={i}
+                       points={line.points}
+                       stroke={line.color || '#111827'}
+                       strokeWidth={(line.size || 4) * 0.8}
+                       tension={0.5}
+                       lineCap="round"
+                       lineJoin="round"
+                       opacity={0.6}
+                       globalCompositeOperation="source-over"
+                    />
+                 );
+              }
+              
               const strokeOptions = { 
                  size: isEraser ? 24 : isHighlighter ? (line.size || 4) * 3 : (line.size || 4), 
-                 thinning: (isHighlighter || isPencil) ? 0 : 0.5,
-                 smoothing: isPencil ? 0.2 : 0.5, 
-                 streamline: isPencil ? 0.2 : 0.5 
+                 thinning: isHighlighter ? 0 : 0.5,
+                 smoothing: 0.5, 
+                 streamline: 0.5 
               };
               
               const stroke = getStroke(pointPairs, strokeOptions);
@@ -1551,11 +1608,27 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                      const isEraser = line.tool === 'eraser';
                      const isPencil = line.tool === 'pencil';
                      
+                     if (isPencil) {
+                        return (
+                           <Line
+                              key={`lasso-line-${i}`}
+                              points={line.points}
+                              stroke={line.color || '#111827'}
+                              strokeWidth={(line.size || 4) * 0.8}
+                              tension={0.5}
+                              lineCap="round"
+                              lineJoin="round"
+                              opacity={0.6}
+                              globalCompositeOperation="source-over"
+                           />
+                        );
+                     }
+                     
                      const strokeOptions = { 
                         size: isEraser ? 24 : isHighlighter ? (line.size || 4) * 3 : (line.size || 4), 
-                        thinning: (isHighlighter || isPencil) ? 0 : 0.5,
-                        smoothing: isPencil ? 0.2 : 0.5, 
-                        streamline: isPencil ? 0.2 : 0.5 
+                        thinning: isHighlighter ? 0 : 0.5,
+                        smoothing: 0.5, 
+                        streamline: 0.5 
                      };
                      
                      const stroke = getStroke(pointPairs, strokeOptions);
@@ -1726,8 +1799,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
       </Stage>
 
       {/* Floating Textarea for inline editing */}
-      {editingTextId && (() => {
-         const t = currentPage.texts.find(tx => tx.id === editingTextId);
+      {(() => {
+         if (!editingTextId) return null;
+         const t = currentPage.texts?.find(tx => tx.id === editingTextId);
          if (!t) return null;
          
          const absoluteX = (t.x + pageX) * scale + position.x;
@@ -1735,6 +1809,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
          
          return (
            <textarea
+             key={`textarea-${editingTextId}`}
              ref={textareaRef}
              autoFocus
              placeholder="พิมพ์ข้อความที่นี่..."
@@ -1785,3 +1860,4 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     </>
   );
 }
+
