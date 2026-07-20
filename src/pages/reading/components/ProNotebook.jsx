@@ -124,10 +124,11 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   const handlePointerDown = (e) => {
     if (tool === 'pan') return;
     
-    isDrawing.current = true;
     const stage = e.target.getStage();
     const pos = stage.getRelativePointerPosition();
+    if (!pos) return;
     
+    isDrawing.current = true;
     setLines([...lines, { 
       tool, 
       points: [pos.x, pos.y, pos.x, pos.y] 
@@ -139,6 +140,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
     
     const stage = e.target.getStage();
     const pos = stage.getRelativePointerPosition();
+    if (!pos) return;
     
     const lastLine = { ...lines[lines.length - 1] };
     lastLine.points = lastLine.points.concat([pos.x, pos.y]);
@@ -231,9 +233,12 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
         ref={stageRef}
         width={dimensions.width}
         height={dimensions.height}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
+        onMouseDown={handlePointerDown}
+        onTouchStart={handlePointerDown}
+        onMouseMove={handlePointerMove}
+        onTouchMove={handlePointerMove}
+        onMouseUp={handlePointerUp}
+        onTouchEnd={handlePointerUp}
         onWheel={handleWheel}
         draggable={tool === 'pan'}
         scaleX={scale}
