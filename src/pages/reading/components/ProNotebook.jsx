@@ -656,7 +656,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   const [showPageManager, setShowPageManager] = useState(false);
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--gray-light)', display: 'flex' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--gray-light)', display: 'flex' }}>
       
       {isDesktop && (
         <div style={{ width: 64, height: '100%', background: '#111827', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 0', zIndex: 10, boxShadow: '2px 0 10px rgba(0,0,0,0.1)', flexShrink: 0 }}>
@@ -732,7 +732,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
         </div>
       )}
 
-      <div style={{ flex: 1, position: 'relative' }}>
+      <div ref={containerRef} style={{ flex: 1, position: 'relative' }}>
       
       {showModeSelection && !isMobile && (
          <div style={{ position: 'absolute', inset: 0, zIndex: 20, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
