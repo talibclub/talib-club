@@ -75,7 +75,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
         const proxyUrl = `/api/proxy-pdf?url=${encodeURIComponent(url)}`;
         toast.loading(`กำลังโหลด PDF...`, { id: 'pdf-load' });
         
-        const loadingTask = pdfjsLib.getDocument(proxyUrl);
+        const loadingTask = pdfjsLib.getDocument({ url: proxyUrl });
         const pdf = await loadingTask.promise;
         const numPages = Math.min(pdf.numPages, 30);
         
