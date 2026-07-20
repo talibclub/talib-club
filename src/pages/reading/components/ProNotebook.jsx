@@ -615,6 +615,78 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
     isDrawing.current = false;
   };
 
+  // --- Multi-Touch Pan & Zoom ---
+  const lastCenter = useRef(null);
+  const lastDist = useRef(null);
+
+  const handleTouchMove = (e) => {
+    e.evt.preventDefault();
+    if (e.evt.touches && e.evt.touches.length === 2) {
+      // 2-finger gesture (Pan & Zoom)
+      const touch1 = e.evt.touches[0];
+      const touch2 = e.evt.touches[1];
+
+      const p1 = { x: touch1.clientX, y: touch1.clientY };
+      const p2 = { x: touch2.clientX, y: touch2.clientY };
+
+      const newCenter = {
+        x: (p1.x + p2.x) / 2,
+        y: (p1.y + p2.y) / 2,
+      };
+
+      const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+
+      if (lastCenter.current && lastDist.current) {
+        const stage = stageRef.current;
+        const oldScale = stage.scaleX();
+
+        // Pan
+        const dx = newCenter.x - lastCenter.current.x;
+        const dy = newCenter.y - lastCenter.current.y;
+
+        // Zoom
+        const scaleBy = dist / lastDist.current;
+        let newScale = oldScale * scaleBy;
+        newScale = Math.max(0.1, Math.min(newScale, 5));
+
+        // Center calculation for zoom
+        const pointerPosition = {
+           x: newCenter.x - stage.container().getBoundingClientRect().left,
+           y: newCenter.y - stage.container().getBoundingClientRect().top
+        };
+        
+        const mousePointTo = {
+          x: (pointerPosition.x - position.x) / oldScale,
+          y: (pointerPosition.y - position.y) / oldScale,
+        };
+
+        const newPos = {
+          x: pointerPosition.x - mousePointTo.x * newScale + dx,
+          y: pointerPosition.y - mousePointTo.y * newScale + dy,
+        };
+
+        setScale(newScale);
+        setPosition(newPos);
+      }
+
+      lastCenter.current = newCenter;
+      lastDist.current = dist;
+    } else if (e.evt.touches && e.evt.touches.length === 1 && !lastCenter.current) {
+       // Only process 1-finger draw if not coming out of a 2-finger gesture
+       handlePointerMove();
+    }
+  };
+
+  const handleTouchEnd = (e) => {
+    if (!e.evt.touches || e.evt.touches.length < 2) {
+      lastCenter.current = null;
+      lastDist.current = null;
+    }
+    if (!e.evt.touches || e.evt.touches.length === 0) {
+      handlePointerUp();
+    }
+  };
+
   const handleWheel = (e) => {
     e.evt.preventDefault();
     if (e.evt.ctrlKey || e.evt.metaKey) {
@@ -1110,11 +1182,11 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
         width={dimensions.width}
         height={dimensions.height}
         onMouseDown={handlePointerDown}
-        onTouchStart={handlePointerDown}
+        onTouchStart={(e) => { if (e.evt.touches && e.evt.touches.length === 1) handlePointerDown(e); }}
         onMouseMove={handlePointerMove}
-        onTouchMove={handlePointerMove}
+        onTouchMove={handleTouchMove}
         onMouseUp={handlePointerUp}
-        onTouchEnd={handlePointerUp}
+        onTouchEnd={handleTouchEnd}
         onWheel={handleWheel}
         draggable={tool === 'pan'}
         scaleX={scale}
