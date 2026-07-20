@@ -55,10 +55,9 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
           const assetId = AssetRecordType.createId();
           assets.push({
             id: assetId,
-            type: 'asset',
+            type: 'image',
             typeName: 'asset',
             props: {
-              type: 'image',
               src: dataUrl,
               w: canvas.width,
               h: canvas.height,
