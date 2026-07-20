@@ -7,7 +7,7 @@ import { cleanForFirestore, getMs, byNewest, mergeWithFallback, getQueryCacheKey
 import { 
   collectionCache, countCache, inFlightRequests, setWithLimit,
   readCachedCollection, writeCachedCollection, readLocalStorageCacheEntry, invalidateCollectionCache,
-  fetchContentMetadata, updateCollectionMetadata,
+  fetchContentMetadata, updateCollectionMetadata, invalidateCollectionCountOnly,
   readCachedUserDocument, writeCachedUserDocument, invalidateUserDocumentCache
 } from "./cache.js"
 
@@ -386,6 +386,7 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
         }
       }
     }
+    invalidateCollectionCountOnly(collectionName)
 
     try {
       await deleteDoc(doc(db, collectionName, String(id)))
@@ -475,6 +476,7 @@ export async function deleteContentItem(name, id) {
       }
     }
   }
+  invalidateCollectionCountOnly(collectionName)
   await updateCollectionMetadata(collectionName)
 }
 
@@ -520,6 +522,7 @@ export async function bulkDeleteItems(name, ids) {
     }
   }
 
+  invalidateCollectionCountOnly(collectionName)
   if (deleted > 0) await updateCollectionMetadata(collectionName)
   return { deleted, failed }
 }
@@ -586,6 +589,7 @@ export async function bulkSaveItems(name, items, uid = null) {
     }
   }
 
+  invalidateCollectionCountOnly(collectionName)
   if (saved > 0) await updateCollectionMetadata(collectionName)
   return { saved, failed }
 }

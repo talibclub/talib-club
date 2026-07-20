@@ -233,3 +233,13 @@ export function invalidateDocumentCache(collectionName, docId) {
   const cacheKey = `${collectionName}:${docId}`
   userDocumentCache.delete(cacheKey)
 }
+export function invalidateCollectionCountOnly(collectionName) {
+  for (const [key, val] of Object.entries(CONTENT_COLLECTIONS)) {
+    if (val === collectionName) {
+      countCache.delete(count_ + key)
+      try {
+        localStorage.removeItem(LOCAL_STORAGE_CACHE_PREFIX + count_ + key)
+      } catch (e) { }
+    }
+  }
+}
