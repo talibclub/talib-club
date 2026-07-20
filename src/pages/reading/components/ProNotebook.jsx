@@ -839,7 +839,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
       {/* Huawei Notes Unified Draggable Floating Toolbar (Tablet & Desktop) */}
       {!isMobile && (
         <Draggable handle=".huawei-drag-handle">
-          <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 60, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: '6px 8px', borderRadius: 16, display: 'flex', gap: 4, boxShadow: '0 10px 40px rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.05)', flexWrap: 'nowrap', alignItems: 'center' }}>
+          <div style={{ position: 'absolute', bottom: 32, left: '50%', transform: 'translateX(-50%)', zIndex: 60, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: '6px 8px', borderRadius: 16, display: 'flex', gap: 4, boxShadow: '0 10px 40px rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.05)', flexWrap: 'nowrap', alignItems: 'center' }}>
             
             <div className="huawei-drag-handle" style={{ cursor: 'grab', color: '#D1D5DB', display: 'flex', alignItems: 'center', padding: '0 8px' }}>
               <GripHorizontal size={16} strokeWidth={2} />
@@ -883,9 +883,9 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
               <Mic size={20} strokeWidth={1.5} />
             </button>
             
-            {/* Huawei Glassmorphism Popover for Tool Settings (Attached below Pill) */}
+            {/* Huawei Glassmorphism Popover for Tool Settings (Attached ABOVE Pill since Pill is at bottom) */}
             {showToolSettings && (tool === 'pen' || tool === 'pencil' || tool === 'highlighter' || tool === 'text' || tool === 'shape') && (
-              <div style={{ position: 'absolute', top: '100%', marginTop: 12, left: '50%', transform: 'translateX(-50%)', background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: '16px 20px', borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 280, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ position: 'absolute', bottom: '100%', marginBottom: 12, left: '50%', transform: 'translateX(-50%)', background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: '16px 20px', borderRadius: 16, boxShadow: '0 -12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 280, display: 'flex', flexDirection: 'column', gap: 16 }}>
                  
                  {/* Thickness / Size Slider */}
                  <div>
