@@ -31,6 +31,12 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   const [showModeSelection, setShowModeSelection] = useState(activeBook?.book?.fileUrl ? true : false);
   
   const [tool, setTool] = useState('pen'); // 'pen', 'eraser', 'pan'
+  
+  const colors = ['#111827', '#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6'];
+  const sizes = [2, 4, 8, 12];
+  const [penColor, setPenColor] = useState('#111827');
+  const [penSize, setPenSize] = useState(4);
+  
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   
@@ -231,7 +237,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
     
     isDrawing.current = true;
     updatePage(currentPageIndex, (page) => {
-       page.lines.push({ tool, points: [pos.x, pos.y, pos.x, pos.y] });
+       page.lines.push({ tool, color: penColor, size: penSize, points: [pos.x, pos.y, pos.x, pos.y] });
     });
   };
 
@@ -323,13 +329,36 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
         <button onClick={() => setTool('pen')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'pen' ? 'var(--teal)' : 'transparent', color: tool === 'pen' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
           <i className="ti ti-pencil" style={{ fontSize: 20 }}></i>
         </button>
+        
+        {tool === 'pen' && (
+          <div style={{ display: 'flex', gap: 6, background: '#F3F4F6', padding: '6px 12px', borderRadius: 100, alignItems: 'center', marginLeft: 4, marginRight: 4 }}>
+            {colors.map(c => (
+              <div 
+                 key={c}
+                 onClick={() => setPenColor(c)}
+                 style={{ width: 20, height: 20, borderRadius: '50%', background: c, cursor: 'pointer', border: penColor === c ? '2px solid white' : '2px solid transparent', outline: penColor === c ? '2px solid var(--teal)' : 'none' }}
+              />
+            ))}
+            <div style={{ width: 1, background: '#D1D5DB', margin: '0 4px', height: 16 }}></div>
+            {sizes.map(s => (
+              <div 
+                 key={s}
+                 onClick={() => setPenSize(s)}
+                 style={{ width: 24, height: 24, borderRadius: '50%', background: penSize === s ? 'white' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: penSize === s ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+              >
+                 <div style={{ width: s, height: s, borderRadius: '50%', background: penSize === s ? 'var(--teal)' : '#9CA3AF' }}></div>
+              </div>
+            ))}
+          </div>
+        )}
+
         <button onClick={() => setTool('eraser')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'eraser' ? 'var(--red)' : 'transparent', color: tool === 'eraser' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
           <i className="ti ti-eraser" style={{ fontSize: 20 }}></i>
         </button>
         <button onClick={() => setTool('pan')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'pan' ? '#E5E7EB' : 'transparent', color: tool === 'pan' ? '#374151' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
           <i className="ti ti-hand-stop" style={{ fontSize: 20 }}></i>
         </button>
-        <div style={{ width: 1, background: 'var(--br2)', margin: '0 4px' }}></div>
+        <div style={{ width: 1, background: 'var(--br2)', margin: '0 4px', height: 24 }}></div>
         <button onClick={() => document.getElementById('pdf-upload').click()} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'var(--blue-light)', color: 'var(--blue-dark)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
           <i className="ti ti-upload" style={{ fontSize: 20 }}></i>
         </button>
@@ -394,6 +423,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
         y={position.y}
         style={{ cursor: tool === 'pan' ? 'grab' : 'crosshair' }}
       >
+        {/* Background Layer (Paper + PDF) */}
         <Layer>
           <Group x={pageX} y={pageY}>
             {/* Page Paper Background */}
@@ -403,28 +433,38 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
             {currentPage.src && (
                <PDFPageImage src={currentPage.src} width={currentPage.width} height={currentPage.height} />
             )}
-            
+          </Group>
+        </Layer>
+        
+        {/* Drawing Layer (Strokes isolated so eraser only erases strokes) */}
+        <Layer>
+          <Group x={pageX} y={pageY}>
             {/* Strokes */}
             {currentPage.lines.map((line, i) => {
               const pointPairs = [];
               for(let p = 0; p < line.points.length; p+=2) {
                   pointPairs.push([line.points[p], line.points[p+1]]);
               }
-              const stroke = getStroke(pointPairs, { size: line.tool === 'eraser' ? 24 : 4, thinning: 0.5, smoothing: 0.5, streamline: 0.5 });
+              const stroke = getStroke(pointPairs, { size: line.tool === 'eraser' ? 24 : (line.size || 4), thinning: 0.5, smoothing: 0.5, streamline: 0.5 });
               const pathData = getSvgPathFromStroke(stroke);
               
               return (
                 <Path
                   key={i}
                   data={pathData}
-                  fill={line.tool === 'eraser' ? 'white' : '#111827'}
+                  fill={line.tool === 'eraser' ? 'black' : (line.color || '#111827')}
                   globalCompositeOperation={line.tool === 'eraser' ? 'destination-out' : 'source-over'}
                   lineCap="round"
                   lineJoin="round"
                 />
               );
             })}
-            
+          </Group>
+        </Layer>
+        
+        {/* Stickers Layer */}
+        <Layer>
+          <Group x={pageX} y={pageY}>
             {/* Audio Stickers */}
             {currentPage.stickers.map((sticker) => (
                <Group 
