@@ -1,1 +1,0 @@
-import admin from './test_module.mjs'; console.log(admin.firestore().id); console.log(admin.firestore.Timestamp.now());
