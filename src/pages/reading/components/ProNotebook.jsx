@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Image as KonvaImage, Path, Group, Circle, Text, Rect, Transformer } from 'react-konva';
 import Draggable from 'react-draggable';
-import { PenTool, Highlighter, Eraser, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, FileStack, LayoutList, Check, Lock, MousePointerClick, Move3d } from 'lucide-react';
+import { PenTool, Highlighter, Eraser, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, GripVertical, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, FileStack, LayoutList, Check, Lock, MousePointerClick, Move3d } from 'lucide-react';
 import useImage from 'use-image';
 import getStroke from 'perfect-freehand';
 import toast from 'react-hot-toast';
@@ -1095,6 +1095,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                  { id: 'image', icon: ImageIcon },
                  { id: 'pdf', icon: FileText },
                  { id: 'sticker', icon: StickyNote },
+                 { id: 'save', icon: Save },
                  { id: 'laser', icon: Move3d },
                  { id: 'mic', icon: Mic }
                ].map(t => (
