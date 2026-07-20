@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Image as KonvaImage, Path, Group, Circle, Text, Rect, Transformer } from 'react-konva';
 import Draggable from 'react-draggable';
-import { PenTool, Highlighter, Eraser, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal } from 'lucide-react';
+import { PenTool, Highlighter, Eraser, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, Pencil, Pointer } from 'lucide-react';
 import useImage from 'use-image';
 import getStroke from 'perfect-freehand';
 import toast from 'react-hot-toast';
@@ -86,6 +86,26 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   
   const [tool, setTool] = useState('pen'); // 'pen', 'pencil', 'highlighter', 'eraser', 'pan', 'text', 'laser', 'shape', 'lasso'
   const [shapeType, setShapeType] = useState('rect'); // 'rect', 'circle', 'line'
+  const [isSpaceDown, setIsSpaceDown] = useState(false);
+  
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        setIsSpaceDown(true);
+      }
+    };
+    const handleKeyUp = (e) => {
+      if (e.code === 'Space') {
+        setIsSpaceDown(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
   
   const [showToolSettings, setShowToolSettings] = useState(false);
   
@@ -440,14 +460,14 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   const handlePointerDown = (e) => {
     checkDeselect(e);
   
-    if (tool === 'pan') return;
+    if (tool === 'pan' || isSpaceDown) return;
     const pos = getPointerPosRelativeToPage();
     if (!pos) return;
     
     const relativeTime = isRecording && recordingStartTimeRef.current ? Date.now() - recordingStartTimeRef.current : null;
     
     if (tool === 'text') {
-       const newText = { id: `text-${Date.now()}`, text: 'พิมพ์ข้อความที่นี่...', x: pos.x, y: pos.y, color: penColor, size: penSize * 4 };
+       const newText = { id: `text-${Date.now()}`, text: '', x: pos.x, y: pos.y, color: penColor, size: penSize * 4 };
        pushHistory();
        updatePage(currentPageIndex, (page) => {
           if (!page.texts) page.texts = [];
@@ -503,7 +523,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   };
 
   const handlePointerMove = () => {
-    if (!isDrawing.current || tool === 'pan') return;
+    if (!isDrawing.current || tool === 'pan' || isSpaceDown) return;
     const pos = getPointerPosRelativeToPage();
     if (!pos) return;
     
@@ -597,24 +617,31 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
 
   const handleWheel = (e) => {
     e.evt.preventDefault();
-    const scaleBy = 1.1;
-    const stage = stageRef.current;
-    const oldScale = stage.scaleX();
-    const pointer = stage.getPointerPosition();
+    if (e.evt.ctrlKey || e.evt.metaKey) {
+      const scaleBy = 1.1;
+      const stage = stageRef.current;
+      const oldScale = stage.scaleX();
+      const pointer = stage.getPointerPosition();
 
-    const mousePointTo = {
-      x: (pointer.x - stage.x()) / oldScale,
-      y: (pointer.y - stage.y()) / oldScale,
-    };
+      const mousePointTo = {
+        x: (pointer.x - stage.x()) / oldScale,
+        y: (pointer.y - stage.y()) / oldScale,
+      };
 
-    let newScale = e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy;
-    newScale = Math.max(0.1, Math.min(newScale, 5));
-    
-    setScale(newScale);
-    setPosition({
-      x: pointer.x - mousePointTo.x * newScale,
-      y: pointer.y - mousePointTo.y * newScale,
-    });
+      let newScale = e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy;
+      newScale = Math.max(0.1, Math.min(newScale, 5));
+      
+      setScale(newScale);
+      setPosition({
+        x: pointer.x - mousePointTo.x * newScale,
+        y: pointer.y - mousePointTo.y * newScale,
+      });
+    } else {
+      setPosition(prev => ({
+        x: prev.x - e.evt.deltaX,
+        y: prev.y - e.evt.deltaY
+      }));
+    }
   };
   
   const handleImageUpload = (e) => {
@@ -825,13 +852,13 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
             <div style={{ width: 1, background: '#E5E7EB', margin: '0 6px', height: 24 }}></div>
             
             {[
-              { id: 'pan', icon: MousePointer2 },
+              { id: 'pan', icon: Pointer },
               { id: 'pen', icon: PenTool },
+              { id: 'pencil', icon: Pencil },
               { id: 'highlighter', icon: Highlighter },
               { id: 'eraser', icon: Eraser },
               { id: 'lasso', icon: Lasso },
-              { id: 'text', icon: Type },
-              { id: 'laser', icon: Zap }
+              { id: 'text', icon: Type }
             ].map(t => (
                <button 
                  key={t.id}
@@ -839,7 +866,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
                  style={{ width: 40, height: 40, borderRadius: 8, border: 'none', background: tool === t.id ? '#F3F4F6' : 'transparent', color: tool === t.id ? '#111827' : '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', position: 'relative' }}
                >
                  <t.icon size={20} strokeWidth={1.5} />
-                 {tool === t.id && (t.id === 'pen' || t.id === 'highlighter' || t.id === 'text') && <div style={{ position: 'absolute', bottom: 4, width: 16, height: 2, borderRadius: 2, background: '#111827' }}></div>}
+                 {tool === t.id && (t.id === 'pen' || t.id === 'pencil' || t.id === 'highlighter' || t.id === 'text' || t.id === 'eraser' || t.id === 'lasso') && <div style={{ position: 'absolute', bottom: 4, width: 16, height: 2, borderRadius: 2, background: '#111827' }}></div>}
                </button>
             ))}
             
@@ -854,17 +881,28 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
             </button>
             
             {/* Huawei Glassmorphism Popover for Tool Settings (Attached below Pill) */}
-            {showToolSettings && (tool === 'pen' || tool === 'highlighter' || tool === 'text') && (
+            {showToolSettings && (tool === 'pen' || tool === 'pencil' || tool === 'highlighter' || tool === 'text' || tool === 'shape') && (
               <div style={{ position: 'absolute', top: '100%', marginTop: 12, left: '50%', transform: 'translateX(-50%)', background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: '16px 20px', borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 280, display: 'flex', flexDirection: 'column', gap: 16 }}>
                  
-                 {/* Thickness Slider */}
+                 {/* Thickness / Size Slider */}
                  <div>
                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                      <span style={{ fontSize: 13, fontWeight: 500, color: '#4B5563' }}>ความหนา (Thickness)</span>
                      <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{penSize}px</span>
                    </div>
-                   <input type="range" min="1" max="24" step="1" value={penSize} onChange={(e) => setPenSize(parseInt(e.target.value))} style={{ width: '100%', accentColor: '#111827' }} />
+                   <input type="range" min="1" max="48" step="1" value={penSize} onChange={(e) => setPenSize(parseInt(e.target.value))} style={{ width: '100%', accentColor: '#111827' }} />
                  </div>
+                 
+                 {/* Opacity Slider */}
+                 {(tool === 'pen' || tool === 'pencil' || tool === 'highlighter' || tool === 'shape') && (
+                 <div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                     <span style={{ fontSize: 13, fontWeight: 500, color: '#4B5563' }}>ความโปร่งใส (Opacity)</span>
+                     <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{Math.round(penOpacity * 100)}%</span>
+                   </div>
+                   <input type="range" min="0.1" max="1" step="0.05" value={penOpacity} onChange={(e) => setPenOpacity(parseFloat(e.target.value))} style={{ width: '100%', accentColor: '#111827' }} />
+                 </div>
+                 )}
                  
                  {/* Color Palette (Tightly Packed) */}
                  <div>
@@ -1258,6 +1296,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
            <textarea
              ref={textareaRef}
              autoFocus
+             placeholder="พิมพ์ข้อความที่นี่..."
              value={editingTextValue}
              onChange={(e) => setEditingTextValue(e.target.value)}
              onBlur={() => {
@@ -1280,7 +1319,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
                 margin: 0,
                 padding: 4,
                 border: '1px dashed var(--teal)',
-                background: 'rgba(255,255,255,0.8)',
+                background: 'rgba(255,255,255,0.95)',
                 color: t.color,
                 fontSize: `${t.size * scale}px`,
                 fontFamily: 'Kanit, sans-serif',
@@ -1291,7 +1330,8 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
                 minHeight: 100,
                 overflow: 'hidden',
                 zIndex: 100,
-                borderRadius: 4
+                borderRadius: 8,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.1)'
              }}
            />
          );
