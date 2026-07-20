@@ -8,6 +8,8 @@ import { AudioShapeUtil } from './AudioShapeUtil.jsx';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
+const customShapeUtils = [AudioShapeUtil];
+
 export default function ProNotebook({ bookId, uid, activeBook }) {
   const [mode, setMode] = useState(activeBook?.book?.fileUrl ? 'annotate' : 'blank'); 
   const [loadingPdf, setLoadingPdf] = useState(activeBook?.book?.fileUrl ? true : false);
@@ -111,7 +113,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
         key={mode}
         persistenceKey={`tldraw-notebook-${uid}-${bookId}-${mode}`} 
         onMount={handleMount} 
-        shapeUtils={[AudioShapeUtil]}
+        shapeUtils={customShapeUtils}
       />
       {tldrawEditor && (
         <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 100 }}>
