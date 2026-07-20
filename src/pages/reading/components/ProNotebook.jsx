@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Image as KonvaImage, Path, Group, Circle, Text, Rect, Transformer } from 'react-konva';
-import { PenTool, Highlighter, Eraser, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap } from 'lucide-react';
+import Draggable from 'react-draggable';
+import { PenTool, Highlighter, Eraser, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal } from 'lucide-react';
 import useImage from 'use-image';
 import getStroke from 'perfect-freehand';
 import toast from 'react-hot-toast';
@@ -659,8 +660,11 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
     <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--gray-light)', display: 'flex' }}>
       
       {isDesktop && (
-        <div style={{ width: 64, height: '100%', background: '#111827', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 0', zIndex: 10, boxShadow: '2px 0 10px rgba(0,0,0,0.1)', flexShrink: 0 }}>
-          <div style={{ color: 'white', marginBottom: 24, fontSize: 12, fontWeight: 700 }}>TALIB</div>
+        <Draggable handle=".drag-handle">
+          <div style={{ position: 'absolute', top: 24, left: 24, width: 64, background: '#111827', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 0', zIndex: 60, boxShadow: '0 8px 32px rgba(0,0,0,0.15)', borderRadius: 16 }}>
+            <div className="drag-handle" style={{ cursor: 'grab', color: '#4B5563', marginBottom: 16, display: 'flex', justifyContent: 'center', width: '100%' }}>
+               <GripHorizontal size={20} />
+            </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', alignItems: 'center' }}>
             {[
@@ -692,13 +696,18 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
               <Mic size={22} />
             </button>
           </div>
-        </div>
+          </div>
+        </Draggable>
       )}
 
       {/* Expanded Desktop Tool Settings Panel */}
       {isDesktop && showToolSettings && (tool === 'pen' || tool === 'pencil' || tool === 'highlighter' || tool === 'laser' || tool === 'text' || tool === 'shape') && (
-        <div style={{ width: 280, height: '100%', background: 'white', borderRight: '1px solid var(--br2)', display: 'flex', flexDirection: 'column', padding: 24, zIndex: 9, flexShrink: 0, boxShadow: '2px 0 10px rgba(0,0,0,0.05)' }}>
-           <h3 style={{ fontSize: 16, fontWeight: 600, color: '#111827', margin: '0 0 24px 0', textTransform: 'capitalize' }}>{tool === 'pen' ? 'Pen Options' : tool === 'highlighter' ? 'Highlighter' : tool === 'shape' ? 'Shapes' : tool === 'text' ? 'Text' : 'Settings'}</h3>
+        <Draggable handle=".settings-drag-handle">
+          <div style={{ position: 'absolute', top: 24, left: 100, width: 280, background: 'white', display: 'flex', flexDirection: 'column', padding: 24, zIndex: 59, borderRadius: 16, boxShadow: '0 8px 32px rgba(0,0,0,0.15)', border: '1px solid var(--br2)' }}>
+            <div className="settings-drag-handle" style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', cursor: 'grab', color: '#D1D5DB' }}>
+               <GripHorizontal size={16} />
+            </div>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: '#111827', margin: '16px 0 24px 0', textTransform: 'capitalize' }}>{tool === 'pen' ? 'Pen Options' : tool === 'highlighter' ? 'Highlighter' : tool === 'shape' ? 'Shapes' : tool === 'text' ? 'Text' : 'Settings'}</h3>
            
            <label style={{ fontSize: 13, fontWeight: 500, color: '#4B5563', marginBottom: 8 }}>Size</label>
            <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
@@ -729,7 +738,8 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
            
            <label style={{ fontSize: 13, fontWeight: 500, color: '#4B5563', marginBottom: 8 }}>Opacity</label>
            <input type="range" min="0.1" max="1" step="0.1" value={penOpacity} onChange={(e) => setPenOpacity(parseFloat(e.target.value))} style={{ width: '100%', accentColor: '#10B981' }} />
-        </div>
+         </div>
+        </Draggable>
       )}
 
       <div ref={containerRef} style={{ flex: 1, position: 'relative' }}>
@@ -826,8 +836,14 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
 
       {/* Huawei Notes style Top Pill Toolbar for Tablet (Hidden on Desktop & Mobile) */}
       {!isDesktop && !isMobile && (
-        <>
+        <Draggable handle=".tablet-drag-handle">
           <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 5, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(16px)', padding: '6px', borderRadius: 100, display: 'flex', gap: 4, boxShadow: '0 8px 32px rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.05)', flexWrap: 'nowrap', alignItems: 'center' }}>
+            
+            <div className="tablet-drag-handle" style={{ cursor: 'grab', color: '#D1D5DB', display: 'flex', alignItems: 'center', padding: '0 4px' }}>
+              <GripHorizontal size={16} />
+            </div>
+            <div style={{ width: 1, background: '#E5E7EB', margin: '0 2px', height: 20 }}></div>
+
             
             <button onClick={undo} disabled={!canUndo} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'transparent', color: canUndo ? '#4B5563' : '#D1D5DB', cursor: canUndo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Undo2 size={18} />
@@ -865,29 +881,29 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
             <button onClick={toggleRecording} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: isRecording ? '#FEE2E2' : 'transparent', color: isRecording ? '#EF4444' : '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', animation: isRecording ? 'pulse 1.5s infinite' : 'none' }}>
               <Mic size={18} />
             </button>
+            
+            {/* Huawei Glassmorphism Popover for Tool Settings (Attached to Pill) */}
+            {showToolSettings && (tool === 'pen' || tool === 'highlighter' || tool === 'text') && (
+              <div style={{ position: 'absolute', top: '100%', marginTop: 8, left: '50%', transform: 'translateX(-50%)', background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(16px)', padding: 16, borderRadius: 16, boxShadow: '0 10px 40px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 220 }}>
+                 <label style={{ fontSize: 12, fontWeight: 500, color: '#6B7280', marginBottom: 8, display: 'block' }}>Size</label>
+                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+                   {sizes.map(s => (
+                      <div key={s} onClick={() => setPenSize(s)} style={{ width: 28, height: 28, borderRadius: '50%', background: penSize === s ? '#F3F4F6' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: penSize === s ? '1px solid #D1D5DB' : '1px solid transparent' }}>
+                         <div style={{ width: s, height: s, borderRadius: '50%', background: penSize === s ? '#111827' : '#9CA3AF' }}></div>
+                      </div>
+                   ))}
+                 </div>
+                 
+                 <label style={{ fontSize: 12, fontWeight: 500, color: '#6B7280', marginBottom: 8, display: 'block' }}>Color</label>
+                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
+                   {colors.map(c => (
+                      <div key={c} onClick={() => setPenColor(c)} style={{ width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer', border: penColor === c ? '2px solid white' : '1px solid rgba(0,0,0,0.1)', outline: penColor === c ? '2px solid #10B981' : 'none', margin: 'auto' }} />
+                   ))}
+                 </div>
+              </div>
+            )}
           </div>
-
-          {/* Huawei Glassmorphism Popover for Tool Settings */}
-          {showToolSettings && (tool === 'pen' || tool === 'highlighter' || tool === 'text') && (
-            <div style={{ position: 'absolute', top: 64, left: '50%', transform: 'translateX(-50%)', zIndex: 6, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(16px)', padding: 16, borderRadius: 16, boxShadow: '0 10px 40px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 220 }}>
-               <label style={{ fontSize: 12, fontWeight: 500, color: '#6B7280', marginBottom: 8, display: 'block' }}>Size</label>
-               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-                 {sizes.map(s => (
-                    <div key={s} onClick={() => setPenSize(s)} style={{ width: 28, height: 28, borderRadius: '50%', background: penSize === s ? '#F3F4F6' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: penSize === s ? '1px solid #D1D5DB' : '1px solid transparent' }}>
-                       <div style={{ width: s, height: s, borderRadius: '50%', background: penSize === s ? '#111827' : '#9CA3AF' }}></div>
-                    </div>
-                 ))}
-               </div>
-               
-               <label style={{ fontSize: 12, fontWeight: 500, color: '#6B7280', marginBottom: 8, display: 'block' }}>Color</label>
-               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
-                 {colors.map(c => (
-                    <div key={c} onClick={() => setPenColor(c)} style={{ width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer', border: penColor === c ? '2px solid white' : '1px solid rgba(0,0,0,0.1)', outline: penColor === c ? '2px solid #10B981' : 'none', margin: 'auto' }} />
-                 ))}
-               </div>
-            </div>
-          )}
-        </>
+        </Draggable>
       )}
       
       {/* Universal Pagination & Actions (Bottom) */}
