@@ -32,8 +32,11 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   
   const [tool, setTool] = useState('pen'); // 'pen', 'eraser', 'pan'
   
-  const colors = ['#111827', '#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6'];
-  const sizes = [2, 4, 8, 12];
+  const colors = [
+    '#111827', '#EF4444', '#F97316', '#F59E0B', '#84CC16', '#10B981', '#06B6D4', 
+    '#3B82F6', '#6366F1', '#8B5CF6', '#D946EF', '#F43F5E', '#78716C', '#FFFFFF'
+  ];
+  const sizes = [2, 4, 6, 8, 12, 16, 24];
   const [penColor, setPenColor] = useState('#111827');
   const [penSize, setPenSize] = useState(4);
   
@@ -325,21 +328,35 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
       )}
 
       {/* Floating Toolbar */}
-      <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 5, background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(10px)', padding: '8px', borderRadius: 100, display: 'flex', gap: 8, boxShadow: '0 4px 15px rgba(0,0,0,0.08)', border: '1px solid var(--br2)' }}>
+      <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 5, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(12px)', padding: '8px', borderRadius: 100, display: 'flex', gap: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.1)', border: '1px solid var(--br2)' }}>
         <button onClick={() => setTool('pen')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'pen' ? 'var(--teal)' : 'transparent', color: tool === 'pen' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
           <i className="ti ti-pencil" style={{ fontSize: 20 }}></i>
         </button>
+        <button onClick={() => setTool('highlighter')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: tool === 'highlighter' ? '#F59E0B' : 'transparent', color: tool === 'highlighter' ? 'white' : 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+          <i className="ti ti-highlight" style={{ fontSize: 20 }}></i>
+        </button>
         
-        {tool === 'pen' && (
-          <div style={{ display: 'flex', gap: 6, background: '#F3F4F6', padding: '6px 12px', borderRadius: 100, alignItems: 'center', marginLeft: 4, marginRight: 4 }}>
+        {(tool === 'pen' || tool === 'highlighter') && (
+          <div style={{ display: 'flex', gap: 6, background: '#F3F4F6', padding: '6px 12px', borderRadius: 100, alignItems: 'center', marginLeft: 4, marginRight: 4, flexWrap: 'wrap', maxWidth: 300, justifyContent: 'center' }}>
             {colors.map(c => (
               <div 
                  key={c}
                  onClick={() => setPenColor(c)}
-                 style={{ width: 20, height: 20, borderRadius: '50%', background: c, cursor: 'pointer', border: penColor === c ? '2px solid white' : '2px solid transparent', outline: penColor === c ? '2px solid var(--teal)' : 'none' }}
+                 style={{ width: 20, height: 20, borderRadius: '50%', background: c, cursor: 'pointer', border: penColor === c ? '2px solid white' : '1px solid rgba(0,0,0,0.1)', outline: penColor === c ? '2px solid var(--teal)' : 'none' }}
               />
             ))}
+            {/* Custom Color Input */}
+            <div style={{ position: 'relative', width: 20, height: 20, borderRadius: '50%', overflow: 'hidden', cursor: 'pointer', border: '1px solid rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)' }}>
+               <input 
+                 type="color" 
+                 value={penColor}
+                 onChange={(e) => setPenColor(e.target.value)}
+                 style={{ position: 'absolute', opacity: 0, width: '200%', height: '200%', cursor: 'pointer' }}
+               />
+            </div>
+            
             <div style={{ width: 1, background: '#D1D5DB', margin: '0 4px', height: 16 }}></div>
+            
             {sizes.map(s => (
               <div 
                  key={s}
@@ -445,15 +462,35 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
               for(let p = 0; p < line.points.length; p+=2) {
                   pointPairs.push([line.points[p], line.points[p+1]]);
               }
-              const stroke = getStroke(pointPairs, { size: line.tool === 'eraser' ? 24 : (line.size || 4), thinning: 0.5, smoothing: 0.5, streamline: 0.5 });
+              
+              const isHighlighter = line.tool === 'highlighter';
+              const isEraser = line.tool === 'eraser';
+              
+              const strokeOptions = { 
+                 size: isEraser ? 24 : isHighlighter ? (line.size || 4) * 3 : (line.size || 4), 
+                 thinning: isHighlighter ? 0 : 0.5, // Highlighters usually don't thin
+                 smoothing: 0.5, 
+                 streamline: 0.5 
+              };
+              
+              const stroke = getStroke(pointPairs, strokeOptions);
               const pathData = getSvgPathFromStroke(stroke);
+              
+              let fillStr = line.color || '#111827';
+              if (isEraser) fillStr = 'black';
+              
+              // Highlighter uses mix-blend-mode multiply equivalent
+              let compositeOp = 'source-over';
+              if (isEraser) compositeOp = 'destination-out';
+              else if (isHighlighter) compositeOp = 'multiply';
               
               return (
                 <Path
                   key={i}
                   data={pathData}
-                  fill={line.tool === 'eraser' ? 'black' : (line.color || '#111827')}
-                  globalCompositeOperation={line.tool === 'eraser' ? 'destination-out' : 'source-over'}
+                  fill={fillStr}
+                  opacity={isHighlighter ? 0.5 : 1}
+                  globalCompositeOperation={compositeOp}
                   lineCap="round"
                   lineJoin="round"
                 />
