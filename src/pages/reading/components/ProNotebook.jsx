@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Stage, Layer, Image as KonvaImage, Line } from 'react-konva';
+import { Stage, Layer, Image as KonvaImage, Path, Group, Circle, Text } from 'react-konva';
 import useImage from 'use-image';
 import getStroke from 'perfect-freehand';
 import toast from 'react-hot-toast';
@@ -35,8 +35,14 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   
   const [tool, setTool] = useState('pen'); // 'pen', 'eraser', 'pan'
   const [lines, setLines] = useState([]);
+  const [stickers, setStickers] = useState([]);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  
+  // Audio Recording State
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
   
   const isDrawing = useRef(false);
 
@@ -59,21 +65,27 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
     return () => observer.disconnect();
   }, []);
 
-  // Function to load PDF when user explicitly requests it
-  const startLoadingPDF = async () => {
+  // Function to load PDF from URL (Automatic)
+  const startLoadingPDF = async (pdfUrl = null) => {
     setShowModeSelection(false);
     setLoadingPdf(true);
     
     try {
-      let url = activeBook.book.fileUrl;
-      if (url.includes('drive.google.com') && url.includes('/view')) {
-         const match = url.match(/\/d\/(.*?)\//);
-         if (match && match[1]) {
-           url = `https://drive.google.com/uc?export=download&id=${match[1]}`;
-         }
+      let targetUrl = pdfUrl;
+      let proxyUrl = targetUrl;
+      
+      // If no url provided, use the activeBook's URL and pass through proxy
+      if (!targetUrl) {
+        let url = activeBook.book.fileUrl;
+        if (url.includes('drive.google.com') && url.includes('/view')) {
+           const match = url.match(/\/d\/(.*?)\//);
+           if (match && match[1]) {
+             url = `https://drive.google.com/uc?export=download&id=${match[1]}`;
+           }
+        }
+        proxyUrl = `/api/proxy-pdf?url=${encodeURIComponent(url)}`;
       }
       
-      const proxyUrl = `/api/proxy-pdf?url=${encodeURIComponent(url)}`;
       toast.loading(`กำลังโหลด PDF...`, { id: 'pdf-load' });
       
       const loadingTask = pdfjsLib.getDocument({ url: proxyUrl });
@@ -112,18 +124,106 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
         currentY += displayHeight + 20; // spacing
       }
       
-      setPages(extractedPages);
+      setPages((prev) => [...prev, ...extractedPages]);
       toast.success('โหลดหน้าหนังสือลงกระดานสำเร็จ!', { id: 'pdf-load' });
     } catch (err) {
       console.error("PDF Load Error", err);
-      toast.error('ดึงข้อมูล PDF ไม่สำเร็จ จะใช้เป็นกระดานเปล่าแทน', { id: 'pdf-load', duration: 4000 });
+      toast.error('โหลด PDF ไม่สำเร็จ จะใช้เป็นกระดานเปล่าแทน', { id: 'pdf-load', duration: 4000 });
     } finally {
       setLoadingPdf(false);
     }
   };
 
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file && file.type === 'application/pdf') {
+      const objectUrl = URL.createObjectURL(file);
+      startLoadingPDF(objectUrl);
+    } else if (file) {
+      toast.error('กรุณาเลือกไฟล์ PDF เท่านั้นครับ');
+    }
+    e.target.value = null;
+  };
+
   const chooseBlankBoard = () => {
     setShowModeSelection(false);
+  };
+
+  // Audio Recording Logic
+  const toggleRecording = async () => {
+    if (isRecording) {
+      // Stop Recording
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.stop();
+      }
+      setIsRecording(false);
+    } else {
+      // Start Recording
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+        
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) {
+            audioChunksRef.current.push(e.data);
+          }
+        };
+        
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const audioUrl = URL.createObjectURL(audioBlob);
+          
+          // Place sticker at the center of the screen
+          const stage = stageRef.current;
+          const pos = stage ? stage.getPointerPosition() : null;
+          const transform = stage ? stage.getAbsoluteTransform().copy().invert() : null;
+          
+          let stickerX = 100;
+          let stickerY = 100;
+          
+          if (pos && transform) {
+            const relPos = transform.point({ x: stage.width() / 2, y: stage.height() / 2 });
+            stickerX = relPos.x;
+            stickerY = relPos.y;
+          }
+          
+          setStickers((prev) => [...prev, {
+            id: `audio-${Date.now()}`,
+            x: stickerX,
+            y: stickerY,
+            audioUrl: audioUrl,
+            isPlaying: false
+          }]);
+          
+          toast.success('วางสติกเกอร์เสียงเรียบร้อยแล้ว!', { icon: '🎤' });
+          
+          // Stop tracks to release microphone
+          stream.getTracks().forEach(track => track.stop());
+        };
+        
+        mediaRecorder.start();
+        setIsRecording(true);
+        toast('กำลังอัดเสียง... (กดอีกครั้งเพื่อหยุด)', { icon: '🔴', duration: 4000 });
+      } catch (err) {
+        console.error("Mic access denied", err);
+        toast.error('ไม่สามารถเข้าถึงไมโครโฟนได้');
+      }
+    }
+  };
+
+  const playAudioSticker = (id, url) => {
+    // Basic play implementation
+    const audio = new Audio(url);
+    audio.play();
+    
+    // Optionally update state to show playing animation
+    setStickers((prev) => prev.map(s => s.id === id ? { ...s, isPlaying: true } : s));
+    
+    audio.onended = () => {
+      setStickers((prev) => prev.map(s => s.id === id ? { ...s, isPlaying: false } : s));
+    };
   };
 
   // Handle Drawing
@@ -205,7 +305,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
       {showModeSelection && (
          <div style={{ position: 'absolute', inset: 0, zIndex: 20, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
            <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>เริ่มต้นใช้งานสมุดโน้ต</h3>
-           <p style={{ fontSize: 14, color: 'var(--t2)', marginBottom: 32, textAlign: 'center' }}>คุณต้องการปูพื้นหลังกระดานด้วย PDF ของหนังสือเล่มนี้เลยหรือไม่?</p>
+           <p style={{ fontSize: 14, color: 'var(--t2)', marginBottom: 32, textAlign: 'center' }}>คุณต้องการปูพื้นหลังกระดานด้วย PDF หรือไม่?</p>
            
            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
              <button 
@@ -216,14 +316,30 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
              </button>
              
              <button 
-               onClick={startLoadingPDF}
+               onClick={() => document.getElementById('pdf-upload').click()}
+               style={{ padding: '12px 24px', borderRadius: 12, border: '1px solid var(--teal)', background: 'white', color: 'var(--teal)', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+               <i className="ti ti-upload" style={{ fontSize: 20 }}></i>
+               อัปโหลดไฟล์ PDF เอง
+             </button>
+
+             <button 
+               onClick={() => startLoadingPDF(null)}
                style={{ padding: '12px 24px', borderRadius: 12, border: 'none', background: 'var(--teal)', color: 'white', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(0, 169, 143, 0.2)' }}>
-               <i className="ti ti-file-text" style={{ fontSize: 20 }}></i>
-               แนบหน้า PDF มาด้วย
+               <i className="ti ti-link" style={{ fontSize: 20 }}></i>
+               ดึงจากลิงก์หนังสือ
              </button>
            </div>
          </div>
       )}
+
+      {/* Hidden File Input */}
+      <input 
+        type="file" 
+        id="pdf-upload" 
+        accept="application/pdf" 
+        style={{ display: 'none' }} 
+        onChange={handleFileUpload} 
+      />
 
       {/* Loading Overlay */}
       {loadingPdf && (
@@ -252,9 +368,14 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
         </button>
         <div style={{ width: 1, background: 'var(--br2)', margin: '0 4px' }}></div>
         <button 
-          onClick={() => toast('ฟีเจอร์อัดเสียงกำลังมา!', { icon: '🎤' })}
-          style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'var(--orange-light)', color: 'var(--orange-dark)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <i className="ti ti-microphone" style={{ fontSize: 20 }}></i>
+          onClick={() => document.getElementById('pdf-upload').click()}
+          style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'var(--blue-light)', color: 'var(--blue-dark)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+          <i className="ti ti-upload" style={{ fontSize: 20 }}></i>
+        </button>
+        <button 
+          onClick={toggleRecording}
+          style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: isRecording ? 'var(--red)' : 'var(--orange-light)', color: isRecording ? 'white' : 'var(--orange-dark)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', animation: isRecording ? 'pulse 1.5s infinite' : 'none' }}>
+          <i className={isRecording ? "ti ti-player-stop-filled" : "ti ti-microphone"} style={{ fontSize: 20 }}></i>
         </button>
       </div>
 
@@ -291,7 +412,6 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
           
           {/* Strokes */}
           {lines.map((line, i) => {
-            // Group points into [x,y, x,y] structure for perfect-freehand
             const pointPairs = [];
             for(let p = 0; p < line.points.length; p+=2) {
                 pointPairs.push([line.points[p], line.points[p+1]]);
@@ -306,17 +426,58 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
             const pathData = getSvgPathFromStroke(stroke);
             
             return (
-              <Line
+              <Path
                 key={i}
                 data={pathData}
                 fill={line.tool === 'eraser' ? '#F9FAFB' : '#111827'}
                 globalCompositeOperation={line.tool === 'eraser' ? 'destination-out' : 'source-over'}
-                tension={0.5}
                 lineCap="round"
                 lineJoin="round"
-                closed={true}
               />
             );
+          })}
+          
+          {/* Audio Stickers */}
+          {stickers.map((sticker) => {
+             // We use HTMLImageElement for an icon if we wanted, or just raw Konva Text.
+             // But we need to import Circle, Group, Text from react-konva!
+             // Assuming we have them imported.
+             return (
+               <Group 
+                 key={sticker.id}
+                 x={sticker.x}
+                 y={sticker.y}
+                 draggable={tool === 'pan'}
+                 onDragEnd={(e) => {
+                   const { x, y } = e.target.position();
+                   setStickers((prev) => prev.map(s => s.id === sticker.id ? { ...s, x, y } : s));
+                 }}
+                 onClick={() => playAudioSticker(sticker.id, sticker.audioUrl)}
+                 onTap={() => playAudioSticker(sticker.id, sticker.audioUrl)}
+               >
+                 <Circle 
+                   radius={24}
+                   fill={sticker.isPlaying ? '#10B981' : '#F59E0B'}
+                   shadowColor="rgba(0,0,0,0.2)"
+                   shadowBlur={10}
+                   shadowOffsetY={4}
+                 />
+                 <Text 
+                   text="🎤"
+                   fontSize={24}
+                   x={-12}
+                   y={-12}
+                 />
+                 {sticker.isPlaying && (
+                   <Circle 
+                     radius={24}
+                     stroke="#10B981"
+                     strokeWidth={4}
+                     dash={[10, 5]}
+                   />
+                 )}
+               </Group>
+             );
           })}
         </Layer>
       </Stage>
