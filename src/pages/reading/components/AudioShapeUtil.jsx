@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { BaseBoxShapeUtil, HTMLContainer } from 'tldraw';
+import { BaseBoxShapeUtil, HTMLContainer, T } from 'tldraw';
 import { storage } from '../../../lib/firebase.js';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { safeDateNow } from '../../../utils/time.js';
@@ -161,6 +161,12 @@ function AudioSticker({ shape, editor }) {
 
 export class AudioShapeUtil extends BaseBoxShapeUtil {
   static type = 'audio';
+
+  static props = {
+    w: T.number,
+    h: T.number,
+    url: T.string,
+  };
 
   getDefaultProps() {
     return {
