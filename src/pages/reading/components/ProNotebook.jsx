@@ -30,7 +30,8 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [pages, setPages] = useState([]);
-  const [loadingPdf, setLoadingPdf] = useState(activeBook?.book?.fileUrl ? true : false);
+  const [loadingPdf, setLoadingPdf] = useState(false);
+  const [showModeSelection, setShowModeSelection] = useState(activeBook?.book?.fileUrl ? true : false);
   
   const [tool, setTool] = useState('pen'); // 'pen', 'eraser', 'pan'
   const [lines, setLines] = useState([]);
@@ -58,71 +59,72 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
     return () => observer.disconnect();
   }, []);
 
-  // Load PDF
-  useEffect(() => {
-    const loadPDF = async () => {
-      if (!activeBook?.book?.fileUrl) return;
-      setLoadingPdf(true);
-      try {
-        let url = activeBook.book.fileUrl;
-        if (url.includes('drive.google.com') && url.includes('/view')) {
-           const match = url.match(/\/d\/(.*?)\//);
-           if (match && match[1]) {
-             url = `https://drive.google.com/uc?export=download&id=${match[1]}`;
-           }
-        }
-        
-        const proxyUrl = `/api/proxy-pdf?url=${encodeURIComponent(url)}`;
-        toast.loading(`กำลังโหลด PDF...`, { id: 'pdf-load' });
-        
-        const loadingTask = pdfjsLib.getDocument({ url: proxyUrl });
-        const pdf = await loadingTask.promise;
-        const numPages = Math.min(pdf.numPages, 30);
-        
-        const extractedPages = [];
-        let currentY = 20; // top padding
-        
-        toast.loading(`กำลังแยกหน้า PDF (${numPages} หน้า)...`, { id: 'pdf-load' });
-        
-        for (let i = 1; i <= numPages; i++) {
-          const page = await pdf.getPage(i);
-          const viewport = page.getViewport({ scale: 2.0 }); 
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          
-          await page.render({ canvasContext: context, viewport }).promise;
-          const dataUrl = canvas.toDataURL('image/png');
-          
-          // Compute scale to fit page to screen width with padding
-          const displayWidth = dimensions.width > 0 ? dimensions.width - 40 : viewport.width;
-          const displayScale = displayWidth / viewport.width;
-          const displayHeight = viewport.height * displayScale;
-          
-          extractedPages.push({
-            id: `page-${i}`,
-            src: dataUrl,
-            y: currentY,
-            width: displayWidth,
-            height: displayHeight
-          });
-          
-          currentY += displayHeight + 20; // spacing
-        }
-        
-        setPages(extractedPages);
-        toast.success('โหลดหน้าหนังสือลงกระดานสำเร็จ!', { id: 'pdf-load' });
-      } catch (err) {
-        console.error("PDF Load Error", err);
-        toast.error('ดึงข้อมูล PDF ไม่สำเร็จ จะใช้เป็นกระดานเปล่าแทน', { id: 'pdf-load', duration: 4000 });
-      } finally {
-        setLoadingPdf(false);
-      }
-    };
+  // Function to load PDF when user explicitly requests it
+  const startLoadingPDF = async () => {
+    setShowModeSelection(false);
+    setLoadingPdf(true);
     
-    loadPDF();
-  }, [activeBook, dimensions.width]);
+    try {
+      let url = activeBook.book.fileUrl;
+      if (url.includes('drive.google.com') && url.includes('/view')) {
+         const match = url.match(/\/d\/(.*?)\//);
+         if (match && match[1]) {
+           url = `https://drive.google.com/uc?export=download&id=${match[1]}`;
+         }
+      }
+      
+      const proxyUrl = `/api/proxy-pdf?url=${encodeURIComponent(url)}`;
+      toast.loading(`กำลังโหลด PDF...`, { id: 'pdf-load' });
+      
+      const loadingTask = pdfjsLib.getDocument({ url: proxyUrl });
+      const pdf = await loadingTask.promise;
+      const numPages = Math.min(pdf.numPages, 30);
+      
+      const extractedPages = [];
+      let currentY = 20; // top padding
+      
+      toast.loading(`กำลังแยกหน้า PDF (${numPages} หน้า)...`, { id: 'pdf-load' });
+      
+      for (let i = 1; i <= numPages; i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 2.0 }); 
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        
+        await page.render({ canvasContext: context, viewport }).promise;
+        const dataUrl = canvas.toDataURL('image/png');
+        
+        // Compute scale to fit page to screen width with padding
+        const displayWidth = dimensions.width > 0 ? dimensions.width - 40 : viewport.width;
+        const displayScale = displayWidth / viewport.width;
+        const displayHeight = viewport.height * displayScale;
+        
+        extractedPages.push({
+          id: `page-${i}`,
+          src: dataUrl,
+          y: currentY,
+          width: displayWidth,
+          height: displayHeight
+        });
+        
+        currentY += displayHeight + 20; // spacing
+      }
+      
+      setPages(extractedPages);
+      toast.success('โหลดหน้าหนังสือลงกระดานสำเร็จ!', { id: 'pdf-load' });
+    } catch (err) {
+      console.error("PDF Load Error", err);
+      toast.error('ดึงข้อมูล PDF ไม่สำเร็จ จะใช้เป็นกระดานเปล่าแทน', { id: 'pdf-load', duration: 4000 });
+    } finally {
+      setLoadingPdf(false);
+    }
+  };
+
+  const chooseBlankBoard = () => {
+    setShowModeSelection(false);
+  };
 
   // Handle Drawing
   const handlePointerDown = (e) => {
@@ -199,6 +201,30 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--br2)', background: '#F9FAFB' }}>
       
+      {/* Mode Selection Overlay */}
+      {showModeSelection && (
+         <div style={{ position: 'absolute', inset: 0, zIndex: 20, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+           <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>เริ่มต้นใช้งานสมุดโน้ต</h3>
+           <p style={{ fontSize: 14, color: 'var(--t2)', marginBottom: 32, textAlign: 'center' }}>คุณต้องการปูพื้นหลังกระดานด้วย PDF ของหนังสือเล่มนี้เลยหรือไม่?</p>
+           
+           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
+             <button 
+               onClick={chooseBlankBoard}
+               style={{ padding: '12px 24px', borderRadius: 12, border: '1px solid var(--br2)', background: 'white', color: 'var(--text)', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+               <i className="ti ti-notebook" style={{ fontSize: 20 }}></i>
+               ใช้กระดานเปล่า
+             </button>
+             
+             <button 
+               onClick={startLoadingPDF}
+               style={{ padding: '12px 24px', borderRadius: 12, border: 'none', background: 'var(--teal)', color: 'white', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(0, 169, 143, 0.2)' }}>
+               <i className="ti ti-file-text" style={{ fontSize: 20 }}></i>
+               แนบหน้า PDF มาด้วย
+             </button>
+           </div>
+         </div>
+      )}
+
       {/* Loading Overlay */}
       {loadingPdf && (
          <div style={{ position: 'absolute', inset: 0, zIndex: 10, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
