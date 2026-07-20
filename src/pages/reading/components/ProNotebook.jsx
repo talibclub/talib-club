@@ -618,7 +618,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
   const handleWheel = (e) => {
     e.evt.preventDefault();
     if (e.evt.ctrlKey || e.evt.metaKey) {
-      const scaleBy = 1.1;
+      // Zoom
       const stage = stageRef.current;
       const oldScale = stage.scaleX();
       const pointer = stage.getPointerPosition();
@@ -628,7 +628,9 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
         y: (pointer.y - stage.y()) / oldScale,
       };
 
-      let newScale = e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy;
+      // Math.exp handles both standard wheel and smooth trackpad pinch
+      const scaleBy = Math.exp(-e.evt.deltaY / 300); 
+      let newScale = oldScale * scaleBy;
       newScale = Math.max(0.1, Math.min(newScale, 5));
       
       setScale(newScale);
@@ -637,6 +639,7 @@ export default function ProNotebook({ bookId, uid, activeBook }) {
         y: pointer.y - mousePointTo.y * newScale,
       });
     } else {
+      // Pan (Trackpad 2-finger scroll works perfectly here via deltaX and deltaY)
       setPosition(prev => ({
         x: prev.x - e.evt.deltaX,
         y: prev.y - e.evt.deltaY
