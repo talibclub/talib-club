@@ -22,6 +22,7 @@
     "react-dom": "^18.2.0",
     "react-draggable": "^4.7.0",
     "react-hot-toast": "^2.4.1",
+    "react-image-crop": "^11.1.2",
     "react-konva": "^18.2.10",
     "react-quill": "^2.0.0",
     "react-router-dom": "^7.17.0",

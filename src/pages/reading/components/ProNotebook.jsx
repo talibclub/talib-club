@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Image as KonvaImage, Path, Group, Circle, Text, Rect, Transformer, RegularPolygon, Line } from 'react-konva';
 import Draggable from 'react-draggable';
-import { PenTool, Highlighter, Eraser, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, GripVertical, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, FileStack, LayoutList, Check, Lock, MousePointerClick, Move3d, Triangle, Cloud, CheckCircle } from 'lucide-react';
+import { PenTool, Highlighter, Eraser, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, GripVertical, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, FileStack, LayoutList, Check, Lock, MousePointerClick, Move3d, Triangle, Cloud, CheckCircle, Trash2, Scissors, Crop } from 'lucide-react';
+import CropModal from './CropModal';
 import useImage from 'use-image';
 import getStroke from 'perfect-freehand';
 import toast from 'react-hot-toast';
@@ -189,6 +190,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     if (clickedOnEmpty) {
       selectShape(null);
     }
+    if (showToolSettings) setShowToolSettings(false);
   };
   
   const colors = [
@@ -204,6 +206,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [croppingImageId, setCroppingImageId] = useState(null);
   
   // History State
   const pagesRef = useRef(pages);
@@ -491,7 +494,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   };
 
   const pushHistory = () => {
-    undoStack.current.push(pagesRef.current);
+    undoStack.current.push(JSON.parse(JSON.stringify(pagesRef.current)));
     if (undoStack.current.length > 50) undoStack.current.shift();
     redoStack.current = [];
     setCanUndo(true);
@@ -501,7 +504,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   const undo = () => {
     if (undoStack.current.length === 0) return;
     const previousState = undoStack.current.pop();
-    redoStack.current.push(pagesRef.current);
+    redoStack.current.push(JSON.parse(JSON.stringify(pagesRef.current)));
     setPages(previousState);
     setCanUndo(undoStack.current.length > 0);
     setCanRedo(true);
@@ -510,7 +513,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   const redo = () => {
     if (redoStack.current.length === 0) return;
     const nextState = redoStack.current.pop();
-    undoStack.current.push(pagesRef.current);
+    undoStack.current.push(JSON.parse(JSON.stringify(pagesRef.current)));
     setPages(nextState);
     setCanUndo(true);
     setCanRedo(redoStack.current.length > 0);
@@ -534,6 +537,18 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
        page.lines = [];
     });
     toast.success('ล้างเส้นทั้งหมดแล้ว');
+  };
+
+  const deleteSelected = () => {
+    if (!selectedId) return;
+    pushHistory();
+    updatePage(currentPageIndex, (page) => {
+       if (page.texts) page.texts = page.texts.filter(tx => tx.id !== selectedId);
+       if (page.stickers) page.stickers = page.stickers.filter(st => st.id !== selectedId);
+       if (page.images) page.images = page.images.filter(img => img.id !== selectedId);
+       if (page.shapes) page.shapes = page.shapes.filter(sh => sh.id !== selectedId);
+    });
+    selectShape(null);
   };
 
   const deletePage = () => {
@@ -647,11 +662,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     
     if (tool === 'text') {
        if (editingTextId) {
-           // Save current text before creating new one
-           updatePage(currentPageIndex, (page) => {
-              const txt = page.texts.find(tx => tx.id === editingTextId);
-              if (txt) txt.text = editingTextValue;
-           });
+           if (textareaRef.current) textareaRef.current.blur();
+           return;
        }
        const newText = { id: `text-${Date.now()}`, text: '', x: pos.x, y: pos.y, color: penColor, size: penSize * 4 };
        pushHistory();
@@ -1051,6 +1063,25 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   const [showShapeSettings, setShowShapeSettings] = useState(false);
   const [recordingTimer, setRecordingTimer] = useState(0);
 
+  useEffect(() => {
+     let interval;
+     if (isRecording) {
+        setRecordingTimer(0);
+        interval = setInterval(() => {
+           setRecordingTimer(prev => prev + 1);
+        }, 1000);
+     } else {
+        setRecordingTimer(0);
+     }
+     return () => clearInterval(interval);
+  }, [isRecording]);
+
+  const formatTime = (secs) => {
+     const m = Math.floor(secs / 60);
+     const s = secs % 60;
+     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
   return (
     <>
     <style>{`
@@ -1060,6 +1091,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
       .hide-scroll {
         -ms-overflow-style: none;
         scrollbar-width: none;
+      }
+      @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
       }
     `}</style>
     <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: '#F3F4F6', display: 'flex', flexDirection: 'column' }}>
@@ -1143,6 +1179,17 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
             </div>
          </div>
 
+      {/* Floating Recording Indicator */}
+      {isRecording && (
+         <div style={{ position: 'absolute', top: 64, left: '50%', transform: 'translateX(-50%)', zIndex: 100, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)', padding: '8px 16px', borderRadius: 24, display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', border: '1px solid rgba(0,0,0,0.05)' }}>
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#EF4444', animation: 'pulse 1.5s infinite' }}></div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#111827', fontFamily: 'Kanit, sans-serif' }}>{formatTime(recordingTimer)}</span>
+            <button onClick={toggleRecording} style={{ marginLeft: 8, padding: '4px 12px', borderRadius: 16, border: 'none', background: '#FEE2E2', color: '#EF4444', fontWeight: 600, cursor: 'pointer' }}>
+               หยุด
+            </button>
+         </div>
+      )}
+
       {/* NEW: Huawei Notes Main Toolbar (Sticky & Scrollable) */}
       {!readonly && (
          <div style={{ position: 'relative', zIndex: 40, width: '100%' }}>
@@ -1159,8 +1206,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                   {[
                     { id: 'pan', icon: Pointer, title: 'เลื่อนกระดาน' },
-                    { id: 'pen', icon: PenTool, title: 'ปากกา' },
+                    { id: 'pen', icon: PenTool, title: 'ปากกาลูกลื่น' },
+                    { id: 'fountain-pen', icon: PenTool, title: 'ปากกาหมึกซึม' },
                     { id: 'pencil', icon: Pencil, title: 'ดินสอ' },
+                    { id: 'marker', icon: Highlighter, title: 'มาร์กเกอร์' },
                     { id: 'highlighter', icon: Highlighter, title: 'ไฮไลท์' },
                     { id: 'eraser', icon: Eraser, title: 'ยางลบ' },
                     { id: 'lasso', icon: Lasso, title: 'Lasso' },
@@ -1179,7 +1228,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                           else if (t.id === 'mic') toggleRecording();
                           else {
                              setTool(t.id); 
-                             if (t.id === tool && ['pen', 'pencil', 'highlighter', 'text', 'shape', 'eraser', 'lasso'].includes(t.id)) setShowToolSettings(!showToolSettings); 
+                             if (t.id === tool && ['pen', 'fountain-pen', 'marker', 'pencil', 'highlighter', 'text', 'shape', 'eraser', 'lasso'].includes(t.id)) setShowToolSettings(!showToolSettings); 
                              else setShowToolSettings(true);
                           }
                        }}
@@ -1189,6 +1238,19 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                        {t.id === 'mic' && isRecording && <div style={{ position: 'absolute', top: -4, right: -4, width: 8, height: 8, borderRadius: '50%', background: '#EF4444' }}></div>}
                      </button>
                   ))}
+                  {selectedId && (
+                     <>
+                        <div style={{ width: 1, background: '#E5E7EB', height: 24, flexShrink: 0, margin: '0 4px' }}></div>
+                        {currentPage.images?.find(i => i.id === selectedId) && (
+                           <button onClick={() => setCroppingImageId(selectedId)} title="ครอบตัด" style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: '#E0F2FE', color: '#0369A1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', marginRight: 4 }}>
+                              <Scissors size={18} strokeWidth={1.5} />
+                           </button>
+                        )}
+                        <button onClick={deleteSelected} title="ลบทิ้ง" style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: '#FEE2E2', color: '#EF4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
+                           <Trash2 size={18} strokeWidth={1.5} />
+                        </button>
+                     </>
+                  )}
                </div>
 
                <div style={{ width: 1, background: '#E5E7EB', height: 24, flexShrink: 0, margin: '0 4px' }}></div>
@@ -1211,11 +1273,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
             </div>
 
             {/* Tool Settings Popover (Huawei Style) */}
-            {showToolSettings && ['pen', 'pencil', 'highlighter', 'shape', 'eraser', 'lasso'].includes(tool) && (
-              <div style={{ position: 'absolute', top: '100%', left: 16, background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(20px)', padding: 0, borderRadius: '0 0 16px 16px', boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', borderTop: 'none', width: 280, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {showToolSettings && ['pen', 'fountain-pen', 'marker', 'pencil', 'highlighter', 'shape', 'eraser', 'lasso'].includes(tool) && (
+              <div style={{ position: 'absolute', top: '100%', left: 16, background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(20px)', padding: 0, borderRadius: '0 0 16px 16px', boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', borderTop: 'none', width: 280, display: 'flex', flexDirection: 'column', overflow: 'hidden', zIndex: 150 }}>
                  
                  <div style={{ padding: '16px 0 12px', textAlign: 'center', fontSize: 15, fontWeight: 600, color: '#111827', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                    {tool === 'pen' ? 'ปากกาลูกลื่น' : tool === 'pencil' ? 'ดินสอ HB' : tool === 'highlighter' ? 'ปากกาเน้นข้อความ' : tool === 'eraser' ? 'ยางลบ' : tool === 'lasso' ? 'แลสโซ' : tool === 'sticker' ? 'โพสต์อิท' : 'รูปทรง'}
+                    {tool === 'pen' ? 'ปากกาลูกลื่น' : tool === 'fountain-pen' ? 'ปากกาหมึกซึม' : tool === 'marker' ? 'มาร์กเกอร์' : tool === 'pencil' ? 'ดินสอ HB' : tool === 'highlighter' ? 'ปากกาเน้นข้อความ' : tool === 'eraser' ? 'ยางลบ' : tool === 'lasso' ? 'แลสโซ' : tool === 'sticker' ? 'โพสต์อิท' : 'รูปทรง'}
                  </div>
                  
                  <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -1250,10 +1312,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                          <div key={c} className="cancel-drag" onClick={() => setPenColor(c)} style={{ width: 32, height: 32, borderRadius: 8, background: c, cursor: 'pointer', outline: penColor === c ? '2px solid #3B82F6' : 'none', outlineOffset: 2, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }} />
                       ))}
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                       <button className="cancel-drag" onClick={() => setStickerStyle('classic')} style={{ flex: 1, padding: 8, background: stickerStyle === 'classic' ? '#E0F2FE' : '#F3F4F6', color: stickerStyle === 'classic' ? '#0369A1' : '#4B5563', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>คลาสสิก</button>
-                       <button className="cancel-drag" onClick={() => setStickerStyle('pin')} style={{ flex: 1, padding: 8, background: stickerStyle === 'pin' ? '#E0F2FE' : '#F3F4F6', color: stickerStyle === 'pin' ? '#0369A1' : '#4B5563', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>หมุดปัก</button>
-                       <button className="cancel-drag" onClick={() => setStickerStyle('tape')} style={{ flex: 1, padding: 8, background: stickerStyle === 'tape' ? '#E0F2FE' : '#F3F4F6', color: stickerStyle === 'tape' ? '#0369A1' : '#4B5563', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>เทปกาว</button>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                       <button className="cancel-drag" onClick={() => setStickerStyle('classic')} style={{ flex: '1 1 calc(50% - 4px)', padding: 8, background: stickerStyle === 'classic' ? '#E0F2FE' : '#F3F4F6', color: stickerStyle === 'classic' ? '#0369A1' : '#4B5563', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>คลาสสิก</button>
+                       <button className="cancel-drag" onClick={() => setStickerStyle('pin')} style={{ flex: '1 1 calc(50% - 4px)', padding: 8, background: stickerStyle === 'pin' ? '#E0F2FE' : '#F3F4F6', color: stickerStyle === 'pin' ? '#0369A1' : '#4B5563', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>หมุดปัก</button>
+                       <button className="cancel-drag" onClick={() => setStickerStyle('tape')} style={{ flex: '1 1 calc(50% - 4px)', padding: 8, background: stickerStyle === 'tape' ? '#E0F2FE' : '#F3F4F6', color: stickerStyle === 'tape' ? '#0369A1' : '#4B5563', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>เทปกาว</button>
+                       <button className="cancel-drag" onClick={() => setStickerStyle('round')} style={{ flex: '1 1 calc(50% - 4px)', padding: 8, background: stickerStyle === 'round' ? '#E0F2FE' : '#F3F4F6', color: stickerStyle === 'round' ? '#0369A1' : '#4B5563', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>โค้งมน</button>
                     </div>
                     </>
                     )}
@@ -1876,7 +1939,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                   onDblClick={(e) => { e.cancelBubble = true; setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); }}
                   onTap={(e) => { e.cancelBubble = true; setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); }}
                 >
-                  <Rect width={150} height={150} fill={st.color} shadowColor="rgba(0,0,0,0.15)" shadowBlur={10} shadowOffsetY={4} cornerRadius={2} />
+                  <Rect width={150} height={150} fill={st.color} shadowColor="rgba(0,0,0,0.15)" shadowBlur={10} shadowOffsetY={4} cornerRadius={st.style === 'round' ? 16 : 2} />
                   
                   {(!st.style || st.style === 'classic') ? (
                      <>
@@ -1889,9 +1952,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                         <Circle x={74} y={11} radius={2} fill="#FCA5A5" />
                      </>
                   ) : st.style === 'tape' ? (
-                     <>
-                        <Rect x={45} y={-8} width={60} height={20} fill="rgba(255,255,255,0.5)" rotation={-2} shadowColor="rgba(0,0,0,0.05)" shadowBlur={2} shadowOffsetY={1} />
-                     </>
+                     <Rect x={45} y={-8} width={60} height={20} fill="rgba(255,255,255,0.5)" rotation={-2} shadowColor="rgba(0,0,0,0.05)" shadowBlur={2} shadowOffsetY={1} />
                   ) : null}
 
                   {editingStickerId !== st.id && st.text && (
@@ -1933,7 +1994,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
              autoFocus
              placeholder="พิมพ์ข้อความที่นี่..."
              value={editingTextValue}
-             onChange={(e) => setEditingTextValue(e.target.value)}
+             onChange={(e) => {
+                const val = e.target.value;
+                setEditingTextValue(val);
+                updatePage(currentPageIndex, (page) => {
+                   const txt = page.texts?.find(tx => tx.id === editingTextId);
+                   if (txt) txt.text = val;
+                });
+             }}
              onBlur={() => {
                 if (!isEditingText.current) return;
                 isEditingText.current = false;
@@ -1941,11 +2009,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                 if (editingTextValue.trim() === '') {
                    updatePage(currentPageIndex, (page) => {
                       page.texts = page.texts.filter(tx => tx.id !== editingTextId);
-                   });
-                } else {
-                   updatePage(currentPageIndex, (page) => {
-                      const txt = page.texts.find(tx => tx.id === editingTextId);
-                      if (txt) txt.text = editingTextValue;
                    });
                 }
                 setEditingTextId(null);
@@ -1976,9 +2039,29 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
            />
          );
       })()}
+      
+      {/* Crop Modal Overlay */}
+      {croppingImageId && (() => {
+         const img = currentPage.images?.find(i => i.id === croppingImageId);
+         if (!img) return null;
+         return (
+            <CropModal
+              imageUrl={img.url}
+              onCancel={() => setCroppingImageId(null)}
+              onCropComplete={(newUrl) => {
+                 pushHistory();
+                 updatePage(currentPageIndex, (page) => {
+                    const i = page.images.find(im => im.id === croppingImageId);
+                    if (i) i.url = newUrl;
+                 });
+                 setCroppingImageId(null);
+                 toast.success('ครอบตัดรูปภาพเรียบร้อย');
+              }}
+            />
+         );
+      })()}
       </div>{/* End flex-1 Canvas Container */}
     </div>
     </>
   );
 }
-
