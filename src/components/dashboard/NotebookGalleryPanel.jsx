@@ -42,7 +42,7 @@ export default function NotebookGalleryPanel({ authState, setView }) {
 
   if (selectedNotebookId) {
     return (
-      <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 9999, background: '#F3F4F6', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999, background: '#F3F4F6', display: 'flex', flexDirection: 'column' }}>
         <div style={{ height: 56, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', borderBottom: '1px solid #E5E7EB', flexShrink: 0 }}>
            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <button onClick={() => { setSelectedNotebookId(null); setEditing(false); }} className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 13, border: 'none' }}>

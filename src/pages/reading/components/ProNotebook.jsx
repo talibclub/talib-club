@@ -170,7 +170,7 @@ const CommittedStrokes = React.memo(({ lines, playbackTime, nowPlayingId }) => (
   <>
     {lines.map((line, i) => {
       const isPlayingThis = nowPlayingId && (line.recordingId === nowPlayingId || (!line.recordingId && line.startTime != null));
-      const isVisible = !isPlayingThis || line.startTime === undefined || line.startTime === null || line.startTime <= playbackTime;
+      const isVisible = !isPlayingThis || line.startTime === undefined || line.startTime === null || line.startTime <= playbackTime * 1000;
       if (!isVisible) return null;
       return <StrokeShape key={i} line={line} />;
     })}
@@ -632,6 +632,17 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     
     return () => clearTimeout(timer);
   }, [pages, readonly]);
+
+  // Save on unmount to prevent data loss if user navigates away before debounce fires
+  useEffect(() => {
+    return () => {
+      if (readonly || !uid || !notebookId) return;
+      if (pagesRef.current && pagesRef.current.length > 0) {
+        uploadNotebookData(uid, notebookId, pagesRef.current).catch(console.error);
+        try { localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pagesRef.current)); } catch(e){}
+      }
+    };
+  }, [readonly, uid, notebookId]);
 
   useEffect(() => {
      if (tool !== 'lasso' && (selectionRef.current.length > 0 || selectedObjectsRef.current.length > 0)) {
@@ -2280,9 +2291,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   </span>
                )}
                {!isSaving && !readonly && (
-                  <span title="บันทึกแล้ว" style={{ color: '#9CA3AF', display: 'flex', alignItems: 'center' }}>
+                  <button title="บันทึกแล้ว (คลิกเพื่อบังคับบันทึก)" onClick={() => saveNotebook()} style={{ background: 'transparent', border: 'none', color: '#9CA3AF', display: 'flex', alignItems: 'center', cursor: 'pointer', padding: 0 }}>
                      <CheckCircle size={17} />
-                  </span>
+                  </button>
                )}
             </div>
             
@@ -3090,148 +3101,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           </Group>
         </Layer>
         
-        {/* Drawing Layer (Strokes isolated so eraser only erases strokes).
-            Clipped to the paper so no ink — old or new — ever shows outside it. */}
-        <Layer>
-          <Group x={pageX} y={pageY} clipX={0} clipY={0} clipWidth={currentPage.width} clipHeight={currentPage.height}>
-            {/* Strokes */}
-            <CommittedStrokes lines={currentPage.lines} playbackTime={playbackTime} nowPlayingId={nowPlaying?.id} />
-            {/* The stroke under the pointer lives here so committed ink stays untouched
-                while drawing. It has to share this layer for the area eraser's
-                destination-out compositing to bite into the ink below it. */}
-            {liveStroke && <StrokeShape line={liveStroke} />}
-            {/* Laser Lines */}
-            {laserLines.map((line, i) => {
-              const pointPairs = [];
-              for(let p = 0; p < line.points.length; p+=2) { pointPairs.push([line.points[p], line.points[p+1]]); }
-              const stroke = getStroke(pointPairs, { size: line.size || 4, thinning: 0.5, smoothing: 0.5, streamline: 0.5 });
-              const pathData = getSvgPathFromStroke(stroke);
-              return (
-                <Group key={`laser-${line.id}`}>
-                   <Path data={pathData} fill={line.color || 'red'} opacity={0.3} shadowColor={line.color || 'red'} shadowBlur={15} shadowOpacity={1} />
-                   <Path data={pathData} fill="white" />
-                </Group>
-              );
-            })}
-            
-
-            {/* Ruler: draggable body plus a handle at the far end for rotation */}
-            {rulerOn && !readonly && (() => {
-               const rad = (ruler.angle * Math.PI) / 180;
-               const hx = ruler.x + Math.cos(rad) * ruler.length;
-               const hy = ruler.y + Math.sin(rad) * ruler.length;
-               const ticks = [];
-               for (let d = 0; d <= ruler.length; d += 20) {
-                  const long = d % 100 === 0;
-                  ticks.push(<Path key={`tk-${d}`} data={`M ${d} 0 L ${d} ${long ? 16 : 9}`} stroke="rgba(10,89,247,0.55)" strokeWidth={1} />);
-               }
-               return (
-                 <>
-                   <Group
-                     name="ruler"
-                     x={ruler.x}
-                     y={ruler.y}
-                     rotation={ruler.angle}
-                     draggable
-                     onDragEnd={(e) => setRuler(r => ({ ...r, x: e.target.x(), y: e.target.y() }))}
-                   >
-                     <Rect width={ruler.length} height={58} fill="rgba(10,89,247,0.10)" stroke="rgba(10,89,247,0.45)" strokeWidth={1} cornerRadius={4} />
-                     {ticks}
-                     <Text text={`${Math.round(((ruler.angle % 360) + 360) % 360)}°`} x={10} y={34} fontSize={14} fill={HW.accent} fontFamily="Kanit, sans-serif" />
-                   </Group>
-                   <Circle
-                     name="ruler-handle"
-                     x={hx}
-                     y={hy}
-                     radius={13}
-                     fill="white"
-                     stroke={HW.accent}
-                     strokeWidth={2}
-                     draggable
-                     onDragMove={(e) => {
-                        const nx = e.target.x(), ny = e.target.y();
-                        let deg = (Math.atan2(ny - ruler.y, nx - ruler.x) * 180) / Math.PI;
-                        // Ease onto the common angles without preventing free rotation.
-                        const near = Math.round(deg / 15) * 15;
-                        if (Math.abs(deg - near) < 3) deg = near;
-                        setRuler(r => ({ ...r, angle: deg }));
-                     }}
-                     onDragEnd={(e) => {
-                        // Snap the handle back onto the ruler's end point.
-                        const rad2 = (ruler.angle * Math.PI) / 180;
-                        e.target.position({ x: ruler.x + Math.cos(rad2) * ruler.length, y: ruler.y + Math.sin(rad2) * ruler.length });
-                     }}
-                   />
-                 </>
-               );
-            })()}
-
-            {/* Shows which slice of the page the zoom-in writing strip is showing */}
-            {zoomWriter && (
-               <Rect
-                 x={writerFocus.x}
-                 y={writerFocus.y}
-                 width={writerBoxW}
-                 height={writerBoxH}
-                 stroke={HW.accent}
-                 strokeWidth={1.5}
-                 dash={[7, 5]}
-                 fill="rgba(10,89,247,0.05)"
-                 cornerRadius={3}
-                 listening={false}
-               />
-            )}
-
-            {/* Lasso path being drawn */}
-            {tool === 'lasso' && lassoPath && !hasSelection && (
-               <Line points={lassoPath} stroke={HW.accent} strokeWidth={1.5} dash={[6, 4]} closed fill="rgba(10,89,247,0.06)" lineCap="round" lineJoin="round" />
-            )}
-            
-            {/* Lasso Selected Group */}
-            {/* Lasso Selection Box */}
-            {hasSelection && (
-               <Group
-                 name="lasso-group"
-                 draggable
-                 x={lassoGroupPos.x}
-                 y={lassoGroupPos.y}
-                 // Tracked during the drag, not just at the end, so selected
-                 // objects (which stay on the page) travel with the strokes.
-                 onDragMove={(e) => setLassoGroupPos({ x: e.target.x(), y: e.target.y() })}
-                 onDragEnd={(e) => setLassoGroupPos({ x: e.target.x(), y: e.target.y() })}
-               >
-                  {/* Invisible grab surface: without it a selection made up only of
-                      objects would have nothing to drag. */}
-                  {lassoBounds && (
-                     <Rect
-                       x={lassoBounds.minX - 6}
-                       y={lassoBounds.minY - 6}
-                       width={lassoBounds.maxX - lassoBounds.minX + 12}
-                       height={lassoBounds.maxY - lassoBounds.minY + 12}
-                       fill="rgba(0,0,0,0.001)"
-                     />
-                  )}
-                  {lassoBounds && (
-                     <Rect
-                       x={lassoBounds.minX - 6}
-                       y={lassoBounds.minY - 6}
-                       width={lassoBounds.maxX - lassoBounds.minX + 12}
-                       height={lassoBounds.maxY - lassoBounds.minY + 12}
-                       stroke={HW.accent}
-                       strokeWidth={1.5}
-                       dash={[6, 4]}
-                       fill="rgba(10,89,247,0.04)"
-                       cornerRadius={4}
-                     />
-                  )}
-                  {selectedLassoLines.map((line, i) => (
-                     <StrokeShape key={`lasso-line-${i}`} line={line} />
-                  ))}
-               </Group>
-            )}
-          </Group>
-        </Layer>
-        
         {/* Texts Layer */}
         <Layer>
           <Group x={pageX} y={pageY}>
@@ -3384,6 +3253,148 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                 </Group>
               );
             })}
+          </Group>
+        </Layer>
+        
+        {/* Drawing Layer (Strokes isolated so eraser only erases strokes).
+            Clipped to the paper so no ink — old or new — ever shows outside it. */}
+        <Layer>
+          <Group x={pageX} y={pageY} clipX={0} clipY={0} clipWidth={currentPage.width} clipHeight={currentPage.height}>
+            {/* Strokes */}
+            <CommittedStrokes lines={currentPage.lines} playbackTime={playbackTime} nowPlayingId={nowPlaying?.id} />
+            {/* The stroke under the pointer lives here so committed ink stays untouched
+                while drawing. It has to share this layer for the area eraser's
+                destination-out compositing to bite into the ink below it. */}
+            {liveStroke && <StrokeShape line={liveStroke} />}
+            {/* Laser Lines */}
+            {laserLines.map((line, i) => {
+              const pointPairs = [];
+              for(let p = 0; p < line.points.length; p+=2) { pointPairs.push([line.points[p], line.points[p+1]]); }
+              const stroke = getStroke(pointPairs, { size: line.size || 4, thinning: 0.5, smoothing: 0.5, streamline: 0.5 });
+              const pathData = getSvgPathFromStroke(stroke);
+              return (
+                <Group key={`laser-${line.id}`}>
+                   <Path data={pathData} fill={line.color || 'red'} opacity={0.3} shadowColor={line.color || 'red'} shadowBlur={15} shadowOpacity={1} />
+                   <Path data={pathData} fill="white" />
+                </Group>
+              );
+            })}
+            
+
+            {/* Ruler: draggable body plus a handle at the far end for rotation */}
+            {rulerOn && !readonly && (() => {
+               const rad = (ruler.angle * Math.PI) / 180;
+               const hx = ruler.x + Math.cos(rad) * ruler.length;
+               const hy = ruler.y + Math.sin(rad) * ruler.length;
+               const ticks = [];
+               for (let d = 0; d <= ruler.length; d += 20) {
+                  const long = d % 100 === 0;
+                  ticks.push(<Path key={`tk-${d}`} data={`M ${d} 0 L ${d} ${long ? 16 : 9}`} stroke="rgba(10,89,247,0.55)" strokeWidth={1} />);
+               }
+               return (
+                 <>
+                   <Group
+                     name="ruler"
+                     x={ruler.x}
+                     y={ruler.y}
+                     rotation={ruler.angle}
+                     draggable
+                     onDragEnd={(e) => setRuler(r => ({ ...r, x: e.target.x(), y: e.target.y() }))}
+                   >
+                     <Rect width={ruler.length} height={58} fill="rgba(10,89,247,0.10)" stroke="rgba(10,89,247,0.45)" strokeWidth={1} cornerRadius={4} />
+                     {ticks}
+                     <Text text={`${Math.round(((ruler.angle % 360) + 360) % 360)}°`} x={10} y={34} fontSize={14} fill={HW.accent} fontFamily="Kanit, sans-serif" />
+                   </Group>
+                   <Circle
+                     name="ruler-handle"
+                     x={hx}
+                     y={hy}
+                     radius={13}
+                     fill="white"
+                     stroke={HW.accent}
+                     strokeWidth={2}
+                     draggable
+                     onDragMove={(e) => {
+                        const nx = e.target.x(), ny = e.target.y();
+                        let deg = (Math.atan2(ny - ruler.y, nx - ruler.x) * 180) / Math.PI;
+                        // Ease onto the common angles without preventing free rotation.
+                        const near = Math.round(deg / 15) * 15;
+                        if (Math.abs(deg - near) < 3) deg = near;
+                        setRuler(r => ({ ...r, angle: deg }));
+                     }}
+                     onDragEnd={(e) => {
+                        // Snap the handle back onto the ruler's end point.
+                        const rad2 = (ruler.angle * Math.PI) / 180;
+                        e.target.position({ x: ruler.x + Math.cos(rad2) * ruler.length, y: ruler.y + Math.sin(rad2) * ruler.length });
+                     }}
+                   />
+                 </>
+               );
+            })()}
+
+            {/* Shows which slice of the page the zoom-in writing strip is showing */}
+            {zoomWriter && (
+               <Rect
+                 x={writerFocus.x}
+                 y={writerFocus.y}
+                 width={writerBoxW}
+                 height={writerBoxH}
+                 stroke={HW.accent}
+                 strokeWidth={1.5}
+                 dash={[7, 5]}
+                 fill="rgba(10,89,247,0.05)"
+                 cornerRadius={3}
+                 listening={false}
+               />
+            )}
+
+            {/* Lasso path being drawn */}
+            {tool === 'lasso' && lassoPath && !hasSelection && (
+               <Line points={lassoPath} stroke={HW.accent} strokeWidth={1.5} dash={[6, 4]} closed fill="rgba(10,89,247,0.06)" lineCap="round" lineJoin="round" />
+            )}
+            
+            {/* Lasso Selected Group */}
+            {/* Lasso Selection Box */}
+            {hasSelection && (
+               <Group
+                 name="lasso-group"
+                 draggable
+                 x={lassoGroupPos.x}
+                 y={lassoGroupPos.y}
+                 // Tracked during the drag, not just at the end, so selected
+                 // objects (which stay on the page) travel with the strokes.
+                 onDragMove={(e) => setLassoGroupPos({ x: e.target.x(), y: e.target.y() })}
+                 onDragEnd={(e) => setLassoGroupPos({ x: e.target.x(), y: e.target.y() })}
+               >
+                  {/* Invisible grab surface: without it a selection made up only of
+                      objects would have nothing to drag. */}
+                  {lassoBounds && (
+                     <Rect
+                       x={lassoBounds.minX - 6}
+                       y={lassoBounds.minY - 6}
+                       width={lassoBounds.maxX - lassoBounds.minX + 12}
+                       height={lassoBounds.maxY - lassoBounds.minY + 12}
+                       fill="rgba(0,0,0,0.001)"
+                     />
+                  )}
+                  {lassoBounds && (
+                     <Rect
+                       x={lassoBounds.minX - 6}
+                       y={lassoBounds.minY - 6}
+                       width={lassoBounds.maxX - lassoBounds.minX + 12}
+                       height={lassoBounds.maxY - lassoBounds.minY + 12}
+                       stroke={HW.accent}
+                       strokeWidth={1.5}
+                       dash={[6, 4]}
+                       fill="rgba(10,89,247,0.04)"
+                       cornerRadius={4}
+                     />
+                  )}
+                  {selectedLassoLines.map((line, i) => (
+                     <StrokeShape key={`lasso-line-${i}`} line={line} />
+                  ))}
+               </Group>
+            )}
           </Group>
         </Layer>
         
