@@ -309,6 +309,15 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
 
   const [editingStickerId, setEditingStickerId] = useState(null);
   const [editingStickerValue, setEditingStickerValue] = useState("");
+  const stickerTextareaRef = useRef(null);
+
+  // autoFocus alone did not stick: the textarea mounts in the same commit as the
+  // Konva pointer handling, and focus was being taken straight back off it.
+  useEffect(() => {
+     if (!editingStickerId) return;
+     const t = setTimeout(() => stickerTextareaRef.current?.focus(), 60);
+     return () => clearTimeout(t);
+  }, [editingStickerId]);
   
   // Free-form lasso path in page coordinates: flat [x,y,x,y,...].
   const [lassoPath, setLassoPath] = useState(null);
@@ -380,6 +389,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   // Snap roughly drawn shapes to clean ones when the pen lifts.
   const [autoShape, setAutoShape] = useState(false);
 
+  // Formatting for the text tool. Applied to new text boxes, and to the one being
+  // edited or selected so changes are visible immediately.
+  const [textStyle, setTextStyle] = useState({ fontFamily: 'Kanit', fontSize: 24, bold: false, italic: false });
+
   // "Zoom-in writing": a magnified strip at the bottom of the screen. You write
   // large in the strip and the ink lands small on the page, which is how Huawei
   // Notes makes handwriting legible on a tablet.
@@ -446,6 +459,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   const gestureErasedRef = useRef(false);
   // Whether the stroke in progress is riding the ruler.
   const ruledStrokeRef = useRef(false);
+  // Last pointer position while panning, in client coordinates.
+  const panningRef = useRef(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -462,36 +477,25 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     return () => observer.disconnect();
   }, []);
 
-  // Auto-fit scale on mount and resize
-  useEffect(() => {
-    if (dimensions.width > 0 && dimensions.height > 0) {
-       const currentPage = pages[currentPageIndex] || { width: 800, height: 1130 };
-       const paddingX = isMobile ? 10 : 20;
-       const paddingY = isMobile ? 10 : 32; 
-       const availableWidth = dimensions.width - (paddingX * 2);
-       // Bottom clearance for the floating tool capsule (52px bar + 20px inset + breathing room)
-       const availableHeight = dimensions.height - (paddingY * 2) - (readonly ? 0 : 92);
-       
-       const scaleX = availableWidth / currentPage.width;
-       const scaleY = availableHeight / currentPage.height;
-       
-       let newScale = availableWidth / currentPage.width;
-       
-       // On desktop, don't let it be massively wide if the screen is very wide
-       if (!isMobile && newScale > 1.2) {
-           newScale = 1.2;
-       }
-       
-       if (newScale > 2.0) newScale = 2.0;
-       if (newScale < 0.1) newScale = 0.1;
-       
-       setScale(newScale);
-       
-       const scaledHeight = currentPage.height * newScale;
-       const yPos = 40; // Default top padding
-       setPosition({ x: 0, y: yPos });
-    }
-  }, [dimensions.width, dimensions.height, currentPageIndex, isMobile, readonly]);
+  // Scale the page to the viewport and park it at the top. Also reachable from the
+  // header, which is how you recover when the page has been panned off screen.
+  const fitToScreen = useCallback(() => {
+    if (dimensions.width <= 0 || dimensions.height <= 0) return;
+    const page = pagesRef.current[currentPageIndex] || { width: 800, height: 1130 };
+    const paddingX = isMobile ? 10 : 20;
+    const availableWidth = dimensions.width - paddingX * 2;
+
+    let newScale = availableWidth / page.width;
+    // On a very wide desktop, stop the page from becoming absurdly large.
+    if (!isMobile && newScale > 1.2) newScale = 1.2;
+    newScale = Math.max(0.1, Math.min(2.0, newScale));
+
+    setScale(newScale);
+    setPosition({ x: 0, y: 40 });
+  }, [dimensions.width, dimensions.height, currentPageIndex, isMobile]);
+
+  // Auto-fit on mount, on resize, and when moving to another page.
+  useEffect(() => { fitToScreen(); }, [fitToScreen, readonly]);
 
   // Update a specific page's data safely
   const updatePage = (index, updater) => {
@@ -908,7 +912,17 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
 
     checkDeselect(e);
 
-    if (readonly || tool === 'pan' || isSpaceDown) return;
+    // Panning is handled here rather than by Konva's own stage dragging, because
+    // that moved the stage without updating `position`, so the canvas snapped back
+    // to where it started on the next render.
+    //
+    // Middle-drag and space-drag pan with any tool selected, so you don't have to
+    // keep switching to the hand just to bring something back on screen.
+    const wantsPan = readonly || tool === 'pan' || isSpaceDown || evt?.button === 1;
+    if (wantsPan) {
+       if (evt) panningRef.current = { x: evt.clientX, y: evt.clientY };
+       return;
+    }
     if (!shouldDrawWith(e)) return;
     const pos = getPointerPosRelativeToPage();
     if (!pos) return;
@@ -917,12 +931,24 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     const pressure = getPressure(e);
     const relativeTime = isRecording && recordingStartTimeRef.current ? Date.now() - recordingStartTimeRef.current : null;
     
+    // Landing on an existing object means "edit that one". Without this the stage
+    // handler also fired and dropped a brand new note underneath the pointer, so
+    // the note being typed into was not the one that had just been tapped.
+    const hitExistingObject = targetName === 'object' || parentName === 'object';
+
     if (tool === 'text') {
        if (editingTextId) {
            if (textareaRef.current) textareaRef.current.blur();
            return;
        }
-       const newText = { id: `text-${Date.now()}`, text: '', x: pos.x, y: pos.y, color: penColor, size: penSize * 4 };
+       if (hitExistingObject) return;
+       const newText = {
+          id: `text-${Date.now()}`, text: '', x: pos.x, y: pos.y, color: penColor,
+          size: textStyle.fontSize,
+          fontFamily: textStyle.fontFamily,
+          bold: textStyle.bold,
+          italic: textStyle.italic,
+       };
        pushHistory();
        updatePage(currentPageIndex, (page) => {
           if (!page.texts) page.texts = [];
@@ -935,6 +961,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     }
     
     if (tool === 'sticker') {
+       if (hitExistingObject || editingStickerId) return;
        const stickerColor = ['#FEF08A', '#FBCFE8', '#BAE6FD', '#BBF7D0'].includes(penColor) ? penColor : '#FEF08A';
        const newSticker = { id: `sticker-${Date.now()}`, x: pos.x, y: pos.y, color: stickerColor, text: '', style: stickerStyle };
        pushHistory();
@@ -1376,6 +1403,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     }
     if (activePointers.current.size >= 2) { handlePinch(); return; }
 
+    if (panningRef.current && evt) {
+      const dx = evt.clientX - panningRef.current.x;
+      const dy = evt.clientY - panningRef.current.y;
+      panningRef.current = { x: evt.clientX, y: evt.clientY };
+      setPosition((p) => ({ x: p.x + dx, y: p.y + dy }));
+      return;
+    }
+
     if (!isDrawing.current || tool === 'pan' || isSpaceDown) return;
     // Ignore stray pointers (a palm landing mid-stroke) — only the pointer that
     // started the stroke may extend it.
@@ -1430,6 +1465,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     const evt = e?.evt;
     if (evt && evt.pointerId !== undefined) activePointers.current.delete(evt.pointerId);
     if (activePointers.current.size < 2) { lastCenter.current = null; lastDist.current = null; }
+    panningRef.current = null;
 
     if (liveStrokeRef.current) {
        commitLiveStroke();
@@ -1745,6 +1781,20 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                    </button>
                  </div>
                )}
+               {/* Zoom cluster — the quick way back when the page has drifted off screen */}
+               {!isMobile && (
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.04)', borderRadius: 100, padding: '2px 4px' }}>
+                   <button title="ย่อ" onClick={() => setScale(s => Math.max(0.1, s / 1.2))} style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
+                     <Minus size={15} strokeWidth={2} />
+                   </button>
+                   <button title="พอดีหน้าจอ" onClick={fitToScreen} style={{ minWidth: 46, height: 26, borderRadius: 100, border: 'none', background: 'transparent', cursor: 'pointer', color: HW.text, fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                     {Math.round(scale * 100)}%
+                   </button>
+                   <button title="ขยาย" onClick={() => setScale(s => Math.min(5, s * 1.2))} style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
+                     <Plus size={15} strokeWidth={2} />
+                   </button>
+                 </div>
+               )}
                {isSaving && (
                   <span title="กำลังบันทึก" style={{ color: '#10B981', display: 'flex', alignItems: 'center' }}>
                      <Cloud size={17} />
@@ -1915,7 +1965,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
             </div>
 
             {/* Tool options popover — floats above the capsule, Huawei style */}
-            {showToolOptions && ['pen', 'fountain', 'marker', 'pencil', 'highlighter', 'shape', 'sticker', 'eraser'].includes(tool) && (
+            {showToolOptions && ['pen', 'fountain', 'marker', 'pencil', 'highlighter', 'shape', 'sticker', 'eraser', 'text'].includes(tool) && (
               <div className="hide-scroll" style={{ order: -1, display: 'flex', alignItems: 'center', gap: 12, maxWidth: '100%', overflowX: 'auto', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, borderRadius: 16, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`, padding: '10px 14px' }} onWheel={(e) => { if (e.deltaY !== 0) e.currentTarget.scrollLeft += e.deltaY; }} {...rightToolbarScroll}>
                   {['pen', 'fountain', 'marker', 'pencil', 'highlighter', 'shape'].includes(tool) && (
                      <>
@@ -1976,6 +2026,80 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                         )}
                      </>
                   )}
+
+                  {tool === 'text' && (() => {
+                     // Edits apply to the text being typed or the selected one, so the
+                     // effect is visible straight away rather than only on the next box.
+                     const applyToActive = (patch) => {
+                        const id = editingTextId || selectedId;
+                        if (!id) return;
+                        updatePage(currentPageIndex, (page) => {
+                           page.texts = (page.texts || []).map(t => (t.id === id ? { ...t, ...patch } : t));
+                        });
+                     };
+                     const setStyle = (patch, textPatch) => {
+                        setTextStyle(s => ({ ...s, ...patch }));
+                        applyToActive(textPatch);
+                     };
+                     return (
+                       <>
+                          <select
+                            value={textStyle.fontFamily}
+                            onChange={(e) => setStyle({ fontFamily: e.target.value }, { fontFamily: e.target.value })}
+                            style={{ flexShrink: 0, height: 30, borderRadius: 9, border: `1px solid ${HW.hairline}`, background: 'white', color: HW.text, fontSize: 12.5, padding: '0 8px', cursor: 'pointer', fontFamily: textStyle.fontFamily }}
+                          >
+                            {['Kanit', 'Prompt', 'Sarabun', 'serif', 'monospace'].map(f => (
+                              <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
+                            ))}
+                          </select>
+
+                          <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                             {[16, 20, 24, 32, 44, 60].map(sz => (
+                                <button
+                                  key={sz}
+                                  onClick={() => setStyle({ fontSize: sz }, { size: sz })}
+                                  style={{ minWidth: 28, height: 28, padding: '0 5px', borderRadius: 9, border: 'none', background: textStyle.fontSize === sz ? HW.accentSoft : 'transparent', color: textStyle.fontSize === sz ? HW.accent : HW.textDim, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                                >
+                                  {sz}
+                                </button>
+                             ))}
+                          </div>
+
+                          <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                             <button
+                               onClick={() => setStyle({ bold: !textStyle.bold }, { bold: !textStyle.bold })}
+                               title="ตัวหนา"
+                               style={{ width: 30, height: 28, borderRadius: 9, border: 'none', background: textStyle.bold ? HW.accentSoft : 'transparent', color: textStyle.bold ? HW.accent : HW.textDim, fontSize: 14, fontWeight: 800, cursor: 'pointer' }}
+                             >B</button>
+                             <button
+                               onClick={() => setStyle({ italic: !textStyle.italic }, { italic: !textStyle.italic })}
+                               title="ตัวเอียง"
+                               style={{ width: 30, height: 28, borderRadius: 9, border: 'none', background: textStyle.italic ? HW.accentSoft : 'transparent', color: textStyle.italic ? HW.accent : HW.textDim, fontSize: 14, fontStyle: 'italic', fontWeight: 700, cursor: 'pointer' }}
+                             >I</button>
+                          </div>
+
+                          <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+                             {colors.map(c => (
+                                <div
+                                  key={c}
+                                  onClick={() => { setPenColor(c); applyToActive({ color: c }); }}
+                                  title={c}
+                                  style={{ width: 22, height: 22, borderRadius: '50%', background: c, cursor: 'pointer', flexShrink: 0, boxShadow: `inset 0 0 0 1px ${HW.hairline}`, outline: penColor === c ? `2px solid ${HW.accent}` : 'none', outlineOffset: 2 }}
+                                />
+                             ))}
+                             <label title="เลือกสีเอง" style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, cursor: 'pointer', background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)', boxShadow: `inset 0 0 0 1px ${HW.hairline}`, display: 'block' }}>
+                                <input type="color" value={penColor} onChange={(e) => { setPenColor(e.target.value); applyToActive({ color: e.target.value }); }} style={{ opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }} />
+                             </label>
+                          </div>
+                       </>
+                     );
+                  })()}
 
                   {tool === 'sticker' && (
                      <>
@@ -2140,7 +2264,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onWheel={handleWheel}
-        draggable={readonly || tool === 'pan'}
+        onContextMenu={(e) => e.evt.preventDefault()}
         scaleX={scale}
         scaleY={scale}
         x={position.x}
@@ -2443,7 +2567,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                 }}
               >
                 {editingTextId !== t.id && (
-                  <Text text={t.text} fontSize={t.size} fill={t.color} fontFamily="Kanit, sans-serif" padding={4} />
+                  <Text
+                    text={t.text}
+                    fontSize={t.size}
+                    fill={t.color}
+                    fontFamily={t.fontFamily || 'Kanit'}
+                    fontStyle={[t.bold ? 'bold' : '', t.italic ? 'italic' : ''].filter(Boolean).join(' ') || 'normal'}
+                    padding={4}
+                  />
                 )}
               </Group>
             ))}
@@ -2612,7 +2743,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                 background: 'rgba(255,255,255,0.95)',
                 color: t.color,
                 fontSize: `${t.size * scale}px`,
-                fontFamily: 'Kanit, sans-serif',
+                fontFamily: t.fontFamily || 'Kanit',
+                fontWeight: t.bold ? 700 : 400,
+                fontStyle: t.italic ? 'italic' : 'normal',
                 lineHeight: 1.2,
                 outline: 'none',
                 resize: 'none',
@@ -2639,6 +2772,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
          return (
            <div style={{ position: 'absolute', top: absoluteY, left: absoluteX, zIndex: 100, display: 'flex', flexDirection: 'column', gap: 8 }}>
              <textarea
+               ref={stickerTextareaRef}
                autoFocus
                placeholder="พิมพ์ข้อความที่นี่..."
                value={editingStickerValue}
