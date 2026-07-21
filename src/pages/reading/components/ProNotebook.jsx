@@ -1257,6 +1257,56 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     return { minX, minY, maxX, maxY };
   }, [selectedLassoLines, selectedObjects, pages, currentPageIndex]);
 
+  // The selected object, its kind, and its box in page coordinates. Drives the
+  // floating context menu — actions belong next to the thing they act on, not in a
+  // toolbar at the far edge of the screen where nobody finds them.
+  const selectedInfo = React.useMemo(() => {
+    if (!selectedId) return null;
+    const page = pages[currentPageIndex];
+    if (!page) return null;
+
+    for (const kind of ['images', 'shapes', 'texts', 'stickers']) {
+      const obj = (page[kind] || []).find((o) => o.id === selectedId);
+      if (!obj) continue;
+
+      let box;
+      if (kind === 'shapes') {
+        box = { minX: Math.min(obj.x1, obj.x2), minY: Math.min(obj.y1, obj.y2), maxX: Math.max(obj.x1, obj.x2), maxY: Math.max(obj.y1, obj.y2) };
+      } else if (kind === 'images') {
+        box = { minX: obj.x, minY: obj.y, maxX: obj.x + (obj.width || 0) * (obj.scaleX || 1), maxY: obj.y + (obj.height || 0) * (obj.scaleY || 1) };
+      } else if (kind === 'stickers') {
+        const w = obj.audioUrl ? 130 : 150;
+        const h = obj.audioUrl ? 44 : 150;
+        box = { minX: obj.x, minY: obj.y, maxX: obj.x + w * (obj.scaleX || 1), maxY: obj.y + h * (obj.scaleY || 1) };
+      } else {
+        box = { minX: obj.x, minY: obj.y, maxX: obj.x + Math.max(60, (obj.text?.length || 1) * (obj.size || 16) * 0.6), maxY: obj.y + (obj.size || 16) * 1.4 };
+      }
+      return { kind, obj, box };
+    }
+    return null;
+  }, [selectedId, pages, currentPageIndex]);
+
+  const duplicateSelectedObject = () => {
+    if (!selectedInfo) return;
+    const { kind, obj } = selectedInfo;
+    const clone = { ...obj, id: `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` };
+    shiftObject(clone, kind, 24, 24);
+    pushHistory();
+    updatePage(currentPageIndex, (page) => { page[kind] = [...(page[kind] || []), clone]; });
+    selectShape(clone.id);
+    toast.success('ทำซ้ำแล้ว');
+  };
+
+  const recolorSelectedObject = (color) => {
+    if (!selectedInfo) return;
+    const { kind, obj } = selectedInfo;
+    const patch = kind === 'stickers' ? { color } : { color };
+    pushHistory();
+    updatePage(currentPageIndex, (page) => {
+      page[kind] = (page[kind] || []).map((o) => (o.id === obj.id ? { ...o, ...patch } : o));
+    });
+  };
+
   // --- Lasso selection actions ---
   // While a selection is live its strokes are held in `selectedLassoLines` and
   // drawn inside a draggable group, so they are absent from the page until baked.
@@ -2655,8 +2705,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                        }
                     });
                   }}
-                  onClick={(e) => { e.cancelBubble = true; if (tool === 'pan' || tool === 'sticker') { setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); } }}
-                  onTap={(e) => { e.cancelBubble = true; if (tool === 'pan' || tool === 'sticker') { setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); } }}
+                  // Pan selects the note so the context menu appears; the sticky-note
+                  // tool goes straight into typing, which is what you want with it.
+                  onClick={(e) => { e.cancelBubble = true; if (tool === 'sticker') { setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); } else if (tool === 'pan' || tool === 'lasso') { selectShape(st.id); } }}
+                  onTap={(e) => { e.cancelBubble = true; if (tool === 'sticker') { setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); } else if (tool === 'pan' || tool === 'lasso') { selectShape(st.id); } }}
                 >
                   <Rect width={150} height={150} fill={st.color} shadowColor="rgba(0,0,0,0.15)" shadowBlur={10} shadowOffsetY={4} cornerRadius={st.style === 'round' ? 16 : 2} />
                   
@@ -2802,13 +2854,24 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                   borderRadius: st.style === 'round' ? 16 * scale : 2 * scale,
                }}
              />
-             <button onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onClick={() => {
+             {/* preventDefault keeps focus on the textarea. Without it the button
+                 steals focus, onBlur closes the editor, and this button unmounts
+                 before the click can land — so delete silently did nothing. */}
+             <button
+               onPointerDown={(e) => e.stopPropagation()}
+               onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+               onClick={() => {
+                 const id = editingStickerId;
+                 pushHistory();
                  updatePage(currentPageIndex, (page) => {
-                    page.stickers = page.stickers.filter(s => s.id !== editingStickerId);
+                    page.stickers = (page.stickers || []).filter(s => s.id !== id);
                  });
                  setEditingStickerId(null);
-             }} style={{ background: '#EF4444', color: 'white', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer', alignSelf: 'flex-start', fontSize: 13, boxShadow: '0 2px 8px rgba(239,68,68,0.2)' }}>
-                ลบสติกเกอร์
+                 toast.success('ลบโพสต์อิทแล้ว');
+               }}
+               style={{ background: '#EF4444', color: 'white', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer', alignSelf: 'flex-start', fontSize: 13, boxShadow: '0 2px 8px rgba(239,68,68,0.2)' }}
+             >
+                ลบโพสต์อิท
              </button>
            </div>
          );
@@ -2872,6 +2935,70 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
           </Stage>
         </div>
       )}
+
+      {/* Context menu for a single selected object, pinned just above it. */}
+      {selectedInfo && !readonly && !hasSelection && (() => {
+         const { kind, obj, box } = selectedInfo;
+         const left = (box.minX + pageX) * scale + position.x + ((box.maxX - box.minX) * scale) / 2;
+         const top = (box.minY + pageY) * scale + position.y - 54;
+         const btn = { height: 32, padding: '0 10px', borderRadius: 10, border: 'none', background: 'transparent', color: HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap' };
+         const divider = <div style={{ width: 1, height: 20, background: HW.hairline, margin: '0 3px' }} />;
+         const swatches = kind === 'stickers' ? ['#FEF08A', '#FBCFE8', '#BAE6FD', '#BBF7D0'] : ['#111827', '#EF4444', '#F59E0B', '#10B981', '#3B82F6'];
+
+         return (
+           <div
+             onPointerDown={(e) => e.stopPropagation()}
+             onMouseDown={(e) => e.preventDefault()}
+             style={{ position: 'absolute', left, top: Math.max(8, top), transform: 'translateX(-50%)', zIndex: 60, display: 'flex', alignItems: 'center', gap: 2, padding: '4px 6px', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, borderRadius: 14, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}` }}
+           >
+              {kind === 'images' && (
+                <>
+                  <button style={btn} onClick={() => setCroppingImageId(obj.id)}><Crop size={16} strokeWidth={1.7} /> ครอบตัด</button>
+                  {divider}
+                </>
+              )}
+
+              {(kind === 'texts' || kind === 'stickers') && !obj.audioUrl && (
+                <>
+                  <button
+                    style={btn}
+                    onClick={() => {
+                      if (kind === 'texts') {
+                        setEditingTextId(obj.id); setEditingTextValue(obj.text || ''); isEditingText.current = true;
+                      } else {
+                        setEditingStickerId(obj.id); setEditingStickerValue(obj.text || '');
+                      }
+                      selectShape(null);
+                    }}
+                  >
+                    <Type size={16} strokeWidth={1.7} /> แก้ไข
+                  </button>
+                  {divider}
+                </>
+              )}
+
+              {kind !== 'images' && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    {swatches.map(c => (
+                      <div
+                        key={c}
+                        title="เปลี่ยนสี"
+                        onClick={() => recolorSelectedObject(c)}
+                        style={{ width: 18, height: 18, borderRadius: kind === 'stickers' ? 5 : '50%', background: c, cursor: 'pointer', boxShadow: `inset 0 0 0 1px ${HW.hairline}` }}
+                      />
+                    ))}
+                  </div>
+                  {divider}
+                </>
+              )}
+
+              <button style={btn} onClick={duplicateSelectedObject} title="ทำซ้ำ"><FileStack size={16} strokeWidth={1.7} /></button>
+              <button style={{ ...btn, color: '#EF4444' }} onClick={deleteSelected} title="ลบ"><Trash2 size={16} strokeWidth={1.7} /></button>
+              <button style={{ ...btn, color: HW.accent }} onClick={() => selectShape(null)} title="เสร็จสิ้น"><Check size={17} strokeWidth={2} /></button>
+           </div>
+         );
+      })()}
 
       {/* Floating action menu for a lasso selection (Huawei shows this above the marquee) */}
       {lassoBounds && hasSelection && (() => {
