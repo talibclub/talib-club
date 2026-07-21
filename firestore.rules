@@ -89,6 +89,13 @@ service cloud.firestore {
       allow delete: if ownsExistingDocument();
     }
 
+    match /content_notebooks/{docId} {
+      allow read: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update: if ownsExistingDocument() && keepsOwnership();
+      allow delete: if ownsExistingDocument();
+    }
+
     match /content_bookshelf/{docId} {
       allow read: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
       allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
