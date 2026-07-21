@@ -1806,8 +1806,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: '#F3F4F6', display: 'flex', flexDirection: 'column' }}>
       
       {/* Huawei Notes Top Navigation Bar (Fixed App Header) */}
-         <div style={{ height: 52, flexShrink: 0, width: '100%', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', zIndex: 50, borderBottom: `1px solid ${HW.hairline}` }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+         <div className="hide-scroll" style={{ height: 52, flexShrink: 0, width: '100%', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', zIndex: 50, borderBottom: `1px solid ${HW.hairline}`, overflowX: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                <button onClick={() => window.history.back()} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: HW.text, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <ChevronLeft size={24} strokeWidth={1.5} />
                </button>
@@ -1857,7 +1857,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                )}
             </div>
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, position: 'relative' }}>
                {!readonly && (
                  <>
                    {[
