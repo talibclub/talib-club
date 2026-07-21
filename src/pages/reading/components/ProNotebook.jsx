@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Image as KonvaImage, Path, Group, Circle, Text, Rect, Transformer, RegularPolygon, Line } from 'react-konva';
 import Draggable from 'react-draggable';
-import { PenTool, Highlighter, Eraser, Pen, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, GripVertical, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, FileStack, LayoutList, Check, Lock, MousePointerClick, Move3d, Triangle, Cloud, CheckCircle, Trash2, Scissors, Crop, Brush, Feather, Maximize2, Ruler, PanelLeftClose, PanelLeftOpen, Wand2, Camera } from 'lucide-react';
+import { PenTool, Highlighter, Eraser, Pen, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, GripVertical, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, FileStack, LayoutList, Check, Lock, MousePointerClick, Move3d, Triangle, Cloud, CheckCircle, Trash2, Scissors, Crop, Brush, Feather, Maximize2, Ruler, PanelLeftClose, PanelLeftOpen, Wand2, Camera, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Underline, Strikethrough, Smile, Upload } from 'lucide-react';
 import CropModal from './CropModal';
 import ColorPickerPanel from './ColorPickerPanel';
 import BookSnipModal from './BookSnipModal';
+import EmojiStickerPicker from './EmojiStickerPicker';
 import { recognizeShape, shapeFromRecognition, pointInPolygon, distToSegmentXY } from '../utils/shapeRecognition.js';
 import useImage from 'use-image';
 import getStroke from 'perfect-freehand';
@@ -77,7 +78,9 @@ const getSvgPathFromStroke = (stroke) => {
 //  highlighter wide, flat, multiplied so text stays readable underneath
 const PEN_STYLES = {
   pen: {
-    stroke: { thinning: 0.22, smoothing: 0.5, streamline: 0.5 },
+    // Higher thinning so real stylus pressure (and velocity, for mouse) visibly
+    // changes the line weight — at 0.22 the response was too small to notice.
+    stroke: { thinning: 0.5, smoothing: 0.5, streamline: 0.5 },
     opacity: 1, composite: 'source-over',
   },
   fountain: {
@@ -173,6 +176,24 @@ const CommittedStrokes = React.memo(({ lines, playbackTime }) => (
 ));
 
 const ZERO_OFFSET = { x: 0, y: 0 };
+
+// Text with a list style is stored as plain lines; the bullets/numbers are added
+// only for display (and in the editing overlay) so the underlying value stays clean.
+const applyListPrefix = (text, list) => {
+  if (!list || list === 'none' || !text) return text;
+  let n = 0;
+  return text.split('\n').map((line) => {
+    if (list === 'bullet') return line.length ? `•  ${line}` : line;
+    if (line.length) { n += 1; return `${n}.  ${line}`; }
+    return line;
+  }).join('\n');
+};
+
+// Konva's textDecoration accepts a space-separated combination.
+const textDecorationOf = (o) => [o.underline ? 'underline' : '', o.strikethrough ? 'line-through' : ''].filter(Boolean).join(' ') || '';
+
+// Default width of a text box, so alignment and lists have a column to work in.
+const TEXT_BOX_WIDTH = 340;
 
 // HarmonyOS / Huawei Notes design tokens
 const HW = {
@@ -378,9 +399,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     if (showToolSettings) setShowToolSettings(false);
   };
   
+  // Full set kept for reference; the toolbar shows a short essentials row and defers
+  // everything else to the custom picker + recent swatches, so the capsule stays compact.
   const colors = [
-    '#111827', '#EF4444', '#F97316', '#F59E0B', '#84CC16', '#10B981', '#06B6D4', 
-    '#3B82F6', '#6366F1', '#8B5CF6', '#D946EF', '#F43F5E', '#78716C', '#FFFFFF'
+    '#111827', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#FFFFFF'
   ];
   const sizes = [2, 4, 6, 8, 12, 16, 24];
   const [penColor, setPenColor] = useState('#111827');
@@ -407,6 +429,23 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     updatePage(currentPageIndex, (page) => {
       page.texts = (page.texts || []).map((t) => (t.id === id ? { ...t, color: c } : t));
     });
+  };
+
+  // Emoji lands as a large, scalable text object near the middle of the page.
+  const insertEmoji = (emoji) => {
+    const page = pagesRef.current[currentPageIndex] || { width: 800, height: 1130 };
+    const jitter = () => (Math.random() - 0.5) * 60;
+    pushHistory();
+    updatePage(currentPageIndex, (p) => {
+      if (!p.texts) p.texts = [];
+      p.texts.push({
+        id: `text-${Date.now()}`, text: emoji, isEmoji: true,
+        x: page.width / 2 - 32 + jitter(), y: page.height / 2 - 32 + jitter(),
+        color: '#111827', size: 60, fontFamily: 'Kanit', bold: false, italic: false,
+        underline: false, strikethrough: false, align: 'left', list: 'none',
+      });
+    });
+    toast.success('เพิ่มอิโมจิแล้ว ใช้เครื่องมือเลื่อน (มือ) เพื่อย้าย/ปรับขนาด', { id: 'emoji-add' });
   };
   const [showBookSnip, setShowBookSnip] = useState(false);
   const [penOpacity, setPenOpacity] = useState(1);
@@ -435,7 +474,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
   // Formatting for the text tool. Applied to new text boxes, and to the one being
   // edited or selected so changes are visible immediately.
-  const [textStyle, setTextStyle] = useState({ fontFamily: 'Kanit', fontSize: 24, bold: false, italic: false });
+  const [textStyle, setTextStyle] = useState({ fontFamily: 'Kanit', fontSize: 24, bold: false, italic: false, underline: false, strikethrough: false, align: 'left', list: 'none' });
+  // Emoji / imported-sticker picker toggle.
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   // "Zoom-in writing": a magnified strip at the bottom of the screen. You write
   // large in the strip and the ink lands small on the page, which is how Huawei
@@ -686,15 +727,17 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           const localUrl = URL.createObjectURL(audioBlob);
           
           const stickerId = `audio-${Date.now()}`;
-          let stickerX = 100;
-          let stickerY = 100;
-          
+
           updatePage(targetPageIndex, (page) => {
              if (!page.stickers) page.stickers = [];
+             // Dock audio notes in the top-left margin and stack them downward,
+             // instead of dropping every recording in the middle of the page where
+             // it covered whatever was being annotated.
+             const audioCount = page.stickers.filter((s) => s.audioUrl).length;
              page.stickers.push({
                id: stickerId,
-               x: stickerX,
-               y: stickerY,
+               x: 16,
+               y: 16 + audioCount * 54,
                audioUrl: localUrl,
                isPlaying: false,
                isUploading: true
@@ -990,6 +1033,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     // Touching the canvas puts the tool to work — tuck its options away.
     if (showToolOptions) setShowToolOptions(false);
     if (showColorPicker) setShowColorPicker(false);
+    if (showEmojiPicker) setShowEmojiPicker(false);
 
     // If clicking on lasso group, don't bake, just return so they can drag it
     const targetName = e.target.name();
@@ -1050,6 +1094,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           fontFamily: textStyle.fontFamily,
           bold: textStyle.bold,
           italic: textStyle.italic,
+          underline: textStyle.underline,
+          strikethrough: textStyle.strikethrough,
+          align: textStyle.align,
+          list: textStyle.list,
+          width: TEXT_BOX_WIDTH,
        };
        pushHistory();
        updatePage(currentPageIndex, (page) => {
@@ -2185,6 +2234,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                     { id: 'shape', icon: Square, title: 'รูปร่าง' },
                     { id: 'image', icon: ImageIcon, title: 'แทรกรูปภาพ' },
                     { id: 'sticker', icon: StickyNote, title: 'โพสต์อิท' },
+                    { id: 'emoji', icon: Smile, title: 'อิโมจิ & สติกเกอร์' },
                     { id: 'laser', icon: Wand2, title: 'เลเซอร์พอยเตอร์' },
                     { id: 'mic', icon: Mic, title: 'อัดเสียง' }
                   ].map(t => (
@@ -2194,6 +2244,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                        onClick={() => {
                           if (t.id === 'image') { document.getElementById('image-upload').click(); return; }
                           if (t.id === 'mic') { toggleRecording(); return; }
+                          // Emoji picker is an action popover, not a drawing tool.
+                          if (t.id === 'emoji') { setShowEmojiPicker(v => !v); setShowToolOptions(false); setShowColorPicker(false); return; }
                           // The ruler is a modifier, not a tool — it stays on while you draw.
                           if (t.id === 'ruler') { setRulerOn(v => !v); return; }
                           // One tap does it all: selecting a tool also opens its
@@ -2204,7 +2256,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                           if (tool === t.id) setShowToolOptions(v => !v);
                           else { setTool(t.id); setShowToolOptions(hasOptions); setShowColorPicker(false); }
                        }}
-                       style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 12, border: 'none', background: (t.id === 'ruler' ? rulerOn : tool === t.id && !['image','mic'].includes(t.id)) ? HW.accentSoft : 'transparent', color: (t.id === 'ruler' ? rulerOn : tool === t.id && !['image','mic'].includes(t.id)) ? HW.accent : (t.id === 'mic' && isRecording ? '#EF4444' : HW.textDim), cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.18s cubic-bezier(0.2,0.8,0.2,1), background 0.18s, color 0.18s', position: 'relative', transform: (t.id === 'ruler' ? rulerOn : tool === t.id && !['image','mic'].includes(t.id)) ? 'translateY(-4px)' : 'none' }}
+                       style={(() => {
+                          const active = t.id === 'ruler' ? rulerOn : t.id === 'emoji' ? showEmojiPicker : (tool === t.id && !['image','mic'].includes(t.id));
+                          return { flexShrink: 0, width: 40, height: 40, borderRadius: 12, border: 'none', background: active ? HW.accentSoft : 'transparent', color: active ? HW.accent : (t.id === 'mic' && isRecording ? '#EF4444' : HW.textDim), cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.18s cubic-bezier(0.2,0.8,0.2,1), background 0.18s, color 0.18s', position: 'relative', transform: active ? 'translateY(-4px)' : 'none' };
+                       })()}
                      >
                        <t.icon size={20} strokeWidth={1.6} />
                        {t.id === 'mic' && isRecording && <div style={{ position: 'absolute', top: -4, right: -4, width: 8, height: 8, borderRadius: '50%', background: '#EF4444' }}></div>}
@@ -2243,6 +2298,17 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   onChange={(c) => { setPenColor(c); if (tool === 'text') applyColorToActiveText(c); }}
                   onCommit={(c) => { setPenColor(c); if (tool === 'text') applyColorToActiveText(c); rememberCustomColor(c); setShowColorPicker(false); }}
                   onClose={() => setShowColorPicker(false)}
+                />
+              </div>
+            )}
+
+            {/* Emoji / sticker picker — same slot as the colour picker, above the capsule */}
+            {showEmojiPicker && (
+              <div style={{ order: -2 }}>
+                <EmojiStickerPicker
+                  onPick={(e) => insertEmoji(e)}
+                  onUpload={() => { document.getElementById('image-upload').click(); setShowEmojiPicker(false); }}
+                  onClose={() => setShowEmojiPicker(false)}
                 />
               </div>
             )}
@@ -2373,6 +2439,44 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                                title="ตัวเอียง"
                                style={{ width: 30, height: 28, borderRadius: 9, border: 'none', background: textStyle.italic ? HW.accentSoft : 'transparent', color: textStyle.italic ? HW.accent : HW.textDim, fontSize: 14, fontStyle: 'italic', fontWeight: 700, cursor: 'pointer' }}
                              >I</button>
+                             <button
+                               onClick={() => setStyle({ underline: !textStyle.underline }, { underline: !textStyle.underline })}
+                               title="ขีดเส้นใต้"
+                               style={{ width: 30, height: 28, borderRadius: 9, border: 'none', background: textStyle.underline ? HW.accentSoft : 'transparent', color: textStyle.underline ? HW.accent : HW.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                             ><Underline size={15} strokeWidth={2} /></button>
+                             <button
+                               onClick={() => setStyle({ strikethrough: !textStyle.strikethrough }, { strikethrough: !textStyle.strikethrough })}
+                               title="ขีดฆ่า"
+                               style={{ width: 30, height: 28, borderRadius: 9, border: 'none', background: textStyle.strikethrough ? HW.accentSoft : 'transparent', color: textStyle.strikethrough ? HW.accent : HW.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                             ><Strikethrough size={15} strokeWidth={2} /></button>
+                          </div>
+
+                          <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
+
+                          {/* Alignment */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                             {[{ a: 'left', Icon: AlignLeft, label: 'ชิดซ้าย' }, { a: 'center', Icon: AlignCenter, label: 'กึ่งกลาง' }, { a: 'right', Icon: AlignRight, label: 'ชิดขวา' }].map(({ a, Icon, label }) => (
+                                <button
+                                  key={a}
+                                  onClick={() => setStyle({ align: a }, { align: a })}
+                                  title={label}
+                                  style={{ width: 30, height: 28, borderRadius: 9, border: 'none', background: (textStyle.align || 'left') === a ? HW.accentSoft : 'transparent', color: (textStyle.align || 'left') === a ? HW.accent : HW.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                ><Icon size={15} strokeWidth={2} /></button>
+                             ))}
+                          </div>
+
+                          <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
+
+                          {/* Lists */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                             {[{ l: 'bullet', Icon: List, label: 'รายการจุด' }, { l: 'number', Icon: ListOrdered, label: 'รายการตัวเลข' }].map(({ l, Icon, label }) => (
+                                <button
+                                  key={l}
+                                  onClick={() => { const next = textStyle.list === l ? 'none' : l; setStyle({ list: next }, { list: next }); }}
+                                  title={label}
+                                  style={{ width: 30, height: 28, borderRadius: 9, border: 'none', background: textStyle.list === l ? HW.accentSoft : 'transparent', color: textStyle.list === l ? HW.accent : HW.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                ><Icon size={15} strokeWidth={2} /></button>
+                             ))}
                           </div>
 
                           <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
@@ -2883,11 +2987,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               >
                 {editingTextId !== t.id && (
                   <Text
-                    text={t.text}
+                    text={applyListPrefix(t.text, t.list)}
                     fontSize={t.size}
                     fill={t.color}
                     fontFamily={t.fontFamily || 'Kanit'}
                     fontStyle={[t.bold ? 'bold' : '', t.italic ? 'italic' : ''].filter(Boolean).join(' ') || 'normal'}
+                    textDecoration={textDecorationOf(t)}
+                    align={t.align || 'left'}
+                    width={t.align && t.align !== 'left' ? (t.width || TEXT_BOX_WIDTH) : undefined}
                     padding={4}
                   />
                 )}
@@ -3063,6 +3170,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                 fontFamily: t.fontFamily || 'Kanit',
                 fontWeight: t.bold ? 700 : 400,
                 fontStyle: t.italic ? 'italic' : 'normal',
+                textDecoration: [t.underline ? 'underline' : '', t.strikethrough ? 'line-through' : ''].filter(Boolean).join(' ') || 'none',
+                textAlign: t.align || 'left',
                 lineHeight: 1.2,
                 outline: 'none',
                 resize: 'none',
@@ -3298,6 +3407,89 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               <button title="เสร็จสิ้น" onClick={bakeLassoSelection} style={{ ...btn, color: HW.accent }}><Check size={18} strokeWidth={2} /></button>
            </div>
          );
+      })()}
+
+      {/* Paper template picker. The "เปลี่ยนแม่แบบกระดาษ" button set this flag but
+          nothing ever rendered — so the whole feature looked broken. */}
+      {showPageSettings && !readonly && (() => {
+        const paperTypes = [
+          { id: 'blank', label: 'เปล่า' },
+          { id: 'lines', label: 'เส้นบรรทัด' },
+          { id: 'grid', label: 'ตาราง' },
+          { id: 'dots', label: 'จุดไข่ปลา' },
+        ];
+        const paperColors = [
+          { id: 'white', label: 'ขาว', bg: '#FFFFFF' },
+          { id: 'yellow', label: 'ครีม', bg: '#FEF3C7' },
+          { id: 'dark', label: 'มืด', bg: '#1F2937' },
+        ];
+        const cur = pages[currentPageIndex] || {};
+        const isDark = cur.paperColor === 'dark';
+        const lineCol = isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.18)';
+        const previewBg = (id) => (id === 'yellow' ? '#FEF3C7' : id === 'dark' ? '#1F2937' : '#FFFFFF');
+        const patternCss = (type, col) => {
+          if (type === 'lines') return { backgroundImage: `repeating-linear-gradient(${col} 0 1px, transparent 1px 12px)` };
+          if (type === 'grid') return { backgroundImage: `repeating-linear-gradient(${col} 0 1px, transparent 1px 12px), repeating-linear-gradient(90deg, ${col} 0 1px, transparent 1px 12px)` };
+          if (type === 'dots') return { backgroundImage: `radial-gradient(${col} 1.2px, transparent 1.3px)`, backgroundSize: '12px 12px' };
+          return {};
+        };
+        const applyPaper = (patch, allPages) => {
+          pushHistory();
+          if (allPages) {
+            setPages((prev) => prev.map((p) => (p.src ? p : { ...p, ...patch })));
+          } else {
+            updatePage(currentPageIndex, (p) => { Object.assign(p, patch); });
+          }
+        };
+        return (
+          <div onPointerDown={(e) => { if (e.target === e.currentTarget) setShowPageSettings(false); }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div style={{ background: 'white', borderRadius: 18, width: '100%', maxWidth: 460, padding: 22, boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#111827', fontFamily: 'Kanit, sans-serif' }}>แม่แบบกระดาษ</h3>
+                <button onClick={() => setShowPageSettings(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6B7280', display: 'flex' }}><X size={22} /></button>
+              </div>
+
+              {cur.src && (
+                <div style={{ marginBottom: 14, padding: '8px 12px', borderRadius: 10, background: '#FEF3C7', color: '#92400E', fontSize: 12.5, fontFamily: 'Kanit, sans-serif' }}>
+                  หน้านี้เป็นหน้าจาก PDF — เปลี่ยนแม่แบบได้เฉพาะหน้าเปล่าเท่านั้น
+                </div>
+              )}
+
+              {/* Pattern */}
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#6B7280', marginBottom: 8, fontFamily: 'Kanit, sans-serif' }}>ลวดลาย</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 20 }}>
+                {paperTypes.map((pt) => {
+                  const active = (cur.paperType || 'lines') === pt.id;
+                  return (
+                    <button key={pt.id} disabled={!!cur.src} onClick={() => applyPaper({ paperType: pt.id })} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, border: 'none', background: 'transparent', cursor: cur.src ? 'default' : 'pointer', opacity: cur.src ? 0.4 : 1, padding: 0 }}>
+                      <div style={{ width: '100%', aspectRatio: '3/4', borderRadius: 8, background: previewBg(cur.paperColor), boxShadow: active ? `0 0 0 2.5px ${HW.accent}` : 'inset 0 0 0 1px rgba(0,0,0,0.1)', ...patternCss(pt.id, lineCol) }} />
+                      <span style={{ fontSize: 12, fontWeight: active ? 700 : 500, color: active ? HW.accent : '#4B5563', fontFamily: 'Kanit, sans-serif' }}>{pt.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Colour */}
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#6B7280', marginBottom: 8, fontFamily: 'Kanit, sans-serif' }}>สีกระดาษ</div>
+              <div style={{ display: 'flex', gap: 10, marginBottom: 22 }}>
+                {paperColors.map((pc) => {
+                  const active = (cur.paperColor || 'white') === pc.id;
+                  return (
+                    <button key={pc.id} disabled={!!cur.src} onClick={() => applyPaper({ paperColor: pc.id })} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, border: 'none', background: 'transparent', cursor: cur.src ? 'default' : 'pointer', opacity: cur.src ? 0.4 : 1 }}>
+                      <div style={{ width: '100%', height: 40, borderRadius: 8, background: pc.bg, boxShadow: active ? `0 0 0 2.5px ${HW.accent}` : 'inset 0 0 0 1px rgba(0,0,0,0.12)' }} />
+                      <span style={{ fontSize: 12, fontWeight: active ? 700 : 500, color: active ? HW.accent : '#4B5563', fontFamily: 'Kanit, sans-serif' }}>{pc.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => { const cp = pages[currentPageIndex]; if (!cp?.src) applyPaper({ paperType: cp?.paperType, paperColor: cp?.paperColor }, true); toast.success('ใช้กับทุกหน้าแล้ว'); }} disabled={!!cur.src} style={{ flex: 1, height: 42, borderRadius: 11, border: '1px solid #D1D5DB', background: 'white', color: cur.src ? '#D1D5DB' : '#4B5563', fontWeight: 600, cursor: cur.src ? 'default' : 'pointer', fontFamily: 'Kanit, sans-serif', fontSize: 13.5 }}>ใช้กับทุกหน้า</button>
+                <button onClick={() => setShowPageSettings(false)} style={{ flex: 1, height: 42, borderRadius: 11, border: 'none', background: HW.accent, color: 'white', fontWeight: 600, cursor: 'pointer', fontFamily: 'Kanit, sans-serif', fontSize: 13.5 }}>เสร็จสิ้น</button>
+              </div>
+            </div>
+          </div>
+        );
       })()}
 
       {/* Snip-from-book overlay */}
