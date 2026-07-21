@@ -129,7 +129,7 @@ const getGrainTile = (color) => {
 // One rendered stroke. Pulled out of the component (and memoised at the layer
 // level) so that drawing a new stroke does not re-run getStroke for every stroke
 // already on the page — that was the source of the lag as a page filled up.
-const StrokeShape = ({ line }) => {
+const StrokeShape = ({ line, faded }) => {
   const style = PEN_STYLES[line.tool] || PEN_STYLES.pen;
   const color = line.color || '#111827';
 
@@ -153,7 +153,7 @@ const StrokeShape = ({ line }) => {
 
   const common = {
     data: pathData,
-    opacity: (line.opacity ?? 1) * style.opacity,
+    opacity: (line.opacity ?? 1) * style.opacity * (faded ? 0.2 : 1),
     globalCompositeOperation: style.composite,
     lineCap: 'round',
     lineJoin: 'round',
@@ -170,9 +170,8 @@ const CommittedStrokes = React.memo(({ lines, playbackTime, nowPlayingId }) => (
   <>
     {lines.map((line, i) => {
       const isPlayingThis = nowPlayingId && (line.recordingId === nowPlayingId || (!line.recordingId && line.startTime != null));
-      const isVisible = !isPlayingThis || line.startTime === undefined || line.startTime === null || line.startTime <= playbackTime * 1000;
-      if (!isVisible) return null;
-      return <StrokeShape key={i} line={line} />;
+      const inFuture = isPlayingThis && line.startTime !== undefined && line.startTime !== null && line.startTime > playbackTime * 1000;
+      return <StrokeShape key={i} line={line} faded={inFuture} />;
     })}
   </>
 ));
