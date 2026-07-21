@@ -309,16 +309,20 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
        const scaleX = availableWidth / currentPage.width;
        const scaleY = availableHeight / currentPage.height;
        
-       // Use the smaller scale so the entire page fits in view
-       let newScale = Math.min(scaleX, scaleY);
+       let newScale = availableWidth / currentPage.width;
        
-       if (newScale > 1.5) newScale = 1.5;
+       // On desktop, don't let it be massively wide if the screen is very wide
+       if (!isMobile && newScale > 1.2) {
+           newScale = 1.2;
+       }
+       
+       if (newScale > 2.0) newScale = 2.0;
        if (newScale < 0.1) newScale = 0.1;
        
        setScale(newScale);
        
        const scaledHeight = currentPage.height * newScale;
-       const yPos = scaledHeight < (dimensions.height - 52) ? (dimensions.height - 52 - scaledHeight) / 2 : 40;
+       const yPos = 40; // Default top padding
        setPosition({ x: 0, y: yPos });
     }
   }, [dimensions.width, dimensions.height, currentPageIndex, isMobile]);
