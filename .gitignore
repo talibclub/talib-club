@@ -13,3 +13,6 @@ scripts/seed-db.mjs
 # Temp Agent Files
 diff.txt
 scratch/
+
+.claude/
+

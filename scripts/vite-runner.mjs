@@ -38,7 +38,8 @@ if (command === "build") {
     ...viteConfig,
     server: {
       host: exposeToLan ? "0.0.0.0" : "127.0.0.1",
-      port: 5173,
+      // PORT lets a second instance run alongside one already on 5173.
+      port: Number(process.env.PORT) || 5173,
       strictPort: false,
     },
   })
