@@ -821,12 +821,17 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
            coverColor: 'red',
         }, { merge: true });
         // Backup locally
-        localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pages));
+         try { localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pages)); } catch (e) { console.warn("Local storage quota exceeded on backup", e); }
         if (!isAuto) toast.success("บันทึกคลาวด์เรียบร้อย!", { id: "cloud-save", icon: '💾' });
      } catch (err) {
         console.error(err);
-        localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pages));
+         let localSaved = false;
+         try { localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pages)); localSaved = true; } catch (e) { console.warn("Local storage quota exceeded on fallback", e); }
+         if (localSaved) {
         toast.error("บันทึกคลาวด์ล้มเหลว (เซฟลงเครื่องแล้ว)", { id: "cloud-save" });
+         } else {
+            toast.error("บันทึกคลาวด์ล้มเหลว และพื้นที่ในเครื่องเต็ม (ไม่สามารถบันทึกได้)", { id: "cloud-save" });
+         }
      } finally {
         setTimeout(() => setIsSaving(false), 1500);
      }
