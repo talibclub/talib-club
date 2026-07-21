@@ -199,6 +199,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   const [penColor, setPenColor] = useState('#111827');
   const [penSize, setPenSize] = useState(4);
   const [penOpacity, setPenOpacity] = useState(1);
+  const [stickerStyle, setStickerStyle] = useState('classic');
   
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -657,7 +658,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     
     if (tool === 'sticker') {
        const stickerColor = ['#FEF08A', '#FBCFE8', '#BAE6FD', '#BBF7D0'].includes(penColor) ? penColor : '#FEF08A';
-       const newSticker = { id: `sticker-${Date.now()}`, x: pos.x, y: pos.y, color: stickerColor, text: '' };
+       const newSticker = { id: `sticker-${Date.now()}`, x: pos.x, y: pos.y, color: stickerColor, text: '', style: stickerStyle };
        pushHistory();
        updatePage(currentPageIndex, (page) => {
           if (!page.stickers) page.stickers = [];
@@ -705,6 +706,45 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
        return;
     }
     
+    if (tool === 'eraser') {
+       isDrawing.current = true;
+       // Erase on click
+       const eraserRadius = 20;
+       updatePage(currentPageIndex, (page) => {
+          if (page.lines) {
+             page.lines = page.lines.filter(line => {
+                for (let i=0; i<line.points.length; i+=2) {
+                   const dx = line.points[i] - pos.x;
+                   const dy = line.points[i+1] - pos.y;
+                   if (dx*dx + dy*dy < eraserRadius*eraserRadius) return false;
+                }
+                return true;
+             });
+          }
+          if (page.shapes) {
+             page.shapes = page.shapes.filter(s => {
+                const minX = Math.min(s.x1, s.x2); const maxX = Math.max(s.x1, s.x2);
+                const minY = Math.min(s.y1, s.y2); const maxY = Math.max(s.y1, s.y2);
+                if (pos.x >= minX - eraserRadius && pos.x <= maxX + eraserRadius && pos.y >= minY - eraserRadius && pos.y <= maxY + eraserRadius) return false;
+                return true;
+             });
+          }
+          if (page.texts) {
+             page.texts = page.texts.filter(t => {
+                if (pos.x >= t.x - eraserRadius && pos.x <= t.x + 200 + eraserRadius && pos.y >= t.y - eraserRadius && pos.y <= t.y + 50 + eraserRadius) return false;
+                return true;
+             });
+          }
+          if (page.stickers) {
+             page.stickers = page.stickers.filter(st => {
+                if (pos.x >= st.x - eraserRadius && pos.x <= st.x + 150 + eraserRadius && pos.y >= st.y - eraserRadius && pos.y <= st.y + 150 + eraserRadius) return false;
+                return true;
+             });
+          }
+       });
+       return;
+    }
+    
     pushHistory();
     
     isDrawing.current = true;
@@ -717,6 +757,43 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     if (!isDrawing.current || tool === 'pan' || isSpaceDown) return;
     const pos = getPointerPosRelativeToPage();
     if (!pos) return;
+    
+    if (tool === 'eraser') {
+       const eraserRadius = 20;
+       updatePage(currentPageIndex, (page) => {
+          if (page.lines) {
+             page.lines = page.lines.filter(line => {
+                for (let i=0; i<line.points.length; i+=2) {
+                   const dx = line.points[i] - pos.x;
+                   const dy = line.points[i+1] - pos.y;
+                   if (dx*dx + dy*dy < eraserRadius*eraserRadius) return false;
+                }
+                return true;
+             });
+          }
+          if (page.shapes) {
+             page.shapes = page.shapes.filter(s => {
+                const minX = Math.min(s.x1, s.x2); const maxX = Math.max(s.x1, s.x2);
+                const minY = Math.min(s.y1, s.y2); const maxY = Math.max(s.y1, s.y2);
+                if (pos.x >= minX - eraserRadius && pos.x <= maxX + eraserRadius && pos.y >= minY - eraserRadius && pos.y <= maxY + eraserRadius) return false;
+                return true;
+             });
+          }
+          if (page.texts) {
+             page.texts = page.texts.filter(t => {
+                if (pos.x >= t.x - eraserRadius && pos.x <= t.x + 200 + eraserRadius && pos.y >= t.y - eraserRadius && pos.y <= t.y + 50 + eraserRadius) return false;
+                return true;
+             });
+          }
+          if (page.stickers) {
+             page.stickers = page.stickers.filter(st => {
+                if (pos.x >= st.x - eraserRadius && pos.x <= st.x + 150 + eraserRadius && pos.y >= st.y - eraserRadius && pos.y <= st.y + 150 + eraserRadius) return false;
+                return true;
+             });
+          }
+       });
+       return;
+    }
     
     if (tool === 'laser') {
        setLaserLines(prev => {
@@ -1156,11 +1233,18 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                     
                     {/* Sticker Palette */}
                     {tool === 'sticker' && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
                       {['#FEF08A', '#FBCFE8', '#BAE6FD', '#BBF7D0'].map(c => (
                          <div key={c} className="cancel-drag" onClick={() => setPenColor(c)} style={{ width: 32, height: 32, borderRadius: 8, background: c, cursor: 'pointer', outline: penColor === c ? '2px solid #3B82F6' : 'none', outlineOffset: 2, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }} />
                       ))}
                     </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                       <button className="cancel-drag" onClick={() => setStickerStyle('classic')} style={{ flex: 1, padding: 8, background: stickerStyle === 'classic' ? '#E0F2FE' : '#F3F4F6', color: stickerStyle === 'classic' ? '#0369A1' : '#4B5563', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>คลาสสิก</button>
+                       <button className="cancel-drag" onClick={() => setStickerStyle('pin')} style={{ flex: 1, padding: 8, background: stickerStyle === 'pin' ? '#E0F2FE' : '#F3F4F6', color: stickerStyle === 'pin' ? '#0369A1' : '#4B5563', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>หมุดปัก</button>
+                       <button className="cancel-drag" onClick={() => setStickerStyle('tape')} style={{ flex: 1, padding: 8, background: stickerStyle === 'tape' ? '#E0F2FE' : '#F3F4F6', color: stickerStyle === 'tape' ? '#0369A1' : '#4B5563', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>เทปกาว</button>
+                    </div>
+                    </>
                     )}
                     
                     {/* Custom Toggles per tool */}
@@ -1479,12 +1563,15 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
               };
               
               if (s.type === 'rect') {
-                 return <Rect {...shapeProps} width={width} height={height} dash={s.isDashed ? [10, 5] : []} />;
+                 return <Rect key={s.id} {...shapeProps} width={width} height={height} dash={s.isDashed ? [10, 5] : []} />;
               } else if (s.type === 'circle') {
                  const radius = Math.sqrt(width * width + height * height);
-                 return <Circle {...shapeProps} radius={radius} />;
+                 return <Circle key={s.id} {...shapeProps} radius={radius} />;
+              } else if (s.type === 'triangle') {
+                 const radius = Math.sqrt(width * width + height * height);
+                 return <RegularPolygon key={s.id} {...shapeProps} sides={3} radius={radius} />;
               } else if (s.type === 'line') {
-                 return <Path {...shapeProps} data={`M 0 0 L ${width} ${height}`} lineCap="round" lineJoin="round" />;
+                 return <Path key={s.id} {...shapeProps} data={`M 0 0 L ${width} ${height}`} lineCap="round" lineJoin="round" />;
               }
               return null;
             })}
@@ -1571,21 +1658,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
               );
             })}
             
-            {/* Shapes */}
-            {currentPage.shapes && currentPage.shapes.map((s, i) => {
-              const width = s.x2 - s.x1;
-              const height = s.y2 - s.y1;
-              if (s.type === 'rect') {
-                 return <Rect key={s.id} x={s.x1} y={s.y1} width={width} height={height} stroke={s.color} strokeWidth={s.size} opacity={s.opacity} dash={s.isDashed ? [10, 5] : []} />;
-              } else if (s.type === 'circle') {
-                 const radius = Math.sqrt(width * width + height * height);
-                 return <Circle key={s.id} x={s.x1} y={s.y1} radius={radius} stroke={s.color} strokeWidth={s.size} opacity={s.opacity} />;
-              } else if (s.type === 'line') {
-                 return <Path key={s.id} data={`M ${s.x1} ${s.y1} L ${s.x2} ${s.y2}`} stroke={s.color} strokeWidth={s.size} opacity={s.opacity} lineCap="round" lineJoin="round" />;
-              }
-              return null;
-            })}
-            
+
             {/* Lasso Selection Rect */}
             {tool === 'lasso' && lassoRect && selectedLassoLines.length === 0 && (
                <Rect x={lassoRect.x} y={lassoRect.y} width={lassoRect.w} height={lassoRect.h} stroke="var(--teal)" strokeWidth={1} dash={[5, 5]} fill="rgba(0, 169, 143, 0.1)" />
@@ -1688,6 +1761,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                    } else if (tool === 'text') {
                       setEditingTextId(t.id);
                       setEditingTextValue(t.text);
+                      isEditingText.current = true;
                    }
                 }}
                 onTap={() => {
@@ -1696,6 +1770,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                    } else if (tool === 'text') {
                       setEditingTextId(t.id);
                       setEditingTextValue(t.text);
+                      isEditingText.current = true;
                    }
                 }}
               >
@@ -1745,9 +1820,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                        else playAudioSticker(currentPageIndex, st.id, st.audioUrl);
                     }}
                   >
-                    <Circle radius={24} fill={st.isPlaying ? '#10B981' : '#F59E0B'} shadowColor="rgba(0,0,0,0.2)" shadowBlur={10} shadowOffsetY={4} />
-                    <Text text="🎤" fontSize={24} x={-12} y={-12} />
-                    {st.isPlaying && <Circle radius={24} stroke="#10B981" strokeWidth={4} dash={[10, 5]} />}
+                    <Rect width={130} height={44} fill={st.isPlaying ? '#10B981' : 'white'} cornerRadius={22} shadowColor="rgba(0,0,0,0.1)" shadowBlur={8} shadowOffsetY={3} stroke="#F3F4F6" strokeWidth={1} />
+                    <Circle radius={16} x={22} y={22} fill={st.isPlaying ? 'rgba(255,255,255,0.2)' : '#E0F2FE'} />
+                    <Text text="🎤" fontSize={16} x={14} y={14} fill={st.isPlaying ? 'white' : '#0284C7'} />
+                    <Text text={st.isPlaying ? "กำลังเล่น..." : "เล่นเสียง"} fontSize={14} x={48} y={15} fill={st.isPlaying ? 'white' : '#4B5563'} fontFamily="Kanit, sans-serif" fontWeight={500} />
                   </Group>
                 );
               }
@@ -1783,8 +1859,24 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                   onDblClick={(e) => { e.cancelBubble = true; setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); }}
                   onTap={(e) => { e.cancelBubble = true; setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); }}
                 >
-                  <Rect width={150} height={150} fill={st.color} shadowColor="rgba(0,0,0,0.15)" shadowBlur={10} shadowOffsetY={4} cornerRadius={4} />
-                  <Rect width={150} height={20} fill="rgba(0,0,0,0.05)" cornerRadius={[4, 4, 0, 0]} />
+                  <Rect width={150} height={150} fill={st.color} shadowColor="rgba(0,0,0,0.15)" shadowBlur={10} shadowOffsetY={4} cornerRadius={2} />
+                  
+                  {(!st.style || st.style === 'classic') ? (
+                     <>
+                        <Rect width={150} height={20} fill="rgba(0,0,0,0.05)" cornerRadius={[2, 2, 0, 0]} />
+                        <Path data="M 150 150 L 130 150 L 150 130 Z" fill="rgba(0,0,0,0.08)" />
+                     </>
+                  ) : st.style === 'pin' ? (
+                     <>
+                        <Circle x={75} y={12} radius={5} fill="#EF4444" shadowColor="rgba(0,0,0,0.3)" shadowBlur={3} shadowOffsetY={1} />
+                        <Circle x={74} y={11} radius={2} fill="#FCA5A5" />
+                     </>
+                  ) : st.style === 'tape' ? (
+                     <>
+                        <Rect x={45} y={-8} width={60} height={20} fill="rgba(255,255,255,0.5)" rotation={-2} shadowColor="rgba(0,0,0,0.05)" shadowBlur={2} shadowOffsetY={1} />
+                     </>
+                  ) : null}
+
                   {editingStickerId !== st.id && st.text && (
                      <Text text={st.text} x={10} y={24} width={130} height={116} fontSize={16} fill="#111827" fontFamily="Kanit, sans-serif" />
                   )}
@@ -1841,6 +1933,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                 }
                 setEditingTextId(null);
              }}
+             onPointerDown={(e) => e.stopPropagation()}
+             onMouseDown={(e) => e.stopPropagation()}
              style={{
                 position: 'absolute',
                 top: absoluteY,
