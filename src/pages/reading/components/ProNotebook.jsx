@@ -200,6 +200,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   const [penSize, setPenSize] = useState(4);
   const [penOpacity, setPenOpacity] = useState(1);
   const [stickerStyle, setStickerStyle] = useState('classic');
+  const [eraserSettings, setEraserSettings] = useState({ eraseLines: true, eraseHighlighterOnly: false, pressureSensitive: true });
   
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -527,6 +528,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     toast.success('ล้างหน้ากระดาษเรียบร้อย');
   };
 
+  const clearStrokes = () => {
+    pushHistory();
+    updatePage(currentPageIndex, (page) => {
+       page.lines = [];
+    });
+    toast.success('ล้างเส้นทั้งหมดแล้ว');
+  };
+
   const deletePage = () => {
     if (pages.length <= 1) return toast.error("ไม่สามารถลบหน้าสุดท้ายได้");
     pushHistory();
@@ -711,8 +720,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
        // Erase on click
        const eraserRadius = 20;
        updatePage(currentPageIndex, (page) => {
-          if (page.lines) {
+          if (page.lines && eraserSettings.eraseLines) {
              page.lines = page.lines.filter(line => {
+                if (eraserSettings.eraseHighlighterOnly && line.tool !== 'highlighter') return true;
                 for (let i=0; i<line.points.length; i+=2) {
                    const dx = line.points[i] - pos.x;
                    const dy = line.points[i+1] - pos.y;
@@ -721,7 +731,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                 return true;
              });
           }
-          if (page.shapes) {
+          if (page.shapes && eraserSettings.eraseLines && !eraserSettings.eraseHighlighterOnly) {
              page.shapes = page.shapes.filter(s => {
                 const minX = Math.min(s.x1, s.x2); const maxX = Math.max(s.x1, s.x2);
                 const minY = Math.min(s.y1, s.y2); const maxY = Math.max(s.y1, s.y2);
@@ -761,8 +771,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     if (tool === 'eraser') {
        const eraserRadius = 20;
        updatePage(currentPageIndex, (page) => {
-          if (page.lines) {
+          if (page.lines && eraserSettings.eraseLines) {
              page.lines = page.lines.filter(line => {
+                if (eraserSettings.eraseHighlighterOnly && line.tool !== 'highlighter') return true;
                 for (let i=0; i<line.points.length; i+=2) {
                    const dx = line.points[i] - pos.x;
                    const dy = line.points[i+1] - pos.y;
@@ -771,7 +782,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                 return true;
              });
           }
-          if (page.shapes) {
+          if (page.shapes && eraserSettings.eraseLines && !eraserSettings.eraseHighlighterOnly) {
              page.shapes = page.shapes.filter(s => {
                 const minX = Math.min(s.x1, s.x2); const maxX = Math.max(s.x1, s.x2);
                 const minY = Math.min(s.y1, s.y2); const maxY = Math.max(s.y1, s.y2);
@@ -1270,15 +1281,21 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                        <>
                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: 14, color: '#4B5563' }}>ลบเส้น</span>
-                          <div style={{ width: 44, height: 24, borderRadius: 12, background: '#E5E7EB', position: 'relative', cursor: 'pointer' }}><div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, left: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}></div></div>
+                          <div onClick={() => setEraserSettings(s => ({...s, eraseLines: !s.eraseLines}))} style={{ width: 44, height: 24, borderRadius: 12, background: eraserSettings.eraseLines ? '#3B82F6' : '#E5E7EB', position: 'relative', cursor: 'pointer', transition: '0.2s' }}>
+                             <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, left: eraserSettings.eraseLines ? 22 : 2, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', transition: '0.2s' }}></div>
+                          </div>
                        </div>
-                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
                           <span style={{ fontSize: 14, color: '#4B5563' }}>ลบเฉพาะปากกาเน้นข้อความ</span>
-                          <div style={{ width: 44, height: 24, borderRadius: 12, background: '#E5E7EB', position: 'relative', cursor: 'pointer' }}><div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, left: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}></div></div>
+                          <div onClick={() => setEraserSettings(s => ({...s, eraseHighlighterOnly: !s.eraseHighlighterOnly}))} style={{ width: 44, height: 24, borderRadius: 12, background: eraserSettings.eraseHighlighterOnly ? '#3B82F6' : '#E5E7EB', position: 'relative', cursor: 'pointer', transition: '0.2s' }}>
+                             <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, left: eraserSettings.eraseHighlighterOnly ? 22 : 2, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', transition: '0.2s' }}></div>
+                          </div>
                        </div>
-                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #F3F4F6', paddingTop: 16 }}>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #F3F4F6', paddingTop: 16, marginTop: 16 }}>
                           <span style={{ fontSize: 14, color: '#4B5563' }}>ไวต่อแรงกด</span>
-                          <div style={{ width: 44, height: 24, borderRadius: 12, background: '#3B82F6', position: 'relative', cursor: 'pointer' }}><div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, right: 2 }}></div></div>
+                          <div onClick={() => setEraserSettings(s => ({...s, pressureSensitive: !s.pressureSensitive}))} style={{ width: 44, height: 24, borderRadius: 12, background: eraserSettings.pressureSensitive ? '#3B82F6' : '#E5E7EB', position: 'relative', cursor: 'pointer', transition: '0.2s' }}>
+                             <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, left: eraserSettings.pressureSensitive ? 22 : 2, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', transition: '0.2s' }}></div>
+                          </div>
                        </div>
                        </>
                     )}
@@ -1303,7 +1320,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                  
                  {tool === 'eraser' && (
                     <div style={{ background: '#F9FAFB', padding: '12px 20px', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
-                       <button style={{ width: '100%', padding: '10px', borderRadius: 24, border: '1px solid #E5E7EB', background: 'white', color: '#3B82F6', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>ล้างเส้น</button>
+                       <button onClick={clearStrokes} style={{ width: '100%', padding: '10px', borderRadius: 24, border: '1px solid #E5E7EB', background: 'white', color: '#3B82F6', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>ล้างเส้น</button>
                     </div>
                  )}
               </div>

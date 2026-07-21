@@ -906,7 +906,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
         </div>
 
         {/* Workspace Split */}
-        <div style={{ display: "grid", gridTemplateColumns: showNotebook ? "1.2fr 1.5fr" : "1fr 2.2fr", gap: showNotebook ? 2 : 18, flex: 1, minHeight: 0 }} className="reader-split">
+        <div style={{ display: "grid", gridTemplateColumns: showNotebook ? "1fr 1fr" : "1fr 2.2fr", gap: showNotebook ? 2 : 18, flex: 1, minHeight: 0 }} className="reader-split">
           <style dangerouslySetInnerHTML={{
             __html: `
             .mobile-only-btn {
@@ -962,7 +962,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
           />
 
           {/* Right Panel: Embedded Google Preview Viewer */}
-          <div className="reader-preview" style={{ borderRadius: 16, overflow: "hidden", border: "1px solid var(--br2)", background: "var(--bg2)", height: "100%", display: showNotebook ? "block" : "block" }}>
+          <div className="reader-preview" style={{ borderRadius: 16, overflow: "hidden", border: "1px solid var(--br2)", background: "var(--bg2)", height: "100%", minWidth: 0, display: showNotebook ? "block" : "block" }}>
             {activeBook.book.fileUrl ? (
               <iframe
                 src={getPreviewUrl(activeBook.book.fileUrl)}
@@ -981,7 +981,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 
           {/* Far Right Panel: Pro Notebook (Tldraw) */}
           {showNotebook && (
-            <div className="reader-notebook" style={{ height: "100%" }}>
+            <div className="reader-notebook" style={{ height: "100%", minWidth: 0 }}>
               <ProNotebook bookId={activeBook.book.id} uid={uid} activeBook={activeBook} />
             </div>
           )}
