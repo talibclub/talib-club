@@ -1190,20 +1190,30 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
          </div>
       )}
 
-      {/* NEW: Huawei Notes Main Toolbar (Sticky & Scrollable) */}
+      {/* NEW: Huawei Notes Main Toolbar (Sticky & Split layout) */}
       {!readonly && (
          <div style={{ position: 'relative', zIndex: 40, width: '100%' }}>
-            <div style={{ height: 52, flexShrink: 0, width: '100%', background: 'white', display: 'flex', alignItems: 'center', padding: '0 16px', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.05)', overflowX: 'auto' }} className="hide-scroll">
-               <button onClick={undo} disabled={!canUndo} className="cancel-drag" style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: 'transparent', color: canUndo ? '#4B5563' : '#D1D5DB', cursor: canUndo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                 <Undo2 size={20} strokeWidth={1.5} />
-               </button>
-               <button onClick={redo} disabled={!canRedo} className="cancel-drag" style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: 'transparent', color: canRedo ? '#4B5563' : '#D1D5DB', cursor: canRedo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                 <Redo2 size={20} strokeWidth={1.5} />
-               </button>
+            <div style={{ height: 52, flexShrink: 0, width: '100%', background: 'white', display: 'flex', alignItems: 'center', padding: '0 16px', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
                
-               <div style={{ width: 1, background: '#E5E7EB', height: 24, flexShrink: 0, margin: '0 4px' }}></div>
-               
-               <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+               {/* Left Half: Tools (Scrollable) */}
+               <div 
+                  className="hide-scroll" 
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}
+                  onWheel={(e) => {
+                     if (e.deltaY !== 0) {
+                        e.currentTarget.scrollLeft += e.deltaY;
+                     }
+                  }}
+               >
+                  <button onClick={undo} disabled={!canUndo} className="cancel-drag" style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: 'transparent', color: canUndo ? '#4B5563' : '#D1D5DB', cursor: canUndo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Undo2 size={20} strokeWidth={1.5} />
+                  </button>
+                  <button onClick={redo} disabled={!canRedo} className="cancel-drag" style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: 'transparent', color: canRedo ? '#4B5563' : '#D1D5DB', cursor: canRedo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Redo2 size={20} strokeWidth={1.5} />
+                  </button>
+                  
+                  <div style={{ width: 1, background: '#E5E7EB', height: 24, flexShrink: 0, margin: '0 8px' }}></div>
+                  
                   {[
                     { id: 'pan', icon: Pointer, title: 'เลื่อนกระดาน' },
                     { id: 'pen', icon: PenTool, title: 'ปากกาลูกลื่น' },
@@ -1228,8 +1238,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                           else if (t.id === 'mic') toggleRecording();
                           else {
                              setTool(t.id); 
-                             if (t.id === tool && ['pen', 'fountain-pen', 'marker', 'pencil', 'highlighter', 'text', 'shape', 'eraser', 'lasso'].includes(t.id)) setShowToolSettings(!showToolSettings); 
-                             else setShowToolSettings(true);
                           }
                        }}
                        style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: tool === t.id && !['image','mic'].includes(t.id) ? '#E0E7FF' : 'transparent', color: tool === t.id && !['image','mic'].includes(t.id) ? '#3B82F6' : (t.id === 'mic' && isRecording ? '#EF4444' : '#4B5563'), cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', position: 'relative' }}
@@ -1238,9 +1246,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                        {t.id === 'mic' && isRecording && <div style={{ position: 'absolute', top: -4, right: -4, width: 8, height: 8, borderRadius: '50%', background: '#EF4444' }}></div>}
                      </button>
                   ))}
+
                   {selectedId && (
                      <>
-                        <div style={{ width: 1, background: '#E5E7EB', height: 24, flexShrink: 0, margin: '0 4px' }}></div>
+                        <div style={{ width: 1, background: '#E5E7EB', height: 24, flexShrink: 0, margin: '0 8px' }}></div>
                         {currentPage.images?.find(i => i.id === selectedId) && (
                            <button onClick={() => setCroppingImageId(selectedId)} title="ครอบตัด" style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: '#E0F2FE', color: '#0369A1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', marginRight: 4 }}>
                               <Scissors size={18} strokeWidth={1.5} />
@@ -1253,141 +1262,60 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                   )}
                </div>
 
-               <div style={{ width: 1, background: '#E5E7EB', height: 24, flexShrink: 0, margin: '0 4px' }}></div>
-               
-               {/* Direct Palette */}
-               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                  {['#3B82F6', '#1D4ED8', '#111827', '#10B981', '#8B5CF6', '#EF4444'].map(c => (
-                     <div key={c} onClick={() => setPenColor(c)} style={{ width: 22, height: 22, borderRadius: '50%', background: c, cursor: 'pointer', border: penColor === c ? '2px solid #3B82F6' : '2px solid transparent', boxShadow: '0 0 0 1px rgba(0,0,0,0.05)', outline: penColor === c ? '2px solid white' : 'none', outlineOffset: -2 }} />
-                  ))}
-               </div>
-               
-               <div style={{ width: 1, background: '#E5E7EB', height: 24, flexShrink: 0, margin: '0 4px' }}></div>
-               
-               {/* Direct Size Slider */}
-               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, paddingRight: 16 }}>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: '#6B7280' }}>ขนาดเส้น</span>
-                  <input type="range" min="1" max="48" step="1" value={penSize} onChange={(e) => setPenSize(parseInt(e.target.value))} style={{ width: 100, accentColor: '#3B82F6', cursor: 'pointer' }} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#111827', width: 20 }}>{penSize}</span>
+               {/* Right Half: Tool Options (Fixed/Scrollable Context) */}
+               <div className="hide-scroll" style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, borderLeft: '1px solid #E5E7EB', paddingLeft: 12, overflowX: 'auto', maxWidth: '45%' }} onWheel={(e) => { if (e.deltaY !== 0) e.currentTarget.scrollLeft += e.deltaY; }}>
+                  {['pen', 'fountain-pen', 'marker', 'pencil', 'highlighter', 'shape'].includes(tool) && (
+                     <>
+                        {tool === 'shape' && (
+                           <div style={{ display: 'flex', gap: 4, marginRight: 8, flexShrink: 0 }}>
+                              <Square size={24} strokeWidth={1.5} color={shapeType === 'rect' ? '#3B82F6' : '#9CA3AF'} style={{cursor:'pointer'}} onClick={() => setShapeType('rect')} />
+                              <Circle size={24} strokeWidth={1.5} color={shapeType === 'circle' ? '#3B82F6' : '#9CA3AF'} style={{cursor:'pointer'}} onClick={() => setShapeType('circle')} />
+                              <Triangle size={24} strokeWidth={1.5} color={shapeType === 'triangle' ? '#3B82F6' : '#9CA3AF'} style={{cursor:'pointer'}} onClick={() => setShapeType('triangle')} />
+                              <Minus size={24} strokeWidth={1.5} color={shapeType === 'line' ? '#3B82F6' : '#9CA3AF'} style={{cursor:'pointer'}} onClick={() => setShapeType('line')} />
+                           </div>
+                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                           {['#3B82F6', '#1D4ED8', '#111827', '#10B981', '#8B5CF6', '#EF4444'].map(c => (
+                              <div key={c} onClick={() => setPenColor(c)} style={{ width: 22, height: 22, borderRadius: '50%', background: c, cursor: 'pointer', border: penColor === c ? '2px solid #3B82F6' : '2px solid transparent', boxShadow: '0 0 0 1px rgba(0,0,0,0.05)', outline: penColor === c ? '2px solid white' : 'none', outlineOffset: -2 }} />
+                           ))}
+                        </div>
+                        <div style={{ width: 1, background: '#E5E7EB', height: 20, flexShrink: 0 }}></div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                           <input type="range" min="1" max="48" step="1" value={penSize} onChange={(e) => setPenSize(parseInt(e.target.value))} style={{ width: 60, accentColor: '#3B82F6', cursor: 'pointer' }} />
+                           <span style={{ fontSize: 12, fontWeight: 600, color: '#111827', width: 20 }}>{penSize}</span>
+                        </div>
+                     </>
+                  )}
+
+                  {tool === 'sticker' && (
+                     <>
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          {['#FEF08A', '#FBCFE8', '#BAE6FD', '#BBF7D0'].map(c => (
+                             <div key={c} onClick={() => setPenColor(c)} style={{ width: 22, height: 22, borderRadius: 6, background: c, cursor: 'pointer', outline: penColor === c ? '2px solid #3B82F6' : 'none', outlineOffset: 2, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }} />
+                          ))}
+                        </div>
+                        <div style={{ width: 1, background: '#E5E7EB', height: 20, flexShrink: 0 }}></div>
+                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                           {['classic', 'pin', 'tape', 'round'].map(s => (
+                              <button key={s} onClick={() => setStickerStyle(s)} style={{ padding: '4px 8px', background: stickerStyle === s ? '#E0F2FE' : '#F3F4F6', color: stickerStyle === s ? '#0369A1' : '#4B5563', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                                 {s === 'classic' ? 'คลาสสิก' : s === 'pin' ? 'หมุดปัก' : s === 'tape' ? 'เทปกาว' : 'โค้งมน'}
+                              </button>
+                           ))}
+                        </div>
+                     </>
+                  )}
+
+                  {tool === 'eraser' && (
+                     <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#4B5563', cursor: 'pointer', fontWeight: 500 }}>
+                           <input type="checkbox" checked={eraserSettings.eraseLines} onChange={() => setEraserSettings(s => ({...s, eraseLines: !s.eraseLines}))} />
+                           ลบเส้น
+                        </label>
+                        <button onClick={clearStrokes} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #E5E7EB', background: 'white', color: '#EF4444', fontWeight: 600, fontSize: 11, cursor: 'pointer' }}>ล้างเส้นทั้งหมด</button>
+                     </div>
+                  )}
                </div>
             </div>
-
-            {/* Tool Settings Popover (Huawei Style) */}
-            {showToolSettings && ['pen', 'fountain-pen', 'marker', 'pencil', 'highlighter', 'shape', 'eraser', 'lasso'].includes(tool) && (
-              <div style={{ position: 'absolute', top: '100%', left: 16, background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(20px)', padding: 0, borderRadius: '0 0 16px 16px', boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', borderTop: 'none', width: 280, display: 'flex', flexDirection: 'column', overflow: 'hidden', zIndex: 150 }}>
-                 
-                 <div style={{ padding: '16px 0 12px', textAlign: 'center', fontSize: 15, fontWeight: 600, color: '#111827', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                    {tool === 'pen' ? 'ปากกาลูกลื่น' : tool === 'fountain-pen' ? 'ปากกาหมึกซึม' : tool === 'marker' ? 'มาร์กเกอร์' : tool === 'pencil' ? 'ดินสอ HB' : tool === 'highlighter' ? 'ปากกาเน้นข้อความ' : tool === 'eraser' ? 'ยางลบ' : tool === 'lasso' ? 'แลสโซ' : tool === 'sticker' ? 'โพสต์อิท' : 'รูปทรง'}
-                 </div>
-                 
-                 <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-                    {/* Shapes */}
-                    {tool === 'shape' && (
-                       <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
-                          <Square size={28} strokeWidth={1} color={shapeType === 'rect' ? '#3B82F6' : '#9CA3AF'} className="cancel-drag" style={{cursor:'pointer'}} onClick={() => setShapeType('rect')} />
-                          <Circle size={28} strokeWidth={1} color={shapeType === 'circle' ? '#3B82F6' : '#9CA3AF'} className="cancel-drag" style={{cursor:'pointer'}} onClick={() => setShapeType('circle')} />
-                          <Triangle size={28} strokeWidth={1} color={shapeType === 'triangle' ? '#3B82F6' : '#9CA3AF'} className="cancel-drag" style={{cursor:'pointer'}} onClick={() => setShapeType('triangle')} />
-                          <Minus size={28} strokeWidth={1} color={shapeType === 'line' ? '#3B82F6' : '#9CA3AF'} className="cancel-drag" style={{cursor:'pointer'}} onClick={() => setShapeType('line')} />
-                       </div>
-                    )}
-                    
-                    {/* Opacity Checkerboard Slider */}
-                    {['pen', 'pencil', 'highlighter', 'shape'].includes(tool) && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#111827', width: 32 }}>{Math.round(penOpacity * 100)}%</span>
-                      <div style={{ flex: 1, position: 'relative', height: 16, borderRadius: 8, background: 'repeating-conic-gradient(#E5E7EB 0% 25%, white 0% 50%) 50% / 12px 12px', border: '1px solid #E5E7EB', display: 'flex', alignItems: 'center' }}>
-                         <div style={{ position: 'absolute', left: 0, right: 0, height: '100%', borderRadius: 8, background: `linear-gradient(90deg, transparent, ${penColor})` }}></div>
-                         <input type="range" min="0.1" max="1" step="0.05" value={penOpacity} onChange={(e) => setPenOpacity(parseFloat(e.target.value))} style={{ width: '100%', position: 'absolute', opacity: 0, cursor: 'pointer' }} />
-                         <div style={{ position: 'absolute', left: `${penOpacity*100}%`, width: 16, height: 16, borderRadius: '50%', background: 'white', border: '1px solid #D1D5DB', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', transform: 'translate(-50%, 0)', pointerEvents: 'none' }}></div>
-                      </div>
-                    </div>
-                    )}
-                    
-                    {/* Sticker Palette */}
-                    {tool === 'sticker' && (
-                    <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-                      {['#FEF08A', '#FBCFE8', '#BAE6FD', '#BBF7D0'].map(c => (
-                         <div key={c} className="cancel-drag" onClick={() => setPenColor(c)} style={{ width: 32, height: 32, borderRadius: 8, background: c, cursor: 'pointer', outline: penColor === c ? '2px solid #3B82F6' : 'none', outlineOffset: 2, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }} />
-                      ))}
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                       <button className="cancel-drag" onClick={() => setStickerStyle('classic')} style={{ flex: '1 1 calc(50% - 4px)', padding: 8, background: stickerStyle === 'classic' ? '#E0F2FE' : '#F3F4F6', color: stickerStyle === 'classic' ? '#0369A1' : '#4B5563', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>คลาสสิก</button>
-                       <button className="cancel-drag" onClick={() => setStickerStyle('pin')} style={{ flex: '1 1 calc(50% - 4px)', padding: 8, background: stickerStyle === 'pin' ? '#E0F2FE' : '#F3F4F6', color: stickerStyle === 'pin' ? '#0369A1' : '#4B5563', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>หมุดปัก</button>
-                       <button className="cancel-drag" onClick={() => setStickerStyle('tape')} style={{ flex: '1 1 calc(50% - 4px)', padding: 8, background: stickerStyle === 'tape' ? '#E0F2FE' : '#F3F4F6', color: stickerStyle === 'tape' ? '#0369A1' : '#4B5563', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>เทปกาว</button>
-                       <button className="cancel-drag" onClick={() => setStickerStyle('round')} style={{ flex: '1 1 calc(50% - 4px)', padding: 8, background: stickerStyle === 'round' ? '#E0F2FE' : '#F3F4F6', color: stickerStyle === 'round' ? '#0369A1' : '#4B5563', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>โค้งมน</button>
-                    </div>
-                    </>
-                    )}
-                    
-                    {/* Custom Toggles per tool */}
-                    {tool === 'highlighter' && (
-                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #F3F4F6', paddingTop: 16 }}>
-                          <span style={{ fontSize: 14, color: '#4B5563' }}>เส้นตรง</span>
-                          <div style={{ width: 44, height: 24, borderRadius: 12, background: '#3B82F6', position: 'relative', cursor: 'pointer' }}>
-                             <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, right: 2 }}></div>
-                          </div>
-                       </div>
-                    )}
-
-                    {tool === 'shape' && (
-                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #F3F4F6', paddingTop: 16 }}>
-                          <span style={{ fontSize: 14, color: '#4B5563' }}>หยุดชั่วคราวเพื่อสิ้นสุดการสร้างรูปร่าง</span>
-                          <div style={{ width: 44, height: 24, borderRadius: 12, background: '#3B82F6', position: 'relative', cursor: 'pointer' }}>
-                             <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, right: 2 }}></div>
-                          </div>
-                       </div>
-                    )}
-                    
-                    {tool === 'eraser' && (
-                       <>
-                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 14, color: '#4B5563' }}>ลบเส้น</span>
-                          <div onClick={() => setEraserSettings(s => ({...s, eraseLines: !s.eraseLines}))} style={{ width: 44, height: 24, borderRadius: 12, background: eraserSettings.eraseLines ? '#3B82F6' : '#E5E7EB', position: 'relative', cursor: 'pointer', transition: '0.2s' }}>
-                             <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, left: eraserSettings.eraseLines ? 22 : 2, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', transition: '0.2s' }}></div>
-                          </div>
-                       </div>
-                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-                          <span style={{ fontSize: 14, color: '#4B5563' }}>ลบเฉพาะปากกาเน้นข้อความ</span>
-                          <div onClick={() => setEraserSettings(s => ({...s, eraseHighlighterOnly: !s.eraseHighlighterOnly}))} style={{ width: 44, height: 24, borderRadius: 12, background: eraserSettings.eraseHighlighterOnly ? '#3B82F6' : '#E5E7EB', position: 'relative', cursor: 'pointer', transition: '0.2s' }}>
-                             <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, left: eraserSettings.eraseHighlighterOnly ? 22 : 2, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', transition: '0.2s' }}></div>
-                          </div>
-                       </div>
-                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #F3F4F6', paddingTop: 16, marginTop: 16 }}>
-                          <span style={{ fontSize: 14, color: '#4B5563' }}>ไวต่อแรงกด</span>
-                          <div onClick={() => setEraserSettings(s => ({...s, pressureSensitive: !s.pressureSensitive}))} style={{ width: 44, height: 24, borderRadius: 12, background: eraserSettings.pressureSensitive ? '#3B82F6' : '#E5E7EB', position: 'relative', cursor: 'pointer', transition: '0.2s' }}>
-                             <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, left: eraserSettings.pressureSensitive ? 22 : 2, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', transition: '0.2s' }}></div>
-                          </div>
-                       </div>
-                       </>
-                    )}
-
-                    {tool === 'lasso' && (
-                       <>
-                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 14, color: '#4B5563' }}>รูปภาพ</span>
-                          <div style={{ width: 44, height: 24, borderRadius: 12, background: '#3B82F6', position: 'relative', cursor: 'pointer' }}><div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, right: 2 }}></div></div>
-                       </div>
-                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 14, color: '#4B5563' }}>กล่องข้อความ</span>
-                          <div style={{ width: 44, height: 24, borderRadius: 12, background: '#3B82F6', position: 'relative', cursor: 'pointer' }}><div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, right: 2 }}></div></div>
-                       </div>
-                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 14, color: '#4B5563' }}>เอกสารแนบ</span>
-                          <div style={{ width: 44, height: 24, borderRadius: 12, background: '#3B82F6', position: 'relative', cursor: 'pointer' }}><div style={{ width: 20, height: 20, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, right: 2 }}></div></div>
-                       </div>
-                       </>
-                    )}
-                 </div>
-                 
-                 {tool === 'eraser' && (
-                    <div style={{ background: '#F9FAFB', padding: '12px 20px', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
-                       <button onClick={clearStrokes} style={{ width: '100%', padding: '10px', borderRadius: 24, border: '1px solid #E5E7EB', background: 'white', color: '#3B82F6', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>ล้างเส้น</button>
-                    </div>
-                 )}
-              </div>
-            )}
          </div>
       )}
 

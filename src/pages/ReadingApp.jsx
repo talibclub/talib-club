@@ -531,7 +531,8 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       await deleteShelfItem(id)
       toast.success("ลบหนังสือออกจากชั้นเรียบร้อยแล้ว")
     } catch (err) {
-      toast.error("ลบไม่สำเร็จ กรุณาตรวจสอบสิทธิ์")
+      console.error("Delete failed:", err);
+      toast.error("ลบไม่สำเร็จ: " + (err.message || "กรุณาตรวจสอบสิทธิ์"));
     }
   }
 
