@@ -30,10 +30,14 @@ if (command === "build") {
   const server = await preview(viteConfig)
   server.printUrls()
 } else if (command === "dev") {
+  // `--lan` binds to every interface so a tablet or phone on the same network can
+  // open the dev server and the notebook can be tried with a real stylus.
+  // Off by default: it exposes the server to anyone on that network.
+  const exposeToLan = process.argv.includes("--lan")
   const server = await createServer({
     ...viteConfig,
     server: {
-      host: "127.0.0.1",
+      host: exposeToLan ? "0.0.0.0" : "127.0.0.1",
       port: 5173,
       strictPort: false,
     },

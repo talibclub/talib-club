@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node ./scripts/vite-runner.mjs dev",
+    "dev:lan": "node ./scripts/vite-runner.mjs dev --lan",
     "build": "node ./scripts/vite-runner.mjs build",
     "preview": "node ./scripts/vite-runner.mjs preview",
     "test": "node ./scripts/run-tests.mjs"
