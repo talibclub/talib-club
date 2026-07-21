@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Image as KonvaImage, Path, Group, Circle, Text, Rect, Transformer, RegularPolygon, Line } from 'react-konva';
 import Draggable from 'react-draggable';
-import { PenTool, Highlighter, Eraser, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, GripVertical, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, FileStack, LayoutList, Check, Lock, MousePointerClick, Move3d, Triangle } from 'lucide-react';
+import { PenTool, Highlighter, Eraser, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, GripVertical, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, FileStack, LayoutList, Check, Lock, MousePointerClick, Move3d, Triangle, Cloud, CheckCircle } from 'lucide-react';
 import useImage from 'use-image';
 import getStroke from 'perfect-freehand';
 import toast from 'react-hot-toast';
@@ -59,8 +59,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [pages, setPages] = useState([{ id: 'page-default', src: null, width: 800, height: 1130, lines: [], stickers: [], images: [], texts: [], shapes: [], paperType: 'lines', paperColor: 'white' }]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
-  
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  const [isSaving, setIsSaving] = useState(false);
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
     window.addEventListener('resize', handleResize);
@@ -408,24 +408,50 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
         const targetPageIndex = currentPageIndex;
         recordingStartTimeRef.current = Date.now();
         
-        mediaRecorder.onstop = () => {
+        mediaRecorder.onstop = async () => {
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          const audioUrl = URL.createObjectURL(audioBlob);
+          const localUrl = URL.createObjectURL(audioBlob);
           
+          const stickerId = `audio-${Date.now()}`;
           let stickerX = 100;
           let stickerY = 100;
           
           updatePage(targetPageIndex, (page) => {
+             if (!page.stickers) page.stickers = [];
              page.stickers.push({
-               id: `audio-${Date.now()}`,
+               id: stickerId,
                x: stickerX,
                y: stickerY,
-               audioUrl: audioUrl,
-               isPlaying: false
+               audioUrl: localUrl,
+               isPlaying: false,
+               isUploading: true
              });
           });
           
-          toast.success('วางสติกเกอร์เสียงเรียบร้อยแล้ว!', { icon: '🎤' });
+          toast.loading('กำลังอัปโหลดเสียงลงคลาวด์...', { id: `upload-${stickerId}` });
+          
+          try {
+             const storageRef = ref(storage, `user_audio/${uid}/${Date.now()}.webm`);
+             await uploadBytes(storageRef, audioBlob);
+             const downloadUrl = await getDownloadURL(storageRef);
+             
+             updatePage(targetPageIndex, (page) => {
+                const s = page.stickers.find(st => st.id === stickerId);
+                if (s) {
+                   s.audioUrl = downloadUrl;
+                   s.isUploading = false;
+                }
+             });
+             toast.success('อัปโหลดเสียงเสร็จสิ้น!', { id: `upload-${stickerId}`, icon: '🎤' });
+          } catch (err) {
+             console.error(err);
+             toast.error('อัปโหลดเสียงล้มเหลว', { id: `upload-${stickerId}` });
+             updatePage(targetPageIndex, (page) => {
+                const s = page.stickers.find(st => st.id === stickerId);
+                if (s) s.isUploading = false;
+             });
+          }
+          
           stream.getTracks().forEach(track => track.stop());
         };
         
@@ -517,6 +543,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
 
   const saveNotebook = async (isAuto = false) => {
      if (readonly) return;
+     setIsSaving(true);
      if (!isAuto) toast.loading("กำลังบันทึกลงคลาวด์...", { id: "cloud-save" });
      try {
         await uploadNotebookData(uid, notebookId, pages);
@@ -532,11 +559,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
         }, { merge: true });
         // Backup locally
         localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pages));
-        toast.success("บันทึกคลาวด์เรียบร้อย!", { id: "cloud-save", icon: '💾' });
+        if (!isAuto) toast.success("บันทึกคลาวด์เรียบร้อย!", { id: "cloud-save", icon: '💾' });
      } catch (err) {
         console.error(err);
         localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pages));
         toast.error("บันทึกคลาวด์ล้มเหลว (เซฟลงเครื่องแล้ว)", { id: "cloud-save" });
+     } finally {
+        setTimeout(() => setIsSaving(false), 1500);
      }
   };
   const handleAddPage = () => {
@@ -956,17 +985,30 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                <button onClick={() => window.history.back()} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#111827', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <ChevronLeft size={24} strokeWidth={1.5} />
                </button>
-               <button style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#111827', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 500 }}>
-                  <span style={{ marginRight: 4 }}>i</span>
-               </button>
+               {isSaving && (
+                  <span style={{ fontSize: 13, color: '#10B981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                     <Cloud size={16} /> กำลังบันทึก...
+                  </span>
+               )}
+               {!isSaving && !readonly && (
+                  <span style={{ fontSize: 13, color: '#9CA3AF', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
+                     <CheckCircle size={16} /> บันทึกแล้ว
+                  </span>
+               )}
             </div>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
                {!readonly && (
                  <>
-                   <button onClick={() => setShowAddMenu(!showAddMenu)} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: showAddMenu ? '#F3F4F6' : 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-                      <Plus size={24} strokeWidth={1.5} />
+                   <button onClick={handleAddPage} title="เพิ่มหน้าใหม่" style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: '#F3F4F6', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: 13, transition: 'all 0.2s' }}>
+                      <FilePlus size={18} strokeWidth={1.5} /> เพิ่มหน้า
                    </button>
+                   
+                   <button onClick={() => document.getElementById('pdf-upload').click()} title="นำเข้า PDF" style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: '#E0E7FF', color: '#3B82F6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: 13, transition: 'all 0.2s' }}>
+                      <FileText size={18} strokeWidth={1.5} /> PDF
+                   </button>
+                   
+                   <div style={{ width: 1, height: 24, background: '#E5E7EB', margin: '0 4px' }}></div>
                    
                    <button onClick={() => setShowSearch(!showSearch)} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <Search size={22} strokeWidth={1.5} />
@@ -987,29 +1029,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                  </button>
                )}
 
-               {/* Add Menu Dropdown */}
-               {showAddMenu && !readonly && (
-                 <div style={{ position: 'absolute', top: 56, right: 120, zIndex: 60, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: 8, borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 220, display: 'flex', flexDirection: 'column' }}>
-                    <button onClick={handleAddPage} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <FilePlus size={20} strokeWidth={1.5} color="#4B5563" /> หน้าใหม่
-                    </button>
-                    <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>
-                    <button onClick={() => { setShowPageSettings(true); setShowAddMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <FileStack size={20} strokeWidth={1.5} color="#4B5563" /> เพิ่มไฟล์แนบ
-                    </button>
-                    <button onClick={() => { document.getElementById('image-upload').click(); setShowAddMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <ImageIcon size={20} strokeWidth={1.5} color="#4B5563" /> นำเข้ารูปภาพ
-                    </button>
-                    <button onClick={() => { document.getElementById('pdf-upload').click(); setShowAddMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <FileText size={20} strokeWidth={1.5} color="#4B5563" /> นำเข้า PDF
-                    </button>
-
-                 </div>
-               )}
-
                {/* More Menu Dropdown */}
                {showMoreMenu && !readonly && (
                  <div style={{ position: 'absolute', top: 56, right: 0, zIndex: 60, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: 8, borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 280, display: 'flex', flexDirection: 'column' }}>
+                    <button onClick={() => { document.getElementById('image-upload').click(); setShowMoreMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
+                       <ImageIcon size={20} strokeWidth={1.5} color="#4B5563" /> นำเข้ารูปภาพ
+                    </button>
+                    <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>
                     <button onClick={() => setShowPageSettings(true)} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
                        <Settings size={20} strokeWidth={1.5} color="#4B5563" /> เปลี่ยนแม่แบบกระดาษ
                     </button>
