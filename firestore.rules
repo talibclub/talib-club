@@ -29,7 +29,7 @@ service cloud.firestore {
     }
 
     function ownsExistingDocument() {
-      return signedIn() && resource.data.uid == request.auth.uid;
+      return signedIn() && (resource == null || resource.data.get('uid', request.auth.uid) == request.auth.uid);
     }
 
     function keepsOwnership() {
