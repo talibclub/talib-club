@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Image as KonvaImage, Path, Group, Circle, Text, Rect, Transformer, RegularPolygon, Line } from 'react-konva';
 import Draggable from 'react-draggable';
-import { PenTool, Highlighter, Eraser, Pen, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, GripVertical, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, FileStack, LayoutList, Check, Lock, MousePointerClick, Move3d, Triangle, Cloud, CheckCircle, Trash2, Scissors, Crop, Brush, Feather, Maximize2, Ruler, PanelLeftClose, PanelLeftOpen, Wand2, Camera, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Underline, Strikethrough, Smile, Upload, ChevronsUp, ChevronsDown, ListMusic } from 'lucide-react';
+import { PenTool, Highlighter, Eraser, Pen, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, GripVertical, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, FileStack, LayoutList, Check, Lock, MousePointerClick, Move3d, Triangle, Cloud, CheckCircle, Trash2, Scissors, Crop, Brush, Feather, Maximize2, Ruler, PanelLeftClose, PanelLeftOpen, Wand2, Camera, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Underline, Strikethrough, Smile, Upload, ChevronsUp, ChevronsDown, ListMusic, X } from 'lucide-react';
 import CropModal from './CropModal';
 import ColorPickerPanel from './ColorPickerPanel';
 import BookSnipModal from './BookSnipModal';
@@ -490,6 +490,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const [pressureEnabled, setPressureEnabled] = useState(true);
   // Snap roughly drawn shapes to clean ones when the pen lifts.
   const [autoShape, setAutoShape] = useState(false);
+  // Laser pointer colour (its own, separate from the ink colour).
+  const [laserColor, setLaserColor] = useState('#EF4444');
 
   // Formatting for the text tool. Applied to new text boxes, and to the one being
   // edited or selected so changes are visible immediately.
@@ -1013,17 +1015,82 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   };
 
 
-  const exportPage = () => {
-     const stage = stageRef.current;
-     if (!stage) return;
-     const dataURL = stage.toDataURL({ pixelRatio: 2 });
+  const downloadDataUrl = (dataUrl, filename) => {
      const link = document.createElement('a');
-     link.download = `notebook-page-${currentPageIndex + 1}.png`;
-     link.href = dataURL;
+     link.download = filename;
+     link.href = dataUrl;
      document.body.appendChild(link);
      link.click();
      document.body.removeChild(link);
-     toast.success("ดาวน์โหลดรูปภาพสำเร็จ!", { icon: '🖼️' });
+  };
+
+  const preloadImage = (src) => new Promise((resolve) => {
+     if (!src) return resolve();
+     const img = new window.Image();
+     img.onload = resolve; img.onerror = resolve;
+     img.src = src;
+  });
+
+  // Render one page cleanly (scale 1, no pan) and crop to the paper rectangle, so
+  // the export never carries the grey canvas backdrop or the current zoom.
+  const capturePageDataURL = async (index, mime = 'image/png') => {
+     const page = pagesRef.current[index];
+     if (!page) return null;
+     await preloadImage(page.src);
+     setCurrentPageIndex(index);
+     setScale(1);
+     setPosition({ x: 0, y: 0 });
+     // Let React commit, Konva redraw, and the (cached) image paint.
+     await new Promise((r) => setTimeout(r, 350));
+     const stage = stageRef.current;
+     if (!stage) return null;
+     const px = Math.max(0, (dimensions.width - page.width) / 2);
+     return stage.toDataURL({ x: px, y: 20, width: page.width, height: page.height, pixelRatio: 2, mimeType: mime });
+  };
+
+  const [showExport, setShowExport] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportFormat, setExportFormat] = useState('png'); // 'png' | 'pdf'
+  const [exportScope, setExportScope] = useState('current'); // 'current' | 'all'
+
+  const runExport = async (format, scope) => {
+     setExporting(true);
+     const savedIndex = currentPageIndex, savedScale = scale, savedPos = position;
+     try {
+        const indices = scope === 'all' ? pagesRef.current.map((_, i) => i) : [currentPageIndex];
+        const shots = [];
+        for (let k = 0; k < indices.length; k++) {
+           toast.loading(`กำลังเตรียมไฟล์ (${k + 1}/${indices.length})...`, { id: 'export' });
+           const page = pagesRef.current[indices[k]];
+           const url = await capturePageDataURL(indices[k], format === 'pdf' ? 'image/jpeg' : 'image/png');
+           if (url) shots.push({ url, w: page.width, h: page.height, index: indices[k] });
+        }
+        if (shots.length === 0) { toast.error('ไม่สามารถสร้างไฟล์ได้', { id: 'export' }); return; }
+
+        if (format === 'png') {
+           shots.forEach((s) => downloadDataUrl(s.url, `notebook-page-${s.index + 1}.png`));
+           toast.success(shots.length > 1 ? `ดาวน์โหลด ${shots.length} รูปแล้ว` : 'ดาวน์โหลดรูปแล้ว', { id: 'export', icon: '🖼️' });
+        } else {
+           const { jsPDF } = await import('jspdf');
+           const first = shots[0];
+           const pdf = new jsPDF({ orientation: first.w > first.h ? 'landscape' : 'portrait', unit: 'px', format: [first.w, first.h] });
+           shots.forEach((s, k) => {
+              if (k > 0) pdf.addPage([s.w, s.h], s.w > s.h ? 'landscape' : 'portrait');
+              pdf.addImage(s.url, 'JPEG', 0, 0, s.w, s.h);
+           });
+           pdf.save(`notebook-${Date.now()}.pdf`);
+           toast.success('ดาวน์โหลด PDF แล้ว', { id: 'export', icon: '📄' });
+        }
+     } catch (err) {
+        console.error('Export failed', err);
+        toast.error('ส่งออกไม่สำเร็จ', { id: 'export' });
+     } finally {
+        setCurrentPageIndex(savedIndex);
+        setScale(savedScale);
+        setPosition(savedPos);
+        setExporting(false);
+        setShowExport(false);
+     }
   };
 
   const getPointerPosRelativeToPage = () => {
@@ -1222,7 +1289,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     
     if (tool === 'laser') {
        isDrawing.current = true;
-       setLaserLines(prev => [...prev, { id: Date.now(), color: penColor, size: penSize, points: [pos.x, pos.y, pos.x, pos.y] }]);
+       setLaserLines(prev => [...prev, { id: Date.now(), color: laserColor, size: penSize, points: [pos.x, pos.y, pos.x, pos.y] }]);
        return;
     }
     
@@ -2156,9 +2223,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       {/* Huawei Notes Top Navigation Bar (Fixed App Header) */}
          <div className="hide-scroll" style={{ height: 52, flexShrink: 0, width: '100%', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', zIndex: 50, borderBottom: `1px solid ${HW.hairline}`, overflowX: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-               <button onClick={() => window.history.back()} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: HW.text, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <ChevronLeft size={24} strokeWidth={1.5} />
-               </button>
+               {/* No in-notebook back button: it called window.history.back(), which
+                   would kick the user out of the reading room entirely. The reader
+                   (and the gallery viewer) already provide their own exit. */}
                {/* Page stepper (Huawei keeps this in the header, not over the canvas) */}
                {!isMobile && (
                  <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.04)', borderRadius: 100, padding: '2px 4px' }}>
@@ -2248,8 +2315,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                  </>
                )}
                {readonly && (
-                 <button onClick={exportPage} style={{ padding: '8px 16px', borderRadius: 20, border: 'none', background: 'var(--teal)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600 }}>
-                    <Download size={18} strokeWidth={2} /> Export Image
+                 <button onClick={() => setShowExport(true)} style={{ padding: '8px 16px', borderRadius: 20, border: 'none', background: 'var(--teal)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600 }}>
+                    <Download size={18} strokeWidth={2} /> ส่งออก
                  </button>
                )}
 
@@ -2280,6 +2347,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                     <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>
                     <button onClick={() => setShowPageSettings(true)} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
                        <Settings size={20} strokeWidth={1.5} color="#4B5563" /> เปลี่ยนแม่แบบกระดาษ
+                    </button>
+                    <button onClick={() => { setShowExport(true); setShowMoreMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
+                       <Download size={20} strokeWidth={1.5} color="#4B5563" /> ส่งออก (รูป / PDF)
                     </button>
                     <button onClick={toggleBookmark} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
                        <Bookmark size={20} strokeWidth={1.5} color={pages[currentPageIndex]?.isBookmarked ? "#F59E0B" : "#4B5563"} fill={pages[currentPageIndex]?.isBookmarked ? "#F59E0B" : "none"} /> {pages[currentPageIndex]?.isBookmarked ? "ลบบุ๊คมาร์ก" : "บุ๊คมาร์กหน้า"}
@@ -2405,7 +2475,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                           // options right away (nobody discovers a second tap), and
                           // the popover tucks itself away as soon as drawing starts.
                           // Tapping the active tool toggles the popover.
-                          const hasOptions = ['pen', 'fountain', 'marker', 'pencil', 'highlighter', 'shape', 'sticker', 'eraser', 'text'].includes(t.id);
+                          const hasOptions = ['pen', 'fountain', 'marker', 'pencil', 'highlighter', 'shape', 'sticker', 'eraser', 'text', 'laser'].includes(t.id);
                           if (tool === t.id) setShowToolOptions(v => !v);
                           else { setTool(t.id); setShowToolOptions(hasOptions); setShowColorPicker(false); }
                        }}
@@ -2467,14 +2537,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
             )}
 
             {/* Tool options popover — floats above the capsule, Huawei style */}
-            {showToolOptions && ['pen', 'fountain', 'marker', 'pencil', 'highlighter', 'shape', 'sticker', 'eraser', 'text'].includes(tool) && (
+            {showToolOptions && ['pen', 'fountain', 'marker', 'pencil', 'highlighter', 'shape', 'sticker', 'eraser', 'text', 'laser'].includes(tool) && (
               <div className="hide-scroll" style={{ order: -1, display: 'flex', alignItems: 'center', gap: 12, maxWidth: '100%', overflowX: 'auto', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, borderRadius: 16, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`, padding: '10px 14px' }} onWheel={(e) => { if (e.deltaY !== 0) e.currentTarget.scrollLeft += e.deltaY; }} {...rightToolbarScroll}>
                   {['pen', 'fountain', 'marker', 'pencil', 'highlighter', 'shape'].includes(tool) && (
                      <>
                         {tool === 'shape' && (
                            <>
                              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                                {[{ t: 'rect', Icon: Square }, { t: 'circle', Icon: Circle }, { t: 'triangle', Icon: Triangle }, { t: 'line', Icon: Minus }].map(({ t, Icon }) => (
+                                {[{ t: 'rect', Icon: Square }, { t: 'circle', Icon: CircleIcon }, { t: 'triangle', Icon: Triangle }, { t: 'line', Icon: Minus }].map(({ t, Icon }) => (
                                   <button key={t} onClick={() => setShapeType(t)} style={{ width: 32, height: 32, borderRadius: 10, border: 'none', background: shapeType === t ? HW.accentSoft : 'transparent', color: shapeType === t ? HW.accent : '#9CA3AF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <Icon size={20} strokeWidth={1.6} />
                                   </button>
@@ -2707,6 +2777,22 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                            ลบวัตถุด้วย
                         </label>
                         <button onClick={clearStrokes} style={{ padding: '5px 10px', borderRadius: 9, border: `1px solid ${HW.hairline}`, background: 'white', color: '#EF4444', fontWeight: 600, fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>ล้างเส้นทั้งหมด</button>
+                     </div>
+                  )}
+
+                  {tool === 'laser' && (
+                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: HW.textDim, fontFamily: 'Kanit, sans-serif', flexShrink: 0 }}>สีเลเซอร์</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+                           {['#EF4444', '#F97316', '#FACC15', '#22C55E', '#3B82F6', '#A855F7', '#EC4899', '#FFFFFF'].map(c => (
+                              <div
+                                key={c}
+                                onClick={() => setLaserColor(c)}
+                                title={c}
+                                style={{ width: 22, height: 22, borderRadius: '50%', background: c, cursor: 'pointer', flexShrink: 0, boxShadow: `inset 0 0 0 1px ${HW.hairline}`, outline: laserColor === c ? `2px solid ${HW.accent}` : 'none', outlineOffset: 2 }}
+                              />
+                           ))}
+                        </div>
                      </div>
                   )}
               </div>
@@ -3699,6 +3785,46 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                 <button onClick={() => { const cp = pages[currentPageIndex]; if (!cp?.src) applyPaper({ paperType: cp?.paperType, paperColor: cp?.paperColor }, true); toast.success('ใช้กับทุกหน้าแล้ว'); }} disabled={!!cur.src} style={{ flex: 1, height: 42, borderRadius: 11, border: '1px solid #D1D5DB', background: 'white', color: cur.src ? '#D1D5DB' : '#4B5563', fontWeight: 600, cursor: cur.src ? 'default' : 'pointer', fontFamily: 'Kanit, sans-serif', fontSize: 13.5 }}>ใช้กับทุกหน้า</button>
                 <button onClick={() => setShowPageSettings(false)} style={{ flex: 1, height: 42, borderRadius: 11, border: 'none', background: HW.accent, color: 'white', fontWeight: 600, cursor: 'pointer', fontFamily: 'Kanit, sans-serif', fontSize: 13.5 }}>เสร็จสิ้น</button>
               </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Export modal — choose format (image / PDF) and scope (this page / all) */}
+      {showExport && (() => {
+        const Choice = ({ selected, onClick, icon, title, sub }) => (
+          <button onClick={onClick} disabled={exporting} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '16px 12px', borderRadius: 14, border: `2px solid ${selected ? HW.accent : 'rgba(0,0,0,0.08)'}`, background: selected ? HW.accentSoft : 'white', cursor: exporting ? 'default' : 'pointer', transition: 'all 0.15s' }}>
+            {icon}
+            <span style={{ fontSize: 14, fontWeight: 700, color: selected ? HW.accent : '#111827', fontFamily: 'Kanit, sans-serif' }}>{title}</span>
+            {sub && <span style={{ fontSize: 11.5, color: '#9CA3AF', fontFamily: 'Kanit, sans-serif' }}>{sub}</span>}
+          </button>
+        );
+        return (
+          <div onPointerDown={(e) => { if (e.target === e.currentTarget && !exporting) setShowExport(false); }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div style={{ background: 'white', borderRadius: 18, width: '100%', maxWidth: 440, padding: 22, boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#111827', fontFamily: 'Kanit, sans-serif' }}>ส่งออกสมุดโน้ต</h3>
+                <button onClick={() => !exporting && setShowExport(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6B7280', display: 'flex' }}><X size={22} /></button>
+              </div>
+
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#6B7280', marginBottom: 8, fontFamily: 'Kanit, sans-serif' }}>รูปแบบไฟล์</div>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 18 }}>
+                <Choice selected={exportFormat === 'png'} onClick={() => setExportFormat('png')} icon={<ImageIcon size={26} color={exportFormat === 'png' ? HW.accent : '#6B7280'} />} title="รูปภาพ" sub="ไฟล์ .png" />
+                <Choice selected={exportFormat === 'pdf'} onClick={() => setExportFormat('pdf')} icon={<FileText size={26} color={exportFormat === 'pdf' ? HW.accent : '#6B7280'} />} title="PDF" sub="รวมทุกหน้าในไฟล์เดียว" />
+              </div>
+
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#6B7280', marginBottom: 8, fontFamily: 'Kanit, sans-serif' }}>ขอบเขต</div>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 22 }}>
+                <Choice selected={exportScope === 'current'} onClick={() => setExportScope('current')} icon={<FileStack size={26} color={exportScope === 'current' ? HW.accent : '#6B7280'} />} title="เฉพาะหน้านี้" sub={`หน้า ${currentPageIndex + 1}`} />
+                <Choice selected={exportScope === 'all'} onClick={() => setExportScope('all')} icon={<Columns size={26} color={exportScope === 'all' ? HW.accent : '#6B7280'} />} title="ทุกหน้า" sub={`${pages.length} หน้า`} />
+              </div>
+
+              <button onClick={() => runExport(exportFormat, exportScope)} disabled={exporting} style={{ width: '100%', height: 46, borderRadius: 12, border: 'none', background: HW.accent, color: 'white', fontWeight: 700, fontSize: 15, cursor: exporting ? 'default' : 'pointer', fontFamily: 'Kanit, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: exporting ? 0.7 : 1 }}>
+                {exporting ? 'กำลังส่งออก...' : (<><Download size={18} /> ดาวน์โหลด</>)}
+              </button>
+              {exportScope === 'all' && exportFormat === 'png' && (
+                <p style={{ fontSize: 11.5, color: '#9CA3AF', textAlign: 'center', marginTop: 10, marginBottom: 0, fontFamily: 'Kanit, sans-serif' }}>* จะดาวน์โหลดแยกเป็นไฟล์รูปทีละหน้า</p>
+              )}
             </div>
           </div>
         );

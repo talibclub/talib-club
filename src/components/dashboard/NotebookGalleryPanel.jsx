@@ -8,6 +8,10 @@ export default function NotebookGalleryPanel({ authState, setView }) {
   const [notebooks, setNotebooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedNotebookId, setSelectedNotebookId] = useState(null);
+  // The gallery opens a notebook read-only for review; the "จดโน้ต" toggle flips it
+  // into an editable board so people can draw right here (it saves to the same
+  // notebook) instead of being stuck unable to write.
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     async function fetchNotebooks() {
@@ -39,18 +43,28 @@ export default function NotebookGalleryPanel({ authState, setView }) {
   if (selectedNotebookId) {
     return (
       <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 9999, background: '#F3F4F6', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ height: 56, background: 'white', display: 'flex', alignItems: 'center', padding: '0 16px', borderBottom: '1px solid #E5E7EB', flexShrink: 0 }}>
-           <button onClick={() => setSelectedNotebookId(null)} className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 13, border: 'none' }}>
-              <i className="ti ti-arrow-left"></i> กลับไปคลังสมุด
+        <div style={{ height: 56, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', borderBottom: '1px solid #E5E7EB', flexShrink: 0 }}>
+           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <button onClick={() => { setSelectedNotebookId(null); setEditing(false); }} className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 13, border: 'none' }}>
+                 <i className="ti ti-arrow-left"></i> กลับไปคลังสมุด
+              </button>
+              <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>{editing ? 'โหมดจดโน้ต (แก้ไขได้)' : 'โหมดอ่านทบทวน'}</h3>
+           </div>
+           <button
+             onClick={() => setEditing(v => !v)}
+             className={`btn ${editing ? 'btn-outline' : 'btn-teal'}`}
+             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13, fontWeight: 600 }}
+           >
+              <i className={`ti ${editing ? 'ti-eye' : 'ti-pencil'}`}></i> {editing ? 'อ่านอย่างเดียว' : 'จดโน้ต'}
            </button>
-           <h3 style={{ marginLeft: 16, fontSize: 16, fontWeight: 600, margin: 0 }}>โหมดอ่านทบทวน (Read-only)</h3>
         </div>
         <div style={{ flex: 1, position: 'relative' }}>
-           <ProNotebook 
-             bookId={selectedNotebookId} 
-             uid={authState.user.uid} 
-             activeBook={{ book: { title: "สมุดโน้ต" } }} 
-             readonly={true} 
+           <ProNotebook
+             key={editing ? 'edit' : 'view'}
+             bookId={selectedNotebookId}
+             uid={authState.user.uid}
+             activeBook={{ book: { title: "สมุดโน้ต" } }}
+             readonly={!editing}
            />
         </div>
       </div>
