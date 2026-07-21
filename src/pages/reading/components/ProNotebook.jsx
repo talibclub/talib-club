@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Image as KonvaImage, Path, Group, Circle, Text, Rect, Transformer, RegularPolygon, Line } from 'react-konva';
 import Draggable from 'react-draggable';
-import { PenTool, Highlighter, Eraser, Pen, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, GripVertical, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, FileStack, LayoutList, Check, Lock, MousePointerClick, Move3d, Triangle, Cloud, CheckCircle, Trash2, Scissors, Crop, Brush, Feather, Maximize2, Ruler } from 'lucide-react';
+import { PenTool, Highlighter, Eraser, Pen, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, GripVertical, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, FileStack, LayoutList, Check, Lock, MousePointerClick, Move3d, Triangle, Cloud, CheckCircle, Trash2, Scissors, Crop, Brush, Feather, Maximize2, Ruler, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import CropModal from './CropModal';
 import { recognizeShape, shapeFromRecognition, pointInPolygon, distToSegmentXY } from '../utils/shapeRecognition.js';
 import useImage from 'use-image';
@@ -209,7 +209,7 @@ const useDragScroll = () => {
   return { ref, onMouseDown, onMouseLeave, onMouseUp, onMouseMove };
 };
 
-export default function ProNotebook({ bookId, uid, activeBook, readonly = false }) {
+export default function ProNotebook({ bookId, uid, activeBook, readonly = false, fullView = false, onToggleFullView }) {
   const leftToolbarScroll = useDragScroll();
   const rightToolbarScroll = useDragScroll();
   const containerRef = useRef(null);
@@ -229,17 +229,21 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   const isDesktop = windowWidth >= 1024;
   
   const notebookId = bookId || 'default';
-  
+
+  // Initial cloud sync. A full-canvas overlay (spinner + percent bar) replaces the
+  // old corner toast, which users never noticed on a tablet.
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(null); // null = indeterminate
+
   useEffect(() => {
      const loadData = async () => {
-        toast.loading("กำลังซิงก์ข้อมูลคลาวด์...", { id: "cloud-sync" });
+        setIsSyncing(true);
+        setSyncProgress(null);
         try {
-           const cloudData = await downloadNotebookData(uid, notebookId);
+           const cloudData = await downloadNotebookData(uid, notebookId, (p) => setSyncProgress(p));
            if (cloudData && cloudData.length > 0) {
               setPages(cloudData);
               toast.success("ซิงก์ข้อมูลสำเร็จ!", { id: "cloud-sync" });
-           } else {
-              toast.dismiss("cloud-sync");
            }
         } catch (e) {
            console.error("Cloud load failed", e);
@@ -247,9 +251,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
            if (saved) {
               setPages(JSON.parse(saved));
               toast.error("ออฟไลน์: โหลดจากเครื่องแทน", { id: "cloud-sync" });
-           } else {
-              toast.dismiss("cloud-sync");
            }
+        } finally {
+           setIsSyncing(false);
+           setSyncProgress(null);
         }
      };
      
@@ -383,8 +388,21 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   // Huawei Notes offers two erasers: whole-stroke and area ("pixel").
   const [eraserSettings, setEraserSettings] = useState({ mode: 'stroke', size: 24, eraseObjects: true });
   // Stylus handling. 'auto' draws with whatever touches the screen; 'pen' ignores
-  // finger input while drawing so a resting palm can't leave marks.
-  const [stylusMode, setStylusMode] = useState('auto');
+  // finger input while drawing so a resting palm can't leave marks. The choice is
+  // persisted, and the first pen contact auto-enables 'pen' (see handlePointerDown)
+  // because tablet users never find the toggle before their palm has scribbled.
+  const [stylusMode, setStylusModeState] = useState(() => {
+    const saved = localStorage.getItem('talib_notebook_stylus_mode');
+    return saved === 'pen' || saved === 'auto' ? saved : 'auto';
+  });
+  const setStylusMode = useCallback((next) => {
+    setStylusModeState((prev) => {
+      const value = typeof next === 'function' ? next(prev) : next;
+      localStorage.setItem('talib_notebook_stylus_mode', value);
+      return value;
+    });
+  }, []);
+  const penAutoSwitchDone = useRef(localStorage.getItem('talib_notebook_stylus_mode') !== null);
   const [pressureEnabled, setPressureEnabled] = useState(true);
   // Snap roughly drawn shapes to clean ones when the pen lifts.
   const [autoShape, setAutoShape] = useState(false);
@@ -914,14 +932,37 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     const evt = e.evt;
     if (evt && evt.pointerId !== undefined) {
       activePointers.current.set(evt.pointerId, { type: evt.pointerType, clientX: evt.clientX, clientY: evt.clientY });
-      // A second finger means the user is pinching, not drawing — abandon the stroke.
-      if (activePointers.current.size > 1) {
+      if (evt.pointerType === 'pen') {
+        // The pen always wins: it may land while a palm is already resting on the
+        // glass, so extra pointers must not read as a pinch. Any pan or stroke the
+        // palm started is cancelled and the pen takes over cleanly.
+        panningRef.current = null;
+        if (liveStrokeRef.current && drawingPointerId.current !== evt.pointerId) {
+          liveStrokeRef.current = null; setLiveStroke(null);
+          isDrawing.current = false;
+          drawingPointerId.current = null;
+        }
+      } else if (activePointers.current.size > 1) {
+        // A second finger means the user is pinching, not drawing — abandon the stroke.
         if (liveStrokeRef.current) { liveStrokeRef.current = null; setLiveStroke(null); }
         isDrawing.current = false;
         drawingPointerId.current = null;
         return;
       }
     }
+
+    // First pen contact ever: flip to pen-only input on the spot, so the palm of a
+    // tablet user can't scribble before they discover the toggle in the menu.
+    if (evt?.pointerType === 'pen' && !penAutoSwitchDone.current) {
+      penAutoSwitchDone.current = true;
+      if (stylusMode !== 'pen') {
+        setStylusMode('pen');
+        toast('ตรวจพบปากกาสไตลัส: ปิดการเขียนด้วยนิ้วแล้ว ใช้นิ้วเลื่อน/ซูมหน้าได้เลย', { icon: '✍️', duration: 5000 });
+      }
+    }
+
+    // Touching the canvas puts the tool to work — tuck its options away.
+    if (showToolOptions) setShowToolOptions(false);
 
     // If clicking on lasso group, don't bake, just return so they can drag it
     const targetName = e.target.name();
@@ -947,9 +988,19 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
        if (evt) panningRef.current = { x: evt.clientX, y: evt.clientY };
        return;
     }
-    if (!shouldDrawWith(e)) return;
+    // A finger that isn't allowed to draw pans the board instead of doing nothing —
+    // that's what a tablet user expects their hand to do in pen-only mode.
+    if (!shouldDrawWith(e)) {
+      if (evt) panningRef.current = { x: evt.clientX, y: evt.clientY };
+      return;
+    }
     const pos = getPointerPosRelativeToPage();
     if (!pos) return;
+    // Off the paper there is nothing to write on: drag the board instead of inking.
+    if (pos.x < 0 || pos.y < 0 || pos.x > currentPage.width || pos.y > currentPage.height) {
+      if (evt) panningRef.current = { x: evt.clientX, y: evt.clientY };
+      return;
+    }
 
     drawingPointerId.current = evt?.pointerId;
     const pressure = getPressure(e);
@@ -1475,7 +1526,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     if (evt && evt.pointerId !== undefined && activePointers.current.has(evt.pointerId)) {
       activePointers.current.set(evt.pointerId, { type: evt.pointerType, clientX: evt.clientX, clientY: evt.clientY });
     }
-    if (activePointers.current.size >= 2) { handlePinch(); return; }
+    // A pinch is two *fingers*. A pen moving with a palm resting beside it keeps
+    // drawing; the palm's movements are filtered out by the drawingPointerId check.
+    let touchCount = 0;
+    for (const p of activePointers.current.values()) if (p.type === 'touch') touchCount++;
+    if (touchCount >= 2 && evt?.pointerType !== 'pen') { handlePinch(); return; }
 
     if (panningRef.current && evt) {
       const dx = evt.clientX - panningRef.current.x;
@@ -1491,6 +1546,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
     if (evt && drawingPointerId.current !== undefined && evt.pointerId !== drawingPointerId.current) return;
     const pos = getPointerPosRelativeToPage();
     if (!pos) return;
+    // Ink stops at the page edge; dragging past it pins the stroke to the border.
+    pos.x = Math.max(0, Math.min(currentPage.width, pos.x));
+    pos.y = Math.max(0, Math.min(currentPage.height, pos.y));
 
     if (tool === 'eraser') {
        if (eraserSettings.mode === 'area') extendLiveStroke(pos, 1);
@@ -1628,7 +1686,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
   // Two-pointer pinch/pan, driven off the activePointers map so it works for
   // fingers on a tablet and for a pen resting alongside them.
   const handlePinch = () => {
-    const pts = Array.from(activePointers.current.values()).slice(0, 2);
+    // Only fingers pinch — a stray pen or palm-classified pointer must not skew
+    // the zoom centre.
+    const pts = Array.from(activePointers.current.values()).filter(p => p.type === 'touch').slice(0, 2);
     if (pts.length < 2) return;
     {
       const p1 = { x: pts[0].clientX, y: pts[0].clientY };
@@ -1833,6 +1893,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
         50% { opacity: 0.5; }
         100% { opacity: 1; }
       }
+      @keyframes spinSync {
+        to { transform: rotate(360deg); }
+      }
     `}</style>
     <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: '#F3F4F6', display: 'flex', flexDirection: 'column' }}>
       
@@ -1892,6 +1955,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                {!readonly && (
                  <>
                    {[
+                     // Full-view: give the whole browser width to the notebook and
+                     // hide the PDF panel — for people who attach the PDF inside the
+                     // notebook and only want to write.
+                     ...(onToggleFullView ? [{ id: 'fullview', icon: fullView ? PanelLeftOpen : PanelLeftClose, title: fullView ? 'แสดง PDF ข้างๆ' : 'โน้ตเต็มจอ (ซ่อน PDF)', onClick: onToggleFullView, active: fullView }] : []),
                      { id: 'addpage', icon: FilePlus, title: 'เพิ่มหน้าใหม่', onClick: handleAddPage },
                      { id: 'pdf', icon: FileText, title: 'นำเข้า PDF', onClick: () => document.getElementById('pdf-upload').click() },
                      { id: 'zoomwrite', icon: Maximize2, title: 'ขยายเขียน', onClick: () => setZoomWriter(v => !v), active: zoomWriter },
@@ -1916,9 +1983,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                  </button>
                )}
 
-               {/* More Menu Dropdown */}
-               {showMoreMenu && !readonly && (
-                 <div style={{ position: 'absolute', top: 56, right: 0, zIndex: 60, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: 8, borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 280, display: 'flex', flexDirection: 'column' }}>
+            </div>
+         </div>
+
+         {/* More menu dropdown. It must live OUTSIDE the header: the header scrolls
+             horizontally (overflow-x auto), which silently clips any popup rendered
+             inside it — that's why the ⊞ "เพิ่มเติม" button looked dead on tablets. */}
+         {showMoreMenu && !readonly && (
+                 <div style={{ position: 'absolute', top: 58, right: 12, zIndex: 60, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: 8, borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 280, display: 'flex', flexDirection: 'column', maxHeight: 'calc(100% - 70px)', overflowY: 'auto' }}>
                     <button onClick={() => { document.getElementById('image-upload').click(); setShowMoreMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
                        <ImageIcon size={20} strokeWidth={1.5} color="#4B5563" /> นำเข้ารูปภาพ
                     </button>
@@ -1952,9 +2024,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                        <Lock size={20} strokeWidth={1.5} color="#4B5563" /> เพิ่มการล็อค
                     </button>
                  </div>
-               )}
-            </div>
-         </div>
+         )}
 
       {/* Floating Recording Indicator */}
       {isRecording && (
@@ -2026,10 +2096,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                           if (t.id === 'mic') { toggleRecording(); return; }
                           // The ruler is a modifier, not a tool — it stays on while you draw.
                           if (t.id === 'ruler') { setRulerOn(v => !v); return; }
-                          // Huawei behaviour: tap an inactive tool to select it,
-                          // tap the active tool again to open its options.
+                          // One tap does it all: selecting a tool also opens its
+                          // options right away (nobody discovers a second tap), and
+                          // the popover tucks itself away as soon as drawing starts.
+                          // Tapping the active tool toggles the popover.
+                          const hasOptions = ['pen', 'fountain', 'marker', 'pencil', 'highlighter', 'shape', 'sticker', 'eraser', 'text'].includes(t.id);
                           if (tool === t.id) setShowToolOptions(v => !v);
-                          else { setTool(t.id); setShowToolOptions(false); }
+                          else { setTool(t.id); setShowToolOptions(hasOptions); }
                        }}
                        style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 12, border: 'none', background: (t.id === 'ruler' ? rulerOn : tool === t.id && !['image','mic'].includes(t.id)) ? HW.accentSoft : 'transparent', color: (t.id === 'ruler' ? rulerOn : tool === t.id && !['image','mic'].includes(t.id)) ? HW.accent : (t.id === 'mic' && isRecording ? '#EF4444' : HW.textDim), cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.18s cubic-bezier(0.2,0.8,0.2,1), background 0.18s, color 0.18s', position: 'relative', transform: (t.id === 'ruler' ? rulerOn : tool === t.id && !['image','mic'].includes(t.id)) ? 'translateY(-4px)' : 'none' }}
                      >
@@ -2350,6 +2423,25 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
          </div>
       )}
 
+      {/* Cloud sync overlay: spinner + percent bar, blocks the canvas until data arrives */}
+      {isSyncing && (
+         <div style={{ position: 'absolute', inset: 0, zIndex: 90, background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18 }}>
+           <div style={{ width: 44, height: 44, borderRadius: '50%', border: `4px solid ${HW.accentSoft}`, borderTopColor: HW.accent, animation: 'spinSync 0.9s linear infinite' }}></div>
+           <span style={{ fontSize: 16, fontWeight: 600, color: HW.text, fontFamily: 'Kanit, sans-serif' }}>
+             กำลังซิงก์ข้อมูลคลาวด์...{syncProgress != null ? ` ${Math.round(syncProgress * 100)}%` : ''}
+           </span>
+           <div style={{ width: 220, height: 6, borderRadius: 100, background: 'rgba(0,0,0,0.07)', overflow: 'hidden' }}>
+             <div style={{
+               height: '100%', borderRadius: 100, background: HW.accent,
+               width: syncProgress != null ? `${Math.round(syncProgress * 100)}%` : '30%',
+               transition: 'width 0.2s ease',
+               ...(syncProgress == null ? { animation: 'pulse 1.2s infinite' } : {})
+             }}></div>
+           </div>
+           <span style={{ fontSize: 12.5, color: HW.textDim, fontFamily: 'Kanit, sans-serif' }}>กรุณารอสักครู่ กำลังโหลดสมุดโน้ตของคุณ</span>
+         </div>
+      )}
+
       
       <Stage
         ref={stageRef}
@@ -2484,9 +2576,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
           </Group>
         </Layer>
         
-        {/* Drawing Layer (Strokes isolated so eraser only erases strokes) */}
+        {/* Drawing Layer (Strokes isolated so eraser only erases strokes).
+            Clipped to the paper so no ink — old or new — ever shows outside it. */}
         <Layer>
-          <Group x={pageX} y={pageY}>
+          <Group x={pageX} y={pageY} clipX={0} clipY={0} clipWidth={currentPage.width} clipHeight={currentPage.height}>
             {/* Strokes */}
             <CommittedStrokes lines={currentPage.lines} playbackTime={playbackTime} />
             {/* The stroke under the pointer lives here so committed ink stays untouched

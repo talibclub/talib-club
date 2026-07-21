@@ -36,16 +36,34 @@ export async function uploadNotebookData(uid, notebookId, dataObj) {
 }
 
 /**
- * Downloads and decompresses notebook data from Firebase Storage
+ * Downloads and decompresses notebook data from Firebase Storage.
+ * onProgress (optional) receives a 0..1 fraction while the file body streams in.
  */
-export async function downloadNotebookData(uid, notebookId) {
+export async function downloadNotebookData(uid, notebookId, onProgress) {
   try {
     const storageRef = ref(storage, `notebooks/${uid}/${notebookId}.json.gz`);
     const url = await getDownloadURL(storageRef);
     const response = await fetch(url);
     if (!response.ok) throw new Error("Network response was not ok");
-    
-    const blob = await response.blob();
+
+    let blob;
+    const total = Number(response.headers.get("content-length")) || 0;
+    if (onProgress && response.body && total > 0) {
+      const reader = response.body.getReader();
+      const chunks = [];
+      let received = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        onProgress(Math.min(1, received / total));
+      }
+      blob = new Blob(chunks);
+    } else {
+      blob = await response.blob();
+    }
+
     const jsonStr = await decompressBlob(blob);
     return JSON.parse(jsonStr);
   } catch (err) {

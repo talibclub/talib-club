@@ -124,6 +124,8 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   const [showTutorial, setShowTutorial] = useState(false)
   const [readingTab, setReadingTab] = useState("reading") // "reading" | "finished" | "stats"
   const [showNotebook, setShowNotebook] = useState(false) // Toggle Notebook on Desktop
+  const [notebookFull, setNotebookFull] = useState(false) // Notebook takes the whole width, PDF hidden
+  const [hudCollapsed, setHudCollapsed] = useState(false) // Shrink the reading-room header to a floating pill
 
   // External Upload States
   const [addMode, setAddMode] = useState("library")
@@ -802,12 +804,34 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
         background: "var(--bg)",
         display: "flex",
         flexDirection: "column",
-        padding: "16px 20px",
+        padding: hudCollapsed ? "8px 10px" : "16px 20px",
         overflow: "hidden",
         boxSizing: "border-box",
         animation: "pageFadeIn 0.25s ease-out forwards"
       }}>
+        {/* Compact floating HUD — replaces the full header when collapsed, so the
+            book and notebook get nearly the whole screen on a tablet */}
+        {hudCollapsed && (
+          <div style={{ position: "absolute", top: 10, right: 14, zIndex: 2100, display: "flex", alignItems: "center", gap: 6, background: "var(--bg2)", border: "1.5px solid var(--br2)", borderRadius: 24, padding: "5px 8px 5px 14px", boxShadow: "0 6px 24px rgba(0,0,0,0.18)" }}>
+            <i className={`ti ${isRunning ? "ti-clock spin" : "ti-player-pause"}`} style={{ color: seconds >= MIN_VERIFIED_SECONDS ? "var(--teal)" : "var(--t3)", fontSize: 13 }}></i>
+            <strong style={{ fontFamily: "monospace", fontSize: 14, color: seconds >= MIN_VERIFIED_SECONDS ? "var(--teal)" : "var(--text)" }}>{displayTimer}</strong>
+            <button onClick={toggleTimer} title={isRunning ? "หยุดจับเวลา" : "เริ่มจับเวลา"} style={{ width: 30, height: 30, borderRadius: "50%", border: "none", background: "transparent", color: "var(--text)", cursor: "pointer" }}>
+              <i className={`ti ${isRunning ? "ti-player-pause" : "ti-player-play"}`}></i>
+            </button>
+            <button onClick={() => setShowNotebook(!showNotebook)} title={showNotebook ? "ปิดสมุดโน้ต" : "เปิดสมุดโน้ต"} style={{ width: 30, height: 30, borderRadius: "50%", border: "none", background: showNotebook ? "var(--teal-bg)" : "transparent", color: showNotebook ? "var(--teal)" : "var(--text)", cursor: "pointer" }}>
+              <i className="ti ti-pencil"></i>
+            </button>
+            <button onClick={exitReadingRoom} title="ออก" style={{ width: 30, height: 30, borderRadius: "50%", border: "none", background: "transparent", color: "#e05555", cursor: "pointer" }}>
+              <i className="ti ti-logout"></i>
+            </button>
+            <button onClick={() => setHudCollapsed(false)} title="แสดงแถบเต็ม" style={{ width: 30, height: 30, borderRadius: "50%", border: "none", background: "transparent", color: "var(--t3)", cursor: "pointer" }}>
+              <i className="ti ti-chevron-down"></i>
+            </button>
+          </div>
+        )}
+
         {/* Header HUD */}
+        {!hudCollapsed && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, paddingBottom: 14, borderBottom: "1px solid var(--br2)", marginBottom: 14, flexWrap: "wrap" }}>
           <div>
             <span style={{ fontSize: 10, color: "var(--teal)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>โหมดแอปอ่านหนังสือโฟกัส (Distraction-Free)</span>
@@ -836,8 +860,12 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
             <button onClick={exitReadingRoom} className="btn" style={{ background: "#e05555", color: "#fff", padding: "8px 14px", fontSize: 12 }}>
               <i className="ti ti-logout"></i> ออก
             </button>
+            <button onClick={() => setHudCollapsed(true)} title="ย่อแถบ ให้พื้นที่หนังสือ/โน้ตเต็มจอ" className="btn btn-outline" style={{ padding: "8px 10px", fontSize: 12 }}>
+              <i className="ti ti-chevron-up"></i>
+            </button>
           </div>
         </div>
+        )}
 
         {/* Mobile Tabs navigation (rendered only on mobile) */}
         <div style={{ display: "none", gap: 8, marginBottom: 12, borderBottom: "1.5px solid var(--br2)", paddingBottom: 2 }} className="mobile-tabs-container">
@@ -893,8 +921,8 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
           </button>
         </div>
 
-        {/* Notebook Toggle Button for Desktop */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }} className="desktop-only-btn">
+        {/* Notebook Toggle Button for Desktop (folded into the floating pill when collapsed) */}
+        <div style={{ display: hudCollapsed ? "none" : "flex", justifyContent: "flex-end", marginBottom: 12 }} className="desktop-only-btn">
           <button 
             className={`btn ${showNotebook ? "btn-teal" : "btn-outline"}`} 
             onClick={() => setShowNotebook(!showNotebook)}
@@ -905,7 +933,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
         </div>
 
         {/* Workspace Split */}
-        <div style={{ display: "grid", gridTemplateColumns: showNotebook ? "1fr 1fr" : "1fr 2.2fr", gap: showNotebook ? 2 : 18, flex: 1, minHeight: 0 }} className="reader-split">
+        <div style={{ display: "grid", gridTemplateColumns: showNotebook ? (notebookFull ? "1fr" : "1fr 1fr") : "1fr 2.2fr", gap: showNotebook ? 2 : 18, flex: 1, minHeight: 0 }} className="reader-split">
           <style dangerouslySetInnerHTML={{
             __html: `
             .mobile-only-btn {
@@ -961,7 +989,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
           />
 
           {/* Right Panel: Embedded Google Preview Viewer */}
-          <div className="reader-preview" style={{ borderRadius: 16, overflow: "hidden", border: "1px solid var(--br2)", background: "var(--bg2)", height: "100%", minHeight: 0, minWidth: 0, display: showNotebook ? "block" : "block" }}>
+          <div className="reader-preview" style={{ borderRadius: 16, overflow: "hidden", border: "1px solid var(--br2)", background: "var(--bg2)", height: "100%", minHeight: 0, minWidth: 0, display: showNotebook && notebookFull ? "none" : "block" }}>
             {activeBook.book.fileUrl ? (
               <iframe
                 src={getPreviewUrl(activeBook.book.fileUrl)}
@@ -981,7 +1009,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
           {/* Far Right Panel: Pro Notebook (Tldraw) */}
           {showNotebook && (
             <div className="reader-notebook" style={{ height: "100%", minHeight: 0, minWidth: 0 }}>
-              <ProNotebook bookId={activeBook.book.id} uid={uid} activeBook={activeBook} />
+              <ProNotebook bookId={activeBook.book.id} uid={uid} activeBook={activeBook} fullView={notebookFull} onToggleFullView={() => setNotebookFull(v => !v)} />
             </div>
           )}
         </div>
