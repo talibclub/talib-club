@@ -802,8 +802,6 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
         background: "var(--bg)",
         display: "flex",
         flexDirection: "column",
-        width: "100vw",
-        height: "100vh",
         padding: "16px 20px",
         overflow: "hidden",
         boxSizing: "border-box",
@@ -963,7 +961,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
           />
 
           {/* Right Panel: Embedded Google Preview Viewer */}
-          <div className="reader-preview" style={{ borderRadius: 16, overflow: "hidden", border: "1px solid var(--br2)", background: "var(--bg2)", height: "100%", minWidth: 0, display: showNotebook ? "block" : "block" }}>
+          <div className="reader-preview" style={{ borderRadius: 16, overflow: "hidden", border: "1px solid var(--br2)", background: "var(--bg2)", height: "100%", minHeight: 0, minWidth: 0, display: showNotebook ? "block" : "block" }}>
             {activeBook.book.fileUrl ? (
               <iframe
                 src={getPreviewUrl(activeBook.book.fileUrl)}
@@ -982,7 +980,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 
           {/* Far Right Panel: Pro Notebook (Tldraw) */}
           {showNotebook && (
-            <div className="reader-notebook" style={{ height: "100%", minWidth: 0 }}>
+            <div className="reader-notebook" style={{ height: "100%", minHeight: 0, minWidth: 0 }}>
               <ProNotebook bookId={activeBook.book.id} uid={uid} activeBook={activeBook} />
             </div>
           )}
