@@ -1514,12 +1514,16 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                        key={i}
                        points={line.points}
                        stroke={line.color || '#111827'}
-                       strokeWidth={(line.size || 4) * 0.8}
-                       tension={0.5}
-                       lineCap="round"
-                       lineJoin="round"
-                       opacity={0.6}
+                       strokeWidth={Math.max(1, (line.size || 4) * 0.4)}
+                       tension={0.1}
+                       lineCap="square"
+                       lineJoin="miter"
+                       opacity={line.opacity ? line.opacity * 0.7 : 0.7}
                        globalCompositeOperation="source-over"
+                       dash={[1, 1.5]}
+                       shadowColor={line.color || '#111827'}
+                       shadowBlur={1}
+                       shadowOpacity={0.5}
                     />
                  );
               }
@@ -1616,12 +1620,16 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false 
                               key={`lasso-line-${i}`}
                               points={line.points}
                               stroke={line.color || '#111827'}
-                              strokeWidth={(line.size || 4) * 0.8}
-                              tension={0.5}
-                              lineCap="round"
-                              lineJoin="round"
-                              opacity={0.6}
+                              strokeWidth={Math.max(1, (line.size || 4) * 0.4)}
+                              tension={0.1}
+                              lineCap="square"
+                              lineJoin="miter"
+                              opacity={line.opacity ? line.opacity * 0.7 : 0.7}
                               globalCompositeOperation="source-over"
+                              dash={[1, 1.5]}
+                              shadowColor={line.color || '#111827'}
+                              shadowBlur={1}
+                              shadowOpacity={0.5}
                            />
                         );
                      }

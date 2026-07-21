@@ -1,0 +1,38 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // 1. กฎสำหรับโฟลเดอร์เก็บสลิปโอนเงิน (ปลอดภัยและส่วนตัว)
+    match /slips/{fileName} {
+      // ให้ดูได้เฉพาะ "ทีมงานแอดมิน" หรือ "เจ้าของสลิปเท่านั้น" (ป้องกันคนนอกแอบดู)
+      allow read: if request.auth != null && (
+        fileName.matches(request.auth.uid + '.*') || 
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ["staff", "admin", "owner"]
+      );
+      
+      // อัปโหลดได้เฉพาะ "เจ้าของ", ขนาดไม่เกิน 5MB, และต้องเป็นรูปภาพ
+      allow create: if request.auth != null 
+                    && fileName.matches(request.auth.uid + '.*') 
+                    && request.resource.size < 5 * 1024 * 1024 
+                    && request.resource.contentType.matches('image/.*');
+    }
+
+    // 2. กฎสำหรับระบบสมุดโน้ต (เฉพาะผู้ใช้งานของตัวเอง)
+    match /notebooks/{userId}/{allPaths=**} {
+      // อนุญาตให้อ่านและเขียนได้เฉพาะเจ้าของสมุดโน้ตเท่านั้น
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // 3. กฎสำหรับโฟลเดอร์อื่นๆ ทั้งหมด (เช่น รูปบทความ, หน้าปกหนังสือ)
+    match /{allPaths=**} {
+      // คนทั่วไปดูรูปได้ปกติ (เพื่อให้เว็บแสดงรูปได้)
+      allow read: if true; 
+      
+      // แต่คนที่จะอัปโหลด ลบ หรือแก้ไขรูปอื่นๆ ได้ ต้องเป็นทีมงานเท่านั้น
+      allow write: if request.auth != null && (
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ["staff", "admin", "owner"]
+      );
+    }
+    
+  }
+}
