@@ -817,7 +817,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
             be dragged anywhere via the grip on its left edge. */}
         {hudCollapsed && (
           <Draggable nodeRef={hudPillRef} handle=".hud-drag-handle" bounds="parent">
-            <div ref={hudPillRef} style={{ position: "absolute", top: 64, right: 14, zIndex: 2100, display: "flex", alignItems: "center", gap: 6, background: "var(--bg2)", border: "1.5px solid var(--br2)", borderRadius: 24, padding: "5px 8px 5px 6px", boxShadow: "0 6px 24px rgba(0,0,0,0.18)", touchAction: "none" }}>
+            <div ref={hudPillRef} style={{ position: "absolute", top: 64, left: 14, zIndex: 2100, display: "flex", alignItems: "center", gap: 6, background: "var(--bg2)", border: "1.5px solid var(--br2)", borderRadius: 24, padding: "5px 8px 5px 6px", boxShadow: "0 6px 24px rgba(0,0,0,0.18)", touchAction: "none" }}>
               <span className="hud-drag-handle" title="ลากเพื่อย้ายตำแหน่ง" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 26, height: 30, cursor: "grab", color: "var(--t3)" }}>
                 <i className="ti ti-grip-vertical"></i>
               </span>

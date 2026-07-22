@@ -483,11 +483,18 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      if (!q.trim()) return;
      setImgLoading(true);
      try {
-        const res = await fetch(`https://api.openverse.org/v1/images/?q=${encodeURIComponent(q)}&page_size=30&mature=false`);
+        const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrnamespace=6&gsrlimit=30&pithumbsize=300&origin=*`);
         if (!res.ok) throw new Error(`search failed ${res.status}`);
         const data = await res.json();
-        setImgResults(data.results || []);
-        if (!(data.results || []).length) toast('ไม่พบรูปภาพที่ค้นหา');
+        const pages = data.query?.pages || {};
+        const results = Object.values(pages).map(p => ({
+            id: p.pageid,
+            title: p.title.replace('File:', ''),
+            thumbnail: p.thumbnail?.source,
+            url: p.thumbnail?.source
+        })).filter(r => r.thumbnail);
+        setImgResults(results);
+        if (!results.length) toast('ไม่พบรูปภาพที่ค้นหา');
      } catch (e) {
         console.error('Image search failed', e);
         toast.error('ค้นหารูปไม่สำเร็จ (ตรวจสอบอินเทอร์เน็ต)');
@@ -2827,6 +2834,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              horizontally (overflow-x auto), which silently clips any popup rendered
              inside it — that's why the ⊞ "เพิ่มเติม" button looked dead on tablets. */}
          {showMoreMenu && !readonly && (
+             <>
+                 <div style={{ position: 'fixed', inset: 0, zIndex: 59 }} onClick={() => setShowMoreMenu(false)} />
                  <div style={{ position: 'absolute', top: 58, right: 12, zIndex: 60, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: 8, borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 280, display: 'flex', flexDirection: 'column', maxHeight: 'calc(100% - 70px)', overflowY: 'auto' }}>
                     <button onClick={() => { document.getElementById('image-upload').click(); setShowMoreMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
                        <ImageIcon size={20} strokeWidth={1.5} color="#4B5563" /> นำเข้ารูปภาพจากเครื่อง
@@ -2874,6 +2883,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                        <Lock size={20} strokeWidth={1.5} color="#4B5563" /> เพิ่มการล็อค
                     </button>
                  </div>
+             </>
          )}
 
       {/* Floating Recording Indicator */}
@@ -3065,26 +3075,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                            ))}
                         </div>
 
-                        <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
-
-{/* Fine size + opacity sliders (Huawei style). stopPropagation
-                            keeps the toolbar's drag-to-scroll from hijacking the slider. */}
-                        <div
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0, minWidth: 130 }}
-                        >
-                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span style={{ fontSize: 10, color: HW.textDim, width: 26 }}>ขนาด</span>
-                              <input type="range" min={1} max={60} value={penSize} onChange={(e) => setPenSize(Number(e.target.value))} style={{ flex: 1, accentColor: HW.accent, cursor: 'pointer' }} />
-                              <span style={{ fontSize: 10, color: HW.text, width: 24, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{penSize}</span>
-                           </div>
-                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span style={{ fontSize: 10, color: HW.textDim, width: 26 }}>ทึบ</span>
-                              <input type="range" min={10} max={100} value={Math.round(penOpacity * 100)} onChange={(e) => setPenOpacity(Number(e.target.value) / 100)} style={{ flex: 1, accentColor: HW.accent, cursor: 'pointer' }} />
-                              <span style={{ fontSize: 10, color: HW.text, width: 24, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{Math.round(penOpacity * 100)}%</span>
-                           </div>
-                        </div>
+{/* Sliders removed to match Huawei Note clean UI */}
 
                         <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
 
@@ -3299,7 +3290,15 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   )}
 
                   {tool === 'laser' && (
-                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                           {sizes.map(s => (
+                              <button key={s} onClick={() => setPenSize(s)} title={`${s}px`} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: penSize === s ? HW.accentSoft : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                 <span style={{ display: 'block', width: Math.min(18, 4 + s * 0.7), height: Math.min(18, 4 + s * 0.7), borderRadius: '50%', background: penSize === s ? HW.accent : HW.textDim }} />
+                              </button>
+                           ))}
+                        </div>
+                        <div style={{ width: 1, background: HW.hairline, height: 22 }}></div>
                         <span style={{ fontSize: 12.5, fontWeight: 600, color: HW.textDim, fontFamily: 'Kanit, sans-serif', flexShrink: 0 }}>สีเลเซอร์</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
                            {['#EF4444', '#F97316', '#FACC15', '#22C55E', '#3B82F6', '#A855F7', '#EC4899', '#FFFFFF'].map(c => (
@@ -3421,9 +3420,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
       {/* Web image / sticker search panel (Openverse — openly-licensed media) */}
       {showImgSearch && (
-        <div style={{ position: 'absolute', inset: 0, zIndex: 55, background: 'rgba(243,244,246,0.96)', backdropFilter: 'blur(10px)', display: 'flex', flexDirection: 'column', padding: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexShrink: 0 }}>
-            <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: 'var(--text)', whiteSpace: 'nowrap' }}>ค้นหารูป/สติกเกอร์</h3>
+        <Draggable handle=".img-drag-handle" bounds="parent">
+        <div style={{ position: 'absolute', top: 60, right: 20, width: 340, height: 480, zIndex: 60, background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(20px)', borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.15)', border: '1px solid rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', padding: 16 }}>
+          <div className="img-drag-handle" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexShrink: 0, cursor: 'move' }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--text)', whiteSpace: 'nowrap', flex: 1 }}>ค้นหารูป/สติกเกอร์</h3>
             <form onSubmit={(e) => { e.preventDefault(); searchWebImages(imgQuery); }} style={{ flex: 1, display: 'flex', gap: 8 }}>
               <input
                 autoFocus
@@ -3450,6 +3450,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12 }}>
                 {imgResults.map((item) => (
                   <button
+                    style={{ background: 'transparent', border: 'none', padding: 0 }}
                     key={item.id}
                     onClick={() => insertWebImage(item)}
                     title={`${item.title || ''}${item.creator ? ' — ' + item.creator : ''} (${item.license || 'CC'})`}
@@ -3463,6 +3464,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           </div>
           <p style={{ flexShrink: 0, marginTop: 8, fontSize: 11, color: 'var(--t3)', textAlign: 'center' }}>รูปภาพจาก Openverse (สื่อลิขสิทธิ์เปิด CC) — โปรดให้เครดิตผู้สร้างเมื่อเผยแพร่</p>
         </div>
+        </Draggable>
       )}
 
       {/* Paper template / colour picker (was a dead menu item before) */}
@@ -3924,7 +3926,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
             {laserLines.map((line, i) => {
               const pointPairs = [];
               for(let p = 0; p < line.points.length; p+=2) { pointPairs.push([line.points[p], line.points[p+1]]); }
-              const stroke = getStroke(pointPairs, { size: line.size || 4, thinning: 0.5, smoothing: 0.5, streamline: 0.5 });
+              const stroke = getStroke(pointPairs, { size: Math.max(8, (line.size || 4) * 1.5), thinning: 0.5, smoothing: 0.5, streamline: 0.5 });
               const pathData = getSvgPathFromStroke(stroke);
               return (
                 <Group key={`laser-${line.id}`}>
@@ -4389,6 +4391,18 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   >{btn.icon}</button>
                 ))}
              </div>
+             <div style={{ position: 'relative' }}>
+               {(() => {
+                 const txt = pages[currentPageIndex]?.texts?.find(tx => tx.id === editingTextId);
+                 if (txt?.list === 'bullet' || txt?.list === 'number') {
+                   return (
+                     <div style={{ position: 'absolute', top: 8, left: 8, pointerEvents: 'none', color: txt.color || 'black', fontSize: (txt.size || 24) * zoomLevel, fontFamily: txt.font || 'Sarabun', lineHeight: 1.5 }}>
+                       {editingTextValue.split('\n').map((_, i) => <div key={i} style={{ minHeight: '1.5em' }}>{txt.list === 'bullet' ? '•' : `${i + 1}.`}</div>)}
+                     </div>
+                   );
+                 }
+                 return null;
+               })()}
              <textarea
                key={`textarea-${editingTextId}`}
                ref={textareaRef}
@@ -4418,6 +4432,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                style={{
                   margin: 0,
                   padding: 8,
+                  paddingLeft: ['bullet', 'number'].includes(pages[currentPageIndex]?.texts?.find(tx => tx.id === editingTextId)?.list) ? ((pages[currentPageIndex]?.texts?.find(tx => tx.id === editingTextId)?.size || 24) * zoomLevel) + 12 : 8,
                   border: '2px solid var(--teal)',
                   background: 'rgba(255,255,255,0.95)',
                   color: t.color,
@@ -4437,7 +4452,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   borderRadius: 8,
                   boxShadow: '0 4px 16px rgba(0,0,0,0.1)'
                }}
+               onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                     if (textareaRef.current) textareaRef.current.blur();
+                  }
+               }}
              />
+           </div>
            </div>
          );
       })()}
