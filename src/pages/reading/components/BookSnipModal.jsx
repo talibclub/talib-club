@@ -17,9 +17,9 @@ const resolvePdfUrl = (url) => {
   return `/api/proxy-pdf?url=${encodeURIComponent(u)}`;
 };
 
-export default function BookSnipModal({ fileUrl, onInsert, onClose }) {
+export default function BookSnipModal({ fileUrl, onInsert, onClose, initialPage = 1 }) {
   const [status, setStatus] = useState('loading'); // loading | ready | error
-  const [pageNum, setPageNum] = useState(1);
+  const [pageNum, setPageNum] = useState(initialPage || 1);
   const [numPages, setNumPages] = useState(0);
   const [pageImg, setPageImg] = useState(null); // dataURL of the rendered page
   const [rendering, setRendering] = useState(false);
@@ -109,7 +109,7 @@ export default function BookSnipModal({ fileUrl, onInsert, onClose }) {
       Math.round(sel.x * fx), Math.round(sel.y * fy), out.width, out.height,
       0, 0, out.width, out.height
     );
-    onInsert({ src: out.toDataURL('image/png'), width: out.width, height: out.height });
+    onInsert({ src: out.toDataURL('image/png'), width: out.width, height: out.height, pageNum });
   };
 
   return (

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Image as KonvaImage, Path, Group, Circle, Text, Rect, Transformer, RegularPolygon, Line, Star as KonvaStar, Arrow as KonvaArrow } from 'react-konva';
 import Draggable from 'react-draggable';
-import { PenTool, Highlighter, Eraser, Pen, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, GripVertical, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, FileStack, LayoutList, Check, Lock, MousePointerClick, Move3d, Triangle, Cloud, CheckCircle, Trash2, Scissors, Crop, Brush, Feather, Maximize2, Ruler, PanelLeftClose, PanelLeftOpen, Wand2, Camera, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Underline, Strikethrough, Smile, Upload, ChevronsUp, ChevronsDown, ListMusic, X, ArrowRight, Star, Hexagon, Compass } from 'lucide-react';
+import { PenTool, Highlighter, Eraser, Pen, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, GripVertical, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, FileStack, LayoutList, Check, Lock, MousePointerClick, Move3d, Triangle, Cloud, CheckCircle, Trash2, Scissors, Crop, Brush, Feather, Maximize2, Ruler, PanelLeftClose, PanelLeftOpen, Wand2, Camera, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Underline, Strikethrough, Smile, Upload, ChevronsUp, ChevronsDown, ListMusic, X, ArrowRight, Star, Hexagon, Compass, Link2, ScanText, Spline } from 'lucide-react';
 import CropModal from './CropModal';
 import ColorPickerPanel from './ColorPickerPanel';
 import BookSnipModal from './BookSnipModal';
@@ -545,10 +545,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const transformerRef = useRef();
 
   useEffect(() => {
-    // Polygons are edited by their own vertex handles, so they must not also get
-    // the scale/rotate transformer box.
-    const selPoly = pagesRef.current[currentPageIndex]?.shapes?.some((s) => s.id === selectedId && s.type === 'polygon');
-    if (selectedId && !selPoly && transformerRef.current) {
+    // Polygons and connectors are edited by their own handles, so they must not
+    // also get the scale/rotate transformer box.
+    const selCustom = pagesRef.current[currentPageIndex]?.shapes?.some((s) => s.id === selectedId && (s.type === 'polygon' || s.type === 'connector'));
+    if (selectedId && !selCustom && transformerRef.current) {
        const node = stageRef.current.findOne(`#${selectedId}`);
        if (node) {
           transformerRef.current.nodes([node]);
@@ -616,6 +616,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     toast.success('เพิ่มอิโมจิแล้ว ใช้เครื่องมือเลื่อน (มือ) เพื่อย้าย/ปรับขนาด', { id: 'emoji-add' });
   };
   const [showBookSnip, setShowBookSnip] = useState(false);
+  // Page a "jump back to source" link should open the book snipper on. 1 for a
+  // fresh snip; the image's stored sourcePage when jumping back from a snip.
+  const [bookSnipInitialPage, setBookSnipInitialPage] = useState(1);
   const [penOpacity, setPenOpacity] = useState(1);
   const [stickerStyle, setStickerStyle] = useState('classic');
   // Huawei Notes offers two erasers: whole-stroke and area ("pixel").
@@ -1065,7 +1068,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const snapshotPages = (pgs) => pgs.map((p) => ({
     ...p,
     lines: (p.lines || []).map((l) => ({ ...l, points: l.points.slice(), pressures: l.pressures ? l.pressures.slice() : undefined })),
-    shapes: (p.shapes || []).map((s) => ({ ...s, points: s.points ? s.points.slice() : undefined })),
+    shapes: (p.shapes || []).map((s) => ({ ...s, points: s.points ? s.points.slice() : undefined, from: s.from ? { ...s.from } : undefined, to: s.to ? { ...s.to } : undefined })),
     texts: (p.texts || []).map((t) => ({ ...t })),
     stickers: (p.stickers || []).map((s) => ({ ...s })),
     images: (p.images || []).map((i) => ({ ...i })),
@@ -1384,8 +1387,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     if (targetName === 'ruler' || parentName === 'ruler' || targetName === 'ruler-handle') {
        return;
     }
-    // A polygon vertex handle drags itself; the stage must not pan or deselect.
-    if (targetName === 'poly-handle') {
+    // A polygon vertex / connector endpoint handle drags itself; the stage must
+    // not pan or deselect.
+    if (targetName === 'poly-handle' || targetName === 'conn-handle') {
        return;
     }
     // The protractor guide moves/rotates itself and must not lay down ink.
@@ -1505,6 +1509,25 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
        return;
     }
 
+    if (tool === 'shape' && shapeType === 'connector') {
+       // Drag from one object/point to another; endpoints snap to whatever they land on.
+       isDrawing.current = true;
+       const id = `shape-${Date.now()}`;
+       const startId = objectIdAt(pos);
+       connectorDrawIdRef.current = id;
+       pushHistory();
+       updatePage(currentPageIndex, (page) => {
+          if (!page.shapes) page.shapes = [];
+          page.shapes.push({
+             id, type: 'connector',
+             from: startId ? { id: startId, x: pos.x, y: pos.y } : { x: pos.x, y: pos.y },
+             to: { x: pos.x, y: pos.y },
+             color: penColor, size: Math.max(2, penSize), hasArrow: true,
+          });
+       });
+       return;
+    }
+
     if (tool === 'shape') {
        isDrawing.current = true;
        pushHistory();
@@ -1561,7 +1584,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
     if (eraserSettings.eraseObjects) {
       survivingShapes = survivingShapes.filter((s) => {
-        const b = s.type === 'polygon' ? polygonBounds(s.points) : { minX: Math.min(s.x1, s.x2), maxX: Math.max(s.x1, s.x2), minY: Math.min(s.y1, s.y2), maxY: Math.max(s.y1, s.y2) };
+        const b = s.type === 'polygon' ? polygonBounds(s.points)
+          : s.type === 'connector' ? (() => { const { a, b: bb } = connectorPoints(s); return { minX: Math.min(a.x, bb.x), maxX: Math.max(a.x, bb.x), minY: Math.min(a.y, bb.y), maxY: Math.max(a.y, bb.y) }; })()
+          : { minX: Math.min(s.x1, s.x2), maxX: Math.max(s.x1, s.x2), minY: Math.min(s.y1, s.y2), maxY: Math.max(s.y1, s.y2) };
         return !(pos.x >= b.minX - radius && pos.x <= b.maxX + radius && pos.y >= b.minY - radius && pos.y <= b.maxY + radius);
       });
       survivingTexts = survivingTexts.filter((t) => {
@@ -1744,6 +1769,66 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
   // Bounding box of the live selection, in page coordinates (before the group's
   // drag offset is applied). Drives both the outline and the floating menu.
+  // --- Smart connectors (mindmap) ---
+  // Defined above the memos that read them (selectedInfo) so their bindings exist
+  // when those memos run during render.
+  const connectorDrawIdRef = useRef(null);
+  const objectBoundsById = (id) => {
+    const page = pagesRef.current[currentPageIndex];
+    if (!page || !id) return null;
+    for (const kind of ['images', 'shapes', 'texts', 'stickers']) {
+      const o = (page[kind] || []).find((x) => x.id === id);
+      if (!o) continue;
+      if (kind === 'shapes' && o.type === 'connector') return null;
+      if (kind === 'shapes' && o.type === 'polygon') return polygonBounds(o.points);
+      if (kind === 'shapes') return { minX: Math.min(o.x1, o.x2), minY: Math.min(o.y1, o.y2), maxX: Math.max(o.x1, o.x2), maxY: Math.max(o.y1, o.y2) };
+      if (kind === 'images') return { minX: o.x, minY: o.y, maxX: o.x + (o.width || 0) * (o.scaleX || 1), maxY: o.y + (o.height || 0) * (o.scaleY || 1) };
+      if (kind === 'stickers') { const w = o.audioUrl ? 130 : 150, h = o.audioUrl ? 44 : 150; return { minX: o.x, minY: o.y, maxX: o.x + w * (o.scaleX || 1), maxY: o.y + h * (o.scaleY || 1) }; }
+      return { minX: o.x, minY: o.y, maxX: o.x + Math.max(60, (o.text?.length || 1) * (o.size || 16) * 0.6), maxY: o.y + (o.size || 16) * 1.4 };
+    }
+    return null;
+  };
+
+  // Topmost non-connector object under a page-space point (for endpoint snapping).
+  const objectIdAt = (pos, excludeId) => {
+    const page = pagesRef.current[currentPageIndex];
+    if (!page) return null;
+    for (const kind of ['stickers', 'images', 'texts', 'shapes']) {
+      const arr = page[kind] || [];
+      for (let i = arr.length - 1; i >= 0; i--) {
+        const o = arr[i];
+        if (o.id === excludeId || o.type === 'connector') continue;
+        const b = objectBoundsById(o.id);
+        if (b && pos.x >= b.minX && pos.x <= b.maxX && pos.y >= b.minY && pos.y <= b.maxY) return o.id;
+      }
+    }
+    return null;
+  };
+
+  const boundsCenter = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
+
+  // Resolve an endpoint to a page point. A bound end sits on its object's edge
+  // facing `toward`, so the line meets the border instead of the centre.
+  const resolveConnectorEnd = (anchor, toward) => {
+    if (!anchor) return { x: 0, y: 0 };
+    if (!anchor.id) return { x: anchor.x, y: anchor.y };
+    const b = objectBoundsById(anchor.id);
+    if (!b) return { x: anchor.x, y: anchor.y };
+    const c = boundsCenter(b);
+    const dx = (toward ? toward.x : c.x) - c.x, dy = (toward ? toward.y : c.y) - c.y;
+    if (dx === 0 && dy === 0) return c;
+    const hw = (b.maxX - b.minX) / 2 || 1, hh = (b.maxY - b.minY) / 2 || 1;
+    const f = 1 / Math.max(Math.abs(dx) / hw, Math.abs(dy) / hh);
+    return { x: c.x + dx * f, y: c.y + dy * f };
+  };
+
+  // Both endpoints of a connector as page points (each aimed at the other).
+  const connectorPoints = (s) => {
+    const rawA = s.from?.id ? (objectBoundsById(s.from.id) ? boundsCenter(objectBoundsById(s.from.id)) : s.from) : s.from;
+    const rawB = s.to?.id ? (objectBoundsById(s.to.id) ? boundsCenter(objectBoundsById(s.to.id)) : s.to) : s.to;
+    return { a: resolveConnectorEnd(s.from, rawB), b: resolveConnectorEnd(s.to, rawA) };
+  };
+
   const lassoBounds = React.useMemo(() => {
     if (selectedLassoLines.length === 0 && selectedObjects.length === 0) return null;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -1787,6 +1872,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       let box;
       if (kind === 'shapes' && obj.type === 'polygon') {
         box = polygonBounds(obj.points);
+      } else if (kind === 'shapes' && obj.type === 'connector') {
+        const { a, b } = connectorPoints(obj);
+        box = { minX: Math.min(a.x, b.x), minY: Math.min(a.y, b.y), maxX: Math.max(a.x, b.x), maxY: Math.max(a.y, b.y) };
       } else if (kind === 'shapes') {
         box = { minX: Math.min(obj.x1, obj.x2), minY: Math.min(obj.y1, obj.y2), maxX: Math.max(obj.x1, obj.x2), maxY: Math.max(obj.y1, obj.y2) };
       } else if (kind === 'images') {
@@ -1885,6 +1973,43 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     toast.success('วางแล้ว');
   };
 
+  // Local OCR: read the text out of an image with Tesseract.js (runs entirely in
+  // the browser — the wasm engine and language data are fetched once from a CDN,
+  // no paid API). The recognised text lands as an editable note under the image.
+  const ocrRunningRef = useRef(false);
+  const runOcrOnImage = async (img) => {
+    if (!img?.src || ocrRunningRef.current) return;
+    ocrRunningRef.current = true;
+    toast.loading('กำลังอ่านข้อความจากรูป (OCR)... 0%', { id: 'ocr' });
+    try {
+      const Tesseract = (await import('tesseract.js')).default;
+      const { data } = await Tesseract.recognize(img.src, 'tha+eng', {
+        logger: (m) => {
+          if (m.status === 'recognizing text') {
+            toast.loading(`กำลังอ่านข้อความจากรูป (OCR)... ${Math.round(m.progress * 100)}%`, { id: 'ocr' });
+          }
+        },
+      });
+      const text = (data?.text || '').trim();
+      if (!text) { toast.error('ไม่พบข้อความในรูปนี้', { id: 'ocr' }); return; }
+      pushHistory();
+      updatePage(currentPageIndex, (page) => {
+        if (!page.texts) page.texts = [];
+        page.texts.push({
+          id: `text-${Date.now()}`, text,
+          x: img.x, y: img.y + (img.height || 0) * (img.scaleY || 1) + 12,
+          color: penColor, size: 20, fontFamily: 'Sarabun', bold: false, italic: false,
+        });
+      });
+      toast.success('ดึงข้อความสำเร็จ — วางไว้ใต้รูปแล้ว', { id: 'ocr', icon: '📝' });
+    } catch (e) {
+      console.error('OCR failed', e);
+      toast.error('อ่านข้อความไม่สำเร็จ (ตรวจสอบอินเทอร์เน็ตครั้งแรก)', { id: 'ocr' });
+    } finally {
+      ocrRunningRef.current = false;
+    }
+  };
+
   const duplicateSelectedObject = () => {
     if (!selectedInfo) return;
     const { kind, obj } = selectedInfo;
@@ -1949,6 +2074,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
   const shiftObject = (item, kind, dx, dy) => {
     if (kind === 'shapes' && item.type === 'polygon') { item.points = item.points.map((v, i) => (i % 2 === 0 ? v + dx : v + dy)); }
+    else if (kind === 'shapes' && item.type === 'connector') {
+      // Only free (unattached) endpoints move; bound ends stay glued to their object.
+      if (item.from && !item.from.id) { item.from = { ...item.from, x: item.from.x + dx, y: item.from.y + dy }; }
+      if (item.to && !item.to.id) { item.to = { ...item.to, x: item.to.x + dx, y: item.to.y + dy }; }
+    }
     else if (kind === 'shapes') { item.x1 += dx; item.x2 += dx; item.y1 += dy; item.y2 += dy; }
     else { item.x += dx; item.y += dy; }
   };
@@ -2156,6 +2286,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
        return;
     }
     
+    if (tool === 'shape' && connectorDrawIdRef.current) {
+       updatePage(currentPageIndex, (page) => {
+          page.shapes = (page.shapes || []).map((sh) => sh.id === connectorDrawIdRef.current ? { ...sh, to: { x: pos.x, y: pos.y } } : sh);
+       });
+       return;
+    }
+
     if (tool === 'shape') {
        updatePage(currentPageIndex, (page) => {
           const lastShape = { ...page.shapes[page.shapes.length - 1] };
@@ -2199,6 +2336,29 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     }
     gestureErasedRef.current = false;
     drawingPointerId.current = null;
+
+    // Finalise a connector: snap its loose end to whatever it was released over,
+    // or drop it entirely if it was just a tap with no drag.
+    if (connectorDrawIdRef.current) {
+       const id = connectorDrawIdRef.current;
+       connectorDrawIdRef.current = null;
+       isDrawing.current = false;
+       const page = pagesRef.current[currentPageIndex];
+       const conn = page?.shapes?.find((s) => s.id === id);
+       if (conn) {
+          const fb = conn.from.id ? objectBoundsById(conn.from.id) : null;
+          const a = fb ? boundsCenter(fb) : conn.from;
+          const end = conn.to;
+          if (Math.hypot((end.x || 0) - (a.x || 0), (end.y || 0) - (a.y || 0)) < 14) {
+             updatePage(currentPageIndex, (p) => { p.shapes = (p.shapes || []).filter((s) => s.id !== id); });
+          } else {
+             const endId = objectIdAt({ x: end.x, y: end.y }, conn.from.id);
+             if (endId) updatePage(currentPageIndex, (p) => { p.shapes = (p.shapes || []).map((s) => s.id === id ? { ...s, to: { id: endId, x: end.x, y: end.y } } : s); });
+             selectShape(id);
+          }
+       }
+       return;
+    }
 
     if (tool === 'lasso' && isDrawing.current && lassoPathRef.current) {
        isDrawing.current = false;
@@ -2620,7 +2780,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                      { id: 'addpage', icon: FilePlus, title: 'เพิ่มหน้าใหม่', onClick: handleAddPage },
                      { id: 'pdf', icon: FileText, title: 'นำเข้า PDF', onClick: () => document.getElementById('pdf-upload').click() },
                      // Snip a region of the companion book straight into the note.
-                     ...(activeBook?.book?.fileUrl ? [{ id: 'snip', icon: Camera, title: 'แคปจากหนังสือ', onClick: () => setShowBookSnip(true), active: showBookSnip }] : []),
+                     ...(activeBook?.book?.fileUrl ? [{ id: 'snip', icon: Camera, title: 'แคปจากหนังสือ', onClick: () => { setBookSnipInitialPage(1); setShowBookSnip(true); }, active: showBookSnip }] : []),
                      { id: 'zoomwrite', icon: Maximize2, title: 'ขยายเขียน', onClick: () => setZoomWriter(v => !v), active: zoomWriter },
                      { id: 'recordings', icon: ListMusic, title: 'บันทึกเสียง', onClick: () => setShowRecordings(v => !v), active: showRecordings, badge: recordings.length },
                      { id: 'search', icon: Search, title: 'ค้นหา', onClick: () => setShowSearch(!showSearch), active: showSearch },
@@ -2881,8 +3041,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                         {tool === 'shape' && (
                            <>
                              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                                {[{ t: 'rect', Icon: Square }, { t: 'circle', Icon: CircleIcon }, { t: 'triangle', Icon: Triangle }, { t: 'line', Icon: Minus }, { t: 'arrow', Icon: ArrowRight }, { t: 'star', Icon: Star }, { t: 'polygon', Icon: Hexagon }].map(({ t, Icon }) => (
-                                  <button key={t} onClick={() => setShapeType(t)} style={{ width: 32, height: 32, borderRadius: 10, border: 'none', background: shapeType === t ? HW.accentSoft : 'transparent', color: shapeType === t ? HW.accent : '#9CA3AF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {[{ t: 'rect', Icon: Square, title: 'สี่เหลี่ยม' }, { t: 'circle', Icon: CircleIcon, title: 'วงกลม' }, { t: 'triangle', Icon: Triangle, title: 'สามเหลี่ยม' }, { t: 'line', Icon: Minus, title: 'เส้นตรง' }, { t: 'arrow', Icon: ArrowRight, title: 'ลูกศร' }, { t: 'star', Icon: Star, title: 'ดาว' }, { t: 'polygon', Icon: Hexagon, title: 'รูปหลายเหลี่ยม (ปรับมุมได้)' }, { t: 'connector', Icon: Spline, title: 'เส้นเชื่อม (เกาะวัตถุ ทำมายด์แมป)' }].map(({ t, Icon, title }) => (
+                                  <button key={t} title={title} onClick={() => setShapeType(t)} style={{ width: 32, height: 32, borderRadius: 10, border: 'none', background: shapeType === t ? HW.accentSoft : 'transparent', color: shapeType === t ? HW.accent : '#9CA3AF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <Icon size={20} strokeWidth={1.6} />
                                   </button>
                                 ))}
@@ -3484,6 +3644,27 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
             
             {/* Shapes */}
             {currentPage.shapes && currentPage.shapes.map((s, i) => {
+              // Connector: an arrow/line whose ends follow the objects they snap to.
+              if (s.type === 'connector') {
+                 const { a, b } = connectorPoints(s);
+                 return (
+                   <KonvaArrow
+                     key={s.id}
+                     id={s.id}
+                     name="object"
+                     points={[a.x, a.y, b.x, b.y]}
+                     stroke={s.color}
+                     fill={s.color}
+                     strokeWidth={s.size || 3}
+                     pointerLength={s.hasArrow === false ? 0 : 11}
+                     pointerWidth={s.hasArrow === false ? 0 : 11}
+                     hitStrokeWidth={16}
+                     lineCap="round"
+                     onClick={() => { if (tool === 'pan' || tool === 'lasso' || tool === 'shape') selectShape(s.id); }}
+                     onTap={() => { if (tool === 'pan' || tool === 'lasso' || tool === 'shape') selectShape(s.id); }}
+                   />
+                 );
+              }
               // Editable polygon: absolute points, moved as a whole in pan mode and
               // reshaped by the vertex handles rendered separately when selected.
               if (s.type === 'polygon') {
@@ -4058,6 +4239,36 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                 </Group>
               );
            })()}
+
+           {/* Connector endpoint handles: drag to re-point; drop on an object to snap. */}
+           {!readonly && (() => {
+              const conn = currentPage.shapes?.find(sh => sh.id === selectedId && sh.type === 'connector');
+              if (!conn) return null;
+              const { a, b } = connectorPoints(conn);
+              const hr = 8 / scale;
+              const mk = (which, pt) => (
+                <Circle
+                  key={`conn-${conn.id}-${which}`}
+                  name="conn-handle" x={pt.x} y={pt.y} radius={hr} fill="white" stroke={HW.accent} strokeWidth={2 / scale}
+                  draggable
+                  onDragStart={() => pushHistory()}
+                  onDragMove={(e) => {
+                     const nx = e.target.x(), ny = e.target.y();
+                     updatePage(currentPageIndex, (page) => {
+                        page.shapes = (page.shapes || []).map(sh => sh.id === conn.id ? { ...sh, [which]: { x: nx, y: ny } } : sh);
+                     });
+                  }}
+                  onDragEnd={(e) => {
+                     const nx = e.target.x(), ny = e.target.y();
+                     const hitId = objectIdAt({ x: nx, y: ny }, null);
+                     updatePage(currentPageIndex, (page) => {
+                        page.shapes = (page.shapes || []).map(sh => sh.id === conn.id ? { ...sh, [which]: hitId ? { id: hitId, x: nx, y: ny } : { x: nx, y: ny } } : sh);
+                     });
+                  }}
+                />
+              );
+              return <Group x={pageX} y={pageY}>{mk('from', a)}{mk('to', b)}</Group>;
+           })()}
         </Layer>
       </Stage>
 
@@ -4373,6 +4584,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               {kind === 'images' && (
                 <>
                   <button style={btn} onClick={() => setCroppingImageId(obj.id)}><Crop size={16} strokeWidth={1.7} /> ครอบตัด</button>
+                  <button style={btn} onClick={() => { runOcrOnImage(obj); selectShape(null); }}><ScanText size={16} strokeWidth={1.7} /> ดึงข้อความ (OCR)</button>
                   {divider}
                 </>
               )}
@@ -4582,17 +4794,37 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       })()}
 
       {/* Snip-from-book overlay */}
+      {/* Jump-back link on book snips. Shown only in move mode so it never sits in
+          the way of the pen while drawing over the image. */}
+      {!readonly && tool === 'pan' && activeBook?.book?.fileUrl && currentPage.images?.filter(im => im.sourcePage).map(im => {
+         const left = (im.x + (im.width || 0) * (im.scaleX || 1) + pageX) * scale + position.x;
+         const top = (im.y + pageY) * scale + position.y;
+         return (
+           <button
+             key={`srclink-${im.id}`}
+             title={`ไปหน้า ${im.sourcePage} ในหนังสือต้นฉบับ`}
+             onPointerDown={(e) => e.stopPropagation()}
+             onClick={() => { setBookSnipInitialPage(im.sourcePage); setShowBookSnip(true); }}
+             style={{ position: 'absolute', left: left - 28, top: top + 4, zIndex: 58, height: 24, padding: '0 7px', borderRadius: 8, border: 'none', background: HW.accent, color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 600, boxShadow: '0 2px 6px rgba(0,0,0,0.25)' }}
+           >
+             <Link2 size={12} strokeWidth={2.4} /> น.{im.sourcePage}
+           </button>
+         );
+      })}
+
       {showBookSnip && activeBook?.book?.fileUrl && (
          <BookSnipModal
            fileUrl={activeBook.book.fileUrl}
+           initialPage={bookSnipInitialPage}
            onClose={() => setShowBookSnip(false)}
-           onInsert={({ src, width, height }) => {
+           onInsert={({ src, width, height, pageNum }) => {
              const w = Math.min(Math.min(440, currentPage.width * 0.75), width);
              const h = height * (w / width);
              pushHistory();
              updatePage(currentPageIndex, (page) => {
                if (!page.images) page.images = [];
-               page.images.push({ id: `img-${Date.now()}`, src, x: (currentPage.width - w) / 2, y: 60, width: w, height: h });
+               // sourcePage lets the image show a 🔗 that jumps back to the book page.
+               page.images.push({ id: `img-${Date.now()}`, src, x: (currentPage.width - w) / 2, y: 60, width: w, height: h, sourcePage: pageNum });
              });
              setShowBookSnip(false);
              toast.success('แปะภาพจากหนังสือลงโน้ตแล้ว เลือกเครื่องมือเลื่อน (มือ) เพื่อจัดตำแหน่ง');
