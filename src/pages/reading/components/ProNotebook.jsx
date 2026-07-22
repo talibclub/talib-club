@@ -385,8 +385,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      }
   }, [editingTextId]);
 
-  // Size the edit box to its content whenever it opens or the zoom changes, so an
+  // Size the edit box to its content whenever it opens or its text changes, so an
   // existing multi-line note (bullets/numbered lists) is fully visible right away.
+  // NB: `scale` is intentionally not a dependency — it is declared far below this
+  // effect, and referencing it here evaluates during render, before its useState
+  // runs, which throws "Cannot access 'scale' before initialization".
   useEffect(() => {
      const el = textareaRef.current;
      if (!el || !editingTextId) return;
@@ -394,7 +397,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      el.style.height = `${el.scrollHeight}px`;
      el.style.width = 'auto';
      el.style.width = `${el.scrollWidth + 4}px`;
-  }, [editingTextId, editingTextValue, scale]);
+  }, [editingTextId, editingTextValue]);
 
   const [editingStickerId, setEditingStickerId] = useState(null);
   const [editingStickerValue, setEditingStickerValue] = useState("");
@@ -1398,7 +1401,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     //
     // Middle-drag and space-drag pan with any tool selected, so you don't have to
     // keep switching to the hand just to bring something back on screen.
-    const wantsPan = viewOnly || tool === 'pan' || isSpaceDown || evt?.button === 1;
+    const wantsPan = readonly || tool === 'pan' || isSpaceDown || evt?.button === 1;
     if (wantsPan) {
        if (evt) panningRef.current = { x: evt.clientX, y: evt.clientY };
        return;
