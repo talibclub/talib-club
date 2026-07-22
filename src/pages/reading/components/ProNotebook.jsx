@@ -8,7 +8,6 @@ import BookSnipModal from './BookSnipModal';
 import EmojiStickerPicker from './EmojiStickerPicker';
 import { RecordingsPanel, PlaybackBar } from './AudioRecordings';
 import { recognizeShape, shapeFromRecognition, pointInPolygon, distToSegmentXY } from '../utils/shapeRecognition.js';
-import useImage from 'use-image';
 import getStroke from 'perfect-freehand';
 import toast from 'react-hot-toast';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -17,265 +16,12 @@ import { uploadNotebookData, downloadNotebookData } from '../../../utils/noteboo
 import { db, storage } from '../../../lib/firebase.js';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { PDFPageImage, PaperPattern, getSvgPathFromStroke, PEN_STYLES, StrokeShape, CommittedStrokes, StickyStyleThumb } from './notebook/canvasElements.jsx';
+import { polygonBounds, polygonCentroid, polygonInteriorAngle, applyListPrefix, textDecorationOf } from './notebook/geometry.js';
+import { HW, ZERO_OFFSET, TEXT_BOX_WIDTH, STICKY_COLORS, STICKY_STYLES, FONT_OPTIONS } from './notebook/theme.js';
+import { useDragScroll } from './notebook/useDragScroll.js';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
-
-const PDFPageImage = ({ src, width, height }) => {
-  const [image] = useImage(src);
-  return (
-    <KonvaImage
-      image={image}
-      width={width}
-      height={height}
-    />
-  );
-};
-
-const PaperPattern = ({ width, height, type, color }) => {
-  const lineGap = 40;
-  const isDark = color === 'dark';
-  const strokeColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
-
-  const lines = [];
-  if (type === 'lines' || type === 'grid') {
-    for (let y = lineGap; y < height; y += lineGap) {
-      lines.push(<Path key={`h-${y}`} data={`M 0 ${y} L ${width} ${y}`} stroke={strokeColor} strokeWidth={1} />);
-    }
-  }
-  if (type === 'grid') {
-    for (let x = lineGap; x < width; x += lineGap) {
-      lines.push(<Path key={`v-${x}`} data={`M ${x} 0 L ${x} ${height}`} stroke={strokeColor} strokeWidth={1} />);
-    }
-  }
-  if (type === 'dots') {
-    for (let y = lineGap; y < height; y += lineGap) {
-      for (let x = lineGap; x < width; x += lineGap) {
-        lines.push(<Circle key={`d-${x}-${y}`} x={x} y={y} radius={2} fill={strokeColor} />);
-      }
-    }
-  }
-  
-  return <Group>{lines}</Group>;
-};
-
-const getSvgPathFromStroke = (stroke) => {
-  if (!stroke.length) return "";
-  const d = stroke.reduce((acc, [x0, y0], i, arr) => {
-      const [x1, y1] = arr[(i + 1) % arr.length];
-      acc.push(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2);
-      return acc;
-  }, ["M", ...stroke[0], "Q"]);
-  d.push("Z");
-  return d.join(" ");
-};
-
-// What actually distinguishes one pen from another. `stroke` goes to
-// perfect-freehand and shapes the outline; the rest controls how it is painted.
-//
-//  pen         ballpoint — near-constant width, fully opaque
-//  fountain    strong width response and tapered ends, like a flexible nib
-//  pencil      graphite: light, grainy, and it darkens where strokes overlap
-//  marker      chisel tip — flat width, slightly translucent
-//  highlighter wide, flat, multiplied so text stays readable underneath
-const PEN_STYLES = {
-  pen: {
-    // Higher thinning so real stylus pressure (and velocity, for mouse) visibly
-    // changes the line weight — at 0.22 the response was too small to notice.
-    stroke: { thinning: 0.5, smoothing: 0.5, streamline: 0.5 },
-    opacity: 1, composite: 'source-over',
-  },
-  fountain: {
-    stroke: {
-      thinning: 0.78, smoothing: 0.62, streamline: 0.42,
-      start: { taper: 14, cap: true }, end: { taper: 32, cap: true },
-    },
-    opacity: 1, composite: 'source-over',
-  },
-  pencil: {
-    stroke: { thinning: 0.55, smoothing: 0.4, streamline: 0.32 },
-    opacity: 0.62, composite: 'multiply', grain: true,
-  },
-  marker: {
-    stroke: { thinning: 0.05, smoothing: 0.55, streamline: 0.5, start: { cap: true }, end: { cap: true } },
-    sizeScale: 1.7, opacity: 0.9, composite: 'source-over',
-  },
-  highlighter: {
-    stroke: { thinning: 0, smoothing: 0.6, streamline: 0.6, start: { cap: false }, end: { cap: false } },
-    sizeScale: 3, opacity: 0.42, composite: 'multiply',
-  },
-  eraser: {
-    stroke: { thinning: 0, smoothing: 0.5, streamline: 0.5 },
-    opacity: 1, composite: 'destination-out',
-  },
-};
-
-// Graphite grain, one tile per colour, built once and reused. Without this the
-// pencil is just a thin translucent line and reads as a weak pen.
-const grainCache = new Map();
-const getGrainTile = (color) => {
-  if (grainCache.has(color)) return grainCache.get(color);
-  const c = document.createElement('canvas');
-  c.width = c.height = 48;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = color;
-  for (let i = 0; i < 1100; i++) {
-    ctx.globalAlpha = 0.2 + Math.random() * 0.6;
-    ctx.fillRect(Math.random() * 48, Math.random() * 48, 1, 1);
-  }
-  grainCache.set(color, c);
-  return c;
-};
-
-// One rendered stroke. Pulled out of the component (and memoised at the layer
-// level) so that drawing a new stroke does not re-run getStroke for every stroke
-// already on the page — that was the source of the lag as a page filled up.
-const StrokeShape = ({ line, faded }) => {
-  const style = PEN_STYLES[line.tool] || PEN_STYLES.pen;
-  const color = line.color || '#111827';
-
-  // Feed real stylus pressure to perfect-freehand when we captured it; fall back
-  // to its velocity simulation for strokes drawn with a mouse or saved earlier.
-  const hasPressure = Array.isArray(line.pressures) && line.pressures.length === line.points.length / 2;
-  const pointPairs = [];
-  for (let p = 0; p < line.points.length; p += 2) {
-    pointPairs.push(hasPressure
-      ? [line.points[p], line.points[p + 1], line.pressures[p / 2]]
-      : [line.points[p], line.points[p + 1]]);
-  }
-
-  const baseSize = line.tool === 'eraser' ? (line.size || 24) : (line.size || 4) * (style.sizeScale || 1);
-  const outline = getStroke(pointPairs, {
-    size: baseSize,
-    ...style.stroke,
-    simulatePressure: !hasPressure,
-  });
-  const pathData = getSvgPathFromStroke(outline);
-
-  const common = {
-    data: pathData,
-    opacity: (line.opacity ?? 1) * style.opacity * (faded ? 0.2 : 1),
-    globalCompositeOperation: style.composite,
-    lineCap: 'round',
-    lineJoin: 'round',
-  };
-
-  if (style.grain) {
-    return <Path {...common} fillPriority="pattern" fillPatternImage={getGrainTile(color)} fillPatternRepeat="repeat" />;
-  }
-  return <Path {...common} fill={line.tool === 'eraser' ? 'black' : color} />;
-};
-
-// Committed ink. Re-renders only when the stroke list itself changes.
-const CommittedStrokes = React.memo(({ lines, playbackTime, nowPlayingId }) => (
-  <>
-    {lines.map((line, i) => {
-      const isPlayingThis = nowPlayingId && (line.recordingId === nowPlayingId || (!line.recordingId && line.startTime != null));
-      const inFuture = isPlayingThis && line.startTime !== undefined && line.startTime !== null && line.startTime > playbackTime * 1000;
-      return <StrokeShape key={i} line={line} faded={inFuture} />;
-    })}
-  </>
-));
-
-// --- Editable-polygon geometry ---
-// Points are stored flat [x0,y0,x1,y1,...] in page coordinates.
-const polygonBounds = (pts) => {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (let i = 0; i < pts.length; i += 2) {
-    minX = Math.min(minX, pts[i]); maxX = Math.max(maxX, pts[i]);
-    minY = Math.min(minY, pts[i + 1]); maxY = Math.max(maxY, pts[i + 1]);
-  }
-  return { minX, minY, maxX, maxY };
-};
-
-const polygonCentroid = (pts) => {
-  let cx = 0, cy = 0; const n = pts.length / 2;
-  for (let i = 0; i < pts.length; i += 2) { cx += pts[i]; cy += pts[i + 1]; }
-  return { x: cx / n, y: cy / n };
-};
-
-// Interior angle (degrees) at vertex i, between its two adjacent edges.
-const polygonInteriorAngle = (pts, i) => {
-  const n = pts.length / 2;
-  if (n < 3) return 0;
-  const prev = ((i - 1) + n) % n, next = (i + 1) % n;
-  const bx = pts[i * 2], by = pts[i * 2 + 1];
-  const v1x = pts[prev * 2] - bx, v1y = pts[prev * 2 + 1] - by;
-  const v2x = pts[next * 2] - bx, v2y = pts[next * 2 + 1] - by;
-  const m1 = Math.hypot(v1x, v1y), m2 = Math.hypot(v2x, v2y);
-  if (m1 === 0 || m2 === 0) return 0;
-  const cos = Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / (m1 * m2)));
-  return Math.round((Math.acos(cos) * 180) / Math.PI);
-};
-
-const ZERO_OFFSET = { x: 0, y: 0 };
-
-// Text with a list style is stored as plain lines; the bullets/numbers are added
-// only for display (and in the editing overlay) so the underlying value stays clean.
-const applyListPrefix = (text, list) => {
-  if (!list || list === 'none' || !text) return text;
-  let n = 0;
-  return text.split('\n').map((line) => {
-    if (list === 'bullet') return line.length ? `•  ${line}` : line;
-    if (line.length) { n += 1; return `${n}.  ${line}`; }
-    return line;
-  }).join('\n');
-};
-
-// Konva's textDecoration accepts a space-separated combination.
-const textDecorationOf = (o) => [o.underline ? 'underline' : '', o.strikethrough ? 'line-through' : ''].filter(Boolean).join(' ') || '';
-
-// Default width of a text box, so alignment and lists have a column to work in.
-const TEXT_BOX_WIDTH = 340;
-
-// Sticky-note palette and styles, shared by the tool options and the context menu.
-const STICKY_COLORS = ['#FEF08A', '#FBCFE8', '#BAE6FD', '#BBF7D0', '#FED7AA', '#DDD6FE', '#FECACA', '#A7F3D0'];
-const STICKY_STYLES = [
-  { id: 'classic', label: 'คลาสสิก' },
-  { id: 'round', label: 'โค้งมน' },
-  { id: 'pin', label: 'หมุดปัก' },
-  { id: 'tape', label: 'เทปกาว' },
-  { id: 'polaroid', label: 'โพลารอยด์' },
-  { id: 'bubble', label: 'บับเบิล' },
-  { id: 'torn', label: 'ขอบฉีก' },
-  { id: 'lined', label: 'มีเส้น' },
-];
-
-// HarmonyOS / Huawei Notes design tokens
-const HW = {
-  accent: '#0A59F7',
-  accentSoft: 'rgba(10,89,247,0.10)',
-  surface: 'rgba(255,255,255,0.86)',
-  blur: 'saturate(180%) blur(30px)',
-  hairline: 'rgba(0,0,0,0.06)',
-  text: '#181818',
-  textDim: '#6B7280',
-  shadow: '0 6px 24px rgba(0,0,0,0.10), 0 1px 3px rgba(0,0,0,0.06)',
-  radius: 20,
-};
-
-// Drag-to-scroll hook for touchpads and mouse
-const useDragScroll = () => {
-  const ref = useRef(null);
-  
-  const onMouseDown = (e) => {
-    if (!ref.current) return;
-    const ele = ref.current;
-    ele.dataset.isDown = "true";
-    ele.dataset.startX = e.pageX - ele.offsetLeft;
-    ele.dataset.scrollLeft = ele.scrollLeft;
-  };
-  const onMouseLeave = () => { if (ref.current) ref.current.dataset.isDown = "false"; };
-  const onMouseUp = () => { if (ref.current) ref.current.dataset.isDown = "false"; };
-  const onMouseMove = (e) => {
-    if (!ref.current || ref.current.dataset.isDown !== "true") return;
-    e.preventDefault();
-    const ele = ref.current;
-    const x = e.pageX - ele.offsetLeft;
-    const walk = (x - parseFloat(ele.dataset.startX)) * 1.5;
-    ele.scrollLeft = parseFloat(ele.dataset.scrollLeft) - walk;
-  };
-  return { ref, onMouseDown, onMouseLeave, onMouseUp, onMouseMove };
-};
 
 export default function ProNotebook({ bookId, uid, activeBook, readonly = false, fullView = false, onToggleFullView }) {
   const leftToolbarScroll = useDragScroll();
@@ -479,22 +225,75 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const [imgResults, setImgResults] = useState([]);
   const [imgLoading, setImgLoading] = useState(false);
 
+  // Search several open, CORS-friendly image sources at once so a query like
+  // "ซัยยิด กุฏุบ" returns real photos without leaving the app. Thai + English
+  // Wikipedia surface the lead photo of matching articles (people, places, books),
+  // Wikimedia Commons adds broader media, and Openverse covers stickers/clip-art.
   const searchWebImages = async (q) => {
      if (!q.trim()) return;
      setImgLoading(true);
+     setImgResults([]);
+     const merged = [];
+     const seen = new Set();
+     const add = (r) => { if (r?.thumbnail && !seen.has(r.thumbnail)) { seen.add(r.thumbnail); merged.push(r); } };
+
+     // Real Google image results via our server-side proxy. Only returns data when
+     // GOOGLE_CSE_KEY / GOOGLE_CSE_CX are set in the deployment; otherwise it 503s
+     // and we fall through to the keyless sources below — no error shown.
+     const google = (async () => {
+        try {
+           const res = await fetch(`/api/image-search?q=${encodeURIComponent(q)}`);
+           if (!res.ok) return;
+           const data = await res.json();
+           (data.results || []).forEach(add);
+        } catch (_) { /* proxy offline / not configured */ }
+     })();
+
+     const wikiArticles = (lang) => (async () => {
+        try {
+           const res = await fetch(`https://${lang}.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=12&piprop=thumbnail&pithumbsize=400&origin=*`);
+           const data = await res.json();
+           Object.values(data.query?.pages || {}).forEach(p => p.thumbnail && add({
+              id: `wp-${lang}-${p.pageid}`, title: p.title, thumbnail: p.thumbnail.source, url: p.thumbnail.source,
+              width: p.thumbnail.width, height: p.thumbnail.height, source: 'Wikipedia', license: 'สาธารณะ/CC'
+           }));
+        } catch (_) { /* one source failing shouldn't sink the search */ }
+     })();
+
+     const commons = (async () => {
+        try {
+           const res = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrnamespace=6&gsrlimit=24&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=320&origin=*`);
+           const data = await res.json();
+           Object.values(data.query?.pages || {}).forEach(p => {
+              const ii = p.imageinfo?.[0];
+              if (ii?.thumburl) add({
+                 id: `cm-${p.pageid}`, title: p.title.replace('File:', ''), thumbnail: ii.thumburl, url: ii.thumburl,
+                 width: ii.thumbwidth, height: ii.thumbheight, source: 'Commons',
+                 license: ii.extmetadata?.LicenseShortName?.value || 'CC', creator: ii.extmetadata?.Artist?.value?.replace(/<[^>]+>/g, '')
+              });
+           });
+        } catch (_) { /* ignore */ }
+     })();
+
+     const openverse = (async () => {
+        try {
+           const res = await fetch(`https://api.openverse.org/v1/images/?q=${encodeURIComponent(q)}&page_size=24&mature=false`);
+           const data = await res.json();
+           (data.results || []).forEach(im => add({
+              id: `ov-${im.id}`, title: im.title, thumbnail: im.thumbnail || im.url, url: im.url,
+              width: im.width, height: im.height, source: 'Openverse', license: im.license, creator: im.creator
+           }));
+        } catch (_) { /* ignore */ }
+     })();
+
      try {
-        const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrnamespace=6&gsrlimit=30&pithumbsize=300&origin=*`);
-        if (!res.ok) throw new Error(`search failed ${res.status}`);
-        const data = await res.json();
-        const pages = data.query?.pages || {};
-        const results = Object.values(pages).map(p => ({
-            id: p.pageid,
-            title: p.title.replace('File:', ''),
-            thumbnail: p.thumbnail?.source,
-            url: p.thumbnail?.source
-        })).filter(r => r.thumbnail);
-        setImgResults(results);
-        if (!results.length) toast('ไม่พบรูปภาพที่ค้นหา');
+        // Google first (if configured) so its results head the grid; show them
+        // immediately, then fill in the keyless sources.
+        await google;
+        if (merged.length) setImgResults([...merged]);
+        await Promise.all([wikiArticles('th'), wikiArticles('en'), commons, openverse]);
+        setImgResults([...merged]);
+        if (!merged.length) toast('ไม่พบรูปภาพที่ค้นหา — ลองคำอื่น');
      } catch (e) {
         console.error('Image search failed', e);
         toast.error('ค้นหารูปไม่สำเร็จ (ตรวจสอบอินเทอร์เน็ต)');
@@ -1581,36 +1380,34 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     const page = pagesRef.current[currentPageIndex];
     if (!page) return;
 
-    const survivingLines = (page.lines || []).filter((l) => !strokeHitsPoint(l, pos, radius));
-    const hitLine = survivingLines.length !== (page.lines || []).length;
+    // Shared hit predicates, reused for the "did we hit anything?" check and for
+    // the actual filtering inside updatePage (which must run against the latest
+    // draft, not this snapshot, so fast strokes never resurrect erased items).
+    const lineKeep = (l) => !strokeHitsPoint(l, pos, radius);
+    const shapeKeep = (s) => {
+      const b = s.type === 'polygon' ? polygonBounds(s.points)
+        : s.type === 'connector' ? (() => { const { a, b: bb } = connectorPoints(s); return { minX: Math.min(a.x, bb.x), maxX: Math.max(a.x, bb.x), minY: Math.min(a.y, bb.y), maxY: Math.max(a.y, bb.y) }; })()
+        : { minX: Math.min(s.x1, s.x2), maxX: Math.max(s.x1, s.x2), minY: Math.min(s.y1, s.y2), maxY: Math.max(s.y1, s.y2) };
+      return !(pos.x >= b.minX - radius && pos.x <= b.maxX + radius && pos.y >= b.minY - radius && pos.y <= b.maxY + radius);
+    };
+    const textKeep = (t) => {
+      const w = Math.max(60, (t.text?.length || 1) * (t.size || 16) * 0.6);
+      return !(pos.x >= t.x - radius && pos.x <= t.x + w + radius && pos.y >= t.y - radius && pos.y <= t.y + (t.size || 16) * 1.4 + radius);
+    };
+    const stickerKeep = (st) => {
+      const w = st.audioUrl ? 130 : 150;
+      const h = st.audioUrl ? 44 : 150;
+      return !(pos.x >= st.x - radius && pos.x <= st.x + w + radius && pos.y >= st.y - radius && pos.y <= st.y + h + radius);
+    };
 
-    let hitObject = false;
-    let survivingShapes = page.shapes || [];
-    let survivingTexts = page.texts || [];
-    let survivingStickers = page.stickers || [];
-
-    if (eraserSettings.eraseObjects) {
-      survivingShapes = survivingShapes.filter((s) => {
-        const b = s.type === 'polygon' ? polygonBounds(s.points)
-          : s.type === 'connector' ? (() => { const { a, b: bb } = connectorPoints(s); return { minX: Math.min(a.x, bb.x), maxX: Math.max(a.x, bb.x), minY: Math.min(a.y, bb.y), maxY: Math.max(a.y, bb.y) }; })()
-          : { minX: Math.min(s.x1, s.x2), maxX: Math.max(s.x1, s.x2), minY: Math.min(s.y1, s.y2), maxY: Math.max(s.y1, s.y2) };
-        return !(pos.x >= b.minX - radius && pos.x <= b.maxX + radius && pos.y >= b.minY - radius && pos.y <= b.maxY + radius);
-      });
-      survivingTexts = survivingTexts.filter((t) => {
-        const w = Math.max(60, (t.text?.length || 1) * (t.size || 16) * 0.6);
-        return !(pos.x >= t.x - radius && pos.x <= t.x + w + radius && pos.y >= t.y - radius && pos.y <= t.y + (t.size || 16) * 1.4 + radius);
-      });
-      survivingStickers = survivingStickers.filter((st) => {
-        const w = st.audioUrl ? 130 : 150;
-        const h = st.audioUrl ? 44 : 150;
-        return !(pos.x >= st.x - radius && pos.x <= st.x + w + radius && pos.y >= st.y - radius && pos.y <= st.y + h + radius);
-      });
-      hitObject = survivingShapes.length !== (page.shapes || []).length
-        || survivingTexts.length !== (page.texts || []).length
-        || survivingStickers.length !== (page.stickers || []).length;
+    let hitAnything = (page.lines || []).some((l) => !lineKeep(l));
+    if (eraserSettings.eraseObjects && !hitAnything) {
+      hitAnything = (page.shapes || []).some((s) => !shapeKeep(s))
+        || (page.texts || []).some((t) => !textKeep(t))
+        || (page.stickers || []).some((st) => !stickerKeep(st));
     }
 
-    if (!hitLine && !hitObject) return;
+    if (!hitAnything) return;
 
     // One history entry per erase gesture, not per pointer sample.
     if (!gestureErasedRef.current) {
@@ -1618,10 +1415,12 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       gestureErasedRef.current = true;
     }
     updatePage(currentPageIndex, (p) => {
-      p.lines = survivingLines;
-      p.shapes = survivingShapes;
-      p.texts = survivingTexts;
-      p.stickers = survivingStickers;
+      p.lines = (p.lines || []).filter(lineKeep);
+      if (eraserSettings.eraseObjects) {
+        p.shapes = (p.shapes || []).filter(shapeKeep);
+        p.texts = (p.texts || []).filter(textKeep);
+        p.stickers = (p.stickers || []).filter(stickerKeep);
+      }
     });
   };
 
@@ -2604,7 +2403,128 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
   const currentPage = pages[currentPageIndex] || { width: 800, height: 1130, lines: [], stickers: [], images: [], texts: [], shapes: [] };
   const pageX = Math.max(0, (dimensions.width - currentPage.width * scale) / 2 / scale);
-  const pageY = 20; 
+  const pageY = 20;
+
+  // --- Drag-and-drop / paste images (iPad-style: drag a picture from Google or
+  // any tab straight onto the page, or Ctrl/Cmd+V a copied image) ---
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  // Turn a client (screen) point into page-space coordinates using the live stage
+  // transform, so a dropped image lands under the pointer at any zoom/pan.
+  const clientToPage = (clientX, clientY) => {
+     const stage = stageRef.current;
+     if (!stage || clientX == null) return { x: currentPage.width / 2, y: 220 };
+     const rect = stage.container().getBoundingClientRect();
+     const s = stage.scaleX() || scale || 1;
+     return {
+        x: (clientX - rect.left - stage.x()) / s - pageX,
+        y: (clientY - rect.top - stage.y()) / s - pageY,
+     };
+  };
+
+  // Measure an image src, size it to a friendly width keeping aspect ratio, and
+  // drop it centred on the point (or the page centre when no point is given).
+  const insertImageSrcAt = (src, clientX, clientY) => {
+     if (!src) return;
+     const place = (w, h) => {
+        const pt = clientToPage(clientX, clientY);
+        pushHistory();
+        updatePage(currentPageIndex, (page) => {
+           if (!page.images) page.images = [];
+           page.images.push({ id: `img-${Date.now()}`, src, x: pt.x - w / 2, y: pt.y - h / 2, width: w, height: h });
+        });
+        toast.success('แทรกรูปแล้ว', { id: 'drop-img' });
+     };
+     const im = new window.Image();
+     im.onload = () => {
+        const w = Math.min(320, im.naturalWidth || 320);
+        const ratio = im.naturalWidth ? (im.naturalHeight / im.naturalWidth) : 1;
+        place(w, Math.max(40, Math.round(w * (ratio || 1))));
+     };
+     im.onerror = () => place(300, 300); // couldn't measure (CORS): use a default box
+     im.src = src;
+  };
+
+  // Pull the best image reference out of a drag payload. The actual dragged image
+  // usually rides in text/html (<img src>); page/URL drags fall back to uri-list.
+  const imageUrlFromDataTransfer = (dt) => {
+     const html = dt.getData('text/html');
+     if (html) { const m = html.match(/<img[^>]+src=["']([^"']+)["']/i); if (m) return m[1]; }
+     const uri = dt.getData('text/uri-list');
+     if (uri) return uri.split('\n').find(l => l && !l.startsWith('#')) || '';
+     const plain = dt.getData('text/plain');
+     if (plain && /^https?:\/\//i.test(plain.trim())) return plain.trim();
+     return '';
+  };
+
+  const fetchAsDataUrlOrRemote = async (url) => {
+     try {
+        const r = await fetch(url);
+        const blob = await r.blob();
+        if (blob.type.startsWith('image/')) {
+           return await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob); });
+        }
+     } catch (_) { /* CORS or network: reference the remote URL instead */ }
+     return url;
+  };
+
+  const handleCanvasDrop = async (e) => {
+     e.preventDefault();
+     setIsDragOver(false);
+     if (readonly) return;
+     const dt = e.dataTransfer;
+     if (!dt) return;
+     const cx = e.clientX, cy = e.clientY;
+
+     // 1) An actual image file (from the desktop or another app)
+     const file = Array.from(dt.files || []).find(f => f.type.startsWith('image/'));
+     if (file) {
+        const reader = new FileReader();
+        reader.onload = (ev) => insertImageSrcAt(ev.target.result, cx, cy);
+        reader.readAsDataURL(file);
+        return;
+     }
+     // 2) An image dragged out of a web page (Google Images, an article, ...)
+     const url = imageUrlFromDataTransfer(dt);
+     if (!url) { toast.error('ไม่พบรูปในสิ่งที่ลากมา ลองลากที่ตัวรูปโดยตรง'); return; }
+     toast.loading('กำลังแทรกรูป...', { id: 'drop-img' });
+     const src = url.startsWith('data:') ? url : await fetchAsDataUrlOrRemote(url);
+     insertImageSrcAt(src, cx, cy);
+  };
+
+  // Paste a copied image anywhere on the page. Skipped while typing (text box,
+  // sticky note, or any input) so normal text paste keeps working.
+  useEffect(() => {
+     const onPaste = async (e) => {
+        if (readonly) return;
+        const ae = document.activeElement;
+        const typing = isEditingText.current || editingStickerId
+           || (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || ae.isContentEditable));
+        if (typing) return;
+        const cd = e.clipboardData;
+        if (!cd) return;
+        const item = Array.from(cd.items || []).find(it => it.type.startsWith('image/'));
+        if (item) {
+           const file = item.getAsFile();
+           if (file) {
+              e.preventDefault();
+              const reader = new FileReader();
+              reader.onload = (ev) => insertImageSrcAt(ev.target.result, null, null);
+              reader.readAsDataURL(file);
+              return;
+           }
+        }
+        const text = cd.getData('text/plain');
+        if (text && /^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg|avif)(\?|#|$)/i.test(text.trim())) {
+           e.preventDefault();
+           toast.loading('กำลังแทรกรูป...', { id: 'drop-img' });
+           const src = await fetchAsDataUrlOrRemote(text.trim());
+           insertImageSrcAt(src, null, null);
+        }
+     };
+     document.addEventListener('paste', onPaste);
+     return () => document.removeEventListener('paste', onPaste);
+  }, [readonly, editingStickerId, currentPageIndex]);
 
   const [showPageSettings, setShowPageSettings] = useState(false);
   const [showPageManager, setShowPageManager] = useState(false);
@@ -3139,8 +3059,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                             onChange={(e) => setStyle({ fontFamily: e.target.value }, { fontFamily: e.target.value })}
                             style={{ flexShrink: 0, height: 30, borderRadius: 9, border: `1px solid ${HW.hairline}`, background: 'white', color: HW.text, fontSize: 12.5, padding: '0 8px', cursor: 'pointer', fontFamily: textStyle.fontFamily }}
                           >
-                            {['Kanit', 'Prompt', 'Sarabun', 'serif', 'monospace'].map(f => (
-                              <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
+                            {FONT_OPTIONS.map(f => (
+                              <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>{f.label}</option>
                             ))}
                           </select>
 
@@ -3240,10 +3160,16 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                           ))}
                         </div>
                         <div style={{ width: 1, background: '#E5E7EB', height: 20, flexShrink: 0 }}></div>
-                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                        <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
                            {STICKY_STYLES.map(s => (
-                              <button key={s.id} onClick={() => setStickerStyle(s.id)} title={s.label} style={{ padding: '4px 8px', background: stickerStyle === s.id ? '#E0F2FE' : '#F3F4F6', color: stickerStyle === s.id ? '#0369A1' : '#4B5563', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                                 {s.label}
+                              <button
+                                key={s.id}
+                                onClick={() => setStickerStyle(s.id)}
+                                title={s.label}
+                                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '5px 6px', background: stickerStyle === s.id ? '#E0F2FE' : '#F3F4F6', borderRadius: 8, border: stickerStyle === s.id ? '1.5px solid #0EA5E9' : '1.5px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                              >
+                                 <StickyStyleThumb id={s.id} color={STICKY_COLORS.includes(penColor) ? penColor : '#FEF3C7'} />
+                                 <span style={{ fontSize: 10, fontWeight: 600, color: stickerStyle === s.id ? '#0369A1' : '#6B7280', lineHeight: 1 }}>{s.label}</span>
                               </button>
                            ))}
                         </div>
@@ -3317,8 +3243,23 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
          </div>
       )}
 
-      <div ref={containerRef} style={{ flex: 1, position: 'relative', display: 'flex', overflow: 'hidden' }}>
-      
+      <div
+        ref={containerRef}
+        style={{ flex: 1, position: 'relative', display: 'flex', overflow: 'hidden' }}
+        onDragOver={readonly ? undefined : (e) => { if (Array.from(e.dataTransfer?.types || []).some(t => ['Files', 'text/uri-list', 'text/html'].includes(t))) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; if (!isDragOver) setIsDragOver(true); } }}
+        onDragLeave={readonly ? undefined : (e) => { if (e.currentTarget === e.target) setIsDragOver(false); }}
+        onDrop={readonly ? undefined : handleCanvasDrop}
+      >
+
+      {/* iPad-style drop hint */}
+      {isDragOver && !readonly && (
+        <div style={{ position: 'absolute', inset: 12, zIndex: 70, pointerEvents: 'none', border: `2.5px dashed ${HW.accent}`, borderRadius: 18, background: 'rgba(16,185,129,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'white', padding: '12px 22px', borderRadius: 999, boxShadow: '0 8px 28px rgba(0,0,0,0.14)', fontWeight: 700, color: HW.text, fontSize: 15 }}>
+            <ImageIcon size={20} color={HW.accent} /> วางรูปที่นี่เพื่อแทรกลงสมุด
+          </div>
+        </div>
+      )}
+
       {showModeSelection && (
          <div style={{ position: 'absolute', inset: 0, zIndex: 20, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
            <h3 style={{ fontSize: 24, fontWeight: 600, color: '#111827', marginBottom: 8 }}>Start your visual thinking</h3>
@@ -3421,48 +3362,61 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       {/* Web image / sticker search panel (Openverse — openly-licensed media) */}
       {showImgSearch && (
         <Draggable handle=".img-drag-handle" bounds="parent">
-        <div style={{ position: 'absolute', top: 60, right: 20, width: 340, height: 480, zIndex: 60, background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(20px)', borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.15)', border: '1px solid rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', padding: 16 }}>
-          <div className="img-drag-handle" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexShrink: 0, cursor: 'move' }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--text)', whiteSpace: 'nowrap', flex: 1 }}>ค้นหารูป/สติกเกอร์</h3>
-            <form onSubmit={(e) => { e.preventDefault(); searchWebImages(imgQuery); }} style={{ flex: 1, display: 'flex', gap: 8 }}>
-              <input
-                autoFocus
-                type="text"
-                placeholder="เช่น cat sticker, flower, star ... (พิมพ์ภาษาอังกฤษได้ผลดีสุด)"
-                value={imgQuery}
-                onChange={(e) => setImgQuery(e.target.value)}
-                style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid var(--br2)', fontSize: 14, outline: 'none' }}
-              />
-              <button type="submit" disabled={imgLoading} style={{ padding: '0 18px', borderRadius: 10, border: 'none', background: HW.accent, color: 'white', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Search size={17} /> {imgLoading ? 'กำลังค้นหา...' : 'ค้นหา'}
-              </button>
-            </form>
-            <button onClick={() => setShowImgSearch(false)} style={{ border: 'none', background: 'var(--gray-light)', padding: '9px 16px', borderRadius: 10, cursor: 'pointer', fontWeight: 600, color: 'var(--text)' }}>ปิด</button>
+        <div style={{ position: 'absolute', top: 60, right: 20, width: 360, maxWidth: 'calc(100vw - 40px)', height: 520, maxHeight: 'calc(100vh - 90px)', zIndex: 60, background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(20px)', borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.15)', border: '1px solid rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', padding: 16 }}>
+          <div className="img-drag-handle" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexShrink: 0, cursor: 'move' }}>
+            <ImageIcon size={18} color={HW.accent} />
+            <h3 style={{ fontSize: 15.5, fontWeight: 700, margin: 0, color: 'var(--text)', whiteSpace: 'nowrap', flex: 1 }}>ค้นหารูปภาพจากเว็บ</h3>
+            <button onClick={() => setShowImgSearch(false)} title="ปิด" style={{ border: 'none', background: 'var(--gray-light)', width: 30, height: 30, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}><X size={17} /></button>
           </div>
 
+          <form onSubmit={(e) => { e.preventDefault(); searchWebImages(imgQuery); }} style={{ display: 'flex', gap: 8, flexShrink: 0, marginBottom: 10 }}>
+            <input
+              autoFocus
+              type="text"
+              placeholder="พิมพ์สิ่งที่อยากได้ เช่น ซัยยิด กุฏุบ, มัสยิด, ดอกไม้..."
+              value={imgQuery}
+              onChange={(e) => setImgQuery(e.target.value)}
+              style={{ flex: 1, minWidth: 0, padding: '10px 14px', borderRadius: 10, border: '1px solid var(--br2)', fontSize: 14, outline: 'none' }}
+            />
+            <button type="submit" disabled={imgLoading} style={{ padding: '0 16px', borderRadius: 10, border: 'none', background: HW.accent, color: 'white', fontWeight: 600, cursor: imgLoading ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              <Search size={17} /> {imgLoading ? '...' : 'ค้นหา'}
+            </button>
+          </form>
+
           <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-            {imgResults.length === 0 ? (
-              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--t3)', gap: 10 }}>
+            {imgLoading && imgResults.length === 0 ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 10 }}>
+                {Array.from({ length: 9 }).map((_, i) => (
+                  <div key={i} style={{ aspectRatio: '1', borderRadius: 10, background: 'linear-gradient(90deg,#F1F5F9,#E2E8F0,#F1F5F9)', backgroundSize: '200% 100%', animation: 'pulse 1.2s ease-in-out infinite' }} />
+                ))}
+              </div>
+            ) : imgResults.length === 0 ? (
+              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--t3)', gap: 12, textAlign: 'center', padding: '0 12px' }}>
                 <ImageIcon size={44} strokeWidth={1.3} opacity={0.4} />
-                <p style={{ fontSize: 14 }}>{imgLoading ? 'กำลังค้นหา...' : 'พิมพ์คำค้นหาแล้วกดค้นหา เพื่อดึงรูป/สติกเกอร์ลิขสิทธิ์เปิดมาแทรก'}</p>
+                <p style={{ fontSize: 14, margin: 0 }}>พิมพ์คำค้นหาได้ทั้งภาษาไทยและอังกฤษ<br/>แล้วแตะรูปเพื่อแทรกลงสมุดได้ทันที</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+                  {['ซัยยิด กุฏุบ', 'มัสยิด', 'อัลกุรอาน', 'ดอกไม้', 'star sticker'].map(ex => (
+                    <button key={ex} onClick={() => { setImgQuery(ex); searchWebImages(ex); }} style={{ border: '1px solid var(--br2)', background: 'white', color: HW.accent, fontSize: 12.5, fontWeight: 600, padding: '5px 11px', borderRadius: 999, cursor: 'pointer' }}>{ex}</button>
+                  ))}
+                </div>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 10 }}>
                 {imgResults.map((item) => (
                   <button
-                    style={{ background: 'transparent', border: 'none', padding: 0 }}
                     key={item.id}
                     onClick={() => insertWebImage(item)}
-                    title={`${item.title || ''}${item.creator ? ' — ' + item.creator : ''} (${item.license || 'CC'})`}
-                    style={{ border: '1px solid var(--br2)', borderRadius: 10, overflow: 'hidden', background: 'white', cursor: 'pointer', padding: 0, aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    title={`${item.title || ''}${item.creator ? ' — ' + item.creator : ''} (${item.source} · ${item.license || 'CC'})`}
+                    style={{ position: 'relative', border: '1px solid var(--br2)', borderRadius: 10, overflow: 'hidden', background: 'white', cursor: 'pointer', padding: 0, aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   >
-                    <img src={item.thumbnail || item.url} alt={item.title || 'result'} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    <img src={item.thumbnail || item.url} alt={item.title || 'result'} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <span style={{ position: 'absolute', bottom: 4, left: 4, fontSize: 9, fontWeight: 700, color: 'white', background: 'rgba(0,0,0,0.55)', padding: '2px 6px', borderRadius: 999, pointerEvents: 'none' }}>{item.source}</span>
                   </button>
                 ))}
               </div>
             )}
           </div>
-          <p style={{ flexShrink: 0, marginTop: 8, fontSize: 11, color: 'var(--t3)', textAlign: 'center' }}>รูปภาพจาก Openverse (สื่อลิขสิทธิ์เปิด CC) — โปรดให้เครดิตผู้สร้างเมื่อเผยแพร่</p>
+          <p style={{ flexShrink: 0, marginTop: 8, fontSize: 10.5, color: 'var(--t3)', textAlign: 'center' }}>รูปจาก Google · Wikipedia · Commons · Openverse — โปรดตรวจลิขสิทธิ์/ให้เครดิตก่อนเผยแพร่</p>
         </div>
         </Draggable>
       )}
@@ -3760,67 +3714,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         {/* Texts Layer */}
         <Layer>
           <Group x={pageX} y={pageY}>
-            {currentPage.texts && currentPage.texts.map((t) => (
-              <Group
-                key={t.id}
-                id={t.id}
-                name="object"
-                x={t.x + objectOffset('texts', t.id).x}
-                y={t.y + objectOffset('texts', t.id).y}
-                scaleX={t.scaleX || 1}
-                scaleY={t.scaleY || 1}
-                rotation={t.rotation || 0}
-                draggable={tool === 'pan' || tool === 'text'}
-                listening={['pan', 'lasso', 'text'].includes(tool) || selectedId === t.id}
-                onDragEnd={(e) => {
-                   const { x, y } = e.target.position();
-                   updatePage(currentPageIndex, (page) => {
-                     const txt = page.texts.find(tx => tx.id === t.id);
-                     if(txt) { txt.x = x; txt.y = y; }
-                   });
-                }}
-                onTransformEnd={(e) => {
-                   const node = e.target;
-                   updatePage(currentPageIndex, (page) => {
-                     const txt = page.texts.find(tx => tx.id === t.id);
-                     if (txt) { txt.x = node.x(); txt.y = node.y(); txt.scaleX = node.scaleX(); txt.scaleY = node.scaleY(); txt.rotation = node.rotation(); }
-                   });
-                }}
-                onClick={() => {
-                   if (tool === 'pan' || tool === 'lasso') {
-                      selectShape(t.id);
-                   } else if (tool === 'text' && !t.isEmoji) {
-                      setEditingTextId(t.id);
-                      setEditingTextValue(t.text);
-                      isEditingText.current = true;
-                   }
-                }}
-                onTap={() => {
-                   if (tool === 'pan' || tool === 'lasso') {
-                      selectShape(t.id);
-                   } else if (tool === 'text' && !t.isEmoji) {
-                      setEditingTextId(t.id);
-                      setEditingTextValue(t.text);
-                      isEditingText.current = true;
-                   }
-                }}
-              >
-                {editingTextId !== t.id && (
-                  <Text
-                    text={applyListPrefix(t.text, t.list)}
-                    fontSize={t.size}
-                    fill={t.color}
-                    fontFamily={t.fontFamily || 'Kanit'}
-                    fontStyle={[t.bold ? 'bold' : '', t.italic ? 'italic' : ''].filter(Boolean).join(' ') || 'normal'}
-                    textDecoration={textDecorationOf(t)}
-                    align={t.align || 'left'}
-                    width={t.align && t.align !== 'left' ? (t.width || TEXT_BOX_WIDTH) : undefined}
-                    padding={4}
-                  />
-                )}
-              </Group>
-            ))}
-            
             {/* Stickers */}
             {currentPage.stickers && currentPage.stickers.map(st => {
               // Audio notes are surfaced in the recordings panel, not on the canvas.
@@ -3839,8 +3732,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   rotation={st.rotation || 0}
                   draggable={tool === 'pan' || tool === 'sticker'} 
                   listening={['pan', 'lasso', 'sticker'].includes(tool) || selectedId === st.id}
-                  onClick={() => { if (['pan', 'lasso', 'sticker'].includes(tool)) selectShape(st.id, 'stickers'); }}
-                  onTap={() => { if (['pan', 'lasso', 'sticker'].includes(tool)) selectShape(st.id, 'stickers'); }}
                   onDragEnd={(e) => {
                     updatePage(currentPageIndex, (page) => {
                        const sticker = page.stickers.find(s => s.id === st.id);
@@ -3909,6 +3800,68 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                 </Group>
               );
             })}
+
+            {/* Texts render after stickers so labels/notes sit on top of sticky-note tables */}
+            {currentPage.texts && currentPage.texts.map((t) => (
+              <Group
+                key={t.id}
+                id={t.id}
+                name="object"
+                x={t.x + objectOffset('texts', t.id).x}
+                y={t.y + objectOffset('texts', t.id).y}
+                scaleX={t.scaleX || 1}
+                scaleY={t.scaleY || 1}
+                rotation={t.rotation || 0}
+                draggable={tool === 'pan' || tool === 'text'}
+                listening={['pan', 'lasso', 'text'].includes(tool) || selectedId === t.id}
+                onDragEnd={(e) => {
+                   const { x, y } = e.target.position();
+                   updatePage(currentPageIndex, (page) => {
+                     const txt = page.texts.find(tx => tx.id === t.id);
+                     if(txt) { txt.x = x; txt.y = y; }
+                   });
+                }}
+                onTransformEnd={(e) => {
+                   const node = e.target;
+                   updatePage(currentPageIndex, (page) => {
+                     const txt = page.texts.find(tx => tx.id === t.id);
+                     if (txt) { txt.x = node.x(); txt.y = node.y(); txt.scaleX = node.scaleX(); txt.scaleY = node.scaleY(); txt.rotation = node.rotation(); }
+                   });
+                }}
+                onClick={() => {
+                   if (tool === 'pan' || tool === 'lasso') {
+                      selectShape(t.id);
+                   } else if (tool === 'text' && !t.isEmoji) {
+                      setEditingTextId(t.id);
+                      setEditingTextValue(t.text);
+                      isEditingText.current = true;
+                   }
+                }}
+                onTap={() => {
+                   if (tool === 'pan' || tool === 'lasso') {
+                      selectShape(t.id);
+                   } else if (tool === 'text' && !t.isEmoji) {
+                      setEditingTextId(t.id);
+                      setEditingTextValue(t.text);
+                      isEditingText.current = true;
+                   }
+                }}
+              >
+                {editingTextId !== t.id && (
+                  <Text
+                    text={applyListPrefix(t.text, t.list)}
+                    fontSize={t.size}
+                    fill={t.color}
+                    fontFamily={t.fontFamily || 'Kanit'}
+                    fontStyle={[t.bold ? 'bold' : '', t.italic ? 'italic' : ''].filter(Boolean).join(' ') || 'normal'}
+                    textDecoration={textDecorationOf(t)}
+                    align={t.align || 'left'}
+                    width={t.align && t.align !== 'left' ? (t.width || TEXT_BOX_WIDTH) : undefined}
+                    padding={4}
+                  />
+                )}
+              </Group>
+            ))}
           </Group>
         </Layer>
         
@@ -4330,9 +4283,32 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
          const absoluteY = (t.y + pageY) * scale + position.y;
          
          return (
-           <div style={{ position: 'absolute', top: absoluteY - 50, left: absoluteX, zIndex: 101, display: 'flex', flexDirection: 'column', gap: 8 }}>
-             <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'white', padding: '6px', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', border: '1px solid var(--br2)' }}>
-                {[ 
+           <div data-text-editor style={{ position: 'absolute', top: absoluteY - 50, left: absoluteX, zIndex: 101, display: 'flex', flexDirection: 'column', gap: 8 }}>
+             <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'white', padding: '6px', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', border: '1px solid var(--br2)', maxWidth: '92vw', overflowX: 'auto' }}>
+                {/* Font selector — lets you restyle an existing text's font after it's created */}
+                <select
+                  value={t.fontFamily || 'Kanit'}
+                  onMouseDown={e => e.stopPropagation()}
+                  onChange={(e) => {
+                     const font = e.target.value;
+                     setTextStyle(s => ({ ...s, fontFamily: font }));
+                     updatePage(currentPageIndex, (page) => {
+                        const txt = page.texts?.find(tx => tx.id === editingTextId);
+                        if (txt) txt.fontFamily = font;
+                     });
+                     // Return focus to the textarea so a later tap on the canvas still
+                     // commits and closes the editor normally.
+                     setTimeout(() => textareaRef.current?.focus(), 0);
+                  }}
+                  title="เปลี่ยนฟอนต์"
+                  style={{ height: 28, borderRadius: 6, border: '1px solid var(--br2)', background: '#F9FAFB', color: '#111827', fontSize: 12.5, padding: '0 6px', cursor: 'pointer', fontFamily: t.fontFamily || 'Kanit', maxWidth: 118 }}
+                >
+                  {FONT_OPTIONS.map(f => (
+                    <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>{f.label}</option>
+                  ))}
+                </select>
+                <div style={{ width: 1, height: 16, background: 'var(--br2)', margin: '0 4px' }}></div>
+                {[
                   { id: 'bold', icon: <span style={{fontWeight: 700, fontFamily: 'serif', fontSize: 16}}>B</span>, prop: 'bold' },
                   { id: 'italic', icon: <span style={{fontStyle: 'italic', fontFamily: 'serif', fontSize: 16}}>I</span>, prop: 'italic' },
                   { id: 'underline', icon: <span style={{textDecoration: 'underline', fontFamily: 'serif', fontSize: 16}}>U</span>, prop: 'underline' }
@@ -4396,8 +4372,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                  const txt = pages[currentPageIndex]?.texts?.find(tx => tx.id === editingTextId);
                  if (txt?.list === 'bullet' || txt?.list === 'number') {
                    return (
-                     <div style={{ position: 'absolute', top: 8, left: 8, pointerEvents: 'none', color: txt.color || 'black', fontSize: (txt.size || 24) * zoomLevel, fontFamily: txt.font || 'Sarabun', lineHeight: 1.5 }}>
-                       {editingTextValue.split('\n').map((_, i) => <div key={i} style={{ minHeight: '1.5em' }}>{txt.list === 'bullet' ? '•' : `${i + 1}.`}</div>)}
+                     <div style={{ position: 'absolute', top: 8, left: 8, pointerEvents: 'none', color: txt.color || 'black', fontSize: (txt.size || 24) * scale, fontFamily: txt.fontFamily || 'Kanit', lineHeight: 1.2, zIndex: 101 }}>
+                       {editingTextValue.split('\n').map((_, i) => <div key={i} style={{ minHeight: '1.2em', lineHeight: 1.2 }}>{txt.list === 'bullet' ? '•' : `${i + 1}.`}</div>)}
                      </div>
                    );
                  }
@@ -4409,12 +4385,24 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                placeholder="พิมพ์ข้อความที่นี่..."
                value={editingTextValue}
                onChange={(e) => {
-                  setEditingTextValue(e.target.value);
+                  const val = e.target.value;
+                  setEditingTextValue(val);
+                  // Persist live so switching focus to the font dropdown or a format
+                  // button never loses what's been typed.
+                  updatePage(currentPageIndex, (page) => {
+                     const txt = page.texts?.find(tx => tx.id === editingTextId);
+                     if (txt) txt.text = val;
+                  });
                }}
-               onBlur={() => {
+               onBlur={(e) => {
+                  // Keep the editor open when focus moves to one of its own controls
+                  // (the font <select>, alignment/list buttons) so they can restyle
+                  // the text that's still being edited.
+                  const editor = e.currentTarget.closest('[data-text-editor]');
+                  if (editor && e.relatedTarget && editor.contains(e.relatedTarget)) return;
                   if (!isEditingText.current) return;
                   isEditingText.current = false;
-                  
+
                   if (editingTextValue.trim() === '') {
                      updatePage(currentPageIndex, (page) => {
                         page.texts = page.texts.filter(tx => tx.id !== editingTextId);
@@ -4432,7 +4420,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                style={{
                   margin: 0,
                   padding: 8,
-                  paddingLeft: ['bullet', 'number'].includes(pages[currentPageIndex]?.texts?.find(tx => tx.id === editingTextId)?.list) ? ((pages[currentPageIndex]?.texts?.find(tx => tx.id === editingTextId)?.size || 24) * zoomLevel) + 12 : 8,
+                  paddingLeft: ['bullet', 'number'].includes(pages[currentPageIndex]?.texts?.find(tx => tx.id === editingTextId)?.list) ? ((pages[currentPageIndex]?.texts?.find(tx => tx.id === editingTextId)?.size || 24) * scale) + 12 : 8,
                   border: '2px solid var(--teal)',
                   background: 'rgba(255,255,255,0.95)',
                   color: t.color,
