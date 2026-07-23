@@ -105,6 +105,14 @@ input, select, textarea, button {
   transition: background .3s, color .3s;
 }
 
+/* Reading room: size to the SMALL viewport height so the notebook's bottom
+   toolbar is never hidden behind the tablet browser's chrome (address/tab bar).
+   Falls back to 100vh on browsers that don't support svh. */
+.reading-room-shell {
+  height: 100vh;
+  height: 100svh;
+}
+
 /* Main content */
 main {
   width: 100%;

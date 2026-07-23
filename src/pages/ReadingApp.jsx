@@ -17,6 +17,7 @@ import { MissionRow } from "./reading/components/MissionRow.jsx"
 import ReadingDashboard from "./reading/components/ReadingDashboard.jsx"
 import TimerPanel from "./reading/components/TimerPanel.jsx"
 import ProNotebook from "./reading/components/ProNotebook.jsx"
+import { usePWA } from "../hooks/usePWA.js"
 
 // --- Helper Functions ---
 function sanitizeStorageName(name) {
@@ -128,6 +129,14 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   const [notebookFull, setNotebookFull] = useState(false) // Notebook takes the whole width, PDF hidden
   const [hudCollapsed, setHudCollapsed] = useState(false) // Shrink the reading-room header to a floating pill
   const hudPillRef = useRef(null) // react-draggable nodeRef for the floating pill
+
+  // "Install as app" hint for tablet users: running full-screen (standalone)
+  // removes the browser's chrome, so the notebook's bottom toolbar is no longer
+  // clipped by the address/tab bar. Dismissible and remembered.
+  const { isInstallable, isInstalled, installApp } = usePWA()
+  const [pwaHintDismissed, setPwaHintDismissed] = useState(
+    () => typeof localStorage !== "undefined" && localStorage.getItem("talib_pwa_reader_hint_dismissed") === "true"
+  )
 
   // External Upload States
   const [addMode, setAddMode] = useState("library")
@@ -799,9 +808,11 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   if (activeBook) {
     // --- Focused Reading Room View (Full-Bleed Overlay App Interface) ---
     return createPortal(
-      <div className={`app ${theme || "light"}`} style={{
+      <div className={`app ${theme || "light"} reading-room-shell`} style={{
         position: "fixed",
-        inset: 0,
+        top: 0,
+        left: 0,
+        right: 0,
         zIndex: 2000,
         background: "var(--bg)",
         display: "flex",
@@ -1022,6 +1033,22 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
             </div>
           )}
         </div>
+
+        {/* Tablet: suggest installing as an app so the notebook runs full-screen
+            (no browser chrome clipping the bottom toolbar). Shown on the reading
+            dashboard only, so it never overlaps the notebook's own toolbars. */}
+        {isInstallable && !isInstalled && !pwaHintDismissed && !showNotebook && (
+          <div style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", zIndex: 2100, display: "flex", alignItems: "center", gap: 10, background: "linear-gradient(135deg,#0f6e56,#0a4f3e)", color: "#fff", padding: "10px 12px 10px 14px", borderRadius: 14, boxShadow: "0 10px 30px rgba(0,0,0,0.3)", maxWidth: "calc(100% - 24px)", border: "1px solid rgba(255,255,255,0.12)" }}>
+            <i className="ti ti-device-tablet" style={{ fontSize: 18, flexShrink: 0 }}></i>
+            <div style={{ fontSize: 12, lineHeight: 1.35, minWidth: 0 }}>
+              ติดตั้งเป็นแอปเพื่อใช้ <b>เต็มจอ</b> — แถบเครื่องมือจะไม่โดนแถบเบราเซอร์บัง
+            </div>
+            <button onClick={() => { installApp() }} style={{ flexShrink: 0, background: "#fff", color: "#0f6e56", border: "none", borderRadius: 20, padding: "7px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'Prompt', sans-serif" }}>ติดตั้ง</button>
+            <button onClick={() => { localStorage.setItem("talib_pwa_reader_hint_dismissed", "true"); setPwaHintDismissed(true) }} aria-label="ปิด" style={{ flexShrink: 0, background: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.8)", border: "none", borderRadius: "50%", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <i className="ti ti-x" style={{ fontSize: 12 }}></i>
+            </button>
+          </div>
+        )}
       </div>,
       document.body
     )
