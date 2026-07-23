@@ -274,11 +274,53 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      // and we fall through to the keyless sources below — no error shown.
      const google = (async () => {
         try {
+           // Fallback for local development using Vite variables if available
+           const localKey = import.meta.env.VITE_GOOGLE_CSE_KEY;
+           const localCx = import.meta.env.VITE_GOOGLE_CSE_CX;
+           
+           if (import.meta.env.DEV && localKey && localCx) {
+              const start = 1;
+              const api = new URL('https://www.googleapis.com/customsearch/v1');
+              api.searchParams.set('key', localKey);
+              api.searchParams.set('cx', localCx);
+              api.searchParams.set('q', q);
+              api.searchParams.set('searchType', 'image');
+              api.searchParams.set('num', '10');
+              api.searchParams.set('start', String(start));
+              api.searchParams.set('safe', 'active');
+              
+              const gRes = await fetch(api.toString());
+              if (!gRes.ok) {
+                 const errText = await gRes.text();
+                 console.error("Google API Local Error:", errText);
+                 return;
+              }
+              const data = await gRes.json();
+              (data.items || []).forEach((it, i) => add({
+                 id: `g-local-${start + i}`,
+                 title: it.title,
+                 thumbnail: it.image?.thumbnailLink || it.link,
+                 url: it.link,
+                 width: it.image?.width,
+                 height: it.image?.height,
+                 source: 'Google',
+                 license: 'เว็บ',
+                 context: it.image?.contextLink,
+              }));
+              return;
+           }
+
            const res = await fetch(`/api/image-search?q=${encodeURIComponent(q)}`);
-           if (!res.ok) return;
+           if (!res.ok) {
+              if (res.status === 502) {
+                 const errText = await res.text();
+                 console.error("Google API Server Error:", errText);
+              }
+              return;
+           }
            const data = await res.json();
            (data.results || []).forEach(add);
-        } catch (_) { /* proxy offline / not configured */ }
+        } catch (e) { console.error(e) }
      })();
 
      const wikiArticles = (lang) => (async () => {
