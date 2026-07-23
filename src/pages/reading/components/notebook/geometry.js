@@ -45,3 +45,66 @@ export const applyListPrefix = (text, list) => {
 
 // Konva's textDecoration accepts a space-separated combination.
 export const textDecorationOf = (o) => [o.underline ? 'underline' : '', o.strikethrough ? 'line-through' : ''].filter(Boolean).join(' ') || '';
+
+// --- Rich text: per-line formatting (item 9, phase 1) ---
+// Legacy text objects carry one `text` string plus box-level bold/italic/list/…
+// The line-level model stores `lines: [{ text, bold, italic, underline,
+// strikethrough, list, align }]`. These helpers upgrade legacy objects on the
+// fly at render time, so old notes keep rendering identically (a uniform box is
+// still drawn as one Konva <Text>) while future mixed boxes render per line.
+
+const LINE_FLAGS = ['bold', 'italic', 'underline', 'strikethrough'];
+
+export const makeLine = (text = '', fmt = {}) => ({
+  text: text || '',
+  bold: !!fmt.bold,
+  italic: !!fmt.italic,
+  underline: !!fmt.underline,
+  strikethrough: !!fmt.strikethrough,
+  list: fmt.list || 'none',
+  align: fmt.align || 'left',
+});
+
+// Return a copy of the text object guaranteed to have a well-formed `lines[]`.
+// Already-line-level objects are normalized; legacy ones are split on '\n' with
+// every line inheriting the old box-level format.
+export const migrateText = (t) => {
+  if (!t) return t;
+  if (Array.isArray(t.lines)) {
+    return { ...t, lines: t.lines.map((l) => makeLine(l.text, l)) };
+  }
+  const box = { bold: t.bold, italic: t.italic, underline: t.underline, strikethrough: t.strikethrough, list: t.list, align: t.align };
+  const raw = typeof t.text === 'string' ? t.text : '';
+  const parts = raw.length ? raw.split('\n') : [''];
+  return { ...t, lines: parts.map((line) => makeLine(line, box)) };
+};
+
+// Plain-string value of the lines (editor value, search, legacy readers).
+export const textOf = (t) => (Array.isArray(t?.lines) ? t.lines.map((l) => l.text).join('\n') : (t?.text || ''));
+
+// True when every line shares the same formatting → render as a single <Text>,
+// byte-identical to the pre-rich-text behaviour. Always true for legacy boxes.
+export const isUniformText = (t) => {
+  const lines = t?.lines;
+  if (!Array.isArray(lines) || lines.length <= 1) return true;
+  const first = lines[0];
+  return lines.every((l) => l.list === first.list && l.align === first.align && LINE_FLAGS.every((f) => !!l[f] === !!first[f]));
+};
+
+// The shared format of a (uniform) box, read off its first line.
+export const uniformFormatOf = (t) => {
+  const l0 = (Array.isArray(t?.lines) && t.lines[0]) || {};
+  return { bold: !!l0.bold, italic: !!l0.italic, underline: !!l0.underline, strikethrough: !!l0.strikethrough, list: l0.list || 'none', align: l0.align || 'left' };
+};
+
+// Per-line bullet/number prefixes; numbering runs continuously across the box
+// and skips blank lines — matching the legacy applyListPrefix output.
+export const listPrefixes = (lines) => {
+  let n = 0;
+  return lines.map((l) => {
+    if (!l.list || l.list === 'none' || !l.text.length) return '';
+    if (l.list === 'bullet') return '•  ';
+    n += 1;
+    return `${n}.  `;
+  });
+};

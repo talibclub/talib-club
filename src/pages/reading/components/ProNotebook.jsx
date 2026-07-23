@@ -18,7 +18,7 @@ import { db, storage } from '../../../lib/firebase.js';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { PDFPageImage, PaperPattern, getSvgPathFromStroke, PEN_STYLES, StrokeShape, CommittedStrokes, StickyStyleThumb } from './notebook/canvasElements.jsx';
-import { polygonBounds, polygonCentroid, polygonInteriorAngle, applyListPrefix, textDecorationOf } from './notebook/geometry.js';
+import { polygonBounds, polygonCentroid, polygonInteriorAngle, applyListPrefix, textDecorationOf, migrateText, textOf, isUniformText, uniformFormatOf, listPrefixes } from './notebook/geometry.js';
 import { HW, ZERO_OFFSET, TEXT_BOX_WIDTH, STICKY_COLORS, STICKY_STYLES, FONT_OPTIONS } from './notebook/theme.js';
 import { useDragScroll } from './notebook/useDragScroll.js';
 import ImageSearchPanel from './notebook/ImageSearchPanel.jsx';
@@ -3865,19 +3865,45 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                    }
                 }}
               >
-                {editingTextId !== t.id && (
-                  <Text
-                    text={applyListPrefix(t.text, t.list)}
-                    fontSize={t.size}
-                    fill={t.color}
-                    fontFamily={t.fontFamily || 'Kanit'}
-                    fontStyle={[t.bold ? 'bold' : '', t.italic ? 'italic' : ''].filter(Boolean).join(' ') || 'normal'}
-                    textDecoration={textDecorationOf(t)}
-                    align={t.align || 'left'}
-                    width={t.align && t.align !== 'left' ? (t.width || TEXT_BOX_WIDTH) : undefined}
-                    padding={4}
-                  />
-                )}
+                {editingTextId !== t.id && (() => {
+                  // Rich text (item 9, phase 1): a uniform box renders as one
+                  // <Text> exactly as before; a box with per-line formatting
+                  // (created by the phase-2 editor) renders one <Text> per line.
+                  const tt = migrateText(t);
+                  if (isUniformText(tt)) {
+                    const f = uniformFormatOf(tt);
+                    return (
+                      <Text
+                        text={applyListPrefix(textOf(tt), f.list)}
+                        fontSize={t.size}
+                        fill={t.color}
+                        fontFamily={t.fontFamily || 'Kanit'}
+                        fontStyle={[f.bold ? 'bold' : '', f.italic ? 'italic' : ''].filter(Boolean).join(' ') || 'normal'}
+                        textDecoration={textDecorationOf(f)}
+                        align={f.align || 'left'}
+                        width={f.align && f.align !== 'left' ? (t.width || TEXT_BOX_WIDTH) : undefined}
+                        padding={4}
+                      />
+                    );
+                  }
+                  const prefixes = listPrefixes(tt.lines);
+                  const lh = t.size; // Konva default lineHeight = 1 → lines are fontSize apart
+                  return tt.lines.map((l, i) => (
+                    <Text
+                      key={i}
+                      x={4}
+                      y={4 + i * lh}
+                      text={(prefixes[i] || '') + l.text}
+                      fontSize={t.size}
+                      fill={t.color}
+                      fontFamily={t.fontFamily || 'Kanit'}
+                      fontStyle={[l.bold ? 'bold' : '', l.italic ? 'italic' : ''].filter(Boolean).join(' ') || 'normal'}
+                      textDecoration={textDecorationOf(l)}
+                      align={l.align || 'left'}
+                      width={l.align && l.align !== 'left' ? (t.width || TEXT_BOX_WIDTH) : undefined}
+                    />
+                  ));
+                })()}
               </Group>
             ))}
           </Group>

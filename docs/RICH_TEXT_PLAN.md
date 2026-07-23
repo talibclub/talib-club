@@ -34,11 +34,11 @@ t = {
 
 ## งานที่ต้องแก้ (แยกเฟสให้ ship ได้ระหว่างทาง)
 
-### เฟส 1 — โมเดล + Migration + Render ต่อบรรทัด (เอดิเตอร์ยังเป็นระดับกล่อง)
-- เพิ่ม `migrateText` + normalize ตอนโหลด
-- Render: เปลี่ยน `<Text>` ใบเดียว → map เป็น `<Text>` ต่อบรรทัด เรียงตาม y (คำนวณ lineHeight ให้ตรงเอดิเตอร์) แต่ละบรรทัดใช้ fontStyle/decoration/align/prefix ของตัวเอง; เลข list เดิน/รีเซ็ตภายในกล่อง; ห่อใน `<Group>` เดิมเพื่อให้ select/drag/transform เหมือนเดิม
-- อัปเดตการคำนวณ bounds ของกล่อง (สูง = ผลรวม lineHeight) ที่ใช้ select/lasso (~1718, ~2230)
-- ผลลัพธ์: โน้ตเก่าหน้าตาเหมือนเดิมเป๊ะ, export ถูกตาม, ยังไม่เพิ่มความเสี่ยงฝั่งแก้ไข
+### เฟส 1 — โมเดล + Migration + Render ต่อบรรทัด (เอดิเตอร์ยังเป็นระดับกล่อง) — ✅ เสร็จ
+- ✅ helpers ใน `geometry.js`: `migrateText`, `textOf`, `isUniformText`, `uniformFormatOf`, `listPrefixes`, `makeLine` (มี unit test 13 เคส ครอบ parity กล่องเก่า)
+- ✅ Render (`ProNotebook.jsx` ~3868): กล่อง uniform → `<Text>` ใบเดียวเหมือนเดิมเป๊ะ (fast path); กล่อง mixed → `<Text>` ต่อบรรทัด (เลข list เดินต่อ, skip บรรทัดว่าง)
+- **หมายเหตุ:** เฟส 1 ทำ migration แบบ **render-time** (ไม่แตะ storage/editor/creation) → โน้ตเก่า render เหมือนเดิม 100% และ path ต่อบรรทัดยัง dormant จนกว่าเฟส 2 จะสร้างข้อมูล mixed
+- **ยกไปเฟส 2:** storage migration ตอนโหลด (จำเป็นเมื่อเอดิเตอร์เขียน `lines[]`) + ปรับ bounds ต่อบรรทัด (~1718, ~2230) เมื่อมีกล่อง mixed จริง
 
 ### เฟส 2 — เอดิเตอร์ต่อบรรทัด (ส่วนเสี่ยงสุด)
 - เปลี่ยน `<textarea>` → `contentEditable` แบบบล็อกต่อบรรทัด; ปุ่ม B/I/list/align ทำงานกับ "บรรทัดที่ caret อยู่ / บรรทัดที่เลือกคลุม"
