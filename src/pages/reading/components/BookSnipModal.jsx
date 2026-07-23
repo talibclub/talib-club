@@ -1,21 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Check, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
-import * as pdfjsLib from 'pdfjs-dist';
+import { X, Check, ChevronLeft, ChevronRight, RefreshCw, Hand, Crop } from 'lucide-react';
+import { loadBookPdf } from '../utils/pdfCache.js';
 
 // Snip a region of the book straight into the notebook. The book preview beside
 // the notebook is a cross-origin Google Drive iframe that can never be captured,
 // so this modal loads the SAME pdf through our /api/proxy-pdf function, renders
 // the chosen page with pdf.js, and lets the reader drag a box over it — the crop
-// lands in the note as an image.
-
-const resolvePdfUrl = (url) => {
-  let u = url;
-  if (u.includes('drive.google.com') && u.includes('/view')) {
-    const m = u.match(/\/d\/(.*?)\//);
-    if (m && m[1]) u = `https://drive.google.com/uc?export=download&id=${m[1]}`;
-  }
-  return `/api/proxy-pdf?url=${encodeURIComponent(u)}`;
-};
+// lands in the note as an image. The pdf bytes are cached (see pdfCache), so
+// reopening the modal doesn't re-download the whole book.
 
 export default function BookSnipModal({ fileUrl, onInsert, onClose, initialPage = 1 }) {
   const [status, setStatus] = useState('loading'); // loading | ready | error
@@ -24,6 +16,10 @@ export default function BookSnipModal({ fileUrl, onInsert, onClose, initialPage 
   const [pageImg, setPageImg] = useState(null); // dataURL of the rendered page
   const [rendering, setRendering] = useState(false);
   const [sel, setSel] = useState(null); // {x, y, w, h} in displayed-image pixels
+  // 'select' = drag a crop box; 'pan' = let touch scroll the tall page image so
+  // a tablet user can reach parts below the fold (touch-action:none would eat the
+  // scroll otherwise). Desktop can always wheel-scroll regardless.
+  const [mode, setMode] = useState('select');
 
   const pdfRef = useRef(null);
   const fullCanvasRef = useRef(null); // full-resolution render of the current page
@@ -52,8 +48,7 @@ export default function BookSnipModal({ fileUrl, onInsert, onClose, initialPage 
     let cancelled = false;
     (async () => {
       try {
-        const task = pdfjsLib.getDocument({ url: resolvePdfUrl(fileUrl) });
-        const pdf = await task.promise;
+        const pdf = await loadBookPdf(fileUrl);
         if (cancelled) return;
         pdfRef.current = pdf;
         setNumPages(pdf.numPages);
@@ -74,8 +69,10 @@ export default function BookSnipModal({ fileUrl, onInsert, onClose, initialPage 
     renderPage(pdfRef.current, clamped);
   };
 
-  // Drag-to-select over the displayed page image.
+  // Drag-to-select over the displayed page image. Skipped in pan mode so the
+  // touch drag scrolls the page instead of drawing a crop box.
   const selStart = (e) => {
+    if (mode !== 'select') return;
     const img = imgRef.current;
     if (!img) return;
     e.preventDefault();
@@ -120,6 +117,16 @@ export default function BookSnipModal({ fileUrl, onInsert, onClose, initialPage 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid #F3F4F6', gap: 10, flexWrap: 'wrap' }}>
           <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#111827', fontFamily: 'Kanit, sans-serif' }}>แคปจากหนังสือ</h3>
           {status === 'ready' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.04)', borderRadius: 100, padding: '2px' }}>
+              <button onClick={() => setMode('select')} title="เลือกกรอบเพื่อแคป" style={{ display: 'flex', alignItems: 'center', gap: 5, height: 28, padding: '0 11px', borderRadius: 100, border: 'none', cursor: 'pointer', fontFamily: 'Kanit, sans-serif', fontSize: 12.5, fontWeight: 600, background: mode === 'select' ? '#0A59F7' : 'transparent', color: mode === 'select' ? '#fff' : '#4B5563' }}>
+                <Crop size={15} /> เลือกกรอบ
+              </button>
+              <button onClick={() => setMode('pan')} title="เลื่อนหน้าหนังสือ" style={{ display: 'flex', alignItems: 'center', gap: 5, height: 28, padding: '0 11px', borderRadius: 100, border: 'none', cursor: 'pointer', fontFamily: 'Kanit, sans-serif', fontSize: 12.5, fontWeight: 600, background: mode === 'pan' ? '#0A59F7' : 'transparent', color: mode === 'pan' ? '#fff' : '#4B5563' }}>
+                <Hand size={15} /> เลื่อน
+              </button>
+            </div>
+          )}
+          {status === 'ready' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.04)', borderRadius: 100, padding: '2px 4px' }}>
               <button onClick={() => goToPage(pageNum - 1)} disabled={pageNum <= 1 || rendering} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'transparent', cursor: pageNum <= 1 ? 'default' : 'pointer', opacity: pageNum <= 1 ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <ChevronLeft size={17} />
@@ -152,7 +159,7 @@ export default function BookSnipModal({ fileUrl, onInsert, onClose, initialPage 
           )}
           {status === 'ready' && pageImg && (
             <div
-              style={{ position: 'relative', touchAction: 'none', cursor: 'crosshair', opacity: rendering ? 0.4 : 1, transition: 'opacity 0.15s' }}
+              style={{ position: 'relative', touchAction: mode === 'pan' ? 'pan-y' : 'none', cursor: mode === 'pan' ? 'grab' : 'crosshair', opacity: rendering ? 0.4 : 1, transition: 'opacity 0.15s' }}
               onPointerDown={selStart}
               onPointerMove={selMove}
               onPointerUp={selEnd}
@@ -169,7 +176,7 @@ export default function BookSnipModal({ fileUrl, onInsert, onClose, initialPage 
         {/* Footer */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 18px', borderTop: '1px solid #F3F4F6' }}>
           <span style={{ fontSize: 12.5, color: '#6B7280', fontFamily: 'Kanit, sans-serif' }}>
-            ลากกรอบบนหน้าหนังสือเพื่อเลือกส่วนที่ต้องการ
+            {mode === 'pan' ? 'ลากเพื่อเลื่อนดูหน้าหนังสือ • แตะ "เลือกกรอบ" เพื่อแคป' : 'ลากกรอบบนหน้าหนังสือเพื่อเลือกส่วนที่ต้องการ'}
           </span>
           <button
             onClick={confirmSnip}

@@ -12,6 +12,7 @@ import getStroke from 'perfect-freehand';
 import toast from 'react-hot-toast';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
+import { loadBookPdf } from '../utils/pdfCache.js';
 import { uploadNotebookData, downloadNotebookData } from '../../../utils/notebookStorage.js';
 import { db, storage } from '../../../lib/firebase.js';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -742,23 +743,12 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     setLoadingPdf(true);
     
     try {
-      let targetUrl = pdfUrl;
-      let proxyUrl = targetUrl;
-      
-      if (!targetUrl) {
-        let url = activeBook.book.fileUrl;
-        if (url.includes('drive.google.com') && url.includes('/view')) {
-           const match = url.match(/\/d\/(.*?)\//);
-           if (match && match[1]) {
-             url = `https://drive.google.com/uc?export=download&id=${match[1]}`;
-           }
-        }
-        proxyUrl = `/api/proxy-pdf?url=${encodeURIComponent(url)}`;
-      }
-      
       toast.loading(`กำลังโหลด PDF...`, { id: 'pdf-load' });
-      const loadingTask = pdfjsLib.getDocument({ url: proxyUrl });
-      const pdf = await loadingTask.promise;
+      // A raw pdfUrl (rare) loads directly; the common book-file path goes
+      // through the shared byte cache so re-importing never re-downloads.
+      const pdf = pdfUrl
+        ? await pdfjsLib.getDocument({ url: pdfUrl }).promise
+        : await loadBookPdf(activeBook.book.fileUrl);
       const numPages = Math.min(pdf.numPages, 30);
       
       toast.loading(`กำลังแยกหน้า PDF (0/${numPages})...`, { id: 'pdf-load' });
