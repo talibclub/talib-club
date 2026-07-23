@@ -28,6 +28,7 @@ import StickyNoteEditor from './notebook/StickyNoteEditor.jsx';
 import TextEditor from './notebook/TextEditor.jsx';
 import PaperTemplateModal from './notebook/PaperTemplateModal.jsx';
 import ExportModal from './notebook/ExportModal.jsx';
+import AiAssistantPanel from './notebook/AiAssistantPanel.jsx';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -229,6 +230,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // API key required). Its thumbnail endpoint is CORS-enabled, so pictures can be
   // fetched straight into a data URL and stored like any uploaded image.
   const [showImgSearch, setShowImgSearch] = useState(false);
+  const [showAi, setShowAi] = useState(false);
   const [imgQuery, setImgQuery] = useState("");
   const [imgResults, setImgResults] = useState([]);
   const [imgLoading, setImgLoading] = useState(false);
@@ -2771,6 +2773,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                     <button onClick={() => { setShowImgSearch(true); setShowMoreMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
                        <Search size={20} strokeWidth={1.5} color="#4B5563" /> ค้นหารูป/สติกเกอร์จากเน็ต
                     </button>
+                    <button onClick={() => { setShowAi(true); setShowMoreMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
+                       <Wand2 size={20} strokeWidth={1.5} color="#4B5563" /> ผู้ช่วย AI · ถาม PDF
+                    </button>
                     <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>
                     <button onClick={() => setShowPageSettings(true)} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
                        <Settings size={20} strokeWidth={1.5} color="#4B5563" /> เปลี่ยนแม่แบบกระดาษ
@@ -3377,6 +3382,22 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           onSearch={searchWebImages}
           onInsert={insertWebImage}
           onClose={() => setShowImgSearch(false)}
+        />
+      )}
+
+      {/* AI assistant — ask about an attached PDF, drop the answer in as a note */}
+      {showAi && (
+        <AiAssistantPanel
+          onClose={() => setShowAi(false)}
+          onInsertText={(text) => {
+            pushHistory();
+            updatePage(currentPageIndex, (page) => {
+              if (!page.texts) page.texts = [];
+              page.texts.push({ id: `text-${Date.now()}`, text, x: 80, y: 80, color: '#111827', size: 22, fontFamily: 'Sarabun', bold: false, italic: false, underline: false, strikethrough: false, align: 'left', list: 'none', width: TEXT_BOX_WIDTH });
+            });
+            toast.success('แทรกคำตอบลงสมุดแล้ว');
+            setShowAi(false);
+          }}
         />
       )}
 

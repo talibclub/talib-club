@@ -3,7 +3,7 @@ import Draggable from 'react-draggable';
 import { Search, Image as ImageIcon, X } from 'lucide-react';
 import { HW } from './theme.js';
 
-const EXAMPLES = ['ซัยยิด กุฏุบ', 'มัสยิด', 'อัลกุรอาน', 'ดอกไม้', 'star sticker'];
+const EXAMPLES = ['สติกเกอร์น่ารัก', 'หัวใจ', 'ดาว', 'ดอกไม้', 'cute sticker', 'emoji'];
 
 // Draggable panel for finding a web image and inserting it into the notebook.
 // Purely presentational: the parent owns the query/results state and the
@@ -22,7 +22,7 @@ export default function ImageSearchPanel({ query, setQuery, results, loading, on
           <input
             autoFocus
             type="text"
-            placeholder="พิมพ์สิ่งที่อยากได้ เช่น ซัยยิด กุฏุบ, มัสยิด, ดอกไม้..."
+            placeholder="พิมพ์สิ่งที่อยากได้ เช่น สติกเกอร์น่ารัก, หัวใจ, ดาว..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             style={{ flex: 1, minWidth: 0, padding: '10px 14px', borderRadius: 10, border: '1px solid var(--br2)', fontSize: 14, outline: 'none' }}

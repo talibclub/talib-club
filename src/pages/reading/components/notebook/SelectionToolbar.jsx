@@ -8,13 +8,13 @@ import { HW, STICKY_COLORS } from './theme.js';
 export default function SelectionToolbar({ left, top, kind, canEdit, onCrop, onOcr, onEdit, onRecolor, onFront, onBack, onDuplicate, onDelete, onDone }) {
   const btn = { height: 32, padding: '0 10px', borderRadius: 10, border: 'none', background: 'transparent', color: HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap' };
   const divider = <div style={{ width: 1, height: 20, background: HW.hairline, margin: '0 3px' }} />;
-  const swatches = kind === 'stickers' ? STICKY_COLORS : ['#111827', '#EF4444', '#F59E0B', '#10B981', '#3B82F6'];
+  const swatches = kind === 'stickers' ? STICKY_COLORS.slice(0, 6) : ['#111827', '#EF4444', '#F59E0B', '#10B981', '#3B82F6'];
 
   return (
     <div
       onPointerDown={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.preventDefault()}
-      style={{ position: 'absolute', left, top: Math.max(8, top), transform: 'translateX(-50%)', zIndex: 60, display: 'flex', alignItems: 'center', gap: 2, padding: '4px 6px', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, borderRadius: 14, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`, maxWidth: 'calc(100vw - 20px)', overflowX: 'auto' }}
+      style={{ position: 'absolute', left, top: Math.max(8, top), transform: 'translateX(-50%)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 2, padding: '4px 6px', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, borderRadius: 14, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`, maxWidth: 'min(94vw, 420px)' }}
     >
       {kind === 'images' && (
         <>
