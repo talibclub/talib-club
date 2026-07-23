@@ -4310,20 +4310,15 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              y={(t.y + pageY) * scale + position.y}
              scale={scale}
              t={t}
-             value={editingTextValue}
              textareaRef={textareaRef}
-             onChange={(val) => { setEditingTextValue(val); upd(txt => { txt.text = val; }); }}
-             onToggle={(prop) => upd(txt => { txt[prop] = !txt[prop]; })}
-             onAlign={(val) => upd(txt => { txt.align = val; })}
-             onList={(val) => upd(txt => { txt.list = txt.list === val ? 'none' : val; })}
+             onChange={(val) => setEditingTextValue(val)}
+             onLinesChange={(lines) => upd(txt => { txt.lines = lines; txt.text = lines.map(l => l.text).join('\n'); })}
              onFont={(font) => { setTextStyle(s => ({ ...s, fontFamily: font })); upd(txt => { txt.fontFamily = font; }); }}
              onCommit={() => {
                 if (!isEditingText.current) return;
                 isEditingText.current = false;
                 if (editingTextValue.trim() === '') {
                    updatePage(currentPageIndex, (page) => { page.texts = page.texts.filter(tx => tx.id !== editingTextId); });
-                } else {
-                   upd(txt => { txt.text = editingTextValue; });
                 }
                 setEditingTextId(null);
              }}

@@ -40,10 +40,12 @@ t = {
 - **หมายเหตุ:** เฟส 1 ทำ migration แบบ **render-time** (ไม่แตะ storage/editor/creation) → โน้ตเก่า render เหมือนเดิม 100% และ path ต่อบรรทัดยัง dormant จนกว่าเฟส 2 จะสร้างข้อมูล mixed
 - **ยกไปเฟส 2:** storage migration ตอนโหลด (จำเป็นเมื่อเอดิเตอร์เขียน `lines[]`) + ปรับ bounds ต่อบรรทัด (~1718, ~2230) เมื่อมีกล่อง mixed จริง
 
-### เฟส 2 — เอดิเตอร์ต่อบรรทัด (ส่วนเสี่ยงสุด)
-- เปลี่ยน `<textarea>` → `contentEditable` แบบบล็อกต่อบรรทัด; ปุ่ม B/I/list/align ทำงานกับ "บรรทัดที่ caret อยู่ / บรรทัดที่เลือกคลุม"
-- ต้องดูแล: caret, IME/ภาษาไทย, มือถือ/แท็บเล็ต, blur→commit, undo/redo, การ sync กับ `lines[]`
-- แนะนำแยก commit/PR ของเฟสนี้ออกจากเฟส 1 เพื่อให้ย้อนได้ง่ายถ้ามีปัญหา
+### เฟส 2 — เอดิเตอร์ต่อบรรทัด — ✅ เสร็จ (ใช้ textarea ไม่ใช่ contentEditable)
+- **ตัดสินใจ:** คง`<textarea>`ไว้ (ภาษาไทย/IME เสถียรกว่า contentEditable มาก โดยเฉพาะบน Huawei) + ระบบ format ต่อบรรทัดคู่ขนาน — ไม่เอา contentEditable เพราะเสี่ยง IME พังตามที่โน้ตเตือน
+- **`TextEditor.jsx`:** พิมพ์ใน textarea ตามปกติ → วางเคอร์เซอร์/เลือกบรรทัด → ปุ่ม B/I/U/list/align มีผลเฉพาะบรรทัดที่ selection คลุม; แปลง offset→บรรทัดด้วย `lineRange`, คงจำนวน format ให้ตรงบรรทัดด้วย `reconcile` (บรรทัดใหม่สืบทอด format บรรทัดสุดท้าย = Enter ต่อ bullet ได้); gutter โชว์ bullet/เลขต่อบรรทัด; emit `lines[]` ขึ้น ProNotebook ทุกการเปลี่ยน (unit test 13 เคส)
+- **`ProNotebook.jsx`:** wiring ใหม่ `onLinesChange` → เขียน `txt.lines` (canonical) + `txt.text` sync; กล่องเก่าที่ถูกแก้จะ migrate เป็น `lines[]` อัตโนมัติ (storage migrate แบบ lazy-on-edit ไม่ต้องแตะ load path)
+- **ข้อจำกัดที่รู้ตัว:** textarea โชว์ตัวหนา/เอียง "ตอนพิมพ์" ไม่ได้ (เห็นผลจริงบน canvas ตอน commit); แทรกบรรทัดกลางหลังจัด format แล้ว format อาจเลื่อน 1 บรรทัด (index-based reconcile) — WYSIWYG ระหว่างพิมพ์เก็บเป็น enhancement อนาคต
+- **ต้องเทสจริง:** พิมพ์ภาษาไทย + จัด format เฉพาะบรรทัดบนแท็บเล็ต (ผมเทสได้แค่ build/boot + unit test ตรรกะ)
 
 ## ความเสี่ยง & ข้อควรระวัง
 - Migration ผิด = โน้ตเก่าเสีย → เขียนเทสเคสแปลงเก่า→ใหม่ก่อน

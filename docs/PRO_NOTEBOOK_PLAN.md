@@ -59,4 +59,4 @@
 
 ### 🔵 กลุ่ม D — งานใหญ่
 - **ข้อ 2:** ✅ เสร็จ — สร้าง `src/pages/reading/utils/pdfCache.js` (แคช bytes ของ PDF ต่อ URL ใช้ร่วมกันทั้ง `startLoadingPDF` และ `BookSnipModal` → ไม่ดึงไฟล์ซ้ำทุกครั้ง) + เพิ่มปุ่มสลับ "เลือกกรอบ/เลื่อน" ในโมดัลแคป (โหมดเลื่อนใช้ `touch-action: pan-y` ให้แท็บเล็ตเลื่อนดูส่วนล่างของหน้าที่ยาวได้)
-- **ข้อ 9:** 🟡 เฟส 1 เสร็จ, เหลือเฟส 2 — rich-text ต่อบรรทัด แผนละเอียด [`docs/RICH_TEXT_PLAN.md`](./RICH_TEXT_PLAN.md) · เฟส 1 = helpers+render ต่อบรรทัด (migrate ตอน render, โน้ตเก่าเหมือนเดิม) ✅ · เฟส 2 = เอดิเตอร์ contentEditable ต่อบรรทัด + storage migration ⏳
+- **ข้อ 9:** ✅ เสร็จทั้ง 2 เฟส (รอเทสพิมพ์จริง) — rich-text ต่อบรรทัด แผน [`docs/RICH_TEXT_PLAN.md`](./RICH_TEXT_PLAN.md) · เฟส 1 = helpers+render ต่อบรรทัด · เฟส 2 = เอดิเตอร์ textarea + format ต่อบรรทัด (เลือกใช้ textarea แทน contentEditable เพื่อความเสถียรของภาษาไทย/IME) · **ต้องเทสพิมพ์ภาษาไทย + จัด format เฉพาะบรรทัดบนแท็บเล็ต**
