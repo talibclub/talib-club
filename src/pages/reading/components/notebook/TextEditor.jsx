@@ -250,7 +250,7 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
   const noFocusSteal = { onMouseDown: (e) => e.preventDefault() };
 
   return (
-    <div data-text-editor style={{ position: 'absolute', top: y - 52, left: x, zIndex: 3000, isolation: 'isolate', display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div data-text-editor style={{ position: 'absolute', top: y, left: x, zIndex: 3000, isolation: 'isolate' }}>
       <style>{`
         [data-text-editor], [data-text-editor] * {
           -webkit-user-select: text !important;
@@ -274,7 +274,15 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
         }
       `}</style>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'white', padding: 6, borderRadius: 10, boxShadow: '0 6px 20px rgba(0,0,0,0.12)', border: '1px solid var(--br2)', maxWidth: '92vw', overflowX: 'auto' }}>
+      <div style={{ 
+        position: 'absolute', 
+        top: y < 60 ? '100%' : 'auto', 
+        bottom: y >= 60 ? '100%' : 'auto', 
+        marginTop: y < 60 ? 8 : 0, 
+        marginBottom: y >= 60 ? 8 : 0, 
+        left: 0, 
+        display: 'flex', alignItems: 'center', gap: 3, background: 'white', padding: 6, borderRadius: 10, boxShadow: '0 6px 20px rgba(0,0,0,0.12)', border: '1px solid var(--br2)', maxWidth: '92vw', overflowX: 'auto' 
+      }}>
         <select
           value={fontFamily}
           {...noFocusSteal}

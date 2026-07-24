@@ -403,15 +403,33 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         } catch (_) { /* ignore */ }
      })();
 
+     const ddgClient = (async () => {
+        try {
+           const htmlUrl = `https://duckduckgo.com/?q=${encodeURIComponent(q)}&iax=images&ia=images`;
+           const htmlRes = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(htmlUrl)}`);
+           if (!htmlRes.ok) return;
+           const htmlData = await htmlRes.json();
+           const html = htmlData.contents;
+           const m = html.match(/vqd="([^"]+)"/) || html.match(/vqd=([\d-]+)&/);
+           if (!m) return;
+           const vqd = m[1];
+           
+           const fStr = ['', '', '', filter === 'clipart' ? 'type:clipart' : filter === 'transparent' ? 'type:transparent' : filter === 'photo' ? 'type:photo' : '', '', ''].join(',');
+           const imgUrl = `https://duckduckgo.com/i.js?l=us-en&o=json&q=${encodeURIComponent(q)}&vqd=${vqd}&f=${encodeURIComponent(fStr)}&p=1`;
+           const imgRes = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(imgUrl)}`);
+           if (!imgRes.ok) return;
+           const imgData = await imgRes.json();
+           const data = JSON.parse(imgData.contents);
+           
+           (data.results || []).forEach((it, i) => add({
+              id: `ddg-c-${i}`, title: it.title, thumbnail: it.thumbnail || it.image, url: it.image,
+              width: it.width, height: it.height, source: 'DuckDuckGo', license: 'เว็บ', context: it.url
+           }));
+        } catch (e) { console.error(e) }
+     })();
+
      try {
-        // Run every source in parallel and paint results as each arrives — don't
-        // block the fast keyless sources behind Google, which round-trips to a
-        // serverless function and can be slow or rate-limited.
-        // Always run the keyless sources too. The proxy (Pixabay/DDG) is the one
-        // that honours the kind filter, but it can come back empty — DuckDuckGo is
-        // blocked on Vercel and Pixabay needs a key — so leaning on it alone left
-        // the panel blank. Wikimedia/Openverse keep the grid populated regardless.
-        const sources = [google, commons, openverse, wikiArticles('th'), wikiArticles('en')];
+        const sources = [google, ddgClient, commons, openverse, wikiArticles('th'), wikiArticles('en')];
         sources.forEach((p) => p.then(() => setImgResults([...merged])));
         await Promise.allSettled(sources);
         setImgResults([...merged]);
@@ -3351,7 +3369,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                      </>
                   )}
 
-                  {tool === 'text' && (() => {
+                  {tool === 'text' && !editingTextId && (() => {
                      // Edits apply to the text being typed or the selected one, so the
                      // effect is visible straight away rather than only on the next box.
                      const applyToActive = (patch) => {
