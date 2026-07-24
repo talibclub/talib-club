@@ -1411,7 +1411,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     if (tool === 'text') {
        if (editingTextId) {
            if (textareaRef.current) textareaRef.current.blur();
-           return;
        }
        if (hitExistingObject) return;
        const newText = {
