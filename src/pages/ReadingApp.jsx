@@ -643,9 +643,10 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 
   // Auto-start reading session when shelfItemId is passed via context
   useEffect(() => {
-    if (!ctx?.shelfItemId || shelfItems.length === 0 || books.length === 0 || activeBook) return
-    if (dismissedShelfRef.current === ctx.shelfItemId) return
-    const item = shelfItems.find(s => s.id === ctx.shelfItemId)
+    const targetId = ctx?.shelfItemId || sessionStorage.getItem("activeReadingSession")
+    if (!targetId || shelfItems.length === 0 || books.length === 0 || activeBook) return
+    if (dismissedShelfRef.current === targetId) return
+    const item = shelfItems.find(s => s.id === targetId)
     if (item) {
       const book = getShelfBook(item, books)
       if (book) startReading({ ...item, book })
@@ -654,6 +655,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 
   function startReading(shelfItem) {
     setActiveBook(shelfItem)
+    sessionStorage.setItem("activeReadingSession", shelfItem.id)
     resumeTimer()
     setStartPage(shelfItem.currentPage || 1)
     setEndPage("")
@@ -663,6 +665,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 
   function cancelReading() {
     setActiveBook(null)
+    sessionStorage.removeItem("activeReadingSession")
     resetTimer()
     setStartPage("")
     setEndPage("")
@@ -691,6 +694,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     if (!ok) return
     stopReading()
     setActiveBook(null)
+    sessionStorage.removeItem("activeReadingSession")
     resetTimer()
     clearShelfLaunchContext()
   }
@@ -789,6 +793,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       toast.success(`บันทึกการอ่านเสร็จสมบูรณ์! (+${sessionGems} 💎) คะแนนยืนยันการเรียนรู้: ${report.score}/100`)
       resetTimer()
       setActiveBook(null)
+      sessionStorage.removeItem("activeReadingSession")
       clearShelfLaunchContext()
     } catch (err) {
       console.error(err)
