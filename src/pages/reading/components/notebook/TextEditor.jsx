@@ -249,6 +249,10 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
   const sep = <div style={{ width: 1, height: 18, background: 'var(--br2)', margin: '0 3px', flexShrink: 0 }} />;
   const noFocusSteal = { onMouseDown: (e) => e.preventDefault() };
 
+  const FormatBtn = ({ icon, active, onClick }) => (
+    <button {...noFocusSteal} onClick={onClick} style={{...toolBtn(active), width: 26, height: 26}}>{icon}</button>
+  );
+
   return (
     <div data-text-editor style={{ position: 'absolute', top: y, left: x, zIndex: 3000, isolation: 'isolate' }}>
       <style>{`
