@@ -1393,8 +1393,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     }
     const pos = getPointerPosRelativeToPage();
     if (!pos) return;
-    // Off the paper there is nothing to write on: drag the board instead of inking.
-    if (pos.x < 0 || pos.y < 0 || pos.x > currentPage.width || pos.y > currentPage.height) {
+    // Off the paper there is nothing to write on (for ink): drag the board instead.
+    // However, users might want to add text notes or stickers in the margins.
+    if (!tapToPlace && (pos.x < 0 || pos.y < 0 || pos.x > currentPage.width || pos.y > currentPage.height)) {
       if (evt) panningRef.current = { x: evt.clientX, y: evt.clientY };
       return;
     }
