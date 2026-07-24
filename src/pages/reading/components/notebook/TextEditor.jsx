@@ -250,8 +250,12 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
   const noFocusSteal = { onMouseDown: (e) => e.preventDefault() };
 
   return (
-    <div data-text-editor style={{ position: 'absolute', top: y - 52, left: x, zIndex: 101, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div data-text-editor style={{ position: 'absolute', top: y - 52, left: x, zIndex: 3000, isolation: 'isolate', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <style>{`
+        [data-text-editor], [data-text-editor] * {
+          -webkit-user-select: text !important;
+          user-select: text !important;
+        }
         .pn-ed .pn-ln { min-height: 1.2em; }
         .pn-ed .pn-ln[data-prefix]::before {
           content: attr(data-prefix);
@@ -367,6 +371,15 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
           borderRadius: 10,
           boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
           cursor: 'text',
+          // The reading room disables text selection / uses touch-action:none on
+          // the drawing surface; force them back on for the editor so a mouse
+          // drag (and touch) can actually select text, not just Ctrl+A.
+          userSelect: 'text',
+          WebkitUserSelect: 'text',
+          WebkitTouchCallout: 'default',
+          touchAction: 'auto',
+          position: 'relative',
+          zIndex: 1,
         }}
       />
     </div>
