@@ -3257,7 +3257,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
             {/* Tool options popover — floats above the capsule, Huawei style */}
             {showToolOptions && TOOLS_WITH_OPTIONS.includes(tool) && (
-              <div className="hide-scroll" style={{ order: -1, display: 'flex', alignItems: 'center', gap: 12, maxWidth: '100%', overflowX: 'auto', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, borderRadius: 16, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`, padding: '10px 14px' }} onWheel={(e) => { if (e.deltaY !== 0) e.currentTarget.scrollLeft += e.deltaY; }} {...rightToolbarScroll}>
+              <div className="hide-scroll" style={{ order: -1, display: 'flex', alignItems: 'center', gap: 7, maxWidth: '100%', overflowX: 'auto', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, borderRadius: 16, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`, padding: '7px 12px' }} onWheel={(e) => { if (e.deltaY !== 0) e.currentTarget.scrollLeft += e.deltaY; }} {...rightToolbarScroll}>
                   {['pen', 'fountain', 'marker', 'pencil', 'highlighter', 'shape'].includes(tool) && (
                      <>
                         {tool === 'shape' && (
@@ -3273,65 +3273,54 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                            </>
                         )}
 
-                        {/* Live preview of the nib you are about to draw with —
-                            size, colour and opacity together, the way a real pen
-                            case shows you the pen rather than a number. */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, padding: '6px 12px 6px 8px', borderRadius: 14, background: 'rgba(0,0,0,0.035)' }}>
-                           <svg width="62" height="30" viewBox="0 0 62 30" style={{ flexShrink: 0, display: 'block' }}>
-                              <path
-                                d="M4 21 C 14 5, 22 5, 31 15 C 40 25, 48 25, 58 9"
-                                fill="none"
-                                stroke={penColor === '#FFFFFF' ? '#D1D5DB' : penColor}
-                                strokeWidth={Math.max(1.5, Math.min(14, penSize))}
-                                strokeLinecap="round"
-                                opacity={tool === 'highlighter' ? Math.min(0.5, penOpacity) : penOpacity}
-                              />
-                           </svg>
-                           <span style={{ fontSize: 12.5, fontWeight: 700, color: HW.text, whiteSpace: 'nowrap' }}>{penSize}<span style={{ fontSize: 10.5, fontWeight: 600, color: HW.textDim }}> px</span></span>
-                        </div>
+                        {/* Compact nib preview: current colour, size and opacity in
+                            one small dot instead of a whole pen illustration. */}
+                        <span title={`${penSize}px`} style={{ flexShrink: 0, width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.04)' }}>
+                           <span style={{ display: 'block', width: Math.max(4, Math.min(20, penSize * 0.9)), height: Math.max(4, Math.min(20, penSize * 0.9)), borderRadius: '50%', background: penColor === '#FFFFFF' ? '#D1D5DB' : penColor, opacity: tool === 'highlighter' ? Math.min(0.5, penOpacity) : penOpacity }} />
+                        </span>
 
-                        <div style={{ width: 1, background: HW.hairline, height: 26, flexShrink: 0 }}></div>
+                        <div style={{ width: 1, background: HW.hairline, height: 24, flexShrink: 0 }}></div>
 
-                        {/* Stroke sizes as graduated dots (Huawei) */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-                           {sizes.map(s => (
+                        {/* Stroke sizes — a compact essentials row (custom via the picker). */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0 }}>
+                           {[2, 4, 8, 14].map(s => (
                               <button
                                 key={s}
                                 onClick={() => setPenSize(s)}
                                 title={`${s}px`}
-                                style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', background: penSize === s ? HW.accentSoft : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.18s' }}
+                                style={{ width: 30, height: 30, borderRadius: '50%', border: 'none', background: penSize === s ? HW.accentSoft : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                               >
-                                <span style={{ display: 'block', width: Math.min(20, 4 + s * 0.7), height: Math.min(20, 4 + s * 0.7), borderRadius: '50%', background: penSize === s ? HW.accent : HW.textDim, transition: 'background 0.18s' }} />
+                                <span style={{ display: 'block', width: Math.min(18, 4 + s * 0.7), height: Math.min(18, 4 + s * 0.7), borderRadius: '50%', background: penSize === s ? HW.accent : HW.textDim }} />
                               </button>
                            ))}
                         </div>
 
-                        <div style={{ width: 1, background: HW.hairline, height: 26, flexShrink: 0 }}></div>
+                        <div style={{ width: 1, background: HW.hairline, height: 24, flexShrink: 0 }}></div>
 
                         {/* Opacity — the ink was always adjustable, there was just
                             no way to reach it. */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-                           {[1, 0.7, 0.45, 0.25].map(o => (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0 }}>
+                           {[1, 0.6, 0.3].map(o => (
                               <button
                                 key={o}
                                 onClick={() => setPenOpacity(o)}
                                 title={`ความเข้ม ${Math.round(o * 100)}%`}
-                                style={{ width: 34, height: 34, borderRadius: 12, border: 'none', background: Math.abs(penOpacity - o) < 0.01 ? HW.accentSoft : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                                style={{ width: 30, height: 30, borderRadius: 10, border: 'none', background: Math.abs(penOpacity - o) < 0.01 ? HW.accentSoft : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                               >
-                                <span style={{ display: 'block', width: 18, height: 18, borderRadius: 6, background: penColor === '#FFFFFF' ? '#9CA3AF' : penColor, opacity: o, boxShadow: `inset 0 0 0 1px ${HW.hairline}` }} />
+                                <span style={{ display: 'block', width: 16, height: 16, borderRadius: 5, background: penColor === '#FFFFFF' ? '#9CA3AF' : penColor, opacity: o, boxShadow: `inset 0 0 0 1px ${HW.hairline}` }} />
                               </button>
                            ))}
                         </div>
 
-                        <div style={{ width: 1, background: HW.hairline, height: 26, flexShrink: 0 }}></div>
+                        <div style={{ width: 1, background: HW.hairline, height: 24, flexShrink: 0 }}></div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                           {[...colors, ...customColors.slice(0, 3)].map((c, i) => (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                           {[...colors.slice(0, 6), ...customColors.slice(0, 2)].map((c, i) => (
                               <div
                                 key={`${c}-${i}`}
                                 onClick={() => setPenColor(c)}
                                 title={c}
-                                style={{ width: 26, height: 26, borderRadius: '50%', background: c, cursor: 'pointer', flexShrink: 0, boxShadow: `inset 0 0 0 1px ${HW.hairline}`, outline: penColor === c ? `2.5px solid ${HW.accent}` : 'none', outlineOffset: 2, transition: 'outline 0.15s, transform 0.15s', transform: penColor === c ? 'scale(1.08)' : 'none' }}
+                                style={{ width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer', flexShrink: 0, boxShadow: `inset 0 0 0 1px ${HW.hairline}`, outline: penColor === c ? `2.5px solid ${HW.accent}` : 'none', outlineOffset: 2, transition: 'outline 0.15s, transform 0.15s', transform: penColor === c ? 'scale(1.08)' : 'none' }}
                               />
                            ))}
                            <button
