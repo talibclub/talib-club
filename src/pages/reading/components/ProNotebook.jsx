@@ -407,13 +407,15 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         // Run every source in parallel and paint results as each arrives — don't
         // block the fast keyless sources behind Google, which round-trips to a
         // serverless function and can be slow or rate-limited.
-        // A kind filter (สติกเกอร์โปร่งใส / คลิปอาร์ต / GIF) is only honoured by the
-        // proxy, so mixing in the other sources would just dilute the results.
-        const sources = filter ? [google] : [google, commons, openverse, wikiArticles('th'), wikiArticles('en')];
+        // Always run the keyless sources too. The proxy (Pixabay/DDG) is the one
+        // that honours the kind filter, but it can come back empty — DuckDuckGo is
+        // blocked on Vercel and Pixabay needs a key — so leaning on it alone left
+        // the panel blank. Wikimedia/Openverse keep the grid populated regardless.
+        const sources = [google, commons, openverse, wikiArticles('th'), wikiArticles('en')];
         sources.forEach((p) => p.then(() => setImgResults([...merged])));
         await Promise.allSettled(sources);
         setImgResults([...merged]);
-        if (!merged.length) toast('ไม่พบรูปภาพที่ค้นหา — ลองคำอื่น');
+        if (!merged.length) toast('ไม่พบรูปภาพที่ค้นหา — ลองคำอื่น หรือเปลี่ยนตัวกรอง');
      } catch (e) {
         console.error('Image search failed', e);
         toast.error('ค้นหารูปไม่สำเร็จ (ตรวจสอบอินเทอร์เน็ต)');
@@ -1363,9 +1365,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
        if (evt) panningRef.current = { x: evt.clientX, y: evt.clientY };
        return;
     }
-    // A finger that isn't allowed to draw pans the board instead of doing nothing —
-    // that's what a tablet user expects their hand to do in pen-only mode.
-    if (!shouldDrawWith(e)) {
+    // Palm-rejection (stylus-only mode) is meant to stop a resting hand from
+    // INKING while you write. Tap-to-place tools are deliberate single taps, not
+    // scribbles, so a finger must always be allowed to drop a text box / sticker —
+    // otherwise, once the Huawei pen auto-enables pen-only mode, tapping to add
+    // text just pans the board and nothing ever appears.
+    const tapToPlace = tool === 'text' || tool === 'sticker';
+    if (!tapToPlace && !shouldDrawWith(e)) {
       if (evt) panningRef.current = { x: evt.clientX, y: evt.clientY };
       return;
     }
