@@ -19,7 +19,7 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { PDFPageImage, PaperPattern, getSvgPathFromStroke, PEN_STYLES, StrokeShape, CommittedStrokes, StickyStyleThumb } from './notebook/canvasElements.jsx';
 import { polygonBounds, polygonCentroid, polygonInteriorAngle, applyListPrefix, textDecorationOf, migrateText, textOf, isUniformText, uniformFormatOf, listPrefixes } from './notebook/geometry.js';
-import { HW, ZERO_OFFSET, TEXT_BOX_WIDTH, LINE_HEIGHT, STICKY_COLORS, STICKY_STYLES, FONT_OPTIONS } from './notebook/theme.js';
+import { HW, ZERO_OFFSET, TEXT_BOX_WIDTH, LINE_HEIGHT, STICKY_COLORS, STICKY_STYLES, FONT_OPTIONS, DRAW_CURSOR } from './notebook/theme.js';
 import { useDragScroll } from './notebook/useDragScroll.js';
 import ImageSearchPanel from './notebook/ImageSearchPanel.jsx';
 import ObjectContextMenu from './notebook/ObjectContextMenu.jsx';
@@ -170,15 +170,19 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      }
   }, [editingTextId]);
 
-  // Whenever the tool changes away from 'text', force close any open text editor.
+  // When the user switches AWAY from the text tool, close any open editor.
+  // Guarded by prevTool so it only fires on an actual tool change — otherwise it
+  // would also slam shut an editor opened by double-tapping a note while on the
+  // pan/lasso tool (double-tap edits from any tool), making text uneditable.
   // Declared here (not at the top of the component) so `tool`/`editingTextId`/
   // `textareaRef` already exist — referencing them earlier throws a TDZ
   // ("Cannot access 'tool' before initialization") that crashes the reader.
+  const prevToolRef = useRef(tool);
   useEffect(() => {
-    if (tool !== 'text' && editingTextId) {
-      if (textareaRef.current) {
-        textareaRef.current.blur();
-      }
+    const toolChanged = prevToolRef.current !== tool;
+    prevToolRef.current = tool;
+    if (toolChanged && tool !== 'text' && editingTextId && textareaRef.current) {
+      textareaRef.current.blur();
     }
   }, [tool, editingTextId]);
 
@@ -3896,7 +3900,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         y={position.y}
         // touchAction:none stops the browser from claiming pan/zoom gestures, which
         // would otherwise swallow strokes and pinches on a tablet.
-        style={{ cursor: readonly || tool === 'pan' ? 'grab' : 'crosshair', touchAction: 'none' }}
+        style={{ cursor: readonly || tool === 'pan' ? 'grab' : DRAW_CURSOR, touchAction: 'none' }}
       >
         {/* Background Layer (Paper + PDF + Images) */}
         <Layer>
@@ -4762,7 +4766,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
             onPointerMove={handleWriterMove}
             onPointerUp={handleWriterUp}
             onPointerCancel={handleWriterUp}
-            style={{ touchAction: 'none', cursor: 'crosshair' }}
+            style={{ touchAction: 'none', cursor: DRAW_CURSOR }}
           >
             <Layer>
               <Rect

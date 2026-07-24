@@ -16,6 +16,23 @@ export const HW = {
 
 export const ZERO_OFFSET = { x: 0, y: 0 };
 
+// Cursor for the drawing canvas. The native `crosshair` is a thin single-colour
+// line that vanishes against matching paper (users lose the pointer on white),
+// so we ship an SVG crosshair with a white halo + dark core that stays visible
+// on any paper colour. Hotspot is the centre (12,12); falls back to `crosshair`.
+const DRAW_CURSOR_SVG =
+  "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>" +
+  "<g fill='none' stroke-linecap='round'>" +
+  "<g stroke='#ffffff' stroke-width='3'>" +
+  "<line x1='12' y1='2.5' x2='12' y2='9'/><line x1='12' y1='15' x2='12' y2='21.5'/>" +
+  "<line x1='2.5' y1='12' x2='9' y2='12'/><line x1='15' y1='12' x2='21.5' y2='12'/></g>" +
+  "<g stroke='#111827' stroke-width='1.3'>" +
+  "<line x1='12' y1='2.5' x2='12' y2='9'/><line x1='12' y1='15' x2='12' y2='21.5'/>" +
+  "<line x1='2.5' y1='12' x2='9' y2='12'/><line x1='15' y1='12' x2='21.5' y2='12'/></g></g>" +
+  "<circle cx='12' cy='12' r='1.1' fill='#111827' stroke='#ffffff' stroke-width='0.7'/></svg>";
+export const DRAW_CURSOR =
+  `url("data:image/svg+xml,${encodeURIComponent(DRAW_CURSOR_SVG)}") 12 12, crosshair`;
+
 // Default width of a text box, so alignment and lists have a column to work in.
 export const TEXT_BOX_WIDTH = 340;
 
