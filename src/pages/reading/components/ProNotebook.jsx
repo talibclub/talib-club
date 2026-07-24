@@ -1413,7 +1413,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
        if (editingTextId) {
            if (textareaRef.current) textareaRef.current.blur();
        }
-       if (hitExistingObject) return;
+       if (hitExistingObject) {
+           toast.error("โดนออบเจ็กต์เดิม! (hitExistingObject=true)");
+           return;
+       }
+       toast.success("กำลังสร้างกล่องข้อความบนกระดาษ...");
        const newText = {
           id: `text-${Date.now()}`, text: '', x: pos.x, y: pos.y, color: penColor,
           size: textStyle.fontSize,
