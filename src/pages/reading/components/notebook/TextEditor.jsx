@@ -285,7 +285,6 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
       }}>
         <select
           value={fontFamily}
-          {...noFocusSteal}
           onChange={(e) => { onFont(e.target.value); setTimeout(() => edRef.current?.focus(), 0); }}
           title="เปลี่ยนฟอนต์"
           style={{ height: 30, borderRadius: 8, border: '1px solid var(--br2)', background: '#F9FAFB', color: '#111827', fontSize: 12.5, padding: '0 6px', cursor: 'pointer', fontFamily, maxWidth: 112, flexShrink: 0 }}
