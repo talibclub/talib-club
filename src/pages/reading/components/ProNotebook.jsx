@@ -1410,6 +1410,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     const hitExistingObject = targetName === 'object' || parentName === 'object';
 
     if (tool === 'text') {
+       if (e.evt && typeof e.evt.preventDefault === 'function') {
+           e.evt.preventDefault();
+       }
        if (editingTextId) {
            if (textareaRef.current) textareaRef.current.blur();
        }
