@@ -2,6 +2,30 @@ import React, { useEffect, useRef, useState } from 'react';
 import Draggable from 'react-draggable';
 import { Sparkles, X, Send, Paperclip, FileText, Copy, StickyNote } from 'lucide-react';
 import { HW } from './theme.js';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
+const fileToBase64 = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(reader.result);
+  reader.onerror = reject;
+  reader.readAsDataURL(file);
+});
+
+async function extractTextFromPDF(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let fullText = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const strings = content.items.map(item => item.str);
+    fullText += strings.join(' ') + '\n';
+  }
+  return fullText;
+}
 
 // Extract the assistant's reply from whatever JSON shape the upstream returns.
 const readAnswer = (data) =>
@@ -40,26 +64,48 @@ export default function AiAssistantPanel({ onClose, onInsertText }) {
     if (!question.trim() && !file) { setError('พิมพ์คำถาม หรือแนบไฟล์ก่อน'); return; }
     setLoading(true); setAnswer(''); setError('');
     try {
-      const messages = [{ role: 'user', content: question.trim() || 'สรุปไฟล์นี้ให้หน่อย' }];
-      let body;
+      let messages = [];
+      const finalQuestion = question.trim() || 'สรุปข้อมูลนี้ให้หน่อย';
+
       if (file) {
-        body = new FormData();
-        body.append('messages', JSON.stringify(messages));
-        body.append('file', file);
+        if (file.type === 'application/pdf') {
+          setAnswer('กำลังอ่านไฟล์ PDF...');
+          const text = await extractTextFromPDF(file);
+          messages = [{ role: 'user', content: `${finalQuestion}\n\n=== PDF CONTENT ===\n${text.substring(0, 30000)}` }];
+        } else if (file.type.startsWith('image/')) {
+          setAnswer('กำลังประมวลผลรูปภาพ...');
+          const base64 = await fileToBase64(file);
+          messages = [{ 
+            role: 'user', 
+            content: [
+              { type: 'text', text: finalQuestion },
+              { type: 'image_url', image_url: { url: base64 } }
+            ]
+          }];
+        } else if (file.type.startsWith('text/')) {
+          setAnswer('กำลังอ่านไฟล์...');
+          const text = await file.text();
+          messages = [{ role: 'user', content: `${finalQuestion}\n\n=== FILE CONTENT ===\n${text.substring(0, 30000)}` }];
+        } else {
+          setError('รองรับเฉพาะ PDF, รูปภาพ หรือ Text file');
+          setLoading(false);
+          return;
+        }
       } else {
-        // No attachment → send the plain JSON body a chat endpoint expects.
-        // Wrapping a text-only question in multipart was a good way to get a 4xx.
-        body = JSON.stringify({ messages });
+        messages = [{ role: 'user', content: finalQuestion }];
       }
+
+      setAnswer('');
+
       const res = await fetch('/api/ai?path=chat', {
         method: 'POST',
-        headers: file ? undefined : { 'Content-Type': 'application/json' },
-        body,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (data.error === 'not_configured') setError('ยังไม่ได้ตั้งค่า AI — ต้องใส่ UNCLEDEV_AI_KEY ใน Vercel แล้ว redeploy');
-        else if (data.error === 'ai_auth_failed') setError('AI ปฏิเสธการเข้าถึง — UNCLEDEV_AI_KEY อาจหมดอายุ/ไม่ถูกต้อง ตรวจสอบใน Vercel');
+        if (data.error === 'not_configured') setError('ยังไม่ได้ตั้งค่า AI — ต้องใส่ OPENROUTER_API_KEY ใน Vercel แล้ว redeploy');
+        else if (data.error === 'ai_auth_failed') setError('AI ปฏิเสธการเข้าถึง — OPENROUTER_API_KEY อาจหมดอายุ/ไม่ถูกต้อง ตรวจสอบใน Vercel');
         else if (data.error === 'ai_upstream_error') setError(`AI ตอบกลับผิดพลาด (${data.status})${data.detail ? `: ${data.detail}` : ''}`);
         else setError(`เรียก AI ไม่สำเร็จ (${data.error || res.status})`);
         return;
@@ -84,7 +130,7 @@ export default function AiAssistantPanel({ onClose, onInsertText }) {
 
         {configured === false && (
           <div style={{ flexShrink: 0, marginBottom: 10, padding: '9px 12px', borderRadius: 10, background: '#FEF3C7', border: '1px solid #FDE68A', color: '#92400E', fontSize: 12.5, lineHeight: 1.5 }}>
-            เซิร์ฟเวอร์ยังไม่มีคีย์ AI — ต้องตั้งค่า <b>UNCLEDEV_AI_KEY</b> ใน Vercel (Settings → Environment Variables) แล้ว redeploy ถึงจะใช้ได้
+            เซิร์ฟเวอร์ยังไม่มีคีย์ AI — ต้องตั้งค่า <b>OPENROUTER_API_KEY</b> ใน Vercel (Settings → Environment Variables) แล้ว redeploy ถึงจะใช้ได้
           </div>
         )}
 
@@ -146,7 +192,7 @@ export default function AiAssistantPanel({ onClose, onInsertText }) {
             </button>
           </div>
         )}
-        <p style={{ flexShrink: 0, marginTop: 8, fontSize: 10.5, color: 'var(--t3)', textAlign: 'center' }}>ขับเคลื่อนโดย ai.uncledev.net — ตรวจสอบคำตอบก่อนใช้งานจริง</p>
+        <p style={{ flexShrink: 0, marginTop: 8, fontSize: 10.5, color: 'var(--t3)', textAlign: 'center' }}>ขับเคลื่อนโดย OpenRouter — ตรวจสอบคำตอบก่อนใช้งานจริง</p>
       </div>
     </Draggable>
   );
