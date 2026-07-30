@@ -359,14 +359,6 @@ function ScholarCard({ s, color, getAqClass, getMhClass, getMzClass }) {
         e.currentTarget.style.transform = "translateY(0px)"
         e.currentTarget.style.boxShadow = "none"
       }}
-      role={isLong ? "button" : undefined}
-      tabIndex={isLong ? 0 : undefined}
-      onKeyDown={(e) => {
-        if (isLong && (e.key === "Enter" || e.key === " ")) {
-          e.preventDefault()
-          setExpanded(!expanded)
-        }
-      }}
     >
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
         <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)", lineHeight: 1.4 }}>{s.name}</div>
