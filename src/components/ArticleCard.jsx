@@ -5,6 +5,12 @@ export default function ArticleCard({ article: a, onClick, coverHeight = 160 }) 
   return (
     <div
       className="card"
+      role="button"
+      tabIndex={0}
+      aria-label={a.title}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(a) }
+      }}
       style={{
         cursor: "pointer",
         overflow: "hidden",

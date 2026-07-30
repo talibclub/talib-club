@@ -29,17 +29,19 @@ export function Empty({ icon = "ti-search", text = "ไม่พบข้อม�
   )
 }
 
-// Section Header
+// Section Header — a real <h2> so screen readers and search engines see the
+// page structure, not just styled divs.
 export function SecHeader({ title, onSeeAll, count }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-      <span style={{ fontSize: 15, fontWeight: 500, color: "var(--text)" }}>
-        {title}{count !== undefined && <span style={{ fontSize: 12, color: "var(--t3)", marginLeft: 6 }}>({count})</span>}
-      </span>
+      <h2 style={{ fontSize: 15, fontWeight: 500, color: "var(--text)", margin: 0 }}>
+        {title}{count !== undefined && <span style={{ fontSize: 12, color: "var(--t3)", marginLeft: 6, fontWeight: 300 }}>({count})</span>}
+      </h2>
       {onSeeAll && (
         <button onClick={onSeeAll} style={{
           fontSize: 12, color: "var(--teal)", fontWeight: 300, cursor: "pointer",
-          background: "none", border: "none", fontFamily: "'Prompt',sans-serif"
+          background: "none", border: "none", fontFamily: "'Prompt',sans-serif",
+          padding: "12px 12px", margin: "-12px -12px" // ≥44px hit area without moving layout
         }}>ดูทั้งหมด →</button>
       )}
     </div>
@@ -98,14 +100,22 @@ export function BackBtn({ onClick, label = "กลับ" }) {
   )
 }
 
-// Card wrapper
-export function Card({ children, onClick, style = {} }) {
+// Card wrapper. When clickable it becomes keyboard-operable (role, tabIndex,
+// Enter/Space) — a bare <div onClick> is invisible to keyboards and screen readers.
+export function Card({ children, onClick, style = {}, label }) {
+  const interactive = Boolean(onClick)
   return (
     <div
       onClick={onClick}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      aria-label={label}
+      onKeyDown={interactive ? e => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(e) }
+      } : undefined}
       style={{
         background: "var(--card)", border: ".5px solid var(--br2)", borderRadius: 12,
-        transition: "border-color .2s", cursor: onClick ? "pointer" : "default",
+        transition: "border-color .2s", cursor: interactive ? "pointer" : "default",
         ...style
       }}
       onMouseEnter={e => { if (onClick) e.currentTarget.style.borderColor = "var(--acc-br)" }}

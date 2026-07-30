@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Draggable from 'react-draggable';
 import { Sparkles, X, Send, Paperclip, FileText, Copy, StickyNote } from 'lucide-react';
 import { HW } from './theme.js';
+import { auth } from '../../../../lib/firebase.js';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
 
@@ -97,14 +98,20 @@ export default function AiAssistantPanel({ onClose, onInsertText }) {
 
       setAnswer('');
 
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) { setError('กรุณาเข้าสู่ระบบก่อนใช้ผู้ช่วย AI'); return; }
+
       const res = await fetch('/api/ai?path=chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ messages }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (data.error === 'not_configured') setError('ยังไม่ได้ตั้งค่า AI — ต้องใส่ OPENROUTER_API_KEY ใน Vercel แล้ว redeploy');
+        else if (data.error === 'unauthorized') setError('เซสชันหมดอายุ — กรุณาเข้าสู่ระบบใหม่');
+        else if (data.error === 'rate_limited') setError('ถามถี่เกินไป กรุณารอสักครู่');
+        else if (data.error === 'daily_quota_exceeded') setError('ใช้ครบโควตา AI ของวันนี้แล้ว พรุ่งนี้กลับมาใช้ได้อีกครั้ง');
         else if (data.error === 'ai_auth_failed') setError('AI ปฏิเสธการเข้าถึง — OPENROUTER_API_KEY อาจหมดอายุ/ไม่ถูกต้อง ตรวจสอบใน Vercel');
         else if (data.error === 'ai_upstream_error') setError(`AI ตอบกลับผิดพลาด (${data.status})${data.detail ? `: ${data.detail}` : ''}`);
         else setError(`เรียก AI ไม่สำเร็จ (${data.error || res.status})`);

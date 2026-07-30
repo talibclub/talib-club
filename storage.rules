@@ -1,38 +1,73 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    
-    // 1. กฎสำหรับโฟลเดอร์เก็บสลิปโอนเงิน (ปลอดภัยและส่วนตัว)
+
+    // หมายเหตุสำคัญ: Firebase rules ใช้ OR semantics — ถ้ามี match block ใดตรง
+    // path แล้ว allow เป็น true จะผ่านทันที ดังนั้น "ห้าม" มี catch-all
+    // /{allPaths=**} ที่ allow read: if true อีก เพราะมันจะทับกฎ private ของ
+    // slips/ และ notebooks/ ทั้งหมด (บั๊กเดิม: สลิปโอนเงินและสมุดโน้ต
+    // อ่านได้โดยไม่ต้อง login)
+
+    function isStaff() {
+      return request.auth != null &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role
+          in ["staff", "admin", "owner"];
+    }
+
+    // 1. สลิปโอนเงิน — ส่วนตัว: เจ้าของหรือทีมงานเท่านั้น
     match /slips/{fileName} {
-      // ให้ดูได้เฉพาะ "ทีมงานแอดมิน" หรือ "เจ้าของสลิปเท่านั้น" (ป้องกันคนนอกแอบดู)
       allow read: if request.auth != null && (
-        fileName.matches(request.auth.uid + '.*') || 
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ["staff", "admin", "owner"]
+        fileName.matches(request.auth.uid + '.*') ||
+        isStaff()
       );
-      
-      // อัปโหลดได้เฉพาะ "เจ้าของ", ขนาดไม่เกิน 5MB, และต้องเป็นรูปภาพ
-      allow create: if request.auth != null 
-                    && fileName.matches(request.auth.uid + '.*') 
-                    && request.resource.size < 5 * 1024 * 1024 
+      allow create: if request.auth != null
+                    && fileName.matches(request.auth.uid + '.*')
+                    && request.resource.size < 5 * 1024 * 1024
                     && request.resource.contentType.matches('image/.*');
     }
 
-    // 2. กฎสำหรับระบบสมุดโน้ต (เฉพาะผู้ใช้งานของตัวเอง)
+    // 2. สมุดโน้ต — เฉพาะเจ้าของ
     match /notebooks/{userId}/{allPaths=**} {
-      // อนุญาตให้อ่านและเขียนได้เฉพาะเจ้าของสมุดโน้ตเท่านั้น
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-    
-    // 3. กฎสำหรับโฟลเดอร์อื่นๆ ทั้งหมด (เช่น รูปบทความ, หน้าปกหนังสือ)
-    match /{allPaths=**} {
-      // คนทั่วไปดูรูปได้ปกติ (เพื่อให้เว็บแสดงรูปได้)
-      allow read: if true; 
-      
-      // แต่คนที่จะอัปโหลด ลบ หรือแก้ไขรูปอื่นๆ ได้ ต้องเป็นทีมงานเท่านั้น
-      allow write: if request.auth != null && (
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ["staff", "admin", "owner"]
-      );
+
+    // 3. เสียงอัดของผู้ใช้ — เฉพาะเจ้าของ (playback ใช้ token URL อยู่แล้ว)
+    match /user_audio/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-    
+
+    // 4. เสียงโน้ตในสมุด (path เดิมไม่มี uid) — สมาชิกที่ login อัปโหลด/อ่านได้
+    //    จำกัดชนิดและขนาดไฟล์ไว้กันการใช้เป็นที่ฝากไฟล์
+    match /notebook_audios/{fileName} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.size < 20 * 1024 * 1024
+                    && request.resource.contentType.matches('audio/.*');
+    }
+
+    // 5. ไฟล์งานทีม — ทีมงานเท่านั้น
+    match /staff_submissions/{allPaths=**} {
+      allow read, write: if isStaff();
+    }
+    match /staff_tasks/{allPaths=**} {
+      allow read, write: if isStaff();
+    }
+
+    // 6. Asset สาธารณะ (รูปปก ฯลฯ) — ใครดูก็ได้ ทีมงานอัปโหลด
+    match /article_covers/{allPaths=**} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+    match /library_covers/{allPaths=**} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+    match /campaign_images/{allPaths=**} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    // ไฟล์เก่าใน prefix อื่น: รูปที่เว็บแสดงใช้ download URL แบบมี token ซึ่ง
+    // ไม่ผ่าน rules อยู่แล้ว จึงยังแสดงผลได้ตามปกติแม้ไม่มี catch-all read
   }
 }

@@ -76,6 +76,7 @@ const urlToPage = {
   "staff": "staff",
   "staff-work": "staff-work",
   "staff-translation": "staff-translation",
+  "staff-members": "staff-members",
   "admin": "admin",
   "donate": "donate",
   "reader": "reader",
@@ -239,20 +240,11 @@ export default function App() {
     }
   }
 
-  if (authState.loading) {
-    return (
-      <div className={`app ${theme}`} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", width: "100vw", background: "var(--bg)" }}>
-        <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", animation: "pageFadeIn 0.5s ease-out" }}>
-          <span style={{ fontFamily: '"Times New Roman", Times, serif', color: "var(--text)", fontSize: "48px", fontWeight: "bold", letterSpacing: "2px", textTransform: "uppercase", marginBottom: 32, animation: "countdown-pulse 2.5s infinite" }}>
-            Talib
-          </span>
-          <i className="ti ti-loader-2 spin" style={{ fontSize: 36, color: "var(--teal)", marginBottom: 20 }}></i>
-          <p style={{ color: "var(--t2)", fontSize: 15, fontWeight: 500, letterSpacing: 0.5 }}>กำลังเตรียมความพร้อมของระบบ...</p>
-        </div>
-      </div>
-    )
-  }
-
+  // Public pages (home, articles, library, media, scholars, donate) render
+  // immediately — they don't depend on auth. Blocking the whole app on Firebase
+  // Auth (which has a 6s fallback timeout when blocked by extensions) made every
+  // first visit stare at a spinner. Routes that DO need auth are wrapped in
+  // RequireLogin / RequireStaff, which already show their own loading state.
   return (
     <div className={`app ${theme}`}>
       <Toaster position="top-right" toastOptions={{ style: { fontFamily: "'Prompt', sans-serif", fontSize: 14 } }} />
@@ -292,7 +284,7 @@ export default function App() {
           <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.7 }} />
         </div>
       )}
-      <main className={`${page === "quran" || page === "member" ? "wide" : ""} fade-in-active`}>
+      <main className={`${page === "quran" || page === "member" ? "wide" : ["articles", "library", "media", "scholars"].includes(page) ? "gallery" : ""} fade-in-active`}>
         <PageErrorBoundary resetKey={`${page}:${JSON.stringify(ctx || {})}`} go={go}>
           <Suspense fallback={<LoadingState />}>
             <Routes>

@@ -14,7 +14,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import { loadBookPdf } from '../utils/pdfCache.js';
 import { uploadNotebookData, downloadNotebookData } from '../../../utils/notebookStorage.js';
-import { db, storage } from '../../../lib/firebase.js';
+import { auth, db, storage } from '../../../lib/firebase.js';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { PDFPageImage, PaperPattern, getSvgPathFromStroke, PEN_STYLES, StrokeShape, CommittedStrokes, StickyStyleThumb } from './notebook/canvasElements.jsx';
@@ -78,7 +78,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(null); // null = indeterminate
 
+  // Data-loss guard: every write path (autosave, manual save, unmount flush)
+  // checks this ref. Until the initial load has finished — or if it FAILED and we
+  // don't know what the cloud copy holds — saving is forbidden, so a blank
+  // default page can never overwrite a real notebook.
+  const loadStateRef = useRef('loading'); // 'loading' | 'ready' | 'failed'
+
   useEffect(() => {
+     loadStateRef.current = 'loading';
      const loadData = async () => {
         setIsSyncing(true);
         setSyncProgress(null);
@@ -88,19 +95,32 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               setPages(cloudData);
               toast.success("ซิงก์ข้อมูลสำเร็จ!", { id: "cloud-sync" });
            }
+           // null = notebook doesn't exist yet → a fresh blank book is correct.
+           loadStateRef.current = 'ready';
         } catch (e) {
            console.error("Cloud load failed", e);
            const saved = localStorage.getItem(`talib_notebook_${notebookId}`);
            if (saved) {
-              setPages(JSON.parse(saved));
-              toast.error("ออฟไลน์: โหลดจากเครื่องแทน", { id: "cloud-sync" });
+              try {
+                 setPages(JSON.parse(saved));
+                 loadStateRef.current = 'ready';
+                 toast.error("ออฟไลน์: โหลดจากเครื่องแทน", { id: "cloud-sync" });
+              } catch (parseErr) {
+                 console.error("Local backup unreadable", parseErr);
+                 loadStateRef.current = 'failed';
+              }
+           } else {
+              loadStateRef.current = 'failed';
+           }
+           if (loadStateRef.current === 'failed') {
+              toast.error("โหลดสมุดโน้ตไม่สำเร็จ — ปิดการบันทึกไว้ชั่วคราวเพื่อป้องกันข้อมูลเดิมหาย ลองรีเฟรชอีกครั้ง", { id: "cloud-sync", duration: 10000 });
            }
         } finally {
            setIsSyncing(false);
            setSyncProgress(null);
         }
      };
-     
+
      if (uid && notebookId !== 'default') {
         loadData();
      } else {
@@ -108,6 +128,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         if (saved) {
            try { setPages(JSON.parse(saved)); } catch (e) {}
         }
+        loadStateRef.current = 'ready';
      }
   }, [notebookId, uid]);
   
@@ -371,7 +392,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
            const params = new URLSearchParams({ q });
            if (filter) params.set('type', filter);
-           const res = await fetch(`/api/image-search?${params}`);
+           const idToken = await auth.currentUser?.getIdToken();
+           const res = await fetch(`/api/image-search?${params}`, idToken ? { headers: { Authorization: `Bearer ${idToken}` } } : undefined);
            if (!res.ok) {
               const errText = await res.text().catch(() => '');
               console.error('Image search proxy error:', res.status, errText);
@@ -749,14 +771,22 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     pagesRef.current = pages;
   }, [pages]);
 
+  // Autosave: idle debounce (5s) + max-wait flush. A pure debounce resets on
+  // every stroke, so 30 minutes of continuous writing never reached the cloud
+  // even once — the max-wait guarantees a save at least every 45s while active.
+  const lastAutoSaveRef = useRef(Date.now());
   useEffect(() => {
     if (readonly || !pages || pages.length === 0) return;
-    
-    // Simple debounce to auto-save to firebase
+    if (loadStateRef.current !== 'ready') return; // never overwrite before load settles
+
+    const MAX_WAIT = 45000;
+    const sinceLast = Date.now() - lastAutoSaveRef.current;
+    const delay = sinceLast >= MAX_WAIT ? 0 : Math.min(5000, MAX_WAIT - sinceLast);
     const timer = setTimeout(() => {
+       lastAutoSaveRef.current = Date.now();
        saveNotebook(true); // isAuto = true
-    }, 5000); // 5 seconds debounce
-    
+    }, delay);
+
     return () => clearTimeout(timer);
   }, [pages, readonly]);
 
@@ -764,12 +794,27 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   useEffect(() => {
     return () => {
       if (readonly || !uid || !notebookId) return;
+      if (loadStateRef.current !== 'ready') return; // load failed/pending → don't clobber the cloud copy
       if (pagesRef.current && pagesRef.current.length > 0) {
         uploadNotebookData(uid, notebookId, pagesRef.current).catch(console.error);
+        writeNotebookMeta().catch(console.error);
         try { localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pagesRef.current)); } catch(e){}
       }
     };
   }, [readonly, uid, notebookId]);
+
+  // Last-resort flush: a hard reload (recovery.js) or tab close skips React
+  // unmount cleanup, so mirror the pages into localStorage synchronously.
+  useEffect(() => {
+    const flush = () => {
+      if (readonly || loadStateRef.current !== 'ready') return;
+      if (pagesRef.current && pagesRef.current.length > 0) {
+        try { localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pagesRef.current)); } catch(e){}
+      }
+    };
+    window.addEventListener('beforeunload', flush);
+    return () => window.removeEventListener('beforeunload', flush);
+  }, [readonly, notebookId]);
 
   useEffect(() => {
      if (tool !== 'lasso' && (selectionRef.current.length > 0 || selectedObjectsRef.current.length > 0)) {
@@ -1133,22 +1178,35 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     toast.success('ลบหน้ากระดาษแล้ว');
   };
 
+  // Metadata write shared by manual/auto save and the unmount flush, so the
+  // gallery's "updated at" always tracks the real content.
+  const writeNotebookMeta = () => {
+     const metadataRef = doc(db, 'content_notebooks', `${uid}_${notebookId}`);
+     return setDoc(metadataRef, {
+        uid,
+        bookId: notebookId,
+        title: activeBook?.book?.title || 'สมุดโน้ต',
+        updatedAt: serverTimestamp(),
+        coverColor: 'red',
+     }, { merge: true });
+  };
+
+  const saveInFlightRef = useRef(false);
   const saveNotebook = async (isAuto = false) => {
      if (readonly) return;
+     if (loadStateRef.current !== 'ready') {
+        if (!isAuto) toast.error("ยังโหลดสมุดโน้ตไม่สำเร็จ — บันทึกไม่ได้เพื่อป้องกันข้อมูลเดิมหาย");
+        return;
+     }
+     // Manual save and autosave can fire together; the 2nd would clear the 1st's
+     // spinner state and double-upload. Let one finish first.
+     if (saveInFlightRef.current) return;
+     saveInFlightRef.current = true;
      setIsSaving(true);
      if (!isAuto) toast.loading("กำลังบันทึกลงคลาวด์...", { id: "cloud-save" });
      try {
         await uploadNotebookData(uid, notebookId, pages);
-        
-        // Save metadata to Firestore
-        const metadataRef = doc(db, 'content_notebooks', `${uid}_${notebookId}`);
-        await setDoc(metadataRef, {
-           uid,
-           bookId: notebookId,
-           title: activeBook?.book?.title || 'สมุดโน้ต',
-           updatedAt: serverTimestamp(),
-           coverColor: 'red',
-        }, { merge: true });
+        await writeNotebookMeta();
         // Backup locally
          try { localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pages)); } catch (e) { console.warn("Local storage quota exceeded on backup", e); }
         if (!isAuto) toast.success("บันทึกคลาวด์เรียบร้อย!", { id: "cloud-save", icon: '💾' });
@@ -1162,6 +1220,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
             toast.error("บันทึกคลาวด์ล้มเหลว และพื้นที่ในเครื่องเต็ม (ไม่สามารถบันทึกได้)", { id: "cloud-save" });
          }
      } finally {
+        saveInFlightRef.current = false;
         setTimeout(() => setIsSaving(false), 1500);
      }
   };
@@ -3133,7 +3192,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                     <button onClick={() => { exportNotebookPDF(); setShowMoreMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
                        <Download size={20} strokeWidth={1.5} color="#4B5563" /> ดาวน์โหลดทั้งเล่ม (PDF)
                     </button>
-                    <button onClick={() => { exportPage(); setShowMoreMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
+                    <button onClick={() => { setShowMoreMenu(false); runExport('png', 'current'); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
                        <ImageIcon size={20} strokeWidth={1.5} color="#4B5563" /> บันทึกรูปหน้านี้ (PNG)
                     </button>
                     <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>

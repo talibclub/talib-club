@@ -1,6 +1,12 @@
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../lib/firebase.js";
 
+// Gzip via CompressionStream is unavailable on Safari < 16.4 (the very iPads the
+// notebook targets). Feature-detect and fall back to plain JSON — the download
+// side sniffs the gzip magic bytes, so both formats live under the same path.
+const canGzip = typeof CompressionStream !== "undefined";
+const canGunzip = typeof DecompressionStream !== "undefined";
+
 // Helper to compress JSON string to gzip Blob
 async function compressString(str) {
   const stream = new Blob([str], { type: 'application/json' }).stream();
@@ -15,18 +21,26 @@ async function decompressBlob(blob) {
   return new Response(decompressedStream).text();
 }
 
+async function isGzipBlob(blob) {
+  const head = new Uint8Array(await blob.slice(0, 2).arrayBuffer());
+  return head.length === 2 && head[0] === 0x1f && head[1] === 0x8b;
+}
+
 /**
- * Uploads notebook data to Firebase Storage with Gzip compression
+ * Uploads notebook data to Firebase Storage (gzip when supported, plain JSON otherwise).
  */
 export async function uploadNotebookData(uid, notebookId, dataObj) {
   try {
     const jsonStr = JSON.stringify(dataObj);
-    const compressedBlob = await compressString(jsonStr);
+    const body = canGzip
+      ? await compressString(jsonStr)
+      : new Blob([jsonStr], { type: "application/json" });
     const storageRef = ref(storage, `notebooks/${uid}/${notebookId}.json.gz`);
-    
-    // Upload compressed file
-    await uploadBytes(storageRef, compressedBlob, { contentType: 'application/gzip' });
-    
+
+    await uploadBytes(storageRef, body, {
+      contentType: canGzip ? "application/gzip" : "application/json",
+    });
+
     // Return the download URL
     return await getDownloadURL(storageRef);
   } catch (err) {
@@ -38,36 +52,51 @@ export async function uploadNotebookData(uid, notebookId, dataObj) {
 /**
  * Downloads and decompresses notebook data from Firebase Storage.
  * onProgress (optional) receives a 0..1 fraction while the file body streams in.
+ *
+ * Contract (this distinction is what protects against data loss):
+ *   - returns null  ONLY when the file genuinely doesn't exist (a new notebook)
+ *   - THROWS on every other failure (network, permission, decompress, parse) so
+ *     the caller knows the cloud copy may still exist and must not overwrite it.
  */
 export async function downloadNotebookData(uid, notebookId, onProgress) {
+  const storageRef = ref(storage, `notebooks/${uid}/${notebookId}.json.gz`);
+  let url;
   try {
-    const storageRef = ref(storage, `notebooks/${uid}/${notebookId}.json.gz`);
-    const url = await getDownloadURL(storageRef);
-    const response = await fetch(url);
-    if (!response.ok) throw new Error("Network response was not ok");
-
-    let blob;
-    const total = Number(response.headers.get("content-length")) || 0;
-    if (onProgress && response.body && total > 0) {
-      const reader = response.body.getReader();
-      const chunks = [];
-      let received = 0;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        received += value.length;
-        onProgress(Math.min(1, received / total));
-      }
-      blob = new Blob(chunks);
-    } else {
-      blob = await response.blob();
-    }
-
-    const jsonStr = await decompressBlob(blob);
-    return JSON.parse(jsonStr);
+    url = await getDownloadURL(storageRef);
   } catch (err) {
-    // Return null if not found (e.g. new notebook)
-    return null;
+    if (err?.code === "storage/object-not-found") return null; // new notebook
+    throw err;
   }
+
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Notebook fetch failed: ${response.status}`);
+
+  let blob;
+  const total = Number(response.headers.get("content-length")) || 0;
+  if (onProgress && response.body && total > 0) {
+    const reader = response.body.getReader();
+    const chunks = [];
+    let received = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      onProgress(Math.min(1, received / total));
+    }
+    blob = new Blob(chunks);
+  } else {
+    blob = await response.blob();
+  }
+
+  let jsonStr;
+  if (await isGzipBlob(blob)) {
+    if (!canGunzip) {
+      throw new Error("เบราว์เซอร์นี้เปิดสมุดโน้ตแบบบีบอัดไม่ได้ กรุณาอัปเดต iOS/เบราว์เซอร์เป็นเวอร์ชันล่าสุด");
+    }
+    jsonStr = await decompressBlob(blob);
+  } else {
+    jsonStr = await blob.text();
+  }
+  return JSON.parse(jsonStr);
 }

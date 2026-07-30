@@ -310,7 +310,9 @@ export default function Home({ go }) {
           ) : (
             <div className="flex-col">
               {recentMedia.slice(0, 3).map(m => (
-                <div key={m.id} className="card" style={{ padding:"11px 14px", display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}
+                <div key={m.id} className="card" role="button" tabIndex={0} aria-label={m.title}
+                  style={{ padding:"11px 14px", display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go("media") } }}
                   onClick={() => go("media")}>
                   <div style={{
                     width:32, height:32, borderRadius:"50%", background:"var(--acc2)",
@@ -359,10 +361,11 @@ export default function Home({ go }) {
           ) : (
             <div className="flex-col">
               {newBooks.map(b => (
-                <div key={b.id} className="card" style={{
+                <div key={b.id} className="card" role="button" tabIndex={0} aria-label={b.title} style={{
                   padding:"11px 14px", display:"flex", alignItems:"center",
                   justifyContent:"space-between", gap:10, cursor:"pointer"
-                }} onClick={() => go("library")}>
+                }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go("library") } }}
+                  onClick={() => go("library")}>
                   <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                     <i className={`ti ${b.type==="วารสาร" ? "ti-news" : b.type==="PDF" ? "ti-file-text" : "ti-book"}`}
                       style={{ fontSize:16, color:"var(--teal)", flexShrink:0 }}></i>
@@ -410,11 +413,11 @@ export default function Home({ go }) {
 
 function Footer({ site }) {
   const links = [
-    { key: "facebook", icon: "ti-brand-facebook" },
-    { key: "youtube", icon: "ti-brand-youtube" },
-    { key: "spotify", icon: "ti-brand-spotify" },
-    { key: "instagram", icon: "ti-brand-instagram" },
-    { key: "tiktok", icon: "ti-brand-tiktok" },
+    { key: "facebook", icon: "ti-brand-facebook", label: "Facebook" },
+    { key: "youtube", icon: "ti-brand-youtube", label: "YouTube" },
+    { key: "spotify", icon: "ti-brand-spotify", label: "Spotify" },
+    { key: "instagram", icon: "ti-brand-instagram", label: "Instagram" },
+    { key: "tiktok", icon: "ti-brand-tiktok", label: "TikTok" },
   ].map(item => ({ ...item, url: site?.social?.[item.key] }))
    .filter(item => item.url && /^https?:\/\//i.test(item.url))
 
@@ -434,8 +437,8 @@ function Footer({ site }) {
       {/* กลุ่มปุ่มโซเชียล และ ปุ่มขึ้นบน (จัดให้อยู่ด้วยกัน) */}
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
         {links.map(item => (
-          <a key={item.key} href={item.url} target="_blank" rel="noreferrer" 
-             style={{ width: "36px", height: "36px", backgroundColor: "var(--card)", border: ".5px solid var(--br)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t2)", textDecoration: "none", transition: "0.2s" }}
+          <a key={item.key} href={item.url} target="_blank" rel="noreferrer" aria-label={item.label}
+             style={{ width: "44px", height: "44px", backgroundColor: "var(--card)", border: ".5px solid var(--br)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t2)", textDecoration: "none", transition: "0.2s" }}
              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--teal)"; e.currentTarget.style.color = "#fff"; e.currentTarget.style.borderColor = "var(--teal)"; }}
              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--card)"; e.currentTarget.style.color = "var(--t2)"; e.currentTarget.style.borderColor = "var(--br)"; }}
           >
@@ -444,8 +447,8 @@ function Footer({ site }) {
         ))}
 
         {/* ปุ่มลูกศรขึ้นบน (เอา absolute ออก แล้วเรียงต่อกันแทน) */}
-        <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} 
-                style={{ width: "36px", height: "36px", backgroundColor: "var(--teal-bg)", border: "1px solid rgba(15,110,86,0.1)", borderRadius: "50%", color: "var(--teal)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "0.2s", marginLeft: "10px" }}
+        <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} aria-label="เลื่อนขึ้นด้านบนสุด"
+                style={{ width: "44px", height: "44px", backgroundColor: "var(--teal-bg)", border: "1px solid rgba(15,110,86,0.1)", borderRadius: "50%", color: "var(--teal)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "0.2s", marginLeft: "10px" }}
                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--teal)"; e.currentTarget.style.color = "#fff"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--teal-bg)"; e.currentTarget.style.color = "var(--teal)"; }}
         >

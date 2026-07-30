@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { collection, getDocs, writeBatch, doc, updateDoc, Timestamp, query, where, or, limit } from "firebase/firestore";
+import { collection, getDocs, writeBatch, doc, updateDoc, Timestamp } from "firebase/firestore";
 import { trackingDb as db } from "../lib/trackingFirebase.js";
+import { auth } from "../lib/firebase.js";
 import { formatFirebaseDate } from "../utils/format.js";
 import { exportCSV } from "../utils/csvTracking.js";
 
@@ -147,41 +148,33 @@ export default function Tracking({ authState }) {
     setTimeout(() => setSecretClicks(0), 1500);
   };
 
+  // Search goes through /api/track-lookup (exact match, trimmed fields) instead
+  // of querying Firestore directly — rules can't enforce a `where` clause, so a
+  // client-side query would let any member list other people's data.
   const handlePublicSearch = async (e, mode) => {
     e.preventDefault();
     const rawQuery = userQuery.trim();
     if (!rawQuery) return;
+    if (!auth.currentUser) {
+      await myAlert("กรุณาเข้าสู่ระบบก่อนค้นหาสถานะพัสดุ");
+      return;
+    }
     setIsLoading(true);
     setUserSearchResult(null);
     try {
-      const qClean = rawQuery;
-      const qPhone = rawQuery.replace(/[-\s]/g, ""); // digits only
-      const qTrack = rawQuery.replace(/\s/g, "").toUpperCase();
-
-      let q;
-      if (mode === "recipient") {
-        q = query(
-          collection(db, "recipients"),
-          or(
-            where("fullName", "==", qClean),
-            where("phone", "==", qPhone)
-          ),
-          limit(5)
-        );
-      } else {
-        q = query(
-          collection(db, "records"),
-          or(
-            where("fullName", "==", qClean),
-            where("phone", "==", qPhone),
-            where("trackingNumber", "==", qTrack)
-          ),
-          limit(5)
-        );
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch("/api/track-lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ mode, query: rawQuery }),
+      });
+      if (res.status === 429) {
+        await myAlert("ค้นหาถี่เกินไป กรุณารอสักครู่แล้วลองใหม่");
+        setIsLoading(false);
+        return;
       }
-
-      const snap = await getDocs(q);
-      const found = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const data = res.ok ? await res.json() : { results: [] };
+      const found = Array.isArray(data.results) ? data.results : [];
       setUserSearchResult(found.length > 0 ? found : "NOT_FOUND");
     } catch (err) {
       console.error("Public search error:", err);

@@ -52,7 +52,14 @@ service cloud.firestore {
     // --- System Analytics Collections ---
     match /site_visits/{docId} {
       allow read: if isStaff();
-      allow create: if true;
+      // Guests must still be countable (uid: "unknown"), so creation stays open
+      // — but lock the shape and sizes so bots can't dump arbitrary payloads.
+      allow create: if request.resource.data.keys().hasOnly(["createdAt", "userAgent", "path", "uid", "displayName", "email"])
+        && request.resource.data.userAgent is string && request.resource.data.userAgent.size() < 512
+        && request.resource.data.path is string && request.resource.data.path.size() < 256
+        && request.resource.data.uid is string && request.resource.data.uid.size() < 128
+        && request.resource.data.displayName is string && request.resource.data.displayName.size() < 256
+        && request.resource.data.email is string && request.resource.data.email.size() < 256;
     }
 
     // --- Public Content Collections ---
@@ -169,16 +176,15 @@ service cloud.firestore {
     }
 
     // --- Logistics Tracking Collections ---
+    // Member search goes through /api/track-lookup (firebase-admin) which does
+    // exact-match only and trims fields. Rules cannot enforce a `where` clause,
+    // so any client-side list access here would leak other people's PII.
     match /records/{docId} {
-      allow get: if isStaff();
-      allow list: if isStaff() || (signedIn() && request.query.limit != null && request.query.limit <= 5);
-      allow write: if isStaff();
+      allow read, write: if isStaff();
     }
 
     match /recipients/{docId} {
-      allow get: if isStaff();
-      allow list: if isStaff() || (signedIn() && request.query.limit != null && request.query.limit <= 5);
-      allow write: if isStaff();
+      allow read, write: if isStaff();
     }
 
     match /staff_tasks/{docId} {

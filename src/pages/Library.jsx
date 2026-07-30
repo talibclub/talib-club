@@ -296,7 +296,11 @@ export default function Library({ go, authState, ctx }) {
               <div
                 key={b.id}
                 className="card"
+                role="button"
+                tabIndex={0}
+                aria-label={b.title}
                 style={{ padding: 16, display: "flex", gap: 16, cursor: "pointer" }}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click() } }}
                 onClick={() => {
                   if (!authState?.user) {
                     toast.error("กรุณาเข้าสู่ระบบก่อนดาวน์โหลดหรือดูหนังสือ")

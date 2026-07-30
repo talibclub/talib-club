@@ -36,6 +36,16 @@ const browserGlobals = {
   IntersectionObserver: "readonly",
   getComputedStyle: "readonly",
   CSS: "readonly",
+  Audio: "readonly",
+  MediaRecorder: "readonly",
+  indexedDB: "readonly",
+  caches: "readonly",
+  Path2D: "readonly",
+  CompressionStream: "readonly",
+  DecompressionStream: "readonly",
+  Response: "readonly",
+  Uint8Array: "readonly",
+  process: "readonly", // Vite inlines process.env.NODE_ENV at build time
 };
 
 const nodeGlobals = {

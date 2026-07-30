@@ -107,7 +107,6 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
   const [error, setError] = useState(null)
   const [refetchTrigger, setRefetchTrigger] = useState(0)
   const lastRefetchTrigger = useRef(refetchTrigger)
-  const isRefetching = refetchTrigger !== lastRefetchTrigger.current
   const collectionName = CONTENT_COLLECTIONS[name]
   const isUserSpecific = USER_SPECIFIC_COLLECTIONS.includes(name)
 
@@ -125,7 +124,8 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
     }
 
     const cacheKey = getQueryCacheKey(collectionName, uid, limitCount, orderByField, orderDirection)
-    // H7: Fix cache bypass logic
+    // A refetch() call bumps refetchTrigger; that run must bypass the cache.
+    const isRefetching = refetchTrigger !== lastRefetchTrigger.current
     const cached = !live && !isRefetching ? readCachedCollection(cacheKey) : null
     lastRefetchTrigger.current = refetchTrigger
     if (cached) {
@@ -306,6 +306,12 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
     return [...merged].filter(item => !item.deleted).sort(byNewest)
   }, [stableFallbackItems, loading, remoteItems])
 
+  // Mirror for optimistic-update rollbacks. Capturing the backup inside the
+  // setRemoteItems updater is unsafe: if the write rejects before React runs
+  // the updater, the rollback would restore `null` and blank the list.
+  const remoteItemsRef = useRef(remoteItems)
+  useEffect(() => { remoteItemsRef.current = remoteItems }, [remoteItems])
+
   const saveItem = useCallback(async (item) => {
     let id = item.id;
     if (!id) id = await getNextSequenceId(db, name, item);
@@ -327,12 +333,11 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
     const localPayload = { ...payload, updatedAt: Date.now() }
     if (localPayload.createdAt) localPayload.createdAt = Date.now()
 
-    let backupRemoteItems = null
+    const backupRemoteItems = remoteItemsRef.current
     const backupCacheEntries = new Map(
       [...collectionCache.entries()].filter(([key]) => key.includes(`"collectionName":"${collectionName}"`))
     )
     setRemoteItems(prev => {
-      backupRemoteItems = prev
       const list = prev || []
       const idx = list.findIndex(d => String(d.id) === id)
       if (idx >= 0) {
@@ -365,13 +370,12 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
   }, [collectionName, isUserSpecific, uid, name])
 
   const deleteItem = useCallback(async (id) => {
-    let backupRemoteItems = null
+    const backupRemoteItems = remoteItemsRef.current
     const backupCacheEntries = new Map(
       [...collectionCache.entries()].filter(([key]) => key.includes(`"collectionName":"${collectionName}"`))
     )
     // 🟢 Optimistic Update: เอาออกจาก State บนหน้าจอก่อนทันที
     setRemoteItems(prev => {
-      backupRemoteItems = prev
       const list = prev || []
       return list.filter(d => String(d.id) !== String(id))
     })
@@ -389,7 +393,15 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
     invalidateCollectionCountOnly(collectionName)
 
     try {
-      await deleteDoc(doc(db, collectionName, String(id)))
+      // Public content has static fallback files (src/data/*): a hard delete
+      // leaves no tombstone, so mergeWithFallback resurrects the item on the
+      // next cold load. Soft-delete keeps a { deleted: true } doc that the
+      // merge uses to suppress the fallback copy permanently.
+      if (isUserSpecific) {
+        await deleteDoc(doc(db, collectionName, String(id)))
+      } else {
+        await setDoc(doc(db, collectionName, String(id)), { id: String(id), deleted: true, updatedAt: serverTimestamp() }, { merge: true })
+      }
       await updateCollectionMetadata(collectionName)
     } catch (err) {
       setRemoteItems(backupRemoteItems)
@@ -402,7 +414,9 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
       throw err
     }
 
-  }, [collectionName])
+  }, [collectionName, isUserSpecific])
+
+  const refetch = useCallback(() => setRefetchTrigger(n => n + 1), [])
 
   return {
     items,
@@ -411,6 +425,7 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
     isUsingFallback: !loading && (remoteItems === null || error !== null),
     saveItem,
     deleteItem,
+    refetch,
   }
 }
 
@@ -464,7 +479,13 @@ export async function deleteContentItem(name, id) {
   const collectionName = CONTENT_COLLECTIONS[name]
   if (!collectionName) throw new Error(`Unknown content collection: ${name}`)
 
-  await deleteDoc(doc(db, collectionName, String(id)))
+  // Soft-delete public content (has static fallbacks that would resurrect on a
+  // hard delete — see deleteItem above); hard-delete user-specific data.
+  if (USER_SPECIFIC_COLLECTIONS.includes(name)) {
+    await deleteDoc(doc(db, collectionName, String(id)))
+  } else {
+    await setDoc(doc(db, collectionName, String(id)), { id: String(id), deleted: true, updatedAt: serverTimestamp() }, { merge: true })
+  }
 
   // 🟢 Optimistic Update ลบออกจาก Cache ทันที
   for (const [key, entry] of collectionCache.entries()) {
@@ -492,7 +513,7 @@ export async function bulkDeleteItems(name, ids) {
   const BATCH_LIMIT = 500
   let deleted = 0
   let failed = 0
-  const now = serverTimestamp()
+  const succeededIds = new Set()
 
   // Process in chunks of 500 (Firestore writeBatch limit)
   for (let i = 0; i < ids.length; i += BATCH_LIMIT) {
@@ -504,17 +525,18 @@ export async function bulkDeleteItems(name, ids) {
     try {
       await batch.commit()
       deleted += chunk.length
+      chunk.forEach(id => succeededIds.add(String(id)))
     } catch (err) {
       console.error(`bulkDeleteItems: batch failed for chunk starting at index ${i}`, err)
       failed += chunk.length
     }
   }
 
-  // Update local cache optimistically for all successfully marked IDs
+  // Update local cache only for IDs whose batch actually committed — marking a
+  // failed chunk as deleted hides items that still exist in Firestore until reload.
   for (const [key, entry] of collectionCache.entries()) {
     if (key.includes(`"collectionName":"${collectionName}"`)) {
-      const idsSet = new Set(ids.map(String))
-      const newItems = entry.items.map(d => idsSet.has(String(d.id)) ? { ...d, deleted: true } : d)
+      const newItems = entry.items.map(d => succeededIds.has(String(d.id)) ? { ...d, deleted: true } : d)
       collectionCache.set(key, { ...entry, items: newItems })
       if (PUBLIC_COLLECTIONS.includes(collectionName)) {
         try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: newItems, at: Date.now() })) } catch (e) { }

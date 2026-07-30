@@ -333,6 +333,10 @@ function ScholarCard({ s, color, getAqClass, getMhClass, getMzClass }) {
   return (
     <div
       className="card scholar-card"
+      role={isLong ? "button" : undefined}
+      tabIndex={isLong ? 0 : undefined}
+      aria-expanded={isLong ? expanded : undefined}
+      onKeyDown={isLong ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded(!expanded) } } : undefined}
       onClick={() => {
         if (isLong) {
           setExpanded(!expanded)

@@ -1,4 +1,5 @@
 import * as pdfjsLib from 'pdfjs-dist';
+import { auth } from '../../../lib/firebase.js';
 
 // Shared PDF cache for the reading room.
 //
@@ -28,7 +29,9 @@ export function resolvePdfUrl(url) {
 export function getBookPdfBytes(fileUrl) {
   const proxyUrl = resolvePdfUrl(fileUrl);
   if (!bytesCache.has(proxyUrl)) {
-    const p = fetch(proxyUrl)
+    // The proxy requires a signed-in user (it would otherwise be an open relay).
+    const p = Promise.resolve(auth.currentUser?.getIdToken())
+      .then((idToken) => fetch(proxyUrl, idToken ? { headers: { Authorization: `Bearer ${idToken}` } } : undefined))
       .then((r) => {
         if (!r.ok) throw new Error(`PDF fetch failed: ${r.status}`);
         return r.arrayBuffer();

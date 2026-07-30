@@ -125,6 +125,13 @@ main.wide {
   max-width: 1450px;
 }
 
+/* Card-gallery pages (articles, library, media, scholars): their grids are
+   already repeat(auto-fill, minmax(...)) — the 1100px article-width container
+   was the only thing capping them at 3 columns on wide screens. */
+main.gallery {
+  max-width: 1440px;
+}
+
 /* Typography */
 h1,
 h2,
@@ -197,6 +204,9 @@ button {
   border: none;
   font-family: 'Prompt', sans-serif;
   flex-shrink: 0;
+  /* ≥44px tap target without shifting layout */
+  padding: 13px 12px;
+  margin: -13px -12px;
 }
 
 .badge {
@@ -335,6 +345,17 @@ select:focus,
 textarea:focus {
   border-color: var(--teal);
   box-shadow: 0 0 0 3px var(--teal-bg)
+}
+
+/* Keyboard users need to see where focus is — clickable cards and buttons had
+   no visible focus indicator at all. :focus-visible keeps mouse clicks clean. */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 input:disabled,

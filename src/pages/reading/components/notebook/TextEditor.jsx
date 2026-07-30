@@ -326,16 +326,16 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
         <div style={{ width: 1, height: 16, background: 'var(--br2)', margin: '0 2px' }} />
 
         <div style={{ display: 'flex', gap: 2 }}>
-          <FormatBtn icon={<List size={15} />} active={active.list === 'bullet'} onClick={() => toggleFormat('list', 'bullet')} />
-          <FormatBtn icon={<ListOrdered size={15} />} active={active.list === 'number'} onClick={() => toggleFormat('list', 'number')} />
+          <FormatBtn icon={<List size={15} />} active={active.list === 'bullet'} onClick={() => toggleList('bullet')} />
+          <FormatBtn icon={<ListOrdered size={15} />} active={active.list === 'number'} onClick={() => toggleList('number')} />
         </div>
         
         <div style={{ width: 1, height: 16, background: 'var(--br2)', margin: '0 2px' }} />
 
         <div style={{ display: 'flex', gap: 2 }}>
-          <FormatBtn icon={<AlignLeft size={15} />} active={!active.align || active.align === 'left'} onClick={() => toggleFormat('align', 'left')} />
-          <FormatBtn icon={<AlignCenter size={15} />} active={active.align === 'center'} onClick={() => toggleFormat('align', 'center')} />
-          <FormatBtn icon={<AlignRight size={15} />} active={active.align === 'right'} onClick={() => toggleFormat('align', 'right')} />
+          <FormatBtn icon={<AlignLeft size={15} />} active={!active.align || active.align === 'left'} onClick={() => setAlign('left')} />
+          <FormatBtn icon={<AlignCenter size={15} />} active={active.align === 'center'} onClick={() => setAlign('center')} />
+          <FormatBtn icon={<AlignRight size={15} />} active={active.align === 'right'} onClick={() => setAlign('right')} />
         </div>
       </div>
 

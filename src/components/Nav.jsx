@@ -169,15 +169,28 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
     return normalizeStreakSettings(streakRecord, uid)
   }, [streakRecord, uid])
 
+  // Tracked as state (ticked each minute) so a tab left open across midnight
+  // rolls over to the new day, and uses safeDateNow() so a skewed device clock
+  // agrees with the streak calculation.
+  const [todayDayKey, setTodayDayKey] = useState(() => getLocalDayKey(safeDateNow()))
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTodayDayKey(prev => {
+        const next = getLocalDayKey(safeDateNow())
+        return next === prev ? prev : next
+      })
+    }, 60000)
+    return () => clearInterval(timer)
+  }, [])
+
   const hasReadToday = useMemo(() => {
     if (!uid || !readingSessions) return false
-    const today = getLocalDayKey(Date.now())
     return readingSessions.some(
-      session => session.uid === uid && 
-      session.verified && 
-      (session.dayKey || getLocalDayKey(session.completedAt || session.createdAt)) === today
+      session => session.uid === uid &&
+      session.verified &&
+      (session.dayKey || getLocalDayKey(session.completedAt || session.createdAt)) === todayDayKey
     )
-  }, [readingSessions, uid])
+  }, [readingSessions, uid, todayDayKey])
 
   const [currentHM, setCurrentHM] = useState("")
   const [timeRemaining, setTimeRemaining] = useState("") // Countdown timer for 23:00 - 00:00
@@ -547,6 +560,10 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
                 photoURL
                   ? <img src={photoURL} alt="" onError={() => setAvatarBroken(true)} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
                   : userInitial
+              ) : authState?.loading ? (
+                // Auth still resolving — content renders immediately, only this
+                // corner shows a spinner instead of flashing "เข้าสู่ระบบ".
+                <i className="ti ti-loader-2 spin" style={{ fontSize: 16 }}></i>
               ) : (
                 <>
                   <i className="ti ti-login" style={{ fontSize: 16 }}></i>
@@ -569,11 +586,16 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
             )}
           </div>
           <button onClick={() => setTheme(theme === "light" ? "dark" : "light")} style={{
-            background: "var(--bg2)", border: "none", cursor: "pointer",
-            color: "var(--t3)", width: 34, height: 34, borderRadius: "50%",
+            background: "transparent", border: "none", cursor: "pointer",
+            color: "var(--t3)", width: 44, height: 44, margin: -5,
             display: "flex", alignItems: "center", justifyContent: "center"
           }} title="เปลี่ยนธีม" aria-label={theme === "light" ? "Switch to dark theme" : "Switch to light theme"}>
-            <i className={`ti ${theme === "light" ? "ti-moon" : "ti-sun"}`}></i>
+            <span style={{
+              background: "var(--bg2)", width: 34, height: 34, borderRadius: "50%",
+              display: "flex", alignItems: "center", justifyContent: "center"
+            }}>
+              <i className={`ti ${theme === "light" ? "ti-moon" : "ti-sun"}`}></i>
+            </span>
           </button>
         </div>
       </nav>
@@ -661,10 +683,18 @@ function mobileButtonStyle(page, id) {
   }
 }
 
+// 44×44 minimum hit area (WCAG 2.5.5) — the visible glyph stays 20px; the
+// negative margin keeps the layout footprint unchanged.
 const iconButtonStyle = {
   background: "transparent",
   border: "none",
   fontSize: 20,
   cursor: "pointer",
   color: "var(--text)",
+  minWidth: 44,
+  minHeight: 44,
+  display: "grid",
+  placeItems: "center",
+  padding: 0,
+  margin: -8,
 }

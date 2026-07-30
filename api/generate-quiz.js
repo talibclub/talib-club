@@ -221,6 +221,22 @@ The array must contain exactly 20 objects: 7 easy, 8 medium, and 5 hard.`,
   }
 }
 
+// Cost Hardening 3: per-user quota — the endpoint spends OpenAI/Anthropic
+// credit (max_tokens 5000), so cap how often one member can regenerate.
+const QUIZ_DAILY_QUOTA = Number(process.env.QUIZ_DAILY_QUOTA || 20)
+const quizBurst = new Map() // uid -> { count, resetAt }
+
+function quizRateLimited(uid) {
+  const now = Date.now()
+  const entry = quizBurst.get(uid)
+  if (!entry || entry.resetAt <= now) {
+    quizBurst.set(uid, { count: 1, resetAt: now + 24 * 60 * 60 * 1000 })
+    return false
+  }
+  entry.count += 1
+  return entry.count > QUIZ_DAILY_QUOTA
+}
+
 // verifyFirebaseIdToken removed in favor of firebase-admin
 export default async function handler(req, res) {
   const method = req.method || req.httpMethod
@@ -256,6 +272,11 @@ export default async function handler(req, res) {
   const uid = decodedToken.uid;
   if (!uid) {
     return send(res, 401, { error: "Unauthorized: Invalid authentication token" })
+  }
+
+  // Over quota → serve the free metadata-based quiz instead of failing the flow.
+  if (quizRateLimited(uid)) {
+    return send(res, 200, { source: "fallback", quiz: fallbackQuiz(book) })
   }
 
   try {

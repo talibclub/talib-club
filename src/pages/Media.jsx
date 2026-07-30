@@ -346,7 +346,11 @@ export default function Media({ go, ctx }) {
                   <div
                     key={item.id}
                     className="card"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={item.title}
                     style={{ padding: 0, overflow: "hidden", cursor: "pointer", display: "flex", flexDirection: "column" }}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click() } }}
                     onClick={() => go?.("media-detail", {
                       ...item,
                       playlist: ctx?.playlist || "",

@@ -1,6 +1,4 @@
-export const config = {
-  runtime: 'edge',
-};
+import { verifyIdToken } from './_firebase-admin.js';
 
 // Server-side proxy for web image search.
 //
@@ -12,15 +10,11 @@ export const config = {
 // photos). DDG stays as a best-effort fallback for local/dev use, and its
 // failure is never fatal — the client also queries keyless sources (Wikimedia,
 // Openverse) directly, so an empty proxy response just means "nothing extra".
+//
+// Auth-gated (node runtime): the endpoint burns paid/limited third-party quota
+// (Google CSE free tier is 100 queries/day), so only signed-in users may call it.
 
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': '*',
-};
-
-const json = (body, status = 200, extra = {}) =>
-  new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json', ...extra } });
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://talibclub.org';
 
 // Pixabay: reliable from a server, free key. `type` maps onto its own filters.
 async function searchPixabay(q, type, key) {
@@ -107,12 +101,25 @@ async function searchGoogle(q, type, key, cx) {
   })).filter((r) => r.thumbnail);
 }
 
-export default async function handler(req) {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  const json = (body, status = 200, extra = {}) => {
+    for (const [k, v] of Object.entries(extra)) res.setHeader(k, v);
+    return res.status(status).json(body);
+  };
 
-  const url = new URL(req.url);
-  const q = (url.searchParams.get('q') || '').trim();
-  const type = url.searchParams.get('type') || '';
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method !== 'GET') return json({ error: 'method_not_allowed', results: [] }, 405);
+
+  const authHeader = req.headers?.authorization || req.headers?.Authorization || '';
+  if (!authHeader.startsWith('Bearer ')) return json({ error: 'unauthorized', results: [] }, 401);
+  try { await verifyIdToken(authHeader.substring(7)); }
+  catch { return json({ error: 'unauthorized', results: [] }, 401); }
+
+  const q = String(req.query?.q || '').trim().slice(0, 200);
+  const type = String(req.query?.type || '');
   if (!q) return json({ error: 'missing_query', results: [] }, 400);
 
   const key = process.env.PIXABAY_KEY || process.env.PIXABAY_API_KEY;

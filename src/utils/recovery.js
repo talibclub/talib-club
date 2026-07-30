@@ -13,14 +13,17 @@
 
 const RECOVERY_FLAG = "talib_stale_bundle_recovery";
 
+// Keep this list narrow: it must only match errors that genuinely indicate a
+// chunk/bundle mismatch. Broad patterns like /is not a function/ or
+// /is not defined/ also match ordinary application bugs — matching those hides
+// the real error behind an "updating…" screen and the hard reload throws away
+// unsaved work (React unmount cleanup never runs on location.reload()).
 const STALE_PATTERNS = [
-  /before initialization/i,          // TDZ from a mismatched chunk
-  /is not defined/i,
-  /is not a function/i,
   /failed to fetch dynamically imported module/i,
   /error loading dynamically imported module/i,
-  /unexpected token/i,
   /import\(\) failed/i,
+  /failed to load module script/i,
+  /before initialization/i,          // TDZ from a mismatched chunk
 ];
 
 export function isStaleBundleError(error) {

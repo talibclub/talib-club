@@ -329,8 +329,12 @@ function ExportCardModal({ note, onClose, theme }) {
 
   const handlePrint = () => {
     const printContent = cardRef.current.innerHTML
-    
+
     const win = window.open("", "_blank")
+    if (!win) {
+      toast.error("เบราว์เซอร์บล็อกป๊อปอัป กรุณาอนุญาตป๊อปอัปสำหรับเว็บนี้แล้วลองใหม่")
+      return
+    }
     win.document.write(`
       <html>
         <head>
