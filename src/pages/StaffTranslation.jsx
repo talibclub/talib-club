@@ -381,8 +381,8 @@ export default function StaffTranslation({ go }) {
           {/* Header */}
           <div className="staff-section-head" style={{ marginBottom: "20px" }}>
             <div>
-              <button className="btn btn-outline" onClick={closeWorkspace}>
-                <i className="ti ti-arrow-left" /> กลับหน้าหลัก
+              <button className="btn btn-outline" onClick={closeWorkspace} aria-label="กลับหน้าหลัก">
+                <i className="ti ti-arrow-left" /> <span className="btn-label">กลับหน้าหลัก</span>
               </button>
               <h1 style={{ marginTop: "10px" }}>พื้นที่แปลภาษา</h1>
               <p style={{ marginTop: "4px" }}>บทความ: <a href={activeWorkspaceItem.url} target="_blank" rel="noreferrer" style={{ color: "var(--teal)" }}>{activeWorkspaceItem.title} <i className="ti ti-external-link" /></a></p>
@@ -400,15 +400,15 @@ export default function StaffTranslation({ go }) {
             </div>
             
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-              <button className="btn btn-outline" onClick={() => saveWorkspace(false)}>
-                <i className="ti ti-device-floppy" style={{ marginRight: "4px" }} /> บันทึกร่าง
+              <button className="btn btn-outline" onClick={() => saveWorkspace(false)} aria-label="บันทึกร่าง">
+                <i className="ti ti-device-floppy" style={{ marginRight: "4px" }} /> <span className="btn-label">บันทึกร่าง</span>
               </button>
-              <button className="btn btn-teal" onClick={() => saveWorkspace(true)} style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                <i className="ti ti-checkbox" /> บันทึกเสร็จสมบูรณ์
+              <button className="btn btn-teal" onClick={() => saveWorkspace(true)} style={{ display: "inline-flex", alignItems: "center", gap: "4px" }} aria-label="บันทึกเสร็จสมบูรณ์">
+                <i className="ti ti-checkbox" /> <span className="btn-label">บันทึกเสร็จสมบูรณ์</span>
               </button>
               {workspaceParagraphs.length > 0 && (
-                <button className="btn" style={{ background: "var(--acc)", color: "var(--bg)", display: "inline-flex", alignItems: "center", gap: "4px" }} onClick={() => window.print()}>
-                  <i className="ti ti-printer" /> พิมพ์ PDF (เทียบไทย-อังกฤษ)
+                <button className="btn" style={{ background: "var(--acc)", color: "var(--bg)", display: "inline-flex", alignItems: "center", gap: "4px" }} onClick={() => window.print()} aria-label="พิมพ์ PDF (เทียบไทย-อังกฤษ)">
+                  <i className="ti ti-printer" /> <span className="btn-label">พิมพ์ PDF (เทียบไทย-อังกฤษ)</span>
                 </button>
               )}
             </div>
@@ -511,9 +511,9 @@ export default function StaffTranslation({ go }) {
           <h1 style={{ marginTop: "10px" }}>ติดตามงานแปล</h1>
           <p style={{ marginTop: "4px" }}>กวาดรายการจาก abuiyaad.com รับงาน แปลด้วย AI และบันทึกความคืบหน้า</p>
         </div>
-        <button className="btn btn-teal" onClick={runScrape} disabled={scraping}>
+        <button className="btn btn-teal" onClick={runScrape} disabled={scraping} aria-label={scraping ? `กำลังกวาด... ${scrapeProgress}%` : "กวาดข้อมูลจากเว็บ"}>
           <i className={`ti ${scraping ? "ti-loader-2 spin" : "ti-refresh"}`} style={{ marginRight: "6px" }} />
-          {scraping ? `กำลังกวาด... ${scrapeProgress}%` : "กวาดข้อมูลจากเว็บ"}
+          <span className="btn-label">{scraping ? `กำลังกวาด... ${scrapeProgress}%` : "กวาดข้อมูลจากเว็บ"}</span>
         </button>
       </div>
 

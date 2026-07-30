@@ -243,6 +243,19 @@ button {
   align-items: center;
   justify-content: center;
   gap: 6px;
+  white-space: nowrap;
+}
+
+/* Buttons with an icon + a .btn-label span collapse to icon-only on mobile
+   instead of wrapping the label onto a second line. Pair with aria-label
+   on the <button> so the action stays announced once the text is hidden. */
+@media (max-width: 767px) {
+  .btn .btn-label {
+    display: none;
+  }
+  .btn:has(.btn-label) {
+    padding: 9px 14px;
+  }
 }
 
 .btn:hover {
