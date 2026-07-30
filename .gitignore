@@ -15,4 +15,15 @@ diff.txt
 scratch/
 
 .claude/
+.agents/
+.gemini/
+.impeccable/
+
+# scratch/debug scripts and backups — never commit these
+*.bak
+/test-*.js
+/test.html
+/patch.py
+/scripts/patch-*.cjs
+/scripts/patch-*.py
 
