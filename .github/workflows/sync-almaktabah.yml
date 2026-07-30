@@ -1,0 +1,21 @@
+name: Sync al-maktabah books
+
+on:
+  schedule:
+    # 20:00 UTC = 03:00 Asia/Bangkok
+    - cron: "0 20 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: node scripts/import-almaktabah.mjs
+        env:
+          NODE_ENV: production
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
