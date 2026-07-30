@@ -30,7 +30,7 @@ function getDownloadUrl(url) {
 }
 
 export default function Library({ go, authState, ctx }) {
-  const booksQueryOptions = useMemo(() => ({ live: false, limit: 200 }), [])
+  const booksQueryOptions = useMemo(() => ({ live: false, limit: 1000 }), [])
   const { items: books, loading, error, isUsingFallback } = useContentCollection("books", BOOKS, null, booksQueryOptions)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
 
