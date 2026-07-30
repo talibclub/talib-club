@@ -132,7 +132,7 @@ function generateHtml({ title, description, canonical, ogImage, ogType = 'websit
     ${bodyContent}
   </main>
   <script>
-    if (!navigator.userAgent.match(/bot|crawler|spider|crawling|facebookexternalhit|line-poker/i)) {
+    if (!navigator.userAgent.match(/Googlebot|bingbot|Baiduspider|YandexBot|facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|WhatsApp|LINE|Discordbot|TelegramBot/i)) {
       window.location.replace(${JSON.stringify(`${new URL(canonical).pathname}${new URL(canonical).search}`).replace(/</g, '\u003c')});
     }
   </script>
@@ -147,18 +147,28 @@ export default async function handler(req, res) {
     const pathInfo = req.headers['x-vercel-rewrite-path-info'];
     const requestUrl = pathInfo ? `${protocol}://${host}${pathInfo}` : `${protocol}://${host}${req.url}`;
     const url = new URL(requestUrl);
-    const path = url.pathname;
     const id = url.searchParams.get('id');
     const BASE_URL = 'https://talibclub.org';
-    const canonical = `${BASE_URL}${path}${id ? `?id=${id}` : ''}`;
+
+    // Match on the first path segment only (not a strict full-path
+    // equality) so a stale/cached URL variant still resolves to the
+    // right route instead of silently falling through to the generic
+    // placeholder below. Canonical is always rebuilt from the matched
+    // route name + id, never echoed from the raw request path, so every
+    // crawlable variant of a page declares the exact same canonical —
+    // this is what Search Console's "duplicate, Google chose a different
+    // canonical" report was catching.
+    const firstSegment = url.pathname.split('/').filter(Boolean)[0] || '';
+    const canonicalFor = (route, includeId = true) =>
+      `${BASE_URL}/${route}${includeId && id ? `?id=${id}` : ''}`;
 
     let html = '';
 
-    if (path === '/' || path === '') {
+    if (firstSegment === '') {
       html = generateHtml({
         title: 'Talib Club | แหล่งศึกษาอิสลามแนวทางสะลัฟ',
         description: 'คลังความรู้อิสลามวิชาการ สำหรับมุสลิมและผู้สนใจทุกท่าน รวมบทความ หนังสือ สื่อการเรียนรู้ และทำเนียบนักวิชาการ',
-        canonical,
+        canonical: canonicalFor(''),
         ogImage: `${BASE_URL}/logo.png`,
         jsonLd: {
           "@context": "https://schema.org",
@@ -171,7 +181,7 @@ export default async function handler(req, res) {
           <p>คลังความรู้อิสลามวิชาการ สำหรับมุสลิมและผู้สนใจทุกท่าน รวมบทความวิชาการ หนังสือ สื่อการเรียนรู้ และทำเนียบนักวิชาการ</p>
         `
       });
-    } else if (path === '/article' && id) {
+    } else if (firstSegment === 'article' && id) {
       const article = await getDoc('content_articles', id);
       if (article) {
         const plainBody = stripHtml(article.body || article.excerpt || '');
@@ -179,7 +189,7 @@ export default async function handler(req, res) {
         html = generateHtml({
           title: `${article.title} | Talib Club`,
           description: desc,
-          canonical,
+          canonical: canonicalFor('article'),
           ogImage: article.coverUrl || `${BASE_URL}/logo.png`,
           ogType: 'article',
           jsonLd: {
@@ -201,7 +211,7 @@ export default async function handler(req, res) {
           `
         });
       }
-    } else if (path === '/articles') {
+    } else if (firstSegment === 'articles') {
       const articles = await getLatestArticles();
       let listHtml = '<h1>บทความวิชาการอิสลาม</h1><ul>';
       articles.forEach(a => {
@@ -212,16 +222,16 @@ export default async function handler(req, res) {
       html = generateHtml({
         title: 'บทความวิชาการอิสลาม | Talib Club',
         description: 'รวมบทความวิชาการอิสลามแนวทางสะลัฟ ครอบคลุมอากีดะฮ์ ฟิกฮ์ ซีเราะฮ์ ฮะดีษ ตัฟซีร และสังคมศาสตร์อิสลาม',
-        canonical,
+        canonical: canonicalFor('articles', false),
         bodyContent: listHtml
       });
-    } else if (path === '/library-detail' && id) {
+    } else if (firstSegment === 'library-detail' && id) {
       const book = await getDoc('content_books', id);
       if (book) {
         html = generateHtml({
           title: `${book.title} | Talib Club`,
           description: book.description || `ดาวน์โหลดหนังสือ ${book.title}`,
-          canonical,
+          canonical: canonicalFor('library-detail'),
           ogImage: book.coverUrl || `${BASE_URL}/logo.png`,
           jsonLd: {
             "@context": "https://schema.org",
@@ -239,13 +249,13 @@ export default async function handler(req, res) {
           `
         });
       }
-    } else if (path === '/media-detail' && id) {
+    } else if (firstSegment === 'media-detail' && id) {
       const media = await getDoc('content_media', id);
       if (media) {
         html = generateHtml({
           title: `${media.title} | Talib Club`,
           description: media.description || media.series || `สื่อการเรียนรู้อิสลาม: ${media.title}`,
-          canonical,
+          canonical: canonicalFor('media-detail'),
           ogImage: media.thumbnailUrl || media.coverUrl || `${BASE_URL}/logo.png`,
           jsonLd: {
             "@context": "https://schema.org",
@@ -263,11 +273,39 @@ export default async function handler(req, res) {
           `
         });
       }
+    } else if (firstSegment === 'library') {
+      html = generateHtml({
+        title: 'ห้องสมุดและตำราอิสลาม | Talib Club',
+        description: 'หนังสือ วารสาร และสื่อดาวน์โหลดอิสลามวิชาการทั้งหมดของ Talib Club',
+        canonical: canonicalFor('library', false),
+        bodyContent: `<h1>ห้องสมุดและตำราอิสลาม</h1><p>หนังสือ วารสาร และสื่อดาวน์โหลดทั้งหมดของ Talib Club</p>`
+      });
+    } else if (firstSegment === 'media') {
+      html = generateHtml({
+        title: 'มีเดียและสื่อการเรียนรู้ | Talib Club',
+        description: 'คลิปวิดีโอ พอดแคสต์ และสื่อการเรียนรู้อิสลามแนวทางสะลัฟ',
+        canonical: canonicalFor('media', false),
+        bodyContent: `<h1>มีเดียและสื่อการเรียนรู้</h1><p>คลิปวิดีโอ พอดแคสต์ และสื่อการเรียนรู้อิสลามแนวทางสะลัฟ</p>`
+      });
+    } else if (firstSegment === 'scholars') {
+      html = generateHtml({
+        title: 'ทำเนียบนักวิชาการ | Talib Club',
+        description: 'ทำเนียบนักวิชาการอิสลามแนวทางสะลัฟตั้งแต่อดีตถึงปัจจุบัน',
+        canonical: canonicalFor('scholars', false),
+        bodyContent: `<h1>ทำเนียบนักวิชาการ</h1><p>ทำเนียบนักวิชาการอิสลามแนวทางสะลัฟตั้งแต่อดีตถึงปัจจุบัน</p>`
+      });
+    } else if (firstSegment === 'donate') {
+      html = generateHtml({
+        title: 'ร่วมบริจาค | Talib Club',
+        description: 'ร่วมสนับสนุนการเผยแพร่ความรู้อิสลามแนวทางสะลัฟกับ Talib Club',
+        canonical: canonicalFor('donate', false),
+        bodyContent: `<h1>ร่วมบริจาค</h1><p>ร่วมสนับสนุนการเผยแพร่ความรู้อิสลามแนวทางสะลัฟกับ Talib Club</p>`
+      });
     } else {
       html = generateHtml({
         title: 'Talib Club | แหล่งศึกษาอิสลามแนวทางสะลัฟ',
         description: 'คลังความรู้อิสลามวิชาการ สำหรับมุสลิมและผู้สนใจทุกท่าน',
-        canonical,
+        canonical: canonicalFor(firstSegment, false),
         bodyContent: `<h1>Talib Club</h1><p>กำลังพาคุณเข้าสู่เว็บไซต์...</p>`
       });
     }
@@ -276,7 +314,7 @@ export default async function handler(req, res) {
       html = generateHtml({
         title: 'ไม่พบเนื้อหา | Talib Club',
         description: 'เนื้อหาที่คุณค้นหาอาจถูกลบหรือไม่มีอยู่',
-        canonical,
+        canonical: canonicalFor(firstSegment),
         bodyContent: `<h1>ไม่พบเนื้อหา</h1><p>ขออภัย ไม่พบหน้าที่คุณต้องการ</p><a href="/">กลับหน้าแรก</a>`
       });
     }

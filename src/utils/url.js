@@ -1,27 +1,17 @@
 // src/utils/url.js
 
-export function slugifyUrlPart(str) {
-  if (!str) return 'general';
-  return String(str)
-    .trim()
-    .toLowerCase()
-    .replace(/[\s_]+/g, '-')
-    .replace(/[^\w\-]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
 export function getPagePath(id, data = null) {
   if (id === "home" || id === "") return "/";
   if (id === "tracking") return "/tracking-system";
-  
+
   let p = "/" + id;
   if (data) {
-    // If we have a category, add it to the path for these detail pages
-    if (["article", "library-detail", "media-detail"].includes(id) && data.category) {
-       p += "/" + slugifyUrlPart(data.category);
-    }
-
+    // Deliberately no category segment here: SEOHead, the sitemap, and
+    // api/seo-prerender.js all declare the canonical URL as the plain
+    // `/article?id=X` form (no category). Adding one here made every
+    // internally-linked detail page disagree with its own declared
+    // canonical, which Search Console reported as duplicate content with
+    // a mismatched canonical on ~84 pages.
     const qParams = new URLSearchParams()
     if (["article", "library-detail", "media-detail"].includes(id) && data.id) {
       qParams.set("id", String(data.id))

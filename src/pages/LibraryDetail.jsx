@@ -4,6 +4,7 @@ import { BOOKS } from "../data/index.js"
 import { useContentCollection, useContentDoc, saveContentItem } from "../lib/contentStore.js"
 import { bumpContentMetric } from "../utils/contentMetrics.js"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
+import SEOHead, { BASE_URL } from "../components/SEOHead.jsx"
 
 function getDirectUrl(url) {
   if (!url) return ""
@@ -44,12 +45,6 @@ export default function LibraryDetail({ item, go, authState }) {
     if (item?.title) return item
     return null
   }, [item, remoteBook])
-
-  useEffect(() => {
-    if (displayItem?.title) {
-      document.title = `${displayItem.title} | Talib Club`
-    }
-  }, [displayItem])
 
   // บันทึกประวัติการดูหนังสือ
   useEffect(() => {
@@ -115,7 +110,21 @@ export default function LibraryDetail({ item, go, authState }) {
 
   return (
     <div className="article-page" style={{ maxWidth: 800, margin: "0 auto", paddingBottom: 40, width: "100%" }}>
-      <button 
+      <SEOHead
+        title={`${displayItem.title} | Talib Club`}
+        description={displayItem.desc || `ดาวน์โหลดหนังสือ ${displayItem.title}`}
+        canonical={`${BASE_URL}/library-detail?id=${displayItem.id}`}
+        ogImage={displayItem.coverUrl || null}
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "Book",
+          "name": displayItem.title,
+          "author": { "@type": "Person", "name": displayItem.author || "Talib Club" },
+          "description": displayItem.desc,
+          "mainEntityOfPage": { "@type": "WebPage", "@id": `${BASE_URL}/library-detail?id=${displayItem.id}` }
+        }}
+      />
+      <button
         onClick={() => go("library")}
         className="sec-link" 
         style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 20, fontSize: 13, background: "none", border: "none", fontFamily: "'Prompt', sans-serif", cursor: "pointer" }}

@@ -15,6 +15,7 @@ scripts/peek-almaktabah-stats.mjs
 scripts/check-taxonomy-doc.mjs
 scripts/count-books.mjs
 scripts/toggle-almaktabah-visibility.mjs
+scripts/peek-article-fields.mjs
 
 # Temp Agent Files
 diff.txt
