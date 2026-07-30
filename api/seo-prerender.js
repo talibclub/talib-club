@@ -80,9 +80,9 @@ function stringifyJsonForHtml(value) {
     .replace(new RegExp(String.fromCharCode(0x2029), 'g'), '\u2029');
 }
 
-function generateHtml({ title, description, canonical, ogImage, ogType = 'website', jsonLd, bodyContent }) {
+function generateHtml({ title, description, canonical, ogImage, ogType = 'website', jsonLd, bodyContent, noIndex = false }) {
   const SITE_NAME = 'Talib Club';
-  
+
   return `<!DOCTYPE html>
 <html lang="th">
 <head>
@@ -91,7 +91,8 @@ function generateHtml({ title, description, canonical, ogImage, ogType = 'websit
   <title>${escapeHtml(title)}</title>
   <meta name="description" content="${escapeHtml(description)}">
   <link rel="canonical" href="${escapeHtml(canonical)}">
-  
+  ${noIndex ? '<meta name="robots" content="noindex, nofollow">' : ''}
+
   <meta property="og:title" content="${escapeHtml(title)}">
   <meta property="og:description" content="${escapeHtml(description)}">
   <meta property="og:url" content="${escapeHtml(canonical)}">
@@ -310,16 +311,27 @@ export default async function handler(req, res) {
       });
     }
 
+    let notFound = false;
     if (!html) {
+      notFound = true;
       html = generateHtml({
         title: 'ไม่พบเนื้อหา | Talib Club',
         description: 'เนื้อหาที่คุณค้นหาอาจถูกลบหรือไม่มีอยู่',
         canonical: canonicalFor(firstSegment),
+        noIndex: true,
         bodyContent: `<h1>ไม่พบเนื้อหา</h1><p>ขออภัย ไม่พบหน้าที่คุณต้องการ</p><a href="/">กลับหน้าแรก</a>`
       });
     }
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    // Never cache a soft-404 as if it were real content, and never let a
+    // 200 stand in for missing content (Search Console flagged an id that
+    // no longer exists in Firestore as a "failed redirect" — a real 404
+    // here is the correct, deliberate signal instead of a soft-404).
+    if (notFound) {
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(404).send(html);
+    }
     res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
     return res.status(200).send(html);
     
