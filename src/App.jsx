@@ -60,6 +60,14 @@ import { syncServerTime, safeDateNow } from "./utils/time.js"
 import { getMs, getLocalDayKey } from "./utils/streak.js"
 import { attemptStaleBundleRecovery } from "./utils/recovery.js"
 
+// <main> width policy: "wide"/"gallery" pages are dashboards or card-grids
+// that benefit from the extra horizontal space; everything else keeps the
+// narrower 1100px reading column (prose, single-item detail pages, forms).
+// Pages not listed here often have their own inline max-width already —
+// adding them would have no visible effect, so they're left alone.
+const WIDE_PAGES = new Set(["quran", "member", "admin", "tracking", "staff-work", "staff-translation"])
+const GALLERY_PAGES = new Set(["articles", "library", "media", "scholars", "openhouse", "openhouse-campus", "home", "staff"])
+
 const urlToPage = {
   "": "home",
   "articles": "articles",
@@ -284,7 +292,7 @@ export default function App() {
           <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.7 }} />
         </div>
       )}
-      <main className={`${page === "quran" || page === "member" ? "wide" : ["articles", "library", "media", "scholars"].includes(page) ? "gallery" : ""} fade-in-active`}>
+      <main className={`${WIDE_PAGES.has(page) ? "wide" : GALLERY_PAGES.has(page) ? "gallery" : ""} fade-in-active`}>
         <PageErrorBoundary resetKey={`${page}:${JSON.stringify(ctx || {})}`} go={go}>
           <Suspense fallback={<LoadingState />}>
             <Routes>
