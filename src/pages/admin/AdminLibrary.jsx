@@ -1,12 +1,95 @@
 import { useState, useEffect, useMemo } from "react"
+import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp } from "firebase/firestore"
 import { BOOKS, DEFAULT_TAXONOMY } from "../../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
 import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage"
-import { storage, app } from "../../lib/firebase.js"
+import { storage, app, db } from "../../lib/firebase.js"
 import { compressImage } from "../../utils/image.js"
 import ContentStatusBanner from "../../components/ContentStatusBanner.jsx"
 import { clampPage } from "../../utils/pagination.js"
+
+const ALMAKTABAH_SOURCE = "อัลมักตะบะฮ์ อัษรียะฮ์"
+
+function AlMaktabahSyncBanner() {
+  const [status, setStatus] = useState("loading") // loading | hidden | shown | mixed | none
+  const [total, setTotal] = useState(0)
+  const [busy, setBusy] = useState(false)
+
+  async function refresh() {
+    setStatus("loading")
+    const snap = await getDocs(query(collection(db, "content_books"), where("source", "==", ALMAKTABAH_SOURCE)))
+    if (snap.empty) {
+      setStatus("none")
+      setTotal(0)
+      return
+    }
+    const deletedCount = snap.docs.filter(d => d.data().deleted === true).length
+    setTotal(snap.size)
+    if (deletedCount === snap.size) setStatus("hidden")
+    else if (deletedCount === 0) setStatus("shown")
+    else setStatus("mixed")
+  }
+
+  useEffect(() => { refresh() }, [])
+
+  async function toggle() {
+    const willShow = status === "hidden" || status === "mixed"
+    const ok = await confirmAction({
+      title: willShow ? `แสดงหนังสือจาก ${ALMAKTABAH_SOURCE}?` : `ซ่อนหนังสือจาก ${ALMAKTABAH_SOURCE}?`,
+      message: willShow
+        ? `หนังสือ ${total} เล่มจะกลับมาแสดงบนเว็บไซต์ทันที`
+        : `หนังสือ ${total} เล่มจะถูกซ่อนจากเว็บไซต์ทันที (ข้อมูลยังอยู่ครบ กดแสดงกลับได้ตลอด)`,
+      confirmText: willShow ? "แสดง" : "ซ่อน",
+      danger: !willShow,
+    })
+    if (!ok) return
+
+    setBusy(true)
+    try {
+      const snap = await getDocs(query(collection(db, "content_books"), where("source", "==", ALMAKTABAH_SOURCE)))
+      const docs = snap.docs
+      for (let i = 0; i < docs.length; i += 400) {
+        const batch = writeBatch(db)
+        docs.slice(i, i + 400).forEach(d => {
+          batch.update(doc(db, "content_books", d.id), { deleted: !willShow, updatedAt: serverTimestamp() })
+        })
+        await batch.commit()
+      }
+      notifySuccess(willShow ? "แสดงหนังสือแล้ว" : "ซ่อนหนังสือแล้ว")
+      await refresh()
+    } catch (err) {
+      console.error(err)
+      notifyError("เกิดข้อผิดพลาด กรุณาตรวจสิทธิ์ Firestore")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (status === "loading" || status === "none") return null
+
+  const isVisible = status === "shown"
+  return (
+    <div className="card" style={{ padding: 16, borderRadius: 16, marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", border: `1.5px solid ${isVisible ? "var(--teal)" : "var(--br)"}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <i className="ti ti-books" style={{ fontSize: 20, color: isVisible ? "var(--teal)" : "var(--t3)" }}></i>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>
+            แหล่งข้อมูล {ALMAKTABAH_SOURCE} — {total} เล่ม
+            {status === "mixed" && <span style={{ color: "#bd7a13", fontWeight: 500 }}> (สถานะไม่ตรงกันบางส่วน)</span>}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--t2)" }}>
+            {isVisible ? "กำลังแสดงบนเว็บไซต์อยู่" : "กำลังซ่อนจากเว็บไซต์อยู่"}
+          </div>
+        </div>
+      </div>
+      <button className={`btn ${isVisible ? "btn-outline" : "btn-teal"}`} onClick={toggle} disabled={busy} style={{ padding: "8px 16px", fontSize: 13 }}>
+        <i className={busy ? "ti ti-loader-2 spin" : isVisible ? "ti ti-eye-off" : "ti ti-eye"} style={{ marginRight: 6 }}></i>
+        {busy ? "กำลังดำเนินการ..." : isVisible ? "ซ่อนทั้งหมด" : "แสดงทั้งหมด"}
+      </button>
+    </div>
+  )
+}
 
 const EMPTY = {
   title: "",
@@ -246,6 +329,8 @@ export default function AdminLibrary() {
           <i className="ti ti-plus" style={{ marginRight: 6 }}></i>เพิ่มใหม่
         </button>
       </div>
+
+      <AlMaktabahSyncBanner />
 
       {/* ━━━ SEARCH & FILTER BAR ━━━ */}
       <div style={{ display: "flex", gap: 8, marginBottom: showAdvanced ? 12 : 24 }}>

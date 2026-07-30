@@ -13,6 +13,8 @@ scripts/add-almaktabah-booth.mjs
 scripts/peek-almaktabah-books.mjs
 scripts/peek-almaktabah-stats.mjs
 scripts/check-taxonomy-doc.mjs
+scripts/count-books.mjs
+scripts/toggle-almaktabah-visibility.mjs
 
 # Temp Agent Files
 diff.txt
