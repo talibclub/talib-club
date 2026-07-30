@@ -158,7 +158,7 @@ export default function StaffTranslation({ go }) {
     setTranslating(true)
     try {
       const idToken = user ? await user.getIdToken() : ""
-      const res = await fetch("/api/abuiyaad-translate", {
+      const res = await fetch("/api/abuiyaad", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -215,7 +215,7 @@ export default function StaffTranslation({ go }) {
     setScrapeProgress(30)
     try {
       const idToken = user ? await user.getIdToken() : ""
-      const res = await fetch("/api/abuiyaad-scrape", {
+      const res = await fetch("/api/abuiyaad", {
         headers: { "authorization": `Bearer ${idToken}` }
       })
       const data = await res.json()
