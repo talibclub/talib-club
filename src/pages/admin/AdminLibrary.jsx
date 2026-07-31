@@ -108,7 +108,11 @@ export default function AdminLibrary() {
   const adminQueryOptions = useMemo(() => ({ live: false }), [])
   const { items, loading, error, saveItem, deleteItem, isUsingFallback } = useContentCollection("books", BOOKS, null, adminQueryOptions)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
-  
+  const bookTypes = useMemo(
+    () => (taxonomy.bookTypes || []).map(t => typeof t === "string" ? { id: t, label: t } : t),
+    [taxonomy.bookTypes]
+  )
+
   const [editing, setEdit] = useState(null)
   
   const [search, setSearch] = useState("")
@@ -201,7 +205,7 @@ export default function AdminLibrary() {
   }
 
   function openNew() {
-    const defaultType = taxonomy.bookTypes?.[0]?.id || "journal"
+    const defaultType = bookTypes[0]?.id || "journal"
     const defaultSource = taxonomy.bookSources?.[0] || "Talib Club"
     setEdit({ ...EMPTY, type: defaultType, source: defaultSource })
   }
@@ -372,7 +376,7 @@ export default function AdminLibrary() {
             <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>ประเภท</span>
             <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
               <option value="all">-- ทุกประเภท --</option>
-              {(taxonomy.bookTypes || []).map(type => (
+              {bookTypes.map(type => (
                 <option key={type.id} value={type.id}>{type.label}</option>
               ))}
             </select>
@@ -446,7 +450,7 @@ export default function AdminLibrary() {
               <span style={{ fontSize: 11, color: "var(--t2)" }}>เปลี่ยนประเภท</span>
               <select value={bulkType} onChange={e => setBulkType(e.target.value)} style={{ fontSize: 12, padding: "6px 10px", background: "var(--card)" }}>
                 <option value="">-- ไม่เปลี่ยน --</option>
-                {(taxonomy.bookTypes || []).map(type => <option key={type.id} value={type.id}>{type.label}</option>)}
+                {bookTypes.map(type => <option key={type.id} value={type.id}>{type.label}</option>)}
               </select>
             </label>
 
@@ -593,7 +597,7 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
         </Field>
         <Field label="ประเภท">
           <select value={item.type || ""} onChange={e => set("type", e.target.value)}>
-            {(taxonomy.bookTypes || []).map(type => <option key={type.id} value={type.id}>{type.label}</option>)}
+            {bookTypes.map(type => <option key={type.id} value={type.id}>{type.label}</option>)}
           </select>
         </Field>
         <Field label="หมวดหมู่ (ใช้ร่วมกับบทความ)">
