@@ -542,6 +542,7 @@ export default function AdminLibrary() {
 function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
   const set = (key, value) => setItem(prev => ({ ...prev, [key]: value }))
   const [uploadingImage, setUploadingImage] = useState(false)
+  const bookTypes = (taxonomy.bookTypes || []).map(t => typeof t === "string" ? { id: t, label: t } : t)
 
   const handleUploadImage = async (e) => {
     const file = e.target.files?.[0]
