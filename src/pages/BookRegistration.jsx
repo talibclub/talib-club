@@ -36,6 +36,7 @@ export default function BookRegistration({ go, ctx }) {
     window.scrollTo(0, 0)
     if (!campaignId) {
       setErrorMsg("ไม่พบข้อมูลแคมเปญ")
+      setStep(0)
       setLoading(false)
       return
     }
@@ -45,6 +46,7 @@ export default function BookRegistration({ go, ctx }) {
         const docSnap = await getDoc(doc(db, "book_campaigns", campaignId))
         if (!docSnap.exists()) {
           setErrorMsg("ไม่พบแคมเปญแจกหนังสือนี้")
+          setStep(0)
           return
         }
         const campData = docSnap.data()
@@ -82,6 +84,7 @@ export default function BookRegistration({ go, ctx }) {
       } catch (err) {
         console.error(err)
         setErrorMsg("เกิดข้อผิดพลาดในการโหลดข้อมูล")
+        setStep(0)
       } finally {
         setLoading(false)
       }

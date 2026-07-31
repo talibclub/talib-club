@@ -103,7 +103,7 @@ export default function AdminScholars() {
 
   function openNew() {
     const defaultEra = taxonomy.scholarEras?.[0]?.id || "salaf"
-    const defaultField = taxonomy.scholarFields?.[0] || "อากีดะฮ์"
+    const defaultField = (typeof taxonomy.scholarFields?.[0] === "string" ? taxonomy.scholarFields[0] : taxonomy.scholarFields?.[0]?.label) || "อากีดะฮ์"
     setEdit({ ...EMPTY, era: defaultEra, field: defaultField })
   }
 

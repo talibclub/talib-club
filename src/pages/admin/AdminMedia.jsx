@@ -47,7 +47,7 @@ export default function AdminMedia() {
   }, [search, typeFilter, playlistFilter, sortOrder])
 
   const existingPlaylists = Array.from(new Set([
-    ...(taxonomy.mediaPlaylists || []),
+    ...(taxonomy.mediaPlaylists || []).map(pl => typeof pl === "string" ? pl : pl.label),
     ...items.map(m => m.series).filter(Boolean)
   ])).sort()
 
@@ -439,7 +439,10 @@ function MediaForm({ item, setItem, onSave, onCancel, taxonomy, existingPlaylist
         <Field label="ชื่อรายการ/ตอน *" span><input value={item.title || ""} onChange={e => set("title", e.target.value)} placeholder="เช่น ปรัชญาอิสลาม Ep.1" /></Field>
         <Field label="ประเภท">
           <select value={item.type || "youtube"} onChange={e => set("type", e.target.value)}>
-            {(taxonomy.mediaTypes || []).map(type => <option key={type} value={type}>{type === "youtube" ? "YouTube" : "Spotify"}</option>)}
+            {(taxonomy.mediaTypes || []).map(type => {
+              const t = typeof type === "string" ? { id: type, label: type } : type
+              return <option key={t.id} value={t.id}>{t.label}</option>
+            })}
           </select>
         </Field>
         <Field label="จากช่อง"><input value={item.channel || ""} onChange={e => set("channel", e.target.value)} placeholder="เช่น Talib Club" /></Field>

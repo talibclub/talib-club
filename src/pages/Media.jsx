@@ -34,11 +34,11 @@ export default function Media({ go, ctx }) {
   const filters = [
     { id: "all", label: "ทั้งหมด", icon: "ti-layout-grid" },
     ...(taxonomy.mediaTypes || []).map(item => {
-      const lower = String(item).toLowerCase();
+      const id = String(item?.id ?? item).toLowerCase();
       return {
-        id: lower,
-        label: lower === "youtube" ? "YouTube" : lower === "spotify" ? "Spotify" : lower === "video" ? "คลิปสั้น" : item,
-        icon: lower === "youtube" ? "ti-brand-youtube" : lower === "spotify" ? "ti-brand-spotify" : lower === "video" ? "ti-video" : "ti-player-play",
+        id,
+        label: id === "youtube" ? "YouTube" : id === "spotify" ? "Spotify" : id === "video" ? "คลิปสั้น" : (item?.label ?? id),
+        icon: id === "youtube" ? "ti-brand-youtube" : id === "spotify" ? "ti-brand-spotify" : id === "video" ? "ti-video" : "ti-player-play",
       };
     }),
   ]
