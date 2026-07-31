@@ -33,6 +33,7 @@ svg {
 /* --- 2. COLOR THEMES --- */
 .app.dark,
 body.dark {
+  color-scheme: dark;
   --bg: #08090b;
   --bg2: #14161a;
   --bg3: #1d2026;
@@ -58,6 +59,7 @@ body.dark {
 
 .app.light,
 body.light {
+  color-scheme: light;
   --bg: #f7f5f1;
   --bg2: #edeae4;
   --bg3: #e2dfd8;
