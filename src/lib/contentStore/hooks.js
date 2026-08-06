@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { collection, doc, getDoc, getDocs, onSnapshot, serverTimestamp, setDoc, writeBatch, query, where, limit, orderBy, getCountFromServer, runTransaction, deleteDoc } from "firebase/firestore"
 import { db } from "../firebase.js"
 import { getOfflineItem } from "../offlineStore.js"
-import { CONTENT_COLLECTIONS, USER_SPECIFIC_COLLECTIONS, PUBLIC_COLLECTIONS, LOCAL_STORAGE_CACHE_PREFIX } from "./constants.js"
+import { CONTENT_COLLECTIONS, USER_SPECIFIC_COLLECTIONS, PUBLIC_COLLECTIONS, LOCAL_STORAGE_CACHE_PREFIX, CACHE_MAX_AGE_MS } from "./constants.js"
 import { cleanForFirestore, getMs, byNewest, mergeWithFallback, getQueryCacheKey, generateDocId } from "./utils.js"
 import { 
   collectionCache, countCache, inFlightRequests, setWithLimit,
@@ -10,6 +10,7 @@ import {
   fetchContentMetadata, updateCollectionMetadata, invalidateCollectionCountOnly,
   readCachedUserDocument, writeCachedUserDocument, invalidateUserDocumentCache
 } from "./cache.js"
+import { safeDateNow } from "../../utils/time.js"
 
 export function getItemCategoryKey(name, item) {
   if (!item) return null;
@@ -156,6 +157,9 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
             if (offlineEntry) {
               let isValid = true
               if (PUBLIC_COLLECTIONS.includes(collectionName)) {
+                if (safeDateNow() - (offlineEntry.at || 0) >= CACHE_MAX_AGE_MS) {
+                  isValid = false
+                }
                 try {
                   const serverMeta = await fetchContentMetadata()
                   const serverLastUpdate = serverMeta[collectionName] || 0
@@ -182,7 +186,11 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
         // Check metadata-based cache first
         if (!live && PUBLIC_COLLECTIONS.includes(collectionName)) {
           const localEntry = readLocalStorageCacheEntry(cacheKey)
-          if (localEntry) {
+          // The metadata timestamp is the only invalidation signal on this
+          // path, so a write that never bumped it would otherwise pin a
+          // visitor to a stale list indefinitely. CACHE_MAX_AGE_MS is the
+          // backstop for exactly that case.
+          if (localEntry && safeDateNow() - (localEntry.at || 0) < CACHE_MAX_AGE_MS) {
             const serverMeta = await fetchContentMetadata()
             const serverLastUpdate = serverMeta[collectionName] || 0
             if (serverLastUpdate > 0 && localEntry.at >= serverLastUpdate) {

@@ -51,7 +51,12 @@ export function invalidateUserDocumentCache(collectionName, docId) {
 export function readCachedCollection(key) {
   const entry = collectionCache.get(key)
   if (entry) {
-    if (Date.now() - entry.at < COLLECTION_CACHE_TTL_MS) {
+    // safeDateNow() on both sides of every comparison against a collection
+    // entry's `at`. These timestamps are compared with the server-clock
+    // timestamp in content_settings/metadata, so stamping them with the raw
+    // device clock let a machine set even a few hours fast declare its cache
+    // permanently newer than the server and stop refetching altogether.
+    if (safeDateNow() - entry.at < COLLECTION_CACHE_TTL_MS) {
       return entry.items
     }
     collectionCache.delete(key)
@@ -63,7 +68,7 @@ export function readCachedCollection(key) {
       const localData = localStorage.getItem(LOCAL_STORAGE_CACHE_PREFIX + key)
       if (localData) {
         const parsed = JSON.parse(localData)
-        if (Date.now() - parsed.at < PUBLIC_CACHE_TTL_MS) {
+        if (safeDateNow() - parsed.at < PUBLIC_CACHE_TTL_MS) {
           collectionCache.set(key, { items: parsed.items, at: parsed.at })
           return parsed.items
         }
@@ -77,7 +82,7 @@ export function readCachedCollection(key) {
 }
 
 export function writeCachedCollection(key, items) {
-  const now = Date.now()
+  const now = safeDateNow()
   setWithLimit(collectionCache, key, { items, at: now }, 50)
 
   try {

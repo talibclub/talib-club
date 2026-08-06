@@ -33,3 +33,11 @@ export const PUBLIC_COLLECTIONS = ["content_articles", "content_books", "content
 export const LOCAL_STORAGE_CACHE_PREFIX = "talib_cache_"
 export const USER_DOC_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 export const METADATA_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+// Ceiling on how long a cached public collection may be trusted on the strength
+// of content_settings/metadata alone. That timestamp is the only invalidation
+// signal on the metadata-validated path, so any write that reaches Firestore
+// without bumping it — the console, a batch script, a restore — used to leave
+// visitors on a stale list forever. One refetch a day caps the damage without
+// giving up the "only refetch when content actually changed" saving.
+export const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000 // 24 hours
