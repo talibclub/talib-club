@@ -15,6 +15,20 @@ export function truncate(text, maxLen = 160) {
   return clean.substring(0, maxLen - 3).trim() + '...'
 }
 
+// schema.org dates have to be ISO 8601 strings. `updatedAt` is written with
+// serverTimestamp() (a Firestore Timestamp) online and Date.now() (a number)
+// from the offline queue, neither of which survives JSON.stringify as a date.
+export function toIsoDate(value) {
+  if (!value) return undefined
+  try {
+    if (typeof value === 'object' && typeof value.toDate === 'function') return value.toDate().toISOString()
+    const parsed = new Date(typeof value === 'number' ? value : String(value))
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString()
+  } catch {
+    return undefined
+  }
+}
+
 function setMetaTag(attr, attrValue, content) {
   let el = document.querySelector(`meta[${attr}="${attrValue}"]`)
   if (!el) {

@@ -8,7 +8,10 @@ import { collection, getDocs, query, where, limit } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
 import { bumpContentMetric } from "../utils/contentMetrics.js"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
-import SEOHead, { stripHtml, truncate, BASE_URL } from '../components/SEOHead.jsx'
+import SEOHead, { stripHtml, truncate, toIsoDate, BASE_URL } from '../components/SEOHead.jsx'
+import { detailPath, detailUrl } from "../utils/slug.js"
+import { useCanonicalDetailUrl, useDetailId } from "../hooks/useDetailRoute.js"
+import { isPlainLeftClick } from "../utils/linkNavigation.js"
 
 const READER_DEFAULTS = { size: "md", tone: "3" }
 const READER_STORAGE_KEY = "talibReaderPrefs"
@@ -18,8 +21,7 @@ const READER_TONE_LABELS = { 1: "1", 2: "2", 3: "3", 4: "4", 5: "5" }
 
 export default function ArticleDetail({ item, go, authState }) {
   const uid = authState?.user?.uid;
-  const urlId = new URLSearchParams(window.location.search).get("id")
-  const articleId = urlId || item?.id
+  const articleId = useDetailId(item)
   const fallbackArticle = useMemo(
     () => (articleId ? ARTICLES.find(a => String(a.id) === String(articleId)) : null) ?? null,
     [articleId]
@@ -44,6 +46,8 @@ export default function ArticleDetail({ item, go, authState }) {
   }, [item, remoteArticle])
 
 
+
+  useCanonicalDetailUrl("article", articleId, displayItem?.title)
 
   const isSeries = displayItem?.type === "series" || displayItem?.type === "ซีรีส์";
 
@@ -522,23 +526,28 @@ export default function ArticleDetail({ item, go, authState }) {
         <SEOHead
           title={`${displayItem.title} | Talib Club`}
           description={truncate(stripHtml(displayItem.body || displayItem.excerpt || ''), 160)}
-          canonical={`${BASE_URL}/article?id=${displayItem.id}`}
+          canonical={detailUrl(BASE_URL, "article", displayItem.id, displayItem.title)}
           ogImage={displayItem.coverUrl || null}
           ogType="article"
           jsonLd={{
             "@context": "https://schema.org",
             "@type": "Article",
             "headline": displayItem.title,
+            "inLanguage": "th",
             "author": { "@type": "Person", "name": displayItem.author || "Talib Club" },
             "datePublished": displayItem.date || undefined,
+            "dateModified": toIsoDate(displayItem.updatedAt) || displayItem.date || undefined,
+            "articleSection": displayItem.category || undefined,
+            "keywords": displayItem.tags && displayItem.tags.length ? displayItem.tags.join(", ") : undefined,
             "image": displayItem.coverUrl || undefined,
             "publisher": {
               "@type": "Organization",
               "name": "Talib Club",
+              "url": BASE_URL,
               "logo": { "@type": "ImageObject", "url": `${BASE_URL}/logo.png` }
             },
             "description": truncate(stripHtml(displayItem.body || ''), 200),
-            "mainEntityOfPage": { "@type": "WebPage", "@id": `${BASE_URL}/article?id=${displayItem.id}` }
+            "mainEntityOfPage": { "@type": "WebPage", "@id": detailUrl(BASE_URL, "article", displayItem.id, displayItem.title) }
           }}
         />
       )}
@@ -734,13 +743,23 @@ export default function ArticleDetail({ item, go, authState }) {
           <div className="sec-hd" style={{ marginBottom: 14 }}><span className="sec-title">บทความที่เกี่ยวข้อง</span></div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {related.map(r => (
-              <div key={r.id} className="card" style={{ padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }} onClick={() => go("article", { ...r, fromFilters: displayItem?.fromFilters || item?.fromFilters })}>
+              <a
+                key={r.id}
+                className="card"
+                href={detailPath("article", r.id, r.title)}
+                style={{ padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", color: "inherit", textDecoration: "none" }}
+                onClick={(e) => {
+                  if (!isPlainLeftClick(e)) return
+                  e.preventDefault()
+                  go("article", { ...r, fromFilters: displayItem?.fromFilters || item?.fromFilters })
+                }}
+              >
                 <div>
                   <span className="tag tag-teal" style={{ marginRight: 8 }}>{r.category}</span>
                   <span style={{ fontSize: 13, color: "var(--text)", fontWeight: 400 }}>{r.title}</span>
                 </div>
                 <i className="ti ti-arrow-right" style={{ color: "var(--t3)", flexShrink: 0 }}></i>
-              </div>
+              </a>
             ))}
           </div>
         </div>

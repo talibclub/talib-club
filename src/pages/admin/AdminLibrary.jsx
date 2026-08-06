@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp } from "firebase/firestore"
 import { BOOKS, DEFAULT_TAXONOMY } from "../../data/index.js"
-import { useContentCollection, useTaxonomySettings } from "../../lib/contentStore.js"
+import { useContentCollection, useTaxonomySettings, updateCollectionMetadata, invalidateCollectionCache, CONTENT_COLLECTIONS } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
 import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage"
 import { storage, app, db } from "../../lib/firebase.js"
@@ -56,6 +56,14 @@ function AlMaktabahSyncBanner() {
         })
         await batch.commit()
       }
+      // Visitors read the book list from a localStorage/IndexedDB cache that is
+      // only invalidated by content_settings/metadata.content_books moving
+      // forward — there is no TTL on that path. Writing the batch straight to
+      // Firestore without bumping the timestamp left every returning visitor
+      // looking at the pre-hide list indefinitely, which is why the site kept
+      // showing all 442 books after they were hidden here.
+      await updateCollectionMetadata(CONTENT_COLLECTIONS.books)
+      invalidateCollectionCache(CONTENT_COLLECTIONS.books)
       notifySuccess(willShow ? "แสดงหนังสือแล้ว" : "ซ่อนหนังสือแล้ว")
       await refresh()
     } catch (err) {

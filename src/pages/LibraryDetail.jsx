@@ -5,6 +5,8 @@ import { useContentCollection, useContentDoc, saveContentItem } from "../lib/con
 import { bumpContentMetric } from "../utils/contentMetrics.js"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
 import SEOHead, { BASE_URL } from "../components/SEOHead.jsx"
+import { detailUrl } from "../utils/slug.js"
+import { useCanonicalDetailUrl, useDetailId } from "../hooks/useDetailRoute.js"
 
 function getDirectUrl(url) {
   if (!url) return ""
@@ -29,8 +31,7 @@ function getPreviewUrl(url) {
 
 export default function LibraryDetail({ item, go, authState }) {
   const uid = authState?.user?.uid;
-  const urlId = new URLSearchParams(window.location.search).get("id")
-  const bookId = urlId || item?.id
+  const bookId = useDetailId(item)
   const fallbackBook = useMemo(
     () => (bookId ? BOOKS.find(b => String(b.id) === String(bookId)) : null) ?? null,
     [bookId]
@@ -45,6 +46,8 @@ export default function LibraryDetail({ item, go, authState }) {
     if (item?.title) return item
     return null
   }, [item, remoteBook])
+
+  useCanonicalDetailUrl("library-detail", bookId, displayItem?.title)
 
   // บันทึกประวัติการดูหนังสือ
   useEffect(() => {
@@ -113,15 +116,16 @@ export default function LibraryDetail({ item, go, authState }) {
       <SEOHead
         title={`${displayItem.title} | Talib Club`}
         description={displayItem.desc || `ดาวน์โหลดหนังสือ ${displayItem.title}`}
-        canonical={`${BASE_URL}/library-detail?id=${displayItem.id}`}
+        canonical={detailUrl(BASE_URL, "library-detail", displayItem.id, displayItem.title)}
         ogImage={displayItem.coverUrl || null}
         jsonLd={{
           "@context": "https://schema.org",
           "@type": "Book",
           "name": displayItem.title,
+          "inLanguage": "th",
           "author": { "@type": "Person", "name": displayItem.author || "Talib Club" },
           "description": displayItem.desc,
-          "mainEntityOfPage": { "@type": "WebPage", "@id": `${BASE_URL}/library-detail?id=${displayItem.id}` }
+          "mainEntityOfPage": { "@type": "WebPage", "@id": detailUrl(BASE_URL, "library-detail", displayItem.id, displayItem.title) }
         }}
       />
       <button

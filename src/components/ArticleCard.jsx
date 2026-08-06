@@ -1,25 +1,33 @@
 import React from "react"
 import ImageWithFallback from "./ImageWithFallback.jsx"
+import { detailPath } from "../utils/slug.js"
+import { isPlainLeftClick } from "../utils/linkNavigation.js"
 
+// A real <a href>, not a clickable <div>: this grid is the main crawl path into
+// the articles, and a div carries no link for Googlebot to follow. It also
+// restores middle-click / ctrl-click "open in new tab" and keyboard activation
+// for free, which the div had to fake with role/tabIndex/onKeyDown.
 export default function ArticleCard({ article: a, onClick, coverHeight = 160 }) {
   return (
-    <div
+    <a
       className="card"
-      role="button"
-      tabIndex={0}
+      href={detailPath("article", a.id, a.title)}
       aria-label={a.title}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(a) }
-      }}
       style={{
         cursor: "pointer",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
-        height: "100%"
+        height: "100%",
+        color: "inherit",
+        textDecoration: "none"
       }}
-      onClick={() => onClick(a)}
+      onClick={(e) => {
+        if (!isPlainLeftClick(e)) return
+        e.preventDefault()
+        onClick(a)
+      }}
     >
       {a.coverUrl ? (
         <div style={{ width: "100%", height: coverHeight, overflow: "hidden", borderBottom: ".5px solid var(--br2)" }}>
@@ -56,6 +64,6 @@ export default function ArticleCard({ article: a, onClick, coverHeight = 160 }) 
           </div>
         </div>
       </div>
-    </div>
+    </a>
   )
 }

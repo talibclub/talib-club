@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef } from "react"
 import { useContentCollection, useContentDoc, saveContentItem } from "../lib/contentStore.js"
 import { MEDIA } from "../data/index.js"
-import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
+import SEOHead, { toIsoDate, BASE_URL } from '../components/SEOHead.jsx'
+import { detailUrl } from "../utils/slug.js"
+import { useCanonicalDetailUrl, useDetailId } from "../hooks/useDetailRoute.js"
 
 export default function MediaDetail({ item: initialItem, go, authState }) {
   const uid = authState?.user?.uid;
-  const urlId = new URLSearchParams(window.location.search).get("id")
-  const mediaId = urlId || initialItem?.id
+  const mediaId = useDetailId(initialItem)
   const fallbackMedia = useMemo(
     () => (mediaId ? MEDIA.find(m => String(m.id) === String(mediaId)) : null) ?? null,
     [mediaId]
@@ -63,6 +64,8 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
     }
   }, [item, authState?.user?.uid])
 
+  useCanonicalDetailUrl("media-detail", mediaId, item?.title)
+
   if (loading) return <div style={{ textAlign: "center", padding: 40 }}><i className="ti ti-loader-2 spin" style={{ fontSize: 24, color: "var(--teal)" }}></i></div>
   if (!item) return null
 
@@ -72,9 +75,26 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
         <SEOHead
           title={`${item.title} | Talib Club`}
           description={item.description || item.series || `สื่อการเรียนรู้อิสลาม: ${item.title}`}
-          canonical={`${BASE_URL}/media-detail?id=${item.id}`}
+          canonical={detailUrl(BASE_URL, "media-detail", item.id, item.title)}
           ogType="article"
           ogImage={item.thumbnailUrl || item.coverUrl}
+          jsonLd={{
+            "@context": "https://schema.org",
+            "@type": "VideoObject",
+            "name": item.title,
+            "inLanguage": "th",
+            "description": item.description || item.series || `สื่อการเรียนรู้อิสลาม: ${item.title}`,
+            "thumbnailUrl": item.thumbnailUrl || item.coverUrl || undefined,
+            "uploadDate": toIsoDate(item.date || item.createdAt) || undefined,
+            "embedUrl": item.embedId ? `https://www.youtube.com/embed/${item.embedId}` : undefined,
+            "publisher": {
+              "@type": "Organization",
+              "name": "Talib Club",
+              "url": BASE_URL,
+              "logo": { "@type": "ImageObject", "url": `${BASE_URL}/logo.png` }
+            },
+            "mainEntityOfPage": { "@type": "WebPage", "@id": detailUrl(BASE_URL, "media-detail", item.id, item.title) }
+          }}
         />
       )}
       {/* ปุ่มย้อนกลับ */}

@@ -226,6 +226,18 @@ async function main() {
   }
 
   await commitInChunks(ops);
+
+  // Visitors read the book list from a localStorage/IndexedDB cache whose only
+  // invalidation signal is this timestamp — there is no TTL on that path, so
+  // without the bump an import stays invisible to returning visitors.
+  if (ops.length > 0) {
+    await destDb.doc("content_settings/metadata").set(
+      { content_books: Date.now(), updatedAt: FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+    console.log("Bumped content_settings/metadata.content_books so client caches refetch.");
+  }
+
   console.log(`\nDone. Imported ${toCreate.length}, hid ${toHide.length}.`);
 }
 

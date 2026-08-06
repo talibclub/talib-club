@@ -293,6 +293,10 @@ export default function Library({ go, authState, ctx }) {
             }
 
             return (
+              // Stays a clickable <div>: the card body already contains the
+              // download / read-online <a> tags, and an anchor cannot legally
+              // nest another anchor. Crawlers reach these books through
+              // api/seo-prerender.js, which lists them as real links.
               <div
                 key={b.id}
                 className="card"

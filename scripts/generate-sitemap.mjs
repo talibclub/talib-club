@@ -1,23 +1,40 @@
 import fs from 'fs';
 import path from 'path';
+import { detailUrl } from '../src/utils/slug.js';
 
 const BASE_URL = 'https://talibclub.org';
 const PROJECT_ID = 'talib-club-web';
 
+// Paginated on purpose. A single pageSize=300 request silently truncated
+// content_books at 300 of its 498 documents, and because the hidden
+// al-maktabah imports sort first, only 4 of the 56 visible books survived into
+// the sitemap. Any collection that outgrows one page hits the same wall.
 async function fetchDocuments(collectionName) {
+  const documents = [];
+  let pageToken = '';
+
   try {
-    const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collectionName}?pageSize=300`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      console.warn(`[Sitemap] Warning: Failed to fetch ${collectionName} (${res.status} ${res.statusText})`);
-      return [];
+    for (let page = 0; page < 20; page++) {
+      const params = new URLSearchParams({ pageSize: '300' });
+      if (pageToken) params.set('pageToken', pageToken);
+      const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collectionName}?${params}`;
+
+      const res = await fetch(url);
+      if (!res.ok) {
+        console.warn(`[Sitemap] Warning: Failed to fetch ${collectionName} (${res.status} ${res.statusText})`);
+        break;
+      }
+      const data = await res.json();
+      documents.push(...(data.documents || []));
+
+      pageToken = data.nextPageToken || '';
+      if (!pageToken) break;
     }
-    const data = await res.json();
-    return data.documents || [];
   } catch (err) {
     console.error(`[Sitemap] Error fetching ${collectionName}:`, err.message);
-    return [];
   }
+
+  return documents;
 }
 
 function getField(doc, fieldName, type = 'stringValue') {
@@ -36,6 +53,10 @@ function getDocId(doc) {
   const idVal = getField(doc, 'id', 'stringValue');
   if (idVal) return idVal;
   return doc.name.split('/').pop();
+}
+
+function getTitle(doc) {
+  return getField(doc, 'title', 'stringValue') || '';
 }
 
 function getFormattedDate(doc) {
@@ -76,41 +97,28 @@ async function generate() {
     fetchDocuments('content_media')
   ]);
 
-  // 3. Process Articles
-  articles.forEach(doc => {
-    if (isDeleted(doc)) return;
-    const id = getDocId(doc);
-    urls.push({
-      loc: `${BASE_URL}/article?id=${id}`,
-      lastmod: getFormattedDate(doc),
-      changefreq: 'weekly',
-      priority: '0.7'
-    });
-  });
+  // 3-5. Process detail pages. The URL is built with the same helper the app
+  // and api/seo-prerender.js use, so the sitemap entry, the <link rel=canonical>
+  // on the page and the prerenderer's 301 target are always the same string —
+  // a mismatch between them is what Search Console reports as "duplicate,
+  // Google chose a different canonical".
+  const collections = [
+    { route: 'article', docs: articles },
+    { route: 'library-detail', docs: books },
+    { route: 'media-detail', docs: media }
+  ];
 
-  // 4. Process Books
-  books.forEach(doc => {
-    if (isDeleted(doc)) return;
-    const id = getDocId(doc);
-    urls.push({
-      loc: `${BASE_URL}/library-detail?id=${id}`,
-      lastmod: getFormattedDate(doc),
-      changefreq: 'weekly',
-      priority: '0.7'
+  for (const { route, docs } of collections) {
+    docs.forEach(doc => {
+      if (isDeleted(doc)) return;
+      urls.push({
+        loc: detailUrl(BASE_URL, route, getDocId(doc), getTitle(doc)),
+        lastmod: getFormattedDate(doc),
+        changefreq: 'weekly',
+        priority: '0.7'
+      });
     });
-  });
-
-  // 5. Process Media
-  media.forEach(doc => {
-    if (isDeleted(doc)) return;
-    const id = getDocId(doc);
-    urls.push({
-      loc: `${BASE_URL}/media-detail?id=${id}`,
-      lastmod: getFormattedDate(doc),
-      changefreq: 'weekly',
-      priority: '0.7'
-    });
-  });
+  }
 
   // 6. Generate XML
   let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';

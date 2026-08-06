@@ -101,9 +101,13 @@ export default function App() {
   const location = useLocation()
   const [searchParams] = useSearchParams()
 
+  // Only the first segment names the page: detail routes carry an id and a
+  // title slug after it (`/article/aqeedah-100/<slug>`), and matching on the
+  // full path made those pages fall back to "home" — which silently changed
+  // the <main> width class and the highlighted nav item.
   const page = useMemo(() => {
-    const path = location.pathname.replace(/^\//, "")
-    return urlToPage[path] || "home"
+    const firstSegment = location.pathname.split("/").filter(Boolean)[0] || ""
+    return urlToPage[firstSegment] || "home"
   }, [location.pathname])
 
   const ctx = useMemo(() => {
@@ -299,21 +303,30 @@ export default function App() {
               <Route path="/" element={<Home go={go} />} />
               <Route path="/articles" element={<Articles go={go} authState={authState} ctx={ctx} />} />
               <Route path="/article" element={<ArticleDetail item={ctx} go={go} authState={authState} />} />
-              <Route path="/article/:category" element={<ArticleDetail item={ctx} go={go} authState={authState} />} />
+              {/* `/article/:idOrCategory` covers both the current slug URLs and the
+                  older `/article/<category>?id=X` shape that is still indexed. */}
+              <Route path="/article/:idOrCategory" element={<ArticleDetail item={ctx} go={go} authState={authState} />} />
+              <Route path="/article/:idOrCategory/:slug" element={<ArticleDetail item={ctx} go={go} authState={authState} />} />
               <Route path="/library" element={<Library go={go} authState={authState} ctx={ctx} />} />
               <Route path="/library-detail" element={
                 <RequireLogin authState={authState}>
                   <LibraryDetail item={ctx} go={go} authState={authState} />
                 </RequireLogin>
               } />
-              <Route path="/library-detail/:category" element={
+              <Route path="/library-detail/:idOrCategory" element={
+                <RequireLogin authState={authState}>
+                  <LibraryDetail item={ctx} go={go} authState={authState} />
+                </RequireLogin>
+              } />
+              <Route path="/library-detail/:idOrCategory/:slug" element={
                 <RequireLogin authState={authState}>
                   <LibraryDetail item={ctx} go={go} authState={authState} />
                 </RequireLogin>
               } />
               <Route path="/media" element={<Media go={go} ctx={ctx} />} />
               <Route path="/media-detail" element={<MediaDetail item={ctx} go={go} authState={authState} />} />
-              <Route path="/media-detail/:category" element={<MediaDetail item={ctx} go={go} authState={authState} />} />
+              <Route path="/media-detail/:idOrCategory" element={<MediaDetail item={ctx} go={go} authState={authState} />} />
+              <Route path="/media-detail/:idOrCategory/:slug" element={<MediaDetail item={ctx} go={go} authState={authState} />} />
               <Route path="/scholars" element={<Scholars />} />
               <Route path="/quran" element={
                 <RequireLogin authState={authState}>

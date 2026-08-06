@@ -6,6 +6,8 @@ import PaginationBar from "../components/PaginationBar.jsx"
 import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
+import { detailPath } from "../utils/slug.js"
+import { isPlainLeftClick } from "../utils/linkNavigation.js"
 
 export default function Media({ go, ctx }) {
   const mediaQueryOptions = useMemo(() => ({ live: false, limit: 200 }), [])
@@ -343,21 +345,23 @@ export default function Media({ go, ctx }) {
                 const thumbUrl = item.coverUrl || (item.type === "youtube" && item.embedId ? `https://img.youtube.com/vi/${item.embedId}/hqdefault.jpg` : null)
 
                 return (
-                  <div
+                  <a
                     key={item.id}
                     className="card"
-                    role="button"
-                    tabIndex={0}
+                    href={detailPath("media-detail", item.id, item.title)}
                     aria-label={item.title}
-                    style={{ padding: 0, overflow: "hidden", cursor: "pointer", display: "flex", flexDirection: "column" }}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click() } }}
-                    onClick={() => go?.("media-detail", {
-                      ...item,
-                      playlist: ctx?.playlist || "",
-                      teacher: ctx?.teacher || "",
-                      filter: ctx?.filter,
-                      page: currentPage,
-                    })}
+                    style={{ padding: 0, overflow: "hidden", cursor: "pointer", display: "flex", flexDirection: "column", color: "inherit", textDecoration: "none" }}
+                    onClick={(e) => {
+                      if (!isPlainLeftClick(e)) return
+                      e.preventDefault()
+                      go?.("media-detail", {
+                        ...item,
+                        playlist: ctx?.playlist || "",
+                        teacher: ctx?.teacher || "",
+                        filter: ctx?.filter,
+                        page: currentPage,
+                      })
+                    }}
                   >
                     <div style={{ height: 150, background: "var(--acc2)", position: "relative" }}>
                       {thumbUrl ? (
@@ -379,7 +383,7 @@ export default function Media({ go, ctx }) {
                       </div>
                       <div style={{ fontSize: 11, color: "var(--t3)" }}>{item.channel}</div>
                     </div>
-                  </div>
+                  </a>
                 )
               })}
             </div>
