@@ -54,6 +54,10 @@ const nodeGlobals = {
   console: "readonly",
   fetch: "readonly",
   URL: "readonly",
+  URLSearchParams: "readonly",
+  Request: "readonly",
+  Response: "readonly",
+  Headers: "readonly",
   setTimeout: "readonly",
   clearTimeout: "readonly",
   AbortController: "readonly",
@@ -100,7 +104,7 @@ export default [
     },
   },
   {
-    files: ["api/**/*.js", "scripts/**/*.js", "scripts/**/*.mjs", "*.config.js"],
+    files: ["api/**/*.js", "scripts/**/*.js", "scripts/**/*.mjs", "*.config.js", "middleware.js"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",

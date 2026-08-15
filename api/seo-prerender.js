@@ -756,6 +756,16 @@ export default async function handler(req, res) {
       url.search = req.url.slice(req.url.indexOf('?'));
     }
 
+    // `/` is the one route that reaches this function through middleware.js
+    // rather than a vercel.json rewrite, because the filesystem answers `/`
+    // before rewrites are consulted. A middleware rewrite does not carry the
+    // x-vercel-rewrite-path-info header, so the request arrives addressed to
+    // this function's own path — and the middleware matches nothing but `/`,
+    // so that is unambiguously the page being asked for. Rewriting the pathname
+    // (not just the route) also keeps the canonical check below from reading
+    // `/api/seo-prerender` as a non-canonical spelling and 301ing on itself.
+    if (url.pathname === '/api/seo-prerender') url.pathname = '/';
+
     const segments = url.pathname.split('/').filter(Boolean).map(decodePath);
     const route = segments[0] || '';
 
