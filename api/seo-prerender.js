@@ -1,4 +1,5 @@
 import { detailPath } from '../src/utils/slug.js';
+import { isoDuration, mediaSummary, mediaThumbnail } from '../src/utils/mediaSeo.js';
 
 const BASE_URL = 'https://talibclub.org';
 const SITE_NAME = 'Talib Club';
@@ -38,6 +39,44 @@ async function getDoc(collection, id) {
   const res = await fetch(`${FIRESTORE_ROOT}/${collection}/${encodeURIComponent(id)}`);
   if (!res.ok) return null;
   return parseFirestoreDoc(await res.json());
+}
+
+// The ids in `/article?id=308` and `/library-detail?id=17` are the numbering of
+// the pre-migration site. Google still has those URLs indexed and they answered
+// 404, which throws away every signal they had earned even though the article
+// itself is still on the site under a new id. Each migrated document kept its
+// former number in `old_id`, so the miss is recoverable: the caller renders the
+// document it points at, and the handler's canonical check turns that into a
+// 301 to the live URL.
+//
+// Only reached when a direct document read has already failed, so the extra
+// query never touches the path a normal crawl takes.
+async function findByOldId(collection, oldId) {
+  const value = /^\d+$/.test(oldId) ? [{ stringValue: oldId }, { integerValue: oldId }] : [{ stringValue: oldId }];
+
+  for (const candidate of value) {
+    const res = await fetch(`${FIRESTORE_ROOT}:runQuery`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: collection }],
+          where: { fieldFilter: { field: { fieldPath: 'old_id' }, op: 'EQUAL', value: candidate } },
+          limit: 1,
+        },
+      }),
+    });
+    if (!res.ok) continue;
+    const rows = await res.json();
+    const doc = Array.isArray(rows) ? rows.map(row => row.document).find(Boolean) : null;
+    if (doc) return parseFirestoreDoc(doc);
+  }
+
+  return null;
+}
+
+async function getDocOrPredecessor(collection, id) {
+  return (await getDoc(collection, id)) || (await findByOldId(collection, id));
 }
 
 // Only the fields a listing actually prints are requested. Pulling whole
@@ -293,7 +332,10 @@ function generateHtml({ title, description, canonical, ogImage, ogType = 'websit
     ${bodyContent}
   </main>
   <script>
-    if (!navigator.userAgent.match(/Googlebot|bingbot|Baiduspider|YandexBot|facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|WhatsApp|LINE|Discordbot|TelegramBot/i)) {
+    // Keep this list byte-identical to the two user-agent conditions in
+    // vercel.json. A crawler that the rewrite lets in but this regex does not
+    // recognise gets bounced to the SPA and never reads the page it was served.
+    if (!navigator.userAgent.match(/Googlebot|Google-InspectionTool|GoogleOther|AdsBot-Google|Storebot-Google|bingbot|Baiduspider|YandexBot|Applebot|DuckDuckBot|PetalBot|facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|WhatsApp|LINE|Discordbot|TelegramBot/i)) {
       window.location.replace(${stringifyJsonForHtml(spaTarget)});
     }
   </script>
@@ -478,7 +520,7 @@ function renderDonate() {
 }
 
 async function renderArticle(id) {
-  const article = await getDoc('content_articles', id);
+  const article = await getDocOrPredecessor('content_articles', id);
   if (!article || article.deleted) return null;
 
   const path = detailPath('article', article.id, article.title);
@@ -542,7 +584,7 @@ async function renderArticle(id) {
 }
 
 async function renderBook(id) {
-  const book = await getDoc('content_books', id);
+  const book = await getDocOrPredecessor('content_books', id);
   if (!book || book.deleted) return null;
 
   const path = detailPath('library-detail', book.id, book.title);
@@ -586,32 +628,53 @@ async function renderBook(id) {
   };
 }
 
+// Everything unique a media record holds goes on the page, plus the rest of
+// the series as real links — the old three-line version was thin enough that
+// Search Console dropped these as "crawled - currently not indexed".
 async function renderMediaItem(id) {
-  const media = await getDoc('content_media', id);
+  const media = await getDocOrPredecessor('content_media', id);
   if (!media || media.deleted) return null;
 
   const path = detailPath('media-detail', media.id, media.title);
   const canonical = `${BASE_URL}${path}`;
-  const description = media.description || media.series || `สื่อการเรียนรู้อิสลาม: ${media.title}`;
+  const summary = mediaSummary(media);
+  const thumbnail = mediaThumbnail(media);
+  const watchUrl = media.embedId ? `https://www.youtube.com/watch?v=${encodeURIComponent(media.embedId)}` : null;
+  const spotifyUrl = safeUrl(media.spotifyUrl);
+
+  const sameSeries = media.series
+    ? (await listDocs('content_media', ['title', 'series', 'channel', 'date', 'duration']))
+        .filter(m => m.id !== media.id && m.series === media.series)
+        .sort(byNewestFirst)
+        .slice(0, 10)
+        .map(m => ({
+          path: detailPath('media-detail', m.id, m.title),
+          name: m.title,
+          meta: [m.date, m.duration].filter(Boolean).join(' · '),
+        }))
+    : [];
 
   return {
     canonical,
     html: generateHtml({
       title: `${media.title} | Talib Club`,
-      description: truncate(stripHtml(description), 160),
+      description: truncate(summary, 160),
       canonical,
-      ogImage: media.thumbnailUrl || media.coverUrl || `${BASE_URL}/logo.png`,
-      ogType: 'article',
+      ogImage: thumbnail || `${BASE_URL}/logo.png`,
+      ogType: 'video.other',
       jsonLd: [
         {
           '@context': 'https://schema.org',
           '@type': 'VideoObject',
           name: media.title,
           inLanguage: 'th',
-          description: stripHtml(description) || media.title,
-          thumbnailUrl: media.thumbnailUrl || media.coverUrl || undefined,
+          description: summary,
+          thumbnailUrl: thumbnail || undefined,
           uploadDate: media.date || media.updateTime || undefined,
+          duration: isoDuration(media.duration),
           embedUrl: media.embedId ? `https://www.youtube.com/embed/${media.embedId}` : undefined,
+          contentUrl: watchUrl || spotifyUrl || undefined,
+          isPartOf: media.series ? { '@type': 'CreativeWorkSeries', name: media.series } : undefined,
           publisher: {
             '@type': 'Organization',
             name: SITE_NAME,
@@ -629,10 +692,18 @@ async function renderMediaItem(id) {
       bodyContent: `
       <article>
         <h1>${escapeHtml(media.title)}</h1>
-        <p><strong>ช่อง:</strong> ${escapeHtml(media.channel || '-')}${media.series ? ` | <strong>ซีรีส์:</strong> ${escapeHtml(media.series)}` : ''}</p>
-        ${(media.thumbnailUrl || media.coverUrl) ? `<img src="${escapeHtml(media.thumbnailUrl || media.coverUrl)}" alt="${escapeHtml(media.title)}">` : ''}
-        ${articleBodyHtml(description)}
+        ${thumbnail ? `<img src="${escapeHtml(thumbnail)}" alt="${escapeHtml(media.title)}">` : ''}
+        <p>${escapeHtml(summary)}</p>
+        <ul>
+          ${media.series ? `<li><strong>ซีรีส์:</strong> ${escapeHtml(media.series)}</li>` : ''}
+          ${media.channel ? `<li><strong>ช่อง:</strong> ${escapeHtml(media.channel)}</li>` : ''}
+          ${media.duration ? `<li><strong>ความยาว:</strong> ${escapeHtml(media.duration)} นาที</li>` : ''}
+          ${media.date ? `<li><strong>วันที่เผยแพร่:</strong> <time datetime="${escapeHtml(media.date)}">${escapeHtml(media.date)}</time></li>` : ''}
+        </ul>
+        ${watchUrl ? `<p><a href="${escapeHtml(watchUrl)}" rel="noopener">รับชมวิดีโอ "${escapeHtml(media.title)}" บน YouTube</a></p>` : ''}
+        ${spotifyUrl ? `<p><a href="${escapeHtml(spotifyUrl)}" rel="noopener">ฟังตอนนี้บน Spotify</a></p>` : ''}
       </article>
+      ${sameSeries.length ? `<h2>ตอนอื่นในซีรีส์ ${escapeHtml(media.series)}</h2>${linkList(sameSeries)}` : ''}
     `,
     }),
   };

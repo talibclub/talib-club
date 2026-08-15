@@ -3,6 +3,7 @@ import { useContentCollection, useContentDoc, saveContentItem } from "../lib/con
 import { MEDIA } from "../data/index.js"
 import SEOHead, { toIsoDate, BASE_URL } from '../components/SEOHead.jsx'
 import { detailUrl } from "../utils/slug.js"
+import { isoDuration, mediaSummary, mediaThumbnail } from "../utils/mediaSeo.js"
 import { useCanonicalDetailUrl, useDetailId } from "../hooks/useDetailRoute.js"
 
 export default function MediaDetail({ item: initialItem, go, authState }) {
@@ -74,18 +75,20 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
       {item && (
         <SEOHead
           title={`${item.title} | Talib Club`}
-          description={item.description || item.series || `สื่อการเรียนรู้อิสลาม: ${item.title}`}
+          description={mediaSummary(item)}
           canonical={detailUrl(BASE_URL, "media-detail", item.id, item.title)}
-          ogType="article"
-          ogImage={item.thumbnailUrl || item.coverUrl}
+          ogType="video.other"
+          ogImage={mediaThumbnail(item)}
           jsonLd={{
             "@context": "https://schema.org",
             "@type": "VideoObject",
             "name": item.title,
             "inLanguage": "th",
-            "description": item.description || item.series || `สื่อการเรียนรู้อิสลาม: ${item.title}`,
-            "thumbnailUrl": item.thumbnailUrl || item.coverUrl || undefined,
+            "description": mediaSummary(item),
+            "thumbnailUrl": mediaThumbnail(item) || undefined,
             "uploadDate": toIsoDate(item.date || item.createdAt) || undefined,
+            "duration": isoDuration(item.duration),
+            "isPartOf": item.series ? { "@type": "CreativeWorkSeries", "name": item.series } : undefined,
             "embedUrl": item.embedId ? `https://www.youtube.com/embed/${item.embedId}` : undefined,
             "publisher": {
               "@type": "Organization",

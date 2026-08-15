@@ -61,16 +61,20 @@ export default function SEOHead({ title, description, canonical, ogImage, ogType
       setMetaTag('name', 'description', truncate(description, 160))
     }
     
-    // Canonical
+    // Canonical. Both tags are rewritten on every page, never just added: this
+    // is a SPA, so the <head> left behind by the previous route is still in the
+    // document. A canonical or a noindex that outlives its page points Google
+    // at the wrong URL for the one it is actually looking at.
     if (canonical) {
       setLinkTag('canonical', canonical)
+    } else {
+      const stale = document.querySelector('link[rel="canonical"][data-seo="true"]')
+      if (stale) stale.remove()
     }
-    
+
     // Robots
-    if (noIndex) {
-      setMetaTag('name', 'robots', 'noindex, nofollow')
-    }
-    
+    setMetaTag('name', 'robots', noIndex ? 'noindex, nofollow' : 'index, follow, max-image-preview:large, max-snippet:-1')
+
     // Open Graph
     if (title) setMetaTag('property', 'og:title', title)
     if (description) setMetaTag('property', 'og:description', truncate(description, 200))

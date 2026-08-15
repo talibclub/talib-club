@@ -3,6 +3,9 @@ import { useNavigate, useLocation, useSearchParams, Routes, Route, Navigate } fr
 import { useTheme } from "./hooks/useTheme.js"
 import { useAuth } from "./hooks/useAuth.js"
 import Nav from "./components/Nav.jsx"
+// Eager, not lazyWithRetry: a 404 is often reached because a chunk or a route
+// went missing, which is the worst moment to need one more chunk to load.
+import NotFound from "./pages/NotFound.jsx"
 import { useAudio } from "./context/AudioContext.jsx"
 import { getPagePath } from "./utils/url.js"
 
@@ -375,7 +378,7 @@ export default function App() {
                   <ReadingApp authState={authState} go={go} ctx={ctx} theme={theme} />
                 </RequireLogin>
               } />
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<NotFound go={go} />} />
             </Routes>
           </Suspense>
         </PageErrorBoundary>

@@ -71,7 +71,6 @@ async function generate() {
   const urls = [];
 
   // 1. Add static pages
-  const today = new Date().toISOString().split('T')[0];
   const staticPages = [
     { path: '/', priority: '1.0', changefreq: 'daily' },
     { path: '/articles', priority: '0.8', changefreq: 'daily' },
@@ -81,21 +80,31 @@ async function generate() {
     { path: '/donate', priority: '0.5', changefreq: 'monthly' }
   ];
 
-  for (const page of staticPages) {
-    urls.push({
-      loc: `${BASE_URL}${page.path}`,
-      lastmod: today,
-      changefreq: page.changefreq,
-      priority: page.priority
-    });
-  }
-
   // 2. Fetch dynamic items from Firestore REST API
   const [articles, books, media] = await Promise.all([
     fetchDocuments('content_articles'),
     fetchDocuments('content_books'),
     fetchDocuments('content_media')
   ]);
+
+  // The listing pages change when their contents change, so they are dated from
+  // the newest document rather than from "today". A wall-clock lastmod rewrites
+  // every static entry on every run, which makes the nightly refresh job commit
+  // and redeploy a sitemap that is otherwise identical — and teaches crawlers to
+  // stop believing the field.
+  const newestContentDate = [...articles, ...books, ...media]
+    .map(getFormattedDate)
+    .sort()
+    .pop() || new Date().toISOString().split('T')[0];
+
+  for (const page of staticPages) {
+    urls.push({
+      loc: `${BASE_URL}${page.path}`,
+      lastmod: newestContentDate,
+      changefreq: page.changefreq,
+      priority: page.priority
+    });
+  }
 
   // 3-5. Process detail pages. The URL is built with the same helper the app
   // and api/seo-prerender.js use, so the sitemap entry, the <link rel=canonical>

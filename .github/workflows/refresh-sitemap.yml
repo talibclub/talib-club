@@ -1,0 +1,38 @@
+name: Refresh sitemap
+
+# public/sitemap.xml is a static file that only ever regenerated during `npm run
+# build`, i.e. on deploy. Articles, books and media added through the admin
+# after a deploy stayed out of the sitemap until somebody happened to push a
+# commit, and a title edited after a deploy left the sitemap pointing at a URL
+# that now 301s — which Search Console reports as "Page with redirect".
+#
+# 20:30 UTC = 03:30 Asia/Bangkok, half an hour after the al-maktabah sync, so
+# the books it imports are already in Firestore when the sitemap is rebuilt.
+on:
+  schedule:
+    - cron: "30 20 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/generate-sitemap.mjs
+      - name: Commit if the sitemap changed
+        run: |
+          if git diff --quiet -- public/sitemap.xml; then
+            echo "Sitemap unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/sitemap.xml
+          git commit -m "chore(seo): refresh sitemap.xml"
+          git push
