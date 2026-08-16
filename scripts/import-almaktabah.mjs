@@ -4,10 +4,15 @@
 //   (no secret involved — same config their deployed site embeds in every
 //   page, and the query below mirrors exactly what their own app runs for
 //   an anonymous/unapproved reader: where('restricted','==',false))
+// - keeps only Thai-language books (see isThaiBook) — Talib Club's audience is
+//   Thai, so the English/Arabic half of the upstream library is skipped
 // - adds books not yet imported (tracked via a `sourceId` field)
 // - soft-deletes (deleted:true) previously-imported books that no longer
 //   show up in that public query (they were turned restricted, or removed,
 //   upstream) — this is intentional per the site owner
+// - hard-deletes previously-imported books that are still public upstream but
+//   not Thai (leftovers from before the language filter): they can never
+//   qualify again, so there is nothing to keep them around for
 //
 // Usage:
 //   node scripts/import-almaktabah.mjs --dry-run   (prints a plan, writes nothing)
@@ -94,6 +99,18 @@ const TYPE_MAP = {
   "วิทยานิพนธ์": "รายงาน",
 };
 
+// Upstream tags each book with a Thai-worded `language` ("ไทย" / "อังกฤษ" /
+// "อาหรับ"), which is right for all but a handful of rows — a few genuinely
+// Thai books sit under "อังกฤษ" and one is blank. So: trust the tag when it
+// says Thai, and otherwise fall back to the title's script, which catches the
+// mislabelled ones without dragging in any English/Arabic titles.
+const THAI_SCRIPT = /[฀-๿]/;
+
+function isThaiBook(book) {
+  if (String(book.language || "").trim() === "ไทย") return true;
+  return THAI_SCRIPT.test(book.title || "");
+}
+
 function mapCategory(cat) {
   return CATEGORY_MAP[cat] || "";
 }
@@ -121,7 +138,14 @@ function mapCoverUrl(coverUrl) {
 async function fetchPublicSourceBooks() {
   const q = query(collection(sourceDb, "books"), where("restricted", "==", false));
   const snap = await getClientDocs(q);
-  return snap.docs.map((d) => ({ sourceId: d.id, ...d.data() }));
+  const all = snap.docs.map((d) => ({ sourceId: d.id, ...d.data() }));
+  // Filtered here rather than in the query: the public set is small, and this
+  // keeps the mislabelled-language fallback (and the skipped tally) possible.
+  const thai = all.filter(isThaiBook);
+  console.log(`Public books at source: ${all.length} (Thai: ${thai.length}, skipped non-Thai: ${all.length - thai.length})`);
+  // `allIds` lets main() tell apart "still upstream, just not Thai" (purge for
+  // good) from "gone/turned restricted upstream" (soft-delete, as before).
+  return { thai, allIds: new Set(all.map((b) => b.sourceId)) };
 }
 
 async function fetchAlreadyImported() {
@@ -158,18 +182,34 @@ async function commitInChunks(ops) {
 }
 
 async function main() {
-  const [sourceBooks, existing] = await Promise.all([fetchPublicSourceBooks(), fetchAlreadyImported()]);
-  const sourceIds = new Set(sourceBooks.map((b) => b.sourceId));
+  const [{ thai: sourceBooks, allIds }, existing] = await Promise.all([fetchPublicSourceBooks(), fetchAlreadyImported()]);
+  const thaiIds = new Set(sourceBooks.map((b) => b.sourceId));
 
   const toCreate = sourceBooks.filter((b) => !existing.has(b.sourceId));
-  const toHide = [...existing.values()].filter((doc) => !sourceIds.has(doc.sourceId) && !doc.deleted);
+  // Sort out the books already in Talib that the Thai set no longer covers.
+  // Non-Thai ones are leftovers from before this filter existed and can never
+  // qualify again, so they go for good (site owner's call). Thai ones that
+  // simply vanished upstream (turned restricted, or removed) keep the old
+  // soft-delete, since those can legitimately come back later.
+  const toPurge = [];
+  const toHide = [];
+  for (const doc of existing.values()) {
+    if (thaiIds.has(doc.sourceId)) continue;
+    const stillUpstream = allIds.has(doc.sourceId);
+    if (stillUpstream || !THAI_SCRIPT.test(doc.title || "")) toPurge.push(doc);
+    else if (!doc.deleted) toHide.push(doc);
+  }
   // First run ever (nothing imported yet) is a historical backfill, not "new
   // arrivals" — don't badge all 442 as "ใหม่". Later incremental runs do.
   const isInitialBackfill = existing.size === 0;
+  // The owner keeps this whole source hidden behind the admin toggle; if every
+  // imported book is currently hidden, a new arrival should land hidden too
+  // instead of popping onto the site on its own.
+  const sourceIsHidden = existing.size > 0 && [...existing.values()].every((doc) => doc.deleted);
 
-  console.log(`Public books at source: ${sourceBooks.length}`);
   console.log(`Already imported: ${existing.size}`);
-  console.log(`New to import: ${toCreate.length}`);
+  console.log(`New to import: ${toCreate.length}${sourceIsHidden ? " (as hidden — source is currently hidden on the site)" : ""}`);
+  console.log(`To delete permanently (non-Thai): ${toPurge.length}`);
   console.log(`To hide (no longer public / removed upstream): ${toHide.length}`);
 
   if (DRY_RUN) {
@@ -186,6 +226,10 @@ async function main() {
         coverUrl: mapCoverUrl(b.coverUrl),
       });
     }
+    if (toPurge.length) {
+      console.log(`\n--dry-run: ${toPurge.length} non-Thai books that would be deleted permanently (first 10):`);
+      for (const d of toPurge.slice(0, 10)) console.log({ id: d.id, sourceId: d.sourceId, title: d.title });
+    }
     if (toHide.length) {
       console.log("\n--dry-run: books that would be hidden:");
       for (const d of toHide.slice(0, 10)) console.log({ id: d.id, sourceId: d.sourceId, title: d.title });
@@ -198,6 +242,9 @@ async function main() {
   await ensureSourceTaxonomy();
 
   const ops = [];
+  for (const doc of toPurge) {
+    ops.push((batch) => batch.delete(destDb.collection("content_books").doc(doc.id)));
+  }
   for (const doc of toHide) {
     ops.push((batch) => batch.update(destDb.collection("content_books").doc(doc.id), { deleted: true, updatedAt: FieldValue.serverTimestamp() }));
   }
@@ -218,7 +265,7 @@ async function main() {
         views: 0,
         downloads: 0,
         isNew: !isInitialBackfill,
-        deleted: false,
+        deleted: sourceIsHidden,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       })
@@ -238,7 +285,7 @@ async function main() {
     console.log("Bumped content_settings/metadata.content_books so client caches refetch.");
   }
 
-  console.log(`\nDone. Imported ${toCreate.length}, hid ${toHide.length}.`);
+  console.log(`\nDone. Imported ${toCreate.length}, deleted ${toPurge.length} non-Thai, hid ${toHide.length}.`);
 }
 
 main().catch((err) => {
