@@ -5,6 +5,21 @@ import { autoformatPlainText } from './textAutoformat.js';
 // Presentational: the parent owns the value, the textarea ref, and the
 // commit/delete logic.
 export default function StickyNoteEditor({ x, y, scale, round, value, onChange, textareaRef, onCommit, onDelete, box }) {
+  // Matching the canvas text exactly is worth doing, but never at the cost of
+  // being able to see what you are typing: the canvas <Text> is hidden while the
+  // editor is open, so if this box is mis-sized for any reason the note just
+  // looks empty until you close it — which is exactly what was reported.
+  //
+  // So: fall back to sane numbers if anything arrives missing, and never render
+  // below a readable size, whatever the zoom works out to.
+  const safe = (n, fallback) => (Number.isFinite(n) && n > 0 ? n : fallback);
+  const fontSize = Math.max(13, safe(box?.fontSize, 16 * scale));
+  const boxLeft = safe(box?.left, 12 * scale);
+  const boxTop = safe(box?.top, 24 * scale);
+  const boxWidth = Math.max(90, safe(box?.width, 126 * scale));
+  const boxHeight = Math.max(48, safe(box?.height, 116 * scale));
+  const noteHeight = safe(box?.noteHeight, 150 * scale);
+
   // onBlur used to commit unconditionally. The textarea mounts in the same
   // commit as the Konva pointer handling, which takes focus straight back off
   // it — so the editor opened and closed again before the parent's 60ms
@@ -43,23 +58,27 @@ export default function StickyNoteEditor({ x, y, scale, round, value, onChange, 
         // and re-wrapped the moment you stopped typing.
         style={{
           position: 'absolute',
-          left: box.left,
-          top: box.top,
+          left: boxLeft,
+          top: boxTop,
           margin: 0,
           padding: 0,
+          // A faint wash and ring, so an open editor always reads as a field you
+          // can type into rather than a blank note.
           border: 'none',
-          background: 'transparent',
+          boxShadow: '0 0 0 2px rgba(15,110,86,0.35)',
+          borderRadius: 6,
+          background: 'rgba(255,255,255,0.55)',
           color: '#111827',
-          fontSize: `${box.fontSize}px`,
-          lineHeight: 1.2,
-          textAlign: box.align,
+          caretColor: '#0f6e56',
+          fontSize: `${fontSize}px`,
+          lineHeight: 1.25,
+          textAlign: box?.align || 'left',
           fontFamily: 'Kanit, sans-serif',
           outline: 'none',
           resize: 'none',
-          width: box.width,
-          height: box.height,
-          overflow: 'hidden',
-          borderRadius: round ? 16 * scale : 2 * scale,
+          width: boxWidth,
+          height: boxHeight,
+          overflow: 'auto',
         }}
       />
       {/* preventDefault keeps focus on the textarea. Without it the button
@@ -70,7 +89,7 @@ export default function StickyNoteEditor({ x, y, scale, round, value, onChange, 
         onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
         onClick={onDelete}
         // Sits just under the note now that the textarea is absolutely placed.
-        style={{ position: 'absolute', top: box.noteHeight + 8, left: 0, background: '#c0392b', color: 'white', border: 'none', padding: '6px 12px', borderRadius: 999, cursor: 'pointer', fontSize: 12.5, fontFamily: 'Kanit, sans-serif', whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(192,57,43,0.25)' }}
+        style={{ position: 'absolute', top: noteHeight + 8, left: 0, background: '#c0392b', color: 'white', border: 'none', padding: '6px 12px', borderRadius: 999, cursor: 'pointer', fontSize: 12.5, fontFamily: 'Kanit, sans-serif', whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(192,57,43,0.25)' }}
       >
         ลบโพสต์อิท
       </button>

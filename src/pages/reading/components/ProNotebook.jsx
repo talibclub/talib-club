@@ -3677,8 +3677,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                      ))
                   )}
 
+                  {/* Hidden only while this note is the one being edited, since
+                      the HTML textarea sits on top of it then. Everything else
+                      shows its text. */}
                   {editingStickerId !== st.id && st.text && (
-                     <Text text={st.text} x={12} y={st.style === 'polaroid' ? 118 : 24} width={126} height={st.style === 'polaroid' ? 28 : 116} fontSize={st.style === 'polaroid' ? 13 : 16} fill="#111827" fontFamily="Kanit, sans-serif" align={st.style === 'polaroid' ? 'center' : 'left'} />
+                     <Text text={st.text} x={12} y={st.style === 'polaroid' ? 118 : 24} width={126} height={st.style === 'polaroid' ? 28 : 116} fontSize={st.style === 'polaroid' ? 13 : 16} fill="#111827" fontFamily="Kanit, sans-serif" align={st.style === 'polaroid' ? 'center' : 'left'} listening={false} />
                   )}
                 </Group>
               );
