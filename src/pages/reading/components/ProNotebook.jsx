@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Path, Group, Circle, Text, Rect, Transformer, RegularPolygon, Line, Star as KonvaStar, Arrow as KonvaArrow } from 'react-konva';
-import { PenTool, Highlighter, Eraser, Type, Square, Search, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, Check, Triangle, Cloud, CheckCircle, Trash2, Scissors, Brush, Feather, Maximize2, Ruler, PanelLeftClose, PanelLeftOpen, Wand2, Camera, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Underline, Strikethrough, Smile, ListMusic, X, ArrowRight, Star, Hexagon, Compass, Link2, Spline, BookOpen } from 'lucide-react';
+import { PenTool, Search, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Lasso, MonitorPlay, FileText, Bookmark, Cloud, Ruler, Camera, X, Star, Link2 } from 'lucide-react';
 import CropModal from './CropModal';
 import ColorPickerPanel from './ColorPickerPanel';
 import BookSnipModal from './BookSnipModal';
-import EmojiStickerPicker from './EmojiStickerPicker';
-import { RecordingsPanel, PlaybackBar } from './AudioRecordings';
+import { PlaybackBar } from './AudioRecordings';
 import { recognizeShape, shapeFromRecognition, pointInPolygon, distToSegmentXY } from '../utils/shapeRecognition.js';
 import { confirmAction } from '../../../utils/feedback.jsx';
 import getStroke from 'perfect-freehand';
@@ -19,7 +18,7 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { PDFPageImage, PaperPattern, getSvgPathFromStroke, PEN_STYLES, StrokeShape, CommittedStrokes, StickyStyleThumb } from './notebook/canvasElements.jsx';
 import { polygonBounds, polygonCentroid, polygonInteriorAngle, applyListPrefix, textDecorationOf, migrateText, textOf, isUniformText, uniformFormatOf, listPrefixes } from './notebook/geometry.js';
-import { HW, ZERO_OFFSET, TEXT_BOX_WIDTH, LINE_HEIGHT, STICKY_COLORS, STICKY_STYLES, FONT_OPTIONS, DRAW_CURSOR } from './notebook/theme.js';
+import { HW, ZERO_OFFSET, TEXT_BOX_WIDTH, LINE_HEIGHT, STICKY_COLORS, DRAW_CURSOR } from './notebook/theme.js';
 import { useDragScroll } from './notebook/useDragScroll.js';
 import ImageSearchPanel from './notebook/ImageSearchPanel.jsx';
 import ObjectContextMenu from './notebook/ObjectContextMenu.jsx';
@@ -30,85 +29,14 @@ import TextEditor from './notebook/TextEditor.jsx';
 import PaperTemplateModal from './notebook/PaperTemplateModal.jsx';
 import ExportModal from './notebook/ExportModal.jsx';
 import AiAssistantPanel from './notebook/AiAssistantPanel.jsx';
+import { pickCoverColor, nextStrokeId, nextImageId, compressImageFile } from './notebook/notebookAssets.js';
+import { DEFAULT_LASSO_FILTER } from './notebook/notebookConstants.js';
+import { useNotebookHistory } from './notebook/useNotebookHistory.js';
+import NotebookStyles from './notebook/NotebookStyles.jsx';
+import NotebookTopBar from './notebook/NotebookTopBar.jsx';
+import NotebookToolCapsule from './notebook/NotebookToolCapsule.jsx';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
-
-// Photos off a phone are 3-8 MB, and base64 makes a copy about a third bigger
-// again. Every picture is stored inline in the page JSON, so two or three of
-// them made the notebook slow to upload and blew straight past the localStorage
-// backup quota — the fallback that is supposed to save the work when the cloud
-// save fails. Downscale and re-encode before an image ever enters a page.
-// Two images inserted in the same millisecond — a multi-page PDF import, or a
-// quick drag of several files — used to land with identical ids, which made
-// selection and delete hit the wrong picture.
-// Every notebook was written with coverColor: 'red' on every save, so the
-// gallery was a wall of identical red covers. Derived from the notebook id so
-// it is stable across sessions and devices without needing to be read back.
-export const NOTEBOOK_COVERS = ['red', 'teal', 'indigo', 'amber', 'plum', 'forest'];
-function pickCoverColor(notebookId) {
-  const key = String(notebookId || '');
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (Math.imul(h, 31) + key.charCodeAt(i)) >>> 0;
-  return NOTEBOOK_COVERS[h % NOTEBOOK_COVERS.length];
-}
-
-let strokeIdSeq = 0;
-const nextStrokeId = () => `s-${Date.now().toString(36)}-${++strokeIdSeq}`;
-
-let imageIdSeq = 0;
-const nextImageId = () => `img-${Date.now()}-${++imageIdSeq}`;
-
-const MAX_IMAGE_DIM = 1600;
-const IMAGE_PASSTHROUGH_BYTES = 700 * 1024;
-
-const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
-  const fr = new FileReader();
-  fr.onload = () => resolve(fr.result);
-  fr.onerror = reject;
-  fr.readAsDataURL(file);
-});
-
-async function compressImageFile(file) {
-  const original = await readFileAsDataUrl(file);
-  // A GIF would lose its animation and an SVG is already small and lossless.
-  if (/^image\/(gif|svg\+xml)$/.test(file.type || '')) return original;
-  try {
-    const img = await new Promise((resolve, reject) => {
-      const el = new Image();
-      el.onload = () => resolve(el);
-      el.onerror = reject;
-      el.src = original;
-    });
-    const scale = Math.min(1, MAX_IMAGE_DIM / Math.max(img.width, img.height));
-    if (scale === 1 && original.length < IMAGE_PASSTHROUGH_BYTES) return original;
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(img.width * scale));
-    canvas.height = Math.max(1, Math.round(img.height * scale));
-    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-    // webp keeps transparency; a PNG screenshot re-encoded as JPEG would come
-    // back with a black background.
-    let out = canvas.toDataURL('image/webp', 0.85);
-    if (!out.startsWith('data:image/webp')) out = canvas.toDataURL('image/jpeg', 0.85);
-    return out.length < original.length ? out : original;
-  } catch (err) {
-    console.warn('Image compression failed, inserting the original', err);
-    return original;
-  }
-}
-
-// Tools whose options popover opens with the tool.
-const TOOLS_WITH_OPTIONS = ['pen', 'fountain', 'marker', 'pencil', 'highlighter', 'shape', 'sticker', 'eraser', 'text', 'laser', 'lasso'];
-
-// What the lasso is allowed to pick up, GoodNotes-style. Stored per kind so the
-// user can grab only the handwriting out of a page full of images and notes.
-const LASSO_KINDS = [
-  { key: 'lines', label: 'ลายมือ' },
-  { key: 'shapes', label: 'รูปทรง/เรขาคณิต' },
-  { key: 'images', label: 'รูปภาพ' },
-  { key: 'texts', label: 'กล่องข้อความ' },
-  { key: 'stickers', label: 'โน้ตสติกเกอร์' },
-];
-const DEFAULT_LASSO_FILTER = { lines: true, shapes: true, images: true, texts: true, stickers: true };
 
 export default function ProNotebook({ bookId, uid, activeBook, readonly = false, fullView = false, onToggleFullView, onPdfPageCount }) {
   const leftToolbarScroll = useDragScroll();
@@ -821,8 +749,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   
   // History State
   const pagesRef = useRef(pages);
-  const undoStack = useRef([]);
-  const redoStack = useRef([]);
     
   // Toolbar Scroll Hint State
   const toolsScrollRef = useRef(null);
@@ -842,8 +768,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      window.addEventListener('resize', handleToolsScroll);
      return () => window.removeEventListener('resize', handleToolsScroll);
   }, []);
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
+  const { pushHistory, undo, redo, canUndo, canRedo } = useNotebookHistory(pagesRef, setPages, setCurrentPageIndex);
   
   useEffect(() => {
     pagesRef.current = pages;
@@ -1241,43 +1166,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // Snapshot for undo/redo. Only the annotation arrays are copied — `src` (a base64
   // PDF/image data URL, often megabytes) is carried over by reference, so a snapshot
   // costs roughly the size of the strokes on the page rather than the whole document.
-  const snapshotPages = (pgs) => pgs.map((p) => ({
-    ...p,
-    lines: (p.lines || []).map((l) => ({ ...l, points: l.points.slice(), pressures: l.pressures ? l.pressures.slice() : undefined })),
-    shapes: (p.shapes || []).map((s) => ({ ...s, points: s.points ? s.points.slice() : undefined, from: s.from ? { ...s.from } : undefined, to: s.to ? { ...s.to } : undefined })),
-    texts: (p.texts || []).map((t) => ({ ...t })),
-    stickers: (p.stickers || []).map((s) => ({ ...s })),
-    images: (p.images || []).map((i) => ({ ...i })),
-  }));
-
-  const pushHistory = () => {
-    undoStack.current.push(snapshotPages(pagesRef.current));
-    if (undoStack.current.length > 30) undoStack.current.shift();
-    redoStack.current = [];
-    setCanUndo(true);
-    setCanRedo(false);
-  };
-
-  const undo = () => {
-    if (undoStack.current.length === 0) return;
-    const previousState = undoStack.current.pop();
-    redoStack.current.push(snapshotPages(pagesRef.current));
-    setPages(previousState);
-    setCurrentPageIndex((i) => Math.min(i, previousState.length - 1));
-    setCanUndo(undoStack.current.length > 0);
-    setCanRedo(true);
-  };
-
-  const redo = () => {
-    if (redoStack.current.length === 0) return;
-    const nextState = redoStack.current.pop();
-    undoStack.current.push(snapshotPages(pagesRef.current));
-    setPages(nextState);
-    setCurrentPageIndex((i) => Math.min(i, nextState.length - 1));
-    setCanUndo(true);
-    setCanRedo(redoStack.current.length > 0);
-  };
-
   const clearPage = () => {
     pushHistory();
     updatePage(currentPageIndex, (page) => {
@@ -3166,214 +3054,46 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  // One bag of state and callbacks for the extracted UI files. The notebook
+  // holds all of its state in this component, so the split-out toolbars take a
+  // single `ui` prop instead of fifty individually threaded ones.
+  const ui = {
+    canRedo,
+    canUndo,
+    redo,
+    undo,
+    TOOL_BTN, WRITER_H, activeBook, applyColorToActiveText, audioPlaying,
+    autoShape, clearPage, clearStrokes, closeOverlays, colors, currentPage,
+    currentPageIndex, customColors, deletePage, deleteRecording,
+    deleteSelected, editingTextId, eraserSettings, exportNotebookPDF,
+    fitToScreen, fullView, handleAddPage, handleToolsScroll, insertEmoji,
+    isCoarse, isMobile, isRecording, isSaving, laserColor, lassoFilter,
+    leftToolbarScroll, nowPlaying, onToggleFullView, pages, penColor,
+    penOpacity, penSize, playRecording, position, pressureEnabled,
+    protractor, protractorOn, readonly, recordings, rememberCustomColor,
+    renameRecording, rightToolbarScroll, ruler, rulerOn, runExport,
+    saveNotebook, scale, selectedId, setAutoShape, setBookSnipInitialPage,
+    setCroppingImageId, setCurrentPageIndex, setEraserSettings,
+    setLaserColor, setLassoFilter, setPenColor, setPenOpacity, setPenSize,
+    setPressureEnabled, setProtractorOn, setRulerOn, setScale, setShapeType,
+    setShowAi, setShowBookSnip, setShowColorPicker, setShowEmojiPicker,
+    setShowExport, setShowImgSearch, setShowMoreMenu, setShowPageManager,
+    setShowPageSettings, setShowRecordings, setShowSearch,
+    setShowToolOptions, setStickerStyle, setStylusMode, setTextStyle,
+    setTool, setZoomWriter, shapeType, showBookSnip, showColorPicker,
+    showEmojiPicker, showLeftScrollHint, showMoreMenu, showPageManager,
+    showRecordings, showRightScrollHint, showSearch, showToolOptions, sizes,
+    startLoadingPDF, stickerStyle, stylusMode, textStyle, toggleBookmark,
+    togglePanel, toggleRecording, tool, toolsScrollRef, updatePage,
+    zoomWriter
+  };
+
   return (
     <>
-    <style>{`
-      .hide-scroll::-webkit-scrollbar {
-        display: none;
-      }
-      .hide-scroll {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-      .pulse-scroll-hint {
-        animation: pulseHint 2s infinite ease-in-out;
-      }
-      @keyframes pulseHint {
-        0%, 100% { opacity: 0.5; transform: translateX(0); }
-        50% { opacity: 1; transform: translateX(-2px); }
-      }
-      @keyframes pulse {
-        0% { opacity: 1; }
-        50% { opacity: 0.5; }
-        100% { opacity: 1; }
-      }
-      @keyframes spinSync {
-        to { transform: rotate(360deg); }
-      }
-    `}</style>
+    <NotebookStyles />
     <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: '#F3F4F6', display: 'flex', flexDirection: 'column' }}>
       
-      {/* Huawei Notes Top Navigation Bar (Fixed App Header) */}
-         <div className="hide-scroll" style={{ height: 52, flexShrink: 0, width: '100%', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, display: 'flex', alignItems: 'center', justifyContent: readonly ? 'center' : 'space-between', padding: '0 12px', zIndex: 50, borderBottom: `1px solid ${HW.hairline}`, overflowX: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-               {/* No in-notebook back button: it called window.history.back(), which
-                   would kick the user out of the reading room entirely. The reader
-                   (and the gallery viewer) already provide their own exit. */}
-               {/* Page stepper (Huawei keeps this in the header, not over the canvas) */}
-               {!isMobile && (
-                 <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.04)', borderRadius: 100, padding: '2px 4px' }}>
-                   <button
-                     onClick={() => setCurrentPageIndex(Math.max(0, currentPageIndex - 1))}
-                     disabled={currentPageIndex === 0}
-                     style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'transparent', cursor: currentPageIndex === 0 ? 'default' : 'pointer', opacity: currentPageIndex === 0 ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
-                     <ChevronLeft size={17} strokeWidth={2} />
-                   </button>
-                   <span style={{ fontSize: 12.5, fontWeight: 600, color: HW.text, minWidth: 42, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
-                     {currentPageIndex + 1} / {pages.length}
-                   </span>
-                   <button
-                     onClick={() => setCurrentPageIndex(Math.min(pages.length - 1, currentPageIndex + 1))}
-                     disabled={currentPageIndex === pages.length - 1}
-                     style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'transparent', cursor: currentPageIndex === pages.length - 1 ? 'default' : 'pointer', opacity: currentPageIndex === pages.length - 1 ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
-                     <ChevronRight size={17} strokeWidth={2} />
-                   </button>
-                 </div>
-               )}
-               {/* Zoom cluster — the quick way back when the page has drifted off screen */}
-               {!isMobile && (
-                 <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.04)', borderRadius: 100, padding: '2px 4px' }}>
-                   <button title="ย่อ" onClick={() => setScale(s => Math.max(0.1, s / 1.2))} style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
-                     <Minus size={15} strokeWidth={2} />
-                   </button>
-                   <button title="พอดีหน้าจอ" onClick={fitToScreen} style={{ minWidth: 46, height: 26, borderRadius: 100, border: 'none', background: 'transparent', cursor: 'pointer', color: HW.text, fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                     {Math.round(scale * 100)}%
-                   </button>
-                   <button title="ขยาย" onClick={() => setScale(s => Math.min(5, s * 1.2))} style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
-                     <Plus size={15} strokeWidth={2} />
-                   </button>
-                 </div>
-               )}
-               {isSaving && (
-                  <span title="กำลังบันทึก" style={{ color: '#10B981', display: 'flex', alignItems: 'center' }}>
-                     <Cloud size={17} />
-                  </span>
-               )}
-               {!isSaving && !readonly && (
-                  <button title="บันทึกแล้ว (คลิกเพื่อบังคับบันทึก)" onClick={() => saveNotebook()} style={{ background: 'transparent', border: 'none', color: '#9CA3AF', display: 'flex', alignItems: 'center', cursor: 'pointer', padding: 0 }}>
-                     <CheckCircle size={17} />
-                  </button>
-               )}
-            </div>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, position: 'relative' }}>
-               {!readonly && (
-                 <>
-                   {/* Full-view: give the whole browser width to the notebook and
-                       hide the PDF panel — for people who attach the PDF inside the
-                       notebook and only want to write. A labelled button, not a bare
-                       icon: nobody could guess what the panel glyph meant. */}
-                   {onToggleFullView && (
-                     <button
-                       onClick={onToggleFullView}
-                       title={fullView ? 'กลับมุมมองคู่กับ PDF' : 'ขยายสมุดโน้ตเต็มจอ ซ่อน PDF ด้านข้าง'}
-                       style={{ height: 34, padding: '0 12px', borderRadius: 10, border: 'none', background: fullView ? HW.accentSoft : 'rgba(0,0,0,0.05)', color: fullView ? HW.accent : HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'Kanit, sans-serif', transition: 'all 0.18s' }}
-                     >
-                       {fullView ? <PanelLeftOpen size={17} strokeWidth={1.8} /> : <PanelLeftClose size={17} strokeWidth={1.8} />}
-                       {fullView ? 'แสดง PDF' : 'โน้ตเต็มจอ'}
-                     </button>
-                   )}
-                   {[
-                     { id: 'addpage', icon: FilePlus, title: 'เพิ่มหน้าใหม่', onClick: handleAddPage },
-                     // With a book already open, the obvious thing is to bring THAT
-                     // pdf in. startLoadingPDF() has always supported it — called
-                     // with no url it loads activeBook through the shared byte
-                     // cache — but nothing in the UI ever did, so the only
-                     // book-aware action on offer was screenshotting it page by
-                     // page. "นำเข้า PDF" still opens the file picker for
-                     // everything else.
-                     ...(activeBook?.book?.fileUrl
-                       ? [{ id: 'bookpdf', icon: BookOpen, title: 'ดึงหนังสือเล่มนี้เข้าโน้ต', onClick: () => startLoadingPDF() }]
-                       : []),
-                     { id: 'pdf', icon: FileText, title: activeBook?.book?.fileUrl ? 'นำเข้า PDF อื่น' : 'นำเข้า PDF', onClick: () => document.getElementById('pdf-upload').click() },
-                     // Snip a region of the companion book straight into the note.
-                     ...(activeBook?.book?.fileUrl ? [{ id: 'snip', icon: Camera, title: 'แคปเฉพาะบางส่วน', onClick: () => { closeOverlays('snip'); setBookSnipInitialPage(1); setShowBookSnip(true); }, active: showBookSnip }] : []),
-                     { id: 'zoomwrite', icon: Maximize2, title: 'ขยายเขียน', onClick: () => setZoomWriter(v => !v), active: zoomWriter },
-                     { id: 'recordings', icon: ListMusic, title: 'บันทึกเสียง', onClick: () => togglePanel('recordings', setShowRecordings, showRecordings), active: showRecordings, badge: recordings.length },
-                     { id: 'search', icon: Search, title: 'ค้นหา', onClick: () => togglePanel('search', setShowSearch, showSearch), active: showSearch },
-                     { id: 'pages', icon: Columns, title: 'จัดการหน้า', onClick: () => togglePanel('pages', setShowPageManager, showPageManager), active: showPageManager },
-                     { id: 'more', icon: LayoutGrid, title: 'เพิ่มเติม', onClick: () => togglePanel('more', setShowMoreMenu, showMoreMenu), active: showMoreMenu },
-                   ].map(b => (
-                     <button
-                       key={b.id}
-                       onClick={b.onClick}
-                       title={b.title}
-                       style={{ position: 'relative', width: 36, height: 36, borderRadius: 10, border: 'none', background: b.active ? HW.accentSoft : 'transparent', color: b.active ? HW.accent : HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.18s' }}
-                     >
-                       <b.icon size={20} strokeWidth={1.6} />
-                       {b.badge > 0 && (
-                         <span style={{ position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: '#EF4444', color: 'white', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{b.badge}</span>
-                       )}
-                     </button>
-                   ))}
-                 </>
-               )}
-               {readonly && (
-                 <button onClick={() => { closeOverlays('export'); setShowExport(true); }} style={{ padding: '8px 16px', borderRadius: 20, border: 'none', background: 'var(--teal)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600 }}>
-                    <Download size={18} strokeWidth={2} /> ส่งออก
-                 </button>
-               )}
-
-            </div>
-         </div>
-
-         {/* Recordings list panel — rendered outside the scrollable header. */}
-         {showRecordings && (
-           <RecordingsPanel
-             recordings={recordings}
-             nowPlayingId={nowPlaying?.id}
-             audioPlaying={audioPlaying}
-             onPlayToggle={playRecording}
-             onDelete={deleteRecording}
-             onRename={renameRecording}
-             onClose={() => setShowRecordings(false)}
-           />
-         )}
-
-         {/* More menu dropdown. It must live OUTSIDE the header: the header scrolls
-             horizontally (overflow-x auto), which silently clips any popup rendered
-             inside it — that's why the ⊞ "เพิ่มเติม" button looked dead on tablets. */}
-         {showMoreMenu && !readonly && (
-             <>
-                 <div style={{ position: 'fixed', inset: 0, zIndex: 59 }} onClick={() => setShowMoreMenu(false)} />
-                 <div style={{ position: 'absolute', top: 58, right: 12, zIndex: 60, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: 8, borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 280, display: 'flex', flexDirection: 'column', maxHeight: 'calc(100% - 70px)', overflowY: 'auto' }}>
-                    <button onClick={() => { document.getElementById('image-upload').click(); setShowMoreMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <ImageIcon size={20} strokeWidth={1.5} color="#4B5563" /> นำเข้ารูปภาพจากเครื่อง
-                    </button>
-                    <button onClick={() => { closeOverlays('imgSearch'); setShowImgSearch(true); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Search size={20} strokeWidth={1.5} color="#4B5563" /> ค้นหารูป/สติกเกอร์จากเน็ต
-                    </button>
-                    <button onClick={() => { closeOverlays('ai'); setShowAi(true); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Wand2 size={20} strokeWidth={1.5} color="#4B5563" /> ผู้ช่วย AI · ถาม PDF
-                    </button>
-                    <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>
-                    <button onClick={() => { closeOverlays('pageSettings'); setShowPageSettings(true); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Settings size={20} strokeWidth={1.5} color="#4B5563" /> เปลี่ยนแม่แบบกระดาษ
-                    </button>
-                    <button onClick={() => { closeOverlays('export'); setShowExport(true); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Download size={20} strokeWidth={1.5} color="#4B5563" /> ส่งออก (รูป / PDF)
-                    </button>
-                    <button onClick={toggleBookmark} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Bookmark size={20} strokeWidth={1.5} color={pages[currentPageIndex]?.isBookmarked ? "#F59E0B" : "#4B5563"} fill={pages[currentPageIndex]?.isBookmarked ? "#F59E0B" : "none"} /> {pages[currentPageIndex]?.isBookmarked ? "ลบบุ๊คมาร์ก" : "บุ๊คมาร์กหน้า"}
-                    </button>
-                    <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>
-                    <button onClick={() => setStylusMode(m => (m === 'pen' ? 'auto' : 'pen'))} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <PenTool size={20} strokeWidth={1.5} color={stylusMode === 'pen' ? HW.accent : '#4B5563'} />
-                       <span style={{ flex: 1 }}>เขียนด้วยปากกาเท่านั้น</span>
-                       {stylusMode === 'pen' && <Check size={18} strokeWidth={2} color={HW.accent} />}
-                    </button>
-                    <button onClick={() => setPressureEnabled(v => !v)} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Zap size={20} strokeWidth={1.5} color={pressureEnabled ? HW.accent : '#4B5563'} />
-                       <span style={{ flex: 1 }}>ไวต่อแรงกด</span>
-                       {pressureEnabled && <Check size={18} strokeWidth={2} color={HW.accent} />}
-                    </button>
-                    <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>
-                    <button onClick={clearPage} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Eraser size={20} strokeWidth={1.5} color="#4B5563" /> ล้างหน้า
-                    </button>
-                    <button onClick={deletePage} disabled={pages.length <= 1} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: pages.length <= 1 ? '#D1D5DB' : '#EF4444', cursor: pages.length <= 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Minus size={20} strokeWidth={1.5} color={pages.length <= 1 ? '#D1D5DB' : '#EF4444'} /> ลบหน้า
-                    </button>
-                    <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>
-                    <button onClick={() => { exportNotebookPDF(); setShowMoreMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Download size={20} strokeWidth={1.5} color="#4B5563" /> ดาวน์โหลดทั้งเล่ม (PDF)
-                    </button>
-                    <button onClick={() => { setShowMoreMenu(false); runExport('png', 'current'); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <ImageIcon size={20} strokeWidth={1.5} color="#4B5563" /> บันทึกรูปหน้านี้ (PNG)
-                    </button>
-                 </div>
-             </>
-         )}
+      <NotebookTopBar ui={ui} />
 
       {/* Floating Recording Indicator */}
       {isRecording && (
@@ -3405,456 +3125,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
          </div>
       )}
 
-      {/* Huawei Notes floating tool capsule (bottom-centered, overlays the canvas) */}
-      {!readonly && (
-         <div style={{ position: 'absolute', bottom: zoomWriter ? WRITER_H + 44 + 14 : 20, left: '50%', transform: 'translateX(-50%)', zIndex: 46, maxWidth: 'calc(100% - 24px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, transition: 'bottom 0.22s cubic-bezier(0.2,0.8,0.2,1)' }}>
-            <div style={{ height: TOOL_BTN + 12, background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, borderRadius: HW.radius, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`, display: 'flex', alignItems: 'center', padding: '0 8px', gap: isCoarse ? 4 : 6, maxWidth: '100%' }}>
-                 {/* FIXED Undo / Redo */}
-                 <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-                    <button onClick={undo} disabled={!canUndo} className="cancel-drag" style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: 'transparent', color: canUndo ? '#4B5563' : '#D1D5DB', cursor: canUndo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Undo2 size={20} strokeWidth={1.5} />
-                    </button>
-                    <button onClick={redo} disabled={!canRedo} className="cancel-drag" style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: 'transparent', color: canRedo ? '#4B5563' : '#D1D5DB', cursor: canRedo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Redo2 size={20} strokeWidth={1.5} />
-                    </button>
-                 </div>
-                 
-                 <div style={{ width: 1, background: '#E5E7EB', height: 24, flexShrink: 0, margin: '0 4px' }}></div>
-                 
-                 {/* Tools (Scrollable with visual hint) */}
-                 <div style={{ position: 'relative', display: 'flex', flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                   {showLeftScrollHint && (
-                     <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 16, background: 'linear-gradient(to right, white, transparent)', zIndex: 2, pointerEvents: 'none' }} />
-                   )}
-                   <div
-                      ref={toolsScrollRef}
-                      onScroll={handleToolsScroll}
-                      className="hide-scroll"
-                      style={{ display: 'flex', alignItems: 'center', gap: 2, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth', flex: 1 }}
-                      onWheel={(e) => {
-                         if (e.deltaY !== 0) {
-                            e.currentTarget.scrollLeft += e.deltaY;
-                         }
-                      }}
-                      {...leftToolbarScroll}
-                   >
-                  
-                  {[
-                    { id: 'pan', icon: Pointer, title: 'เลื่อนกระดาน' },
-                    { id: 'pen', icon: PenTool, title: 'ปากกาลูกลื่น' },
-                    { id: 'fountain', icon: Feather, title: 'ปากกาหมึกซึม' },
-                    { id: 'pencil', icon: Pencil, title: 'ดินสอ' },
-                    { id: 'marker', icon: Brush, title: 'มาร์กเกอร์' },
-                    { id: 'highlighter', icon: Highlighter, title: 'ไฮไลท์' },
-                    { id: 'eraser', icon: Eraser, title: 'ยางลบ' },
-                    { id: 'lasso', icon: Lasso, title: 'Lasso' },
-                    { id: 'ruler', icon: Ruler, title: 'ไม้บรรทัด' },
-                    { id: 'protractor', icon: Compass, title: 'ไม้โปรแทรกเตอร์ (วัดมุม)' },
-                    { id: 'text', icon: Type, title: 'ข้อความ' },
-                    { id: 'shape', icon: Square, title: 'รูปร่าง' },
-                    { id: 'image', icon: ImageIcon, title: 'แทรกรูปภาพ' },
-                    { id: 'sticker', icon: StickyNote, title: 'โพสต์อิท' },
-                    { id: 'emoji', icon: Smile, title: 'อิโมจิ & สติกเกอร์' },
-                    { id: 'laser', icon: Wand2, title: 'เลเซอร์พอยเตอร์' },
-                    { id: 'mic', icon: Mic, title: 'อัดเสียง' }
-                  ].map(t => (
-                     <button 
-                       key={t.id}
-                       title={t.title}
-                       onClick={() => {
-                          if (t.id === 'image') { document.getElementById('image-upload').click(); return; }
-                          if (t.id === 'mic') { toggleRecording(); return; }
-                          if (t.id === 'emoji') { togglePanel('emoji', setShowEmojiPicker, showEmojiPicker); return; }
-                          if (t.id === 'ruler') { setRulerOn(v => !v); return; }
-                          if (t.id === 'protractor') { setProtractorOn(v => !v); return; }
-                          // One tap does it all: selecting a tool also opens its
-                          // options right away (nobody discovers a second tap), and
-                          // the popover tucks itself away as soon as drawing starts.
-                          // Tapping the active tool toggles the popover.
-                          const hasOptions = TOOLS_WITH_OPTIONS.includes(t.id);
-                          if (tool === t.id) togglePanel('tools', setShowToolOptions, showToolOptions);
-                          else { setTool(t.id); closeOverlays(hasOptions ? 'tools' : null); setShowToolOptions(hasOptions); }
-                       }}
-                       style={(() => {
-                          const active = t.id === 'ruler' ? rulerOn : t.id === 'protractor' ? protractorOn : t.id === 'emoji' ? showEmojiPicker : (tool === t.id && !['image','mic'].includes(t.id));
-                          return { flexShrink: 0, width: TOOL_BTN, height: TOOL_BTN, borderRadius: 12, border: 'none', background: active ? HW.accentSoft : 'transparent', color: active ? HW.accent : (t.id === 'mic' && isRecording ? '#EF4444' : HW.textDim), cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.18s cubic-bezier(0.2,0.8,0.2,1), background 0.18s, color 0.18s', position: 'relative', transform: active ? 'translateY(-4px)' : 'none' };
-                       })()}
-                     >
-                       <t.icon size={20} strokeWidth={1.6} />
-                       {t.id === 'mic' && isRecording && <div style={{ position: 'absolute', top: -4, right: -4, width: 8, height: 8, borderRadius: '50%', background: '#EF4444' }}></div>}
-                     </button>
-                  ))}
-
-                  {selectedId && (
-                     <>
-                        <div style={{ width: 1, background: '#E5E7EB', height: 24, flexShrink: 0, margin: '0 8px' }}></div>
-                        {currentPage.images?.find(i => i.id === selectedId) && (
-                           <button onClick={() => setCroppingImageId(selectedId)} title="ครอบตัด" style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: '#E0F2FE', color: '#0369A1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', marginRight: 4 }}>
-                              <Scissors size={18} strokeWidth={1.5} />
-                           </button>
-                        )}
-                        <button onClick={deleteSelected} title="ลบทิ้ง" style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: '#FEE2E2', color: '#EF4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-                           <Trash2 size={18} strokeWidth={1.5} />
-                        </button>
-                     </>
-                  )}
-               </div>
-               {showRightScrollHint && (
-                 <div className="pulse-scroll-hint" style={{ position: 'absolute', right: -4, top: 0, bottom: 0, width: 24, background: 'linear-gradient(to left, rgba(255,255,255,1) 40%, rgba(255,255,255,0))', zIndex: 2, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-                   <ChevronRight size={14} color="#9CA3AF" />
-                 </div>
-               )}
-             </div>
-            </div>
-
-            {/* In-app colour picker — sits above the options popover, outside the
-                scrollable capsule so it can never be clipped */}
-            {showColorPicker && (
-              <div style={{ order: -2 }}>
-                <ColorPickerPanel
-                  color={penColor}
-                  recentColors={customColors}
-                  onChange={(c) => { setPenColor(c); if (tool === 'text') applyColorToActiveText(c); }}
-                  onCommit={(c) => { setPenColor(c); if (tool === 'text') applyColorToActiveText(c); rememberCustomColor(c); setShowColorPicker(false); }}
-                  onClose={() => setShowColorPicker(false)}
-                />
-              </div>
-            )}
-
-            {/* Emoji / sticker picker — same slot as the colour picker, above the capsule */}
-            {showEmojiPicker && (
-              <div style={{ order: -2 }}>
-                <EmojiStickerPicker
-                  onPick={(e) => insertEmoji(e)}
-                  onUpload={() => { document.getElementById('image-upload').click(); setShowEmojiPicker(false); }}
-                  onClose={() => setShowEmojiPicker(false)}
-                />
-              </div>
-            )}
-
-            {/* Tool options popover — floats above the capsule, Huawei style */}
-            {showToolOptions && TOOLS_WITH_OPTIONS.includes(tool) && (
-              <div className="hide-scroll" style={{ order: -1, display: 'flex', alignItems: 'center', gap: 7, maxWidth: '100%', overflowX: 'auto', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, borderRadius: 16, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`, padding: '7px 12px' }} onWheel={(e) => { if (e.deltaY !== 0) e.currentTarget.scrollLeft += e.deltaY; }} {...rightToolbarScroll}>
-                  {['pen', 'fountain', 'marker', 'pencil', 'highlighter', 'shape'].includes(tool) && (
-                     <>
-                        {tool === 'shape' && (
-                           <>
-                             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                                {[{ t: 'rect', Icon: Square, title: 'สี่เหลี่ยม' }, { t: 'circle', Icon: CircleIcon, title: 'วงกลม' }, { t: 'triangle', Icon: Triangle, title: 'สามเหลี่ยม' }, { t: 'line', Icon: Minus, title: 'เส้นตรง' }, { t: 'arrow', Icon: ArrowRight, title: 'ลูกศร' }, { t: 'star', Icon: Star, title: 'ดาว' }, { t: 'polygon', Icon: Hexagon, title: 'รูปหลายเหลี่ยม (ปรับมุมได้)' }, { t: 'connector', Icon: Spline, title: 'เส้นเชื่อม (เกาะวัตถุ ทำมายด์แมป)' }].map(({ t, Icon, title }) => (
-                                  <button key={t} title={title} onClick={() => setShapeType(t)} style={{ width: 32, height: 32, borderRadius: 10, border: 'none', background: shapeType === t ? HW.accentSoft : 'transparent', color: shapeType === t ? HW.accent : '#9CA3AF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Icon size={20} strokeWidth={1.6} />
-                                  </button>
-                                ))}
-                             </div>
-                             <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
-                           </>
-                        )}
-
-                        {/* Compact nib preview: current colour, size and opacity in
-                            one small dot instead of a whole pen illustration. */}
-                        <span title={`${penSize}px`} style={{ flexShrink: 0, width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.04)' }}>
-                           <span style={{ display: 'block', width: Math.max(4, Math.min(20, penSize * 0.9)), height: Math.max(4, Math.min(20, penSize * 0.9)), borderRadius: '50%', background: penColor === '#FFFFFF' ? '#D1D5DB' : penColor, opacity: tool === 'highlighter' ? Math.min(0.5, penOpacity) : penOpacity }} />
-                        </span>
-
-                        <div style={{ width: 1, background: HW.hairline, height: 24, flexShrink: 0 }}></div>
-
-                        {/* Stroke sizes — a compact essentials row (custom via the picker). */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0 }}>
-                           {[2, 4, 8, 14].map(s => (
-                              <button
-                                key={s}
-                                onClick={() => setPenSize(s)}
-                                title={`${s}px`}
-                                style={{ width: 30, height: 30, borderRadius: '50%', border: 'none', background: penSize === s ? HW.accentSoft : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                              >
-                                <span style={{ display: 'block', width: Math.min(18, 4 + s * 0.7), height: Math.min(18, 4 + s * 0.7), borderRadius: '50%', background: penSize === s ? HW.accent : HW.textDim }} />
-                              </button>
-                           ))}
-                        </div>
-
-                        <div style={{ width: 1, background: HW.hairline, height: 24, flexShrink: 0 }}></div>
-
-                        {/* Opacity — the ink was always adjustable, there was just
-                            no way to reach it. */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0 }}>
-                           {[1, 0.6, 0.3].map(o => (
-                              <button
-                                key={o}
-                                onClick={() => setPenOpacity(o)}
-                                title={`ความเข้ม ${Math.round(o * 100)}%`}
-                                style={{ width: 30, height: 30, borderRadius: 10, border: 'none', background: Math.abs(penOpacity - o) < 0.01 ? HW.accentSoft : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                              >
-                                <span style={{ display: 'block', width: 16, height: 16, borderRadius: 5, background: penColor === '#FFFFFF' ? '#9CA3AF' : penColor, opacity: o, boxShadow: `inset 0 0 0 1px ${HW.hairline}` }} />
-                              </button>
-                           ))}
-                        </div>
-
-                        <div style={{ width: 1, background: HW.hairline, height: 24, flexShrink: 0 }}></div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                           {[...colors.slice(0, 6), ...customColors.slice(0, 2)].map((c, i) => (
-                              <div
-                                key={`${c}-${i}`}
-                                onClick={() => setPenColor(c)}
-                                title={c}
-                                style={{ width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer', flexShrink: 0, boxShadow: `inset 0 0 0 1px ${HW.hairline}`, outline: penColor === c ? `2.5px solid ${HW.accent}` : 'none', outlineOffset: 2, transition: 'outline 0.15s, transform 0.15s', transform: penColor === c ? 'scale(1.08)' : 'none' }}
-                              />
-                           ))}
-                           <button
-                             title="เลือกสีเอง"
-                             onClick={() => togglePanel('color', setShowColorPicker, showColorPicker, ['tools'])}
-                             style={{ width: 26, height: 26, borderRadius: '50%', flexShrink: 0, cursor: 'pointer', border: 'none', padding: 0, background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)', boxShadow: `inset 0 0 0 1px ${HW.hairline}`, outline: showColorPicker ? `2.5px solid ${HW.accent}` : 'none', outlineOffset: 2 }}
-                           />
-                        </div>
-
-                        {['pen', 'fountain', 'marker', 'pencil'].includes(tool) && (
-                           <>
-                              <div style={{ width: 1, background: HW.hairline, height: 26, flexShrink: 0 }}></div>
-                              <button
-                                onClick={() => setAutoShape(v => !v)}
-                                title="วาดรูปทรงคร่าว ๆ แล้วปล่อย ระบบจะจัดให้เป็นรูปทรงที่สมบูรณ์"
-                                style={{ display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 12px', borderRadius: 17, border: 'none', background: autoShape ? HW.accentSoft : 'rgba(0,0,0,0.035)', color: autoShape ? HW.accent : HW.textDim, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}
-                              >
-                                <Triangle size={15} strokeWidth={1.8} /> จัดรูปทรงอัตโนมัติ
-                              </button>
-                           </>
-                        )}
-                     </>
-                  )}
-
-                  {tool === 'text' && !editingTextId && (() => {
-                     // Edits apply to the text being typed or the selected one, so the
-                     // effect is visible straight away rather than only on the next box.
-                     const applyToActive = (patch) => {
-                        const id = editingTextId || selectedId;
-                        if (!id) return;
-                        updatePage(currentPageIndex, (page) => {
-                           page.texts = (page.texts || []).map(t => (t.id === id ? { ...t, ...patch } : t));
-                        });
-                     };
-                     const setStyle = (patch, textPatch) => {
-                        setTextStyle(s => ({ ...s, ...patch }));
-                        applyToActive(textPatch);
-                     };
-                     return (
-                       <>
-                          <select
-                            value={textStyle.fontFamily}
-                            onChange={(e) => setStyle({ fontFamily: e.target.value }, { fontFamily: e.target.value })}
-                            style={{ flexShrink: 0, height: 30, borderRadius: 9, border: `1px solid ${HW.hairline}`, background: 'white', color: HW.text, fontSize: 12.5, padding: '0 8px', cursor: 'pointer', fontFamily: textStyle.fontFamily }}
-                          >
-                            {FONT_OPTIONS.map(f => (
-                              <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>{f.label}</option>
-                            ))}
-                          </select>
-
-                          <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
-                             {[16, 20, 24, 32, 44, 60].map(sz => (
-                                <button
-                                  key={sz}
-                                  onClick={() => setStyle({ fontSize: sz }, { size: sz })}
-                                  style={{ minWidth: 28, height: 28, padding: '0 5px', borderRadius: 9, border: 'none', background: textStyle.fontSize === sz ? HW.accentSoft : 'transparent', color: textStyle.fontSize === sz ? HW.accent : HW.textDim, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-                                >
-                                  {sz}
-                                </button>
-                             ))}
-                          </div>
-
-                          <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
-                             <button
-                               onClick={() => setStyle({ bold: !textStyle.bold }, { bold: !textStyle.bold })}
-                               title="ตัวหนา"
-                               style={{ width: 30, height: 28, borderRadius: 9, border: 'none', background: textStyle.bold ? HW.accentSoft : 'transparent', color: textStyle.bold ? HW.accent : HW.textDim, fontSize: 14, fontWeight: 800, cursor: 'pointer' }}
-                             >B</button>
-                             <button
-                               onClick={() => setStyle({ italic: !textStyle.italic }, { italic: !textStyle.italic })}
-                               title="ตัวเอียง"
-                               style={{ width: 30, height: 28, borderRadius: 9, border: 'none', background: textStyle.italic ? HW.accentSoft : 'transparent', color: textStyle.italic ? HW.accent : HW.textDim, fontSize: 14, fontStyle: 'italic', fontWeight: 700, cursor: 'pointer' }}
-                             >I</button>
-                             <button
-                               onClick={() => setStyle({ underline: !textStyle.underline }, { underline: !textStyle.underline })}
-                               title="ขีดเส้นใต้"
-                               style={{ width: 30, height: 28, borderRadius: 9, border: 'none', background: textStyle.underline ? HW.accentSoft : 'transparent', color: textStyle.underline ? HW.accent : HW.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                             ><Underline size={15} strokeWidth={2} /></button>
-                             <button
-                               onClick={() => setStyle({ strikethrough: !textStyle.strikethrough }, { strikethrough: !textStyle.strikethrough })}
-                               title="ขีดฆ่า"
-                               style={{ width: 30, height: 28, borderRadius: 9, border: 'none', background: textStyle.strikethrough ? HW.accentSoft : 'transparent', color: textStyle.strikethrough ? HW.accent : HW.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                             ><Strikethrough size={15} strokeWidth={2} /></button>
-                          </div>
-
-                          <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
-
-                          {/* Alignment */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
-                             {[{ a: 'left', Icon: AlignLeft, label: 'ชิดซ้าย' }, { a: 'center', Icon: AlignCenter, label: 'กึ่งกลาง' }, { a: 'right', Icon: AlignRight, label: 'ชิดขวา' }].map(({ a, Icon, label }) => (
-                                <button
-                                  key={a}
-                                  onClick={() => setStyle({ align: a }, { align: a })}
-                                  title={label}
-                                  style={{ width: 30, height: 28, borderRadius: 9, border: 'none', background: (textStyle.align || 'left') === a ? HW.accentSoft : 'transparent', color: (textStyle.align || 'left') === a ? HW.accent : HW.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                ><Icon size={15} strokeWidth={2} /></button>
-                             ))}
-                          </div>
-
-                          <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
-
-                          {/* Lists */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
-                             {[{ l: 'bullet', Icon: List, label: 'รายการจุด' }, { l: 'number', Icon: ListOrdered, label: 'รายการตัวเลข' }].map(({ l, Icon, label }) => (
-                                <button
-                                  key={l}
-                                  onClick={() => { const next = textStyle.list === l ? 'none' : l; setStyle({ list: next }, { list: next }); }}
-                                  title={label}
-                                  style={{ width: 30, height: 28, borderRadius: 9, border: 'none', background: textStyle.list === l ? HW.accentSoft : 'transparent', color: textStyle.list === l ? HW.accent : HW.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                ><Icon size={15} strokeWidth={2} /></button>
-                             ))}
-                          </div>
-
-                          <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
-                             {colors.map(c => (
-                                <div
-                                  key={c}
-                                  onClick={() => { setPenColor(c); applyToActive({ color: c }); }}
-                                  title={c}
-                                  style={{ width: 22, height: 22, borderRadius: '50%', background: c, cursor: 'pointer', flexShrink: 0, boxShadow: `inset 0 0 0 1px ${HW.hairline}`, outline: penColor === c ? `2px solid ${HW.accent}` : 'none', outlineOffset: 2 }}
-                                />
-                             ))}
-                             <button
-                               title="เลือกสีเอง"
-                               onClick={() => togglePanel('color', setShowColorPicker, showColorPicker, ['tools'])}
-                               style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, cursor: 'pointer', border: 'none', padding: 0, background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)', boxShadow: `inset 0 0 0 1px ${HW.hairline}`, outline: showColorPicker ? `2px solid ${HW.accent}` : 'none', outlineOffset: 2 }}
-                             />
-                          </div>
-                       </>
-                     );
-                  })()}
-
-                  {tool === 'lasso' && (
-                     <>
-                        <span style={{ fontSize: 12.5, fontWeight: 700, color: HW.text, flexShrink: 0, whiteSpace: 'nowrap' }}>เลือกเฉพาะ</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                           {LASSO_KINDS.map(({ key, label }) => {
-                              const on = lassoFilter[key] !== false;
-                              return (
-                                 <button
-                                   key={key}
-                                   onClick={() => setLassoFilter(f => ({ ...f, [key]: !on }))}
-                                   title={on ? `กำลังเลือก${label}` : `ข้าม${label}`}
-                                   style={{ display: 'flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 16, border: 'none', background: on ? HW.accentSoft : 'rgba(0,0,0,0.04)', color: on ? HW.accent : HW.textDim, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap', transition: 'background 0.18s, color 0.18s' }}
-                                 >
-                                   <span style={{ width: 26, height: 15, borderRadius: 8, background: on ? HW.accent : '#D1D5DB', position: 'relative', flexShrink: 0, transition: 'background 0.18s' }}>
-                                     <span style={{ position: 'absolute', top: 1.5, left: on ? 12.5 : 1.5, width: 12, height: 12, borderRadius: '50%', background: 'white', transition: 'left 0.18s cubic-bezier(0.2,0.8,0.2,1)', boxShadow: '0 1px 2px rgba(0,0,0,0.25)' }} />
-                                   </span>
-                                   {label}
-                                 </button>
-                              );
-                           })}
-                        </div>
-                        <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
-                        <button
-                          onClick={() => setLassoFilter({ ...DEFAULT_LASSO_FILTER })}
-                          style={{ height: 32, padding: '0 12px', borderRadius: 16, border: 'none', background: 'transparent', color: HW.textDim, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}
-                        >เลือกทั้งหมด</button>
-                     </>
-                  )}
-
-                  {tool === 'sticker' && (
-                     <>
-                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                          {STICKY_COLORS.map(c => (
-                             <div key={c} onClick={() => setPenColor(c)} style={{ width: 22, height: 22, borderRadius: 6, background: c, cursor: 'pointer', outline: penColor === c ? '2px solid #3B82F6' : 'none', outlineOffset: 2, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }} />
-                          ))}
-                        </div>
-                        <div style={{ width: 1, background: '#E5E7EB', height: 20, flexShrink: 0 }}></div>
-                        <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-                           {STICKY_STYLES.map(s => (
-                              <button
-                                key={s.id}
-                                onClick={() => setStickerStyle(s.id)}
-                                title={s.label}
-                                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '5px 6px', background: stickerStyle === s.id ? '#E0F2FE' : '#F3F4F6', borderRadius: 8, border: stickerStyle === s.id ? '1.5px solid #0EA5E9' : '1.5px solid transparent', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                              >
-                                 <StickyStyleThumb id={s.id} color={STICKY_COLORS.includes(penColor) ? penColor : '#FEF3C7'} />
-                                 <span style={{ fontSize: 10, fontWeight: 600, color: stickerStyle === s.id ? '#0369A1' : '#6B7280', lineHeight: 1 }}>{s.label}</span>
-                              </button>
-                           ))}
-                        </div>
-                     </>
-                  )}
-
-                  {tool === 'eraser' && (
-                     <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
-                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                           {[{ m: 'stroke', label: 'ลบทั้งเส้น' }, { m: 'area', label: 'ลบบางส่วน' }].map(({ m, label }) => (
-                              <button
-                                key={m}
-                                onClick={() => setEraserSettings(s => ({ ...s, mode: m }))}
-                                style={{ padding: '5px 10px', borderRadius: 9, border: 'none', background: eraserSettings.mode === m ? HW.accentSoft : 'transparent', color: eraserSettings.mode === m ? HW.accent : HW.textDim, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-                              >
-                                {label}
-                              </button>
-                           ))}
-                        </div>
-
-                        <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                           {[12, 24, 40, 64].map(sz => (
-                              <button
-                                key={sz}
-                                onClick={() => setEraserSettings(s => ({ ...s, size: sz }))}
-                                title={`${sz}px`}
-                                style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: eraserSettings.size === sz ? HW.accentSoft : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                              >
-                                <span style={{ display: 'block', width: 4 + sz * 0.22, height: 4 + sz * 0.22, borderRadius: '50%', border: `1.5px solid ${eraserSettings.size === sz ? HW.accent : HW.textDim}` }} />
-                              </button>
-                           ))}
-                        </div>
-
-                        <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
-
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: HW.textDim, cursor: 'pointer', fontWeight: 500, flexShrink: 0 }}>
-                           <input type="checkbox" checked={eraserSettings.eraseObjects} onChange={() => setEraserSettings(s => ({ ...s, eraseObjects: !s.eraseObjects }))} />
-                           ลบวัตถุด้วย
-                        </label>
-                        <button onClick={clearStrokes} style={{ padding: '5px 10px', borderRadius: 9, border: `1px solid ${HW.hairline}`, background: 'white', color: '#EF4444', fontWeight: 600, fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>ล้างเส้นทั้งหมด</button>
-                     </div>
-                  )}
-
-                  {tool === 'laser' && (
-                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                           {sizes.map(s => (
-                              <button key={s} onClick={() => setPenSize(s)} title={`${s}px`} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: penSize === s ? HW.accentSoft : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                 <span style={{ display: 'block', width: Math.min(18, 4 + s * 0.7), height: Math.min(18, 4 + s * 0.7), borderRadius: '50%', background: penSize === s ? HW.accent : HW.textDim }} />
-                              </button>
-                           ))}
-                        </div>
-                        <div style={{ width: 1, background: HW.hairline, height: 22 }}></div>
-                        <span style={{ fontSize: 12.5, fontWeight: 600, color: HW.textDim, fontFamily: 'Kanit, sans-serif', flexShrink: 0 }}>สีเลเซอร์</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
-                           {['#EF4444', '#F97316', '#FACC15', '#22C55E', '#3B82F6', '#A855F7', '#EC4899', '#FFFFFF'].map(c => (
-                              <div
-                                key={c}
-                                onClick={() => setLaserColor(c)}
-                                title={c}
-                                style={{ width: 22, height: 22, borderRadius: '50%', background: c, cursor: 'pointer', flexShrink: 0, boxShadow: `inset 0 0 0 1px ${HW.hairline}`, outline: laserColor === c ? `2px solid ${HW.accent}` : 'none', outlineOffset: 2 }}
-                              />
-                           ))}
-                        </div>
-                     </div>
-                  )}
-              </div>
-            )}
-         </div>
-      )}
+      <NotebookToolCapsule ui={ui} />
 
       <div
         ref={containerRef}
