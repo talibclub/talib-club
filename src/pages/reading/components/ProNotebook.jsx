@@ -4186,9 +4186,21 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              onChange={setEditingStickerValue}
              textareaRef={stickerTextareaRef}
              onCommit={() => {
+                // Replace the sticker object rather than mutating it. updatePage
+                // shallow-copies the page but not its arrays, so assigning
+                // `sticker.text` wrote into the very object the previous render
+                // already holds — same identity, same array — and anything that
+                // compares by reference (React bailing out, a memo, the undo
+                // snapshot taken before this) can miss that the text changed.
+                // That is consistent with the reported "the text is not there
+                // until I resize the note", since resizing writes new numbers
+                // and forces the node to update.
+                const value = editingStickerValue;
+                const id = editingStickerId;
                 updatePage(currentPageIndex, (page) => {
-                   const sticker = page.stickers?.find(s => s.id === editingStickerId);
-                   if (sticker) sticker.text = editingStickerValue;
+                   page.stickers = (page.stickers || []).map(
+                      (s) => (s.id === id ? { ...s, text: value } : s)
+                   );
                 });
                 setEditingStickerId(null);
              }}
