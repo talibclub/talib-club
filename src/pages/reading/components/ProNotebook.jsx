@@ -2842,6 +2842,27 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // any tab straight onto the page, or Ctrl/Cmd+V a copied image) ---
   const [isDragOver, setIsDragOver] = useState(false);
 
+  // The overlay used to be cleared only by this element's own dragleave and
+  // drop. A drag that ends any other way — dropped outside the notebook, Esc,
+  // or the floating search window being closed mid-drag — fired neither, so the
+  // "ลากรูปมาวาง" frame stayed on screen for good. dragend fires on the source,
+  // and a dragleave with no relatedTarget means the pointer left the window
+  // entirely; either one means the drag is over as far as we are concerned.
+  useEffect(() => {
+    const clear = () => setIsDragOver(false);
+    const onDocLeave = (e) => { if (!e.relatedTarget) clear(); };
+    window.addEventListener('dragend', clear);
+    window.addEventListener('drop', clear);
+    window.addEventListener('blur', clear);
+    document.addEventListener('dragleave', onDocLeave);
+    return () => {
+      window.removeEventListener('dragend', clear);
+      window.removeEventListener('drop', clear);
+      window.removeEventListener('blur', clear);
+      document.removeEventListener('dragleave', onDocLeave);
+    };
+  }, []);
+
   // Turn a client (screen) point into page-space coordinates using the live stage
   // transform, so a dropped image lands under the pointer at any zoom/pan.
   const clientToPage = (clientX, clientY) => {
@@ -2858,8 +2879,16 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // Measure an image src, size it to a friendly width keeping aspect ratio, and
   // drop it centred on the point (or the page centre when no point is given).
   const insertImageSrcAt = (src, clientX, clientY) => {
-     if (!src) return;
+     if (!src) {
+        // Nothing usable came out of the drag. Without this the caller's
+        // "กำลังแทรกรูป..." toast is left spinning with nothing to finish it.
+        toast.error('ไม่พบรูปในสิ่งที่ลากมา', { id: 'drop-img' });
+        return;
+     }
+     let settled = false;
      const place = (w, h) => {
+        if (settled) return;
+        settled = true;
         const pt = clientToPage(clientX, clientY);
         pushHistory();
         updatePage(currentPageIndex, (page) => {
@@ -2875,6 +2904,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         place(w, Math.max(40, Math.round(w * (ratio || 1))));
      };
      im.onerror = () => place(300, 300); // couldn't measure (CORS): use a default box
+     // Some URLs resolve neither way — a blob: from a window that has since been
+     // closed, or a host that simply never answers. Nothing fired, so the image
+     // was never placed and the loading toast span forever. Place it at a
+     // default size instead of waiting indefinitely.
+     setTimeout(() => place(300, 300), 8000);
      im.src = src;
   };
 
@@ -2892,7 +2926,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
   const fetchAsDataUrlOrRemote = async (url) => {
      try {
-        const r = await fetch(url);
+        // Bounded: a host that accepts the connection and then never answers
+        // would otherwise leave the caller awaiting forever, with its
+        // "กำลังแทรกรูป..." toast spinning and no image ever placed. On timeout
+        // we fall through and reference the remote URL, which is the same thing
+        // that happens for a CORS refusal.
+        const ctrl = new AbortController();
+        const bail = setTimeout(() => ctrl.abort(), 8000);
+        const r = await fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(bail));
         const blob = await r.blob();
         if (blob.type.startsWith('image/')) {
            return await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob); });

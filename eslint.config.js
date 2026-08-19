@@ -33,6 +33,7 @@ const browserGlobals = {
   Image: "readonly",
   File: "readonly",
   AbortSignal: "readonly",
+  AbortController: "readonly",
   CustomEvent: "readonly",
   ResizeObserver: "readonly",
   IntersectionObserver: "readonly",
