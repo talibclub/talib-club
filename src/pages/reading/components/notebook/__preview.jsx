@@ -33,6 +33,7 @@ export default function NotebookPreview() {
   const [laserColor, setLaserColor] = useState('#c0392b');
   const [imgQuery, setImgQuery] = useState('ดาว');
   const [showImgSearch, setShowImgSearch] = useState(false);
+  const [demoX, setDemoX] = useState(40);
   const [demoText, setDemoText] = useState({ id: 'demo', text: '', color: '#1a1916', size: 24, fontFamily: 'Kanit', align: 'left', list: 'none', width: 340 });
 
   const ui = {
@@ -61,6 +62,13 @@ export default function NotebookPreview() {
   return (
     <>
     <div style={{ position: 'fixed', top: 8, left: 8, zIndex: 9999, display: 'flex', gap: 6, fontFamily: 'Kanit, sans-serif', fontSize: 12 }}>
+      {[40, 260, 520].map(px => (
+        <button key={'x'+px} onClick={() => setDemoX(px)}
+          style={{ padding: '4px 9px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${HW.hairline}`,
+                   background: demoX === px ? HW.text : '#fff', color: demoX === px ? '#fff' : HW.text }}>
+          x={px}
+        </button>
+      ))}
       {['100%', '900px', '700px', '520px', '380px'].map(w => (
         <button key={w} onClick={() => setPaneWidth(w)}
           style={{ padding: '4px 9px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${HW.hairline}`,
@@ -81,7 +89,7 @@ export default function NotebookPreview() {
       </div>
       {/* The text toolbar, so its layout can be looked at directly. */}
       <TextEditor
-        x={40}
+        x={demoX}
         y={90}
         scale={1}
         t={demoText}

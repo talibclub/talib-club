@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Minus, Plus } from 'lucide-react';
 import { FONT_OPTIONS, LINE_HEIGHT, TEXT_COLORS } from './theme.js';
 import { migrateText, makeLine, listPrefixes } from './geometry.js';
@@ -81,6 +81,31 @@ const FormatBtn = ({ icon, active, onClick }) => (
 );
 
 export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLinesChange, onFont, onSize, onColor, onCommit }) {
+  // The format bar is anchored to the text box's left edge with
+  // `width: max-content` and `maxWidth: calc(100vw - 32px)`. Two problems: a box
+  // near the right of the notebook pushed the bar off the edge, and the clamp
+  // was against the VIEWPORT while the notebook is normally half of it — so the
+  // bold/italic/underline buttons were simply cut off. max-content also defeats
+  // the flexWrap that was already there, since a max-content box never wraps.
+  //
+  // Measure the pane and the bar, then pull the bar back inside and let it wrap.
+  const barRef = useRef(null);
+  const [barShift, setBarShift] = useState(0);
+  const [barMax, setBarMax] = useState(null);
+  useLayoutEffect(() => {
+    const bar = barRef.current;
+    const host = bar?.closest('[data-text-editor]')?.parentElement;
+    if (!bar || !host) return;
+    const hostBox = host.getBoundingClientRect();
+    const room = Math.max(180, hostBox.width - 24);
+    const width = Math.min(bar.scrollWidth, room);
+    // x is the box's offset inside the pane; keep [x + shift, x + shift + width]
+    // within [8, paneWidth - 8].
+    const overflowRight = (x + width) - (hostBox.width - 8);
+    const shift = overflowRight > 0 ? -Math.min(overflowRight, Math.max(0, x - 8)) : 0;
+    setBarMax((prev) => (prev !== room ? room : prev));
+    setBarShift((prev) => (prev !== shift ? shift : prev));
+  });
   const localRef = useRef(null);
   const edRef = textareaRef || localRef;
   const composing = useRef(false);
@@ -296,9 +321,10 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
         bottom: y >= 60 ? '100%' : 'auto', 
         marginTop: y < 60 ? 6 : 0, 
         marginBottom: y >= 60 ? 6 : 0, 
-        left: 0, 
-        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, background: 'white', padding: '6px 8px', borderRadius: 10, boxShadow: '0 4px 24px rgba(0,0,0,0.15)', border: '1px solid var(--br2)', width: 'max-content', maxWidth: 'calc(100vw - 32px)'
-      }}>
+        left: barShift,
+        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, background: 'white', padding: '6px 8px', borderRadius: 10, boxShadow: '0 4px 24px rgba(0,0,0,0.15)', border: '1px solid var(--br2)',
+        maxWidth: barMax ? `${barMax}px` : 'calc(100vw - 32px)'
+      }} ref={barRef}>
         <select
           value={fontFamily}
           onChange={(e) => { onFont(e.target.value); setTimeout(() => edRef.current?.focus(), 0); }}
