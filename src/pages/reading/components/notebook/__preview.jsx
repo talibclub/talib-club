@@ -77,7 +77,7 @@ export default function NotebookPreview() {
     setShowPageSettings: noop, setShowRecordings: noop, setShowSearch: noop,
     setStylusMode: noop, setZoomWriter: noop, showBookSnip: false, showMoreMenu: false,
     showPageManager: false, showRecordings: false, showSearch: false,
-    startLoadingPDF: noop, stylusMode: 'auto', toggleBookmark: noop, zoomWriter: false,
+    startLoadingPDF: noop, stylusMode: 'auto', toggleBookmark: noop,
   };
 
   return (

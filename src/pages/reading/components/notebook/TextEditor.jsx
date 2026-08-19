@@ -537,8 +537,10 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
           maxWidth: '90vw',
           whiteSpace: 'pre-wrap',
           overflowWrap: 'break-word',
-          borderRadius: 10,
-          boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
+          // `borderRadius: 10` and a plain drop shadow used to be repeated here,
+          // silently replacing the rounder corner and the accent focus ring set
+          // above — so the editor never actually looked focused. Duplicate keys
+          // in one object literal; the last one simply wins.
           cursor: 'text',
           // The reading room disables text selection / uses touch-action:none on
           // the drawing surface; force them back on for the editor so a mouse
