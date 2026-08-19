@@ -410,14 +410,35 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         } catch (e) { console.error(e) }
      })();
 
+     // Which Wikipedia is worth asking. A Thai query on en.wikipedia matches
+     // English articles that merely contain the Thai string — searching "ดาว"
+     // returned "Yam khai dao" and three Thai actors, which is exactly the junk
+     // that showed up in the picker. Ask the wiki whose language the query is
+     // actually in.
+     const hasThai = /[฀-๿]/.test(q);
+     const hasLatin = /[a-zA-Z]/.test(q);
+     const wikiLangs = hasThai ? ['th'] : hasLatin ? ['en'] : ['th', 'en'];
+
      const wikiArticles = (lang) => (async () => {
         try {
            const res = await fetch(`https://${lang}.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=12&piprop=thumbnail&pithumbsize=400&origin=*`);
            const data = await res.json();
-           Object.values(data.query?.pages || {}).forEach(p => p.thumbnail && add({
-              id: `wp-${lang}-${p.pageid}`, title: p.title, thumbnail: p.thumbnail.source, url: p.thumbnail.source,
-              width: p.thumbnail.width, height: p.thumbnail.height, source: 'Wikipedia', license: 'สาธารณะ/CC'
-           }));
+           // This is an ARTICLE search, not an image search: it returns the lead
+           // photo of every article that merely mentions the word. Searching
+           // "ดาว" came back with singers and a plate of food, because those
+           // articles contain the word. Keep only pages whose own title matches,
+           // which is the difference between "an article about ดาว" and "an
+           // article that says ดาว somewhere".
+           const needle = q.trim().toLowerCase();
+           Object.values(data.query?.pages || {}).forEach(p => {
+              if (!p.thumbnail) return;
+              const title = String(p.title || '').toLowerCase();
+              if (!title.includes(needle)) return;
+              add({
+                 id: `wp-${lang}-${p.pageid}`, title: p.title, thumbnail: p.thumbnail.source, url: p.thumbnail.source,
+                 width: p.thumbnail.width, height: p.thumbnail.height, source: 'Wikipedia', license: 'สาธารณะ/CC'
+              });
+           });
         } catch { /* one source failing shouldn't sink the search */ }
      })();
 
@@ -454,11 +475,18 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      // reachable without handing anyone's queries to a stranger.
 
      try {
-        const sources = [google, commons, openverse, wikiArticles('th'), wikiArticles('en')];
-        sources.forEach((p) => p.then(() => { if (!isStale()) setImgResults([...merged]); }));
+        const sources = [google, commons, openverse, ...wikiLangs.map(wikiArticles)];
+        // Results used to appear in whatever order the network returned them, so
+        // Wikipedia article photos routinely sat above real picture libraries.
+        // Rank by how much of an image source each one is.
+        const SOURCE_RANK = { 'Google': 0, 'Pixabay': 1, 'Openverse': 2, 'Commons': 3, 'DuckDuckGo': 4, 'Wikipedia': 5, 'ลิงก์': -1 };
+        const ranked = () => [...merged].sort(
+           (a, b) => (SOURCE_RANK[a.source] ?? 9) - (SOURCE_RANK[b.source] ?? 9)
+        );
+        sources.forEach((p) => p.then(() => { if (!isStale()) setImgResults(ranked()); }));
         await Promise.allSettled(sources);
         if (isStale()) return;
-        setImgResults([...merged]);
+        setImgResults(ranked());
         if (!merged.length) toast('ไม่พบรูปภาพที่ค้นหา — ลองคำอื่น หรือเปลี่ยนตัวกรอง');
      } catch (e) {
         console.error('Image search failed', e);
