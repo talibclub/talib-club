@@ -13,8 +13,17 @@ export default function TimerPanel({
   saveReadingProgress,
   MIN_VERIFIED_SECONDS,
   MIN_REFLECTION_CHARS,
-  onOpenBook
+  onOpenBook,
+  totalPages = 0
 }) {
+  // Nothing checked the page numbers against the book, so a 50-page book could
+  // be logged as "read pages 1-9999" — which then fed pagesRead straight into
+  // the session score. `max` stops the spinner going past the end and the
+  // message below says why; saveReadingProgress() re-checks, because typing a
+  // number by hand ignores `max`.
+  const maxPage = Number(totalPages) > 0 ? Number(totalPages) : null
+  const overEnd = maxPage && Number(endPage) > maxPage
+  const overStart = maxPage && Number(startPage) > maxPage
   return (
     <div className="card reader-form-card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14, overflowY: "auto", height: "100%" }}>
       <h3 style={{ fontSize: 14, borderBottom: "1.5px solid var(--br2)", paddingBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
@@ -79,22 +88,33 @@ export default function TimerPanel({
           <span style={{ fontSize: 11, color: "var(--t2)" }}>หน้าเริ่มต้น *</span>
           <input
             type="number"
+            min={1}
+            max={maxPage || undefined}
             value={startPage}
             onChange={e => setStartPage(e.target.value)}
-            style={{ fontSize: 13, padding: "8px 10px" }}
+            style={{ fontSize: 13, padding: "8px 10px", borderColor: overStart ? "var(--red)" : undefined }}
           />
         </label>
         <label style={{ display: "grid", gap: 4 }}>
           <span style={{ fontSize: 11, color: "var(--t2)" }}>อ่านถึงหน้า *</span>
           <input
             type="number"
-            placeholder="เช่น 12"
+            min={1}
+            max={maxPage || undefined}
+            placeholder={maxPage ? `1–${maxPage}` : "เช่น 12"}
             value={endPage}
             onChange={e => setEndPage(e.target.value)}
-            style={{ fontSize: 13, padding: "8px 10px" }}
+            style={{ fontSize: 13, padding: "8px 10px", borderColor: overEnd ? "var(--red)" : undefined }}
           />
         </label>
       </div>
+
+      {maxPage && (overStart || overEnd) && (
+        <div style={{ fontSize: 11.5, color: "var(--red)", display: "flex", alignItems: "center", gap: 6 }}>
+          <i className="ti ti-alert-triangle" style={{ fontSize: 14 }}></i>
+          หนังสือเล่มนี้มี {maxPage} หน้า — ระบุหน้าเกินจำนวนจริงไม่ได้
+        </div>
+      )}
 
       <label style={{ display: "grid", gap: 4 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -114,7 +134,7 @@ export default function TimerPanel({
 
       <button
         onClick={saveReadingProgress}
-        disabled={saving || seconds < MIN_VERIFIED_SECONDS || reflection.length < MIN_REFLECTION_CHARS || !endPage || Number(endPage) < Number(startPage)}
+        disabled={saving || seconds < MIN_VERIFIED_SECONDS || reflection.length < MIN_REFLECTION_CHARS || !endPage || Number(endPage) < Number(startPage) || overStart || overEnd}
         className="btn btn-teal"
         style={{ width: "100%", marginTop: "auto", padding: "10px 0", fontSize: 13 }}
       >

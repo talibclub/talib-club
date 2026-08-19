@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Path, Group, Circle, Text, Rect, Transformer, RegularPolygon, Line, Star as KonvaStar, Arrow as KonvaArrow } from 'react-konva';
-import { PenTool, Highlighter, Eraser, Type, Square, Search, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, Check, Triangle, Cloud, CheckCircle, Trash2, Scissors, Brush, Feather, Maximize2, Ruler, PanelLeftClose, PanelLeftOpen, Wand2, Camera, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Underline, Strikethrough, Smile, ListMusic, X, ArrowRight, Star, Hexagon, Compass, Link2, Spline } from 'lucide-react';
+import { PenTool, Highlighter, Eraser, Type, Square, Search, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, Check, Triangle, Cloud, CheckCircle, Trash2, Scissors, Brush, Feather, Maximize2, Ruler, PanelLeftClose, PanelLeftOpen, Wand2, Camera, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Underline, Strikethrough, Smile, ListMusic, X, ArrowRight, Star, Hexagon, Compass, Link2, Spline, BookOpen } from 'lucide-react';
 import CropModal from './CropModal';
 import ColorPickerPanel from './ColorPickerPanel';
 import BookSnipModal from './BookSnipModal';
@@ -110,7 +110,7 @@ const LASSO_KINDS = [
 ];
 const DEFAULT_LASSO_FILTER = { lines: true, shapes: true, images: true, texts: true, stickers: true };
 
-export default function ProNotebook({ bookId, uid, activeBook, readonly = false, fullView = false, onToggleFullView }) {
+export default function ProNotebook({ bookId, uid, activeBook, readonly = false, fullView = false, onToggleFullView, onPdfPageCount }) {
   const leftToolbarScroll = useDragScroll();
   const rightToolbarScroll = useDragScroll();
   const containerRef = useRef(null);
@@ -1035,6 +1035,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       const pdf = pdfUrl
         ? await pdfjsLib.getDocument({ url: pdfUrl }).promise
         : await loadBookPdf(activeBook.book.fileUrl);
+      // Tell the reader how many pages the file really has. The page-range
+      // fields otherwise validate against the count typed into the book record,
+      // which is self-declared and often blank.
+      onPdfPageCount?.(pdf.numPages);
       const MAX_IMPORT_PAGES = 30;
       const numPages = Math.min(pdf.numPages, MAX_IMPORT_PAGES);
       // Say so rather than silently dropping the rest — a 200-page book used to
@@ -3261,9 +3265,19 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                    )}
                    {[
                      { id: 'addpage', icon: FilePlus, title: 'เพิ่มหน้าใหม่', onClick: handleAddPage },
-                     { id: 'pdf', icon: FileText, title: 'นำเข้า PDF', onClick: () => document.getElementById('pdf-upload').click() },
+                     // With a book already open, the obvious thing is to bring THAT
+                     // pdf in. startLoadingPDF() has always supported it — called
+                     // with no url it loads activeBook through the shared byte
+                     // cache — but nothing in the UI ever did, so the only
+                     // book-aware action on offer was screenshotting it page by
+                     // page. "นำเข้า PDF" still opens the file picker for
+                     // everything else.
+                     ...(activeBook?.book?.fileUrl
+                       ? [{ id: 'bookpdf', icon: BookOpen, title: 'ดึงหนังสือเล่มนี้เข้าโน้ต', onClick: () => startLoadingPDF() }]
+                       : []),
+                     { id: 'pdf', icon: FileText, title: activeBook?.book?.fileUrl ? 'นำเข้า PDF อื่น' : 'นำเข้า PDF', onClick: () => document.getElementById('pdf-upload').click() },
                      // Snip a region of the companion book straight into the note.
-                     ...(activeBook?.book?.fileUrl ? [{ id: 'snip', icon: Camera, title: 'แคปจากหนังสือ', onClick: () => { closeOverlays('snip'); setBookSnipInitialPage(1); setShowBookSnip(true); }, active: showBookSnip }] : []),
+                     ...(activeBook?.book?.fileUrl ? [{ id: 'snip', icon: Camera, title: 'แคปเฉพาะบางส่วน', onClick: () => { closeOverlays('snip'); setBookSnipInitialPage(1); setShowBookSnip(true); }, active: showBookSnip }] : []),
                      { id: 'zoomwrite', icon: Maximize2, title: 'ขยายเขียน', onClick: () => setZoomWriter(v => !v), active: zoomWriter },
                      { id: 'recordings', icon: ListMusic, title: 'บันทึกเสียง', onClick: () => togglePanel('recordings', setShowRecordings, showRecordings), active: showRecordings, badge: recordings.length },
                      { id: 'search', icon: Search, title: 'ค้นหา', onClick: () => togglePanel('search', setShowSearch, showSearch), active: showSearch },

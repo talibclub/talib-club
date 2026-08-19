@@ -157,6 +157,10 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   // Log Form states
   const [startPage, setStartPage] = useState("")
   const [endPage, setEndPage] = useState("")
+  // The real page count of the open book's PDF, learned from pdf.js when the
+  // notebook opens the file. Preferred over the number typed into the book
+  // record, which is self-declared and can be wrong or missing.
+  const [realPdfPages, setRealPdfPages] = useState(0)
   const [reflection, setReflection] = useState("")
   const [saving, setSaving] = useState(false)
 
@@ -249,6 +253,12 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       return dateKey === streak.todayKey && item.lastQuiz.score >= 12
     })
   }, [shelfItems, streak.todayKey, uid])
+
+  const activeBookTotalPages = useMemo(() => {
+    if (realPdfPages > 0) return realPdfPages
+    const declared = Number(activeBook?.book?.totalPages || activeBook?.customBook?.totalPages || 0)
+    return declared > 0 ? declared : 0
+  }, [realPdfPages, activeBook])
 
   const last7Days = useMemo(() => {
     const list = []
@@ -760,6 +770,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 
   function startReading(shelfItem) {
     setActiveBook(shelfItem)
+    setRealPdfPages(0)
     sessionStorage.setItem("activeReadingSession", shelfItem.id)
     resumeTimer()
     setStartPage(shelfItem.currentPage || 1)
@@ -811,6 +822,16 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 
     if (isNaN(start) || isNaN(end) || end < start) {
       toast.error("กรุณาใส่หน้าเริ่มต้นและสิ้นสุดให้ถูกต้อง")
+      return
+    }
+    // `max` on a number input is not enforced for a typed value, and this is
+    // what pagesRead — part of the session score — is calculated from.
+    if (activeBookTotalPages > 0 && (end > activeBookTotalPages || start > activeBookTotalPages)) {
+      toast.error(`หนังสือเล่มนี้มี ${activeBookTotalPages} หน้า — ระบุหน้าเกินจำนวนจริงไม่ได้`)
+      return
+    }
+    if (start < 1) {
+      toast.error("หน้าเริ่มต้นต้องเป็น 1 ขึ้นไป")
       return
     }
     if (seconds < 10) {
@@ -1117,6 +1138,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
             saveReadingProgress={saveReadingProgress}
             MIN_VERIFIED_SECONDS={MIN_VERIFIED_SECONDS}
             MIN_REFLECTION_CHARS={MIN_REFLECTION_CHARS}
+            totalPages={activeBookTotalPages}
             onOpenBook={() => setActiveMobileTab("preview")}
           />
 
@@ -1141,7 +1163,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
           {/* Far Right Panel: Pro Notebook (Tldraw) */}
           {showNotebook && (
             <div className="reader-notebook" style={{ height: "100%", minHeight: 0, minWidth: 0 }}>
-              <ProNotebook bookId={activeBook.book.id} uid={uid} activeBook={activeBook} fullView={notebookFull} onToggleFullView={() => setNotebookFull(v => !v)} />
+              <ProNotebook bookId={activeBook.book.id} uid={uid} activeBook={activeBook} fullView={notebookFull} onToggleFullView={() => setNotebookFull(v => !v)} onPdfPageCount={setRealPdfPages} />
             </div>
           )}
         </div>
