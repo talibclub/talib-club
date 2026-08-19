@@ -445,15 +445,22 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
         marginTop: y < 60 ? 6 : 0, 
         marginBottom: y >= 60 ? 6 : 0, 
         left: barShift,
-        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 5,
-        // Frosted like the rest of the notebook chrome. A solid white slab over
-        // the page is what made this look bolted on.
-        background: HW.surfaceStrong,
+        // One slim row that scrolls, not a block that wraps. Wrapping turned the
+        // bar into a three-row slab in a narrow pane — taller than the text box
+        // it belongs to — and buried the writing under its own controls.
+        display: 'flex', flexWrap: 'nowrap', alignItems: 'center', gap: 5,
+        overflowX: 'auto', overflowY: 'hidden',
+        // Glass, not a panel. The heavy frost is what keeps the icons legible at
+        // this little opacity, even over a dark page underneath.
+        background: 'rgba(252,250,246,0.45)',
         backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur,
-        padding: '7px 9px', borderRadius: 16,
-        boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`,
+        padding: '5px 8px', borderRadius: 14,
+        boxShadow: '0 4px 16px rgba(35,31,27,0.08)', border: `1px solid ${HW.hairline}`,
         maxWidth: barMax ? `${barMax}px` : 'calc(100vw - 32px)'
-      }} ref={barRef}>
+      }}
+      className="hide-scroll"
+      onWheel={(e) => { const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; if (d) e.currentTarget.scrollLeft += d; }}
+      ref={barRef}>
         <select
           value={fontFamily}
           onChange={(e) => { onFont(e.target.value); setTimeout(() => edRef.current?.focus(), 0); }}
