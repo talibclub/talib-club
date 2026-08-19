@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import NotebookStyles from './NotebookStyles.jsx';
 import NotebookToolCapsule from './NotebookToolCapsule.jsx';
+import NotebookTopBar from './NotebookTopBar.jsx';
 import ImageSearchPanel from './ImageSearchPanel.jsx';
 import TextEditor from './TextEditor.jsx';
 import { HW } from './theme.js';
@@ -57,6 +58,19 @@ export default function NotebookPreview() {
     toggleRecording: noop, tool, toolsScrollRef: { current: null },
     updatePage: noop, zoomWriter: false,
     undo: noop, redo: noop, canUndo: true, canRedo: false,
+    activeBook: { book: { id: 'b', title: 'ตัวอย่าง', fileUrl: 'x.pdf' } },
+    audioPlaying: false, clearPage: noop, deletePage: noop, deleteRecording: noop,
+    exportNotebookPDF: noop, fitToScreen: noop, fullView: false, handleAddPage: noop,
+    isMobile: false, isSaving: false, nowPlaying: null, onToggleFullView: noop,
+    pages: [{ id: 'p1' }], playRecording: noop, pressureEnabled: true,
+    recordings: [], renameRecording: noop, runExport: noop, saveNotebook: noop,
+    setBookSnipInitialPage: noop, setCurrentPageIndex: noop, setPressureEnabled: noop,
+    setScale: noop, setShowAi: noop, setShowBookSnip: noop, setShowExport: noop,
+    setShowImgSearch: noop, setShowMoreMenu: noop, setShowPageManager: noop,
+    setShowPageSettings: noop, setShowRecordings: noop, setShowSearch: noop,
+    setStylusMode: noop, setZoomWriter: noop, showBookSnip: false, showMoreMenu: false,
+    showPageManager: false, showRecordings: false, showSearch: false,
+    startLoadingPDF: noop, stylusMode: 'auto', toggleBookmark: noop, zoomWriter: false,
   };
 
   return (
@@ -79,6 +93,7 @@ export default function NotebookPreview() {
     </div>
     <div style={{ position: 'relative', width: paneWidth, height: '100vh', background: HW.paper, overflow: 'hidden', fontFamily: 'Kanit, sans-serif', borderRight: `1px solid ${HW.hairline}` }}>
       <NotebookStyles />
+      <NotebookTopBar ui={ui} />
       <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: HW.textDim }}>
         <div style={{ width: 'min(720px, 86vw)', height: '62vh', background: '#fff', borderRadius: 12, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`, display: 'grid', placeItems: 'center' }}>
           <div style={{ textAlign: 'center' }}>

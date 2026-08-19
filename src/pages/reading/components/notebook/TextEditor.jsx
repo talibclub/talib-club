@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Minus, Plus } from 'lucide-react';
+import { AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Minus, Plus, MoreHorizontal, Bold, Italic, Underline, Strikethrough } from 'lucide-react';
 import { FONT_OPTIONS, LINE_HEIGHT, TEXT_COLORS, HW } from './theme.js';
 import { migrateText, makeLine, listPrefixes } from './geometry.js';
 
@@ -89,6 +89,10 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
   // the flexWrap that was already there, since a max-content box never wraps.
   //
   // Measure the pane and the bar, then pull the bar back inside and let it wrap.
+  // Everything past the essentials lives behind a single ⋯ button. The bar was
+  // four stacked rows floating over the note, which is most of what made it feel
+  // heavy — it is one slim row now unless you ask for the rest.
+  const [moreOpen, setMoreOpen] = useState(false);
   const barRef = useRef(null);
   const [barShift, setBarShift] = useState(0);
   const [barMax, setBarMax] = useState(null);
@@ -335,7 +339,7 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
           value={fontFamily}
           onChange={(e) => { onFont(e.target.value); setTimeout(() => edRef.current?.focus(), 0); }}
           title="เปลี่ยนฟอนต์"
-          style={{ height: 28, borderRadius: 9, border: 'none', background: 'rgba(35,31,27,0.05)', color: HW.text, fontSize: 12, padding: '0 6px', cursor: 'pointer', fontFamily, maxWidth: 104, flexShrink: 0 }}
+          style={{ height: 28, borderRadius: 9, border: 'none', background: 'rgba(35,31,27,0.05)', color: HW.text, fontSize: 12, padding: '0 22px 0 9px', cursor: 'pointer', fontFamily, maxWidth: 104, flexShrink: 0, appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235d5850' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
         >
           {FONT_OPTIONS.map((f) => <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>{f.label}</option>)}
         </select>
@@ -350,7 +354,7 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
 
         {onColor && (
           <>
-            <div style={{ width: 1, height: 16, background: 'var(--br2)', margin: '0 2px' }} />
+            <div style={{ width: 1, height: 16, background: HW.hairline, margin: '0 3px' }} />
             {/* Swatches, not a colour well. The well opened the native
                 <input type="color">, which does nothing at all on several
                 tablet browsers — the same reason ColorPickerPanel exists — and
@@ -383,33 +387,43 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
           </>
         )}
         
-        <div style={{ width: 1, height: 16, background: 'var(--br2)', margin: '0 2px' }} />
+        <div style={{ width: 1, height: 16, background: HW.hairline, margin: '0 3px' }} />
 
         <div style={{ display: 'flex', gap: 2 }}>
           {[
-            { id: 'bold', label: <span style={{ fontWeight: 800, fontFamily: 'serif', fontSize: 14 }}>B</span> },
-            { id: 'italic', label: <span style={{ fontStyle: 'italic', fontFamily: 'serif', fontSize: 14 }}>I</span> },
-            { id: 'underline', label: <span style={{ textDecoration: 'underline', fontFamily: 'serif', fontSize: 14 }}>U</span> },
-            { id: 'strikethrough', label: <span style={{ textDecoration: 'line-through', fontFamily: 'serif', fontSize: 14 }}>S</span> },
+            // Icons, not serif letters. Latin B/I/U next to a row of lucide
+            // glyphs was the most obviously mismatched thing in the bar, and
+            // "B" for หนา means nothing to a Thai reader who is not already
+            // used to Word.
+            { id: 'bold', label: <Bold size={15} /> },
+            { id: 'italic', label: <Italic size={15} /> },
+            { id: 'underline', label: <Underline size={15} /> },
+            { id: 'strikethrough', label: <Strikethrough size={15} /> },
           ].map((b) => (
             <button key={b.id} {...noFocusSteal} onClick={(e) => { e.stopPropagation(); toggleFlag(b.id); }} style={{...toolBtn(active[b.id]), width: 26, height: 26}}>{b.label}</button>
           ))}
         </div>
         
-        <div style={{ width: 1, height: 16, background: 'var(--br2)', margin: '0 2px' }} />
+        <button
+          {...noFocusSteal}
+          onClick={(e) => { e.stopPropagation(); setMoreOpen((v) => !v); }}
+          title="รายการและการจัดวาง"
+          aria-expanded={moreOpen}
+          style={{ ...FORMAT_BTN_STYLE, background: moreOpen ? HW.accentSoft : 'transparent', color: moreOpen ? HW.accent : HW.textDim, marginLeft: 2 }}
+        >
+          <MoreHorizontal size={16} />
+        </button>
 
-        <div style={{ display: 'flex', gap: 2 }}>
-          <FormatBtn icon={<List size={15} />} active={active.list === 'bullet'} onClick={() => toggleList('bullet')} />
-          <FormatBtn icon={<ListOrdered size={15} />} active={active.list === 'number'} onClick={() => toggleList('number')} />
-        </div>
-        
-        <div style={{ width: 1, height: 16, background: 'var(--br2)', margin: '0 2px' }} />
-
-        <div style={{ display: 'flex', gap: 2 }}>
-          <FormatBtn icon={<AlignLeft size={15} />} active={!active.align || active.align === 'left'} onClick={() => setAlign('left')} />
-          <FormatBtn icon={<AlignCenter size={15} />} active={active.align === 'center'} onClick={() => setAlign('center')} />
-          <FormatBtn icon={<AlignRight size={15} />} active={active.align === 'right'} onClick={() => setAlign('right')} />
-        </div>
+        {moreOpen && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%', paddingTop: 5, marginTop: 1, borderTop: `1px solid ${HW.hairline}` }}>
+            <FormatBtn icon={<List size={15} />} active={active.list === 'bullet'} onClick={() => toggleList('bullet')} />
+            <FormatBtn icon={<ListOrdered size={15} />} active={active.list === 'number'} onClick={() => toggleList('number')} />
+            <div style={{ width: 1, height: 16, background: HW.hairline, margin: '0 4px' }} />
+            <FormatBtn icon={<AlignLeft size={15} />} active={!active.align || active.align === 'left'} onClick={() => setAlign('left')} />
+            <FormatBtn icon={<AlignCenter size={15} />} active={active.align === 'center'} onClick={() => setAlign('center')} />
+            <FormatBtn icon={<AlignRight size={15} />} active={active.align === 'right'} onClick={() => setAlign('right')} />
+          </div>
+        )}
       </div>
 
       <div
@@ -437,10 +451,10 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
         style={{
           margin: 0,
           padding: 8,
-          border: `2px solid ${HW.accent}`,
-          borderRadius: 12,
-          background: 'rgba(255,255,255,0.92)',
-          boxShadow: HW.shadow,
+          border: `1.5px solid ${HW.accentRing}`,
+          borderRadius: 14,
+          background: 'rgba(255,255,255,0.90)',
+          boxShadow: `${HW.shadow}, 0 0 0 4px ${HW.accentSoft}`,
           color: t.color,
           fontSize: `${size * scale}px`,
           fontFamily,

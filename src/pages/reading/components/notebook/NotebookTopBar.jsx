@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Cloud, CheckCircle, Zap, Eraser, ChevronLeft, ChevronRight, Download, Bookmark, Settings, FilePlus, Maximize2, Search, Columns, LayoutGrid, ListMusic, Camera, FileText, BookOpen, PanelLeftClose, PanelLeftOpen, Image as ImageIcon, PenTool, Plus, Minus, Check, Wand2 } from 'lucide-react';
 import { HW } from './theme.js';
 import { RecordingsPanel } from '../AudioRecordings.jsx';
@@ -24,10 +24,58 @@ export default function NotebookTopBar({ ui }) {
     startLoadingPDF, stylusMode, toggleBookmark, togglePanel, zoomWriter,
   } = ui;
 
+  // The header overflows on a narrow pane — the notebook is normally half a
+  // split view — and there was no way to reach what fell off the right edge. It
+  // had overflow-x: auto but nothing to drive it: no wheel handler, no drag, and
+  // `justify-content: space-between`, which on an overflowing flex row pins the
+  // content so the ends cannot be scrolled to at all. Vertical wheel now scrolls
+  // it sideways, it can be dragged, and a fade marks that there is more.
+  const railRef = useRef(null);
+  const [moreRight, setMoreRight] = useState(false);
+  const [moreLeft, setMoreLeft] = useState(false);
+  const syncHints = useCallback(() => {
+    const el = railRef.current;
+    if (!el) return;
+    setMoreLeft(el.scrollLeft > 4);
+    setMoreRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
+  }, []);
+  useLayoutEffect(syncHints);
+  useEffect(() => {
+    window.addEventListener('resize', syncHints);
+    return () => window.removeEventListener('resize', syncHints);
+  }, [syncHints]);
+
+  const drag = useRef(null);
+
   return (
     <>
       {/* Huawei Notes Top Navigation Bar (Fixed App Header) */}
-         <div className="hide-scroll" style={{ height: 52, flexShrink: 0, width: '100%', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, display: 'flex', alignItems: 'center', justifyContent: readonly ? 'center' : 'space-between', padding: '0 12px', zIndex: 50, borderBottom: `1px solid ${HW.hairline}`, overflowX: 'auto' }}>
+       <div style={{ position: 'relative', flexShrink: 0, width: '100%', zIndex: 50 }}>
+         {moreLeft && (
+           <div style={{ position: 'absolute', left: 0, top: 0, bottom: 1, width: 22, zIndex: 2, pointerEvents: 'none', background: `linear-gradient(to right, ${HW.surfaceStrong}, transparent)` }} />
+         )}
+         {moreRight && (
+           <div style={{ position: 'absolute', right: 0, top: 0, bottom: 1, width: 26, zIndex: 2, pointerEvents: 'none', background: `linear-gradient(to left, ${HW.surfaceStrong}, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 3 }}>
+             <ChevronRight size={14} color={HW.textDim} />
+           </div>
+         )}
+         <div
+           ref={railRef}
+           className="hide-scroll"
+           onScroll={syncHints}
+           onWheel={(e) => {
+             const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+             if (d !== 0) e.currentTarget.scrollLeft += d;
+           }}
+           onMouseDown={(e) => { drag.current = { x: e.pageX, left: e.currentTarget.scrollLeft }; }}
+           onMouseLeave={() => { drag.current = null; }}
+           onMouseUp={() => { drag.current = null; }}
+           onMouseMove={(e) => {
+             if (!drag.current) return;
+             e.currentTarget.scrollLeft = drag.current.left - (e.pageX - drag.current.x);
+           }}
+           style={{ height: 52, width: '100%', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, display: 'flex', alignItems: 'center', justifyContent: readonly ? 'center' : 'flex-start', gap: 8, padding: '0 12px', borderBottom: `1px solid ${HW.hairline}`, overflowX: 'auto', overflowY: 'hidden', touchAction: 'pan-x', scrollBehavior: 'auto' }}
+         >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                {/* No in-notebook back button: it called window.history.back(), which
                    would kick the user out of the reading room entirely. The reader
@@ -138,6 +186,7 @@ export default function NotebookTopBar({ ui }) {
 
             </div>
          </div>
+       </div>
 
          {/* Recordings list panel — rendered outside the scrollable header. */}
          {showRecordings && (
