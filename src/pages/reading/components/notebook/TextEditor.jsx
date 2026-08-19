@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Minus, Plus, MoreHorizontal, Bold, Italic, Underline, Strikethrough } from 'lucide-react';
 import { FONT_OPTIONS, LINE_HEIGHT, TEXT_COLORS, HW } from './theme.js';
 import { migrateText, makeLine, listPrefixes } from './geometry.js';
-import { matchAutoformat } from './textAutoformat.js';
+import { matchAutoformat, matchLineTrigger, matchInlineWrap } from './textAutoformat.js';
 
 // WYSIWYG in-place editor for a text object with PER-LINE formatting.
 //
@@ -260,8 +260,51 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
     return true;
   };
 
+  // Markdown shorthand while typing. "- " at the start of a line becomes a
+  // bullet, "**คำ**" becomes bold — the things people already type by habit,
+  // so a list does not require a trip to the toolbar.
+  const applyMarkdown = () => {
+    if (composing.current) return false;
+    const sel = window.getSelection();
+    if (!sel || !sel.isCollapsed || sel.rangeCount === 0) return false;
+    const node = sel.anchorNode;
+    if (!node || node.nodeType !== 3 || !edRef.current?.contains(node)) return false;
+
+    const caret = sel.anchorOffset;
+    const before = node.textContent.slice(0, caret);
+
+    const line = matchLineTrigger(before);
+    if (line) {
+      node.textContent = node.textContent.slice(caret);
+      const range = document.createRange();
+      range.setStart(node, 0);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      if (line.action.type === 'list') toggleList(line.action.value);
+      else if (line.action.type === 'heading') onSize?.(line.action.value === 1 ? 32 : 26);
+      return true;
+    }
+
+    const wrap = matchInlineWrap(before);
+    if (wrap) {
+      // Drop the markers, leave the words, and turn the style on for what is
+      // typed next — restyling just the span needs range surgery the flat line
+      // model here cannot express.
+      node.textContent = node.textContent.slice(0, wrap.start) + wrap.inner + node.textContent.slice(caret);
+      const range = document.createRange();
+      range.setStart(node, Math.min(wrap.start + wrap.inner.length, node.textContent.length));
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      toggleFlag(wrap.flag);
+      return true;
+    }
+    return false;
+  };
+
   const handleInput = () => {
-    applyAutoformat();
+    if (!applyMarkdown()) applyAutoformat();
     if (!composing.current) reflow();
     emit();
   };

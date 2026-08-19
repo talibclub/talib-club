@@ -60,3 +60,65 @@ export function autoformatPlainText(value, caret) {
     caret: start + hit.insert.length,
   };
 }
+
+// ── Markdown shorthand ──────────────────────────────────────────────────────
+//
+// Two kinds. Line triggers fire when the shorthand is the only thing typed so
+// far on a line and you press space; inline wraps fire when you close a pair.
+// Both are what people already type out of habit, which is the whole point —
+// nobody should have to reach for the toolbar to make a bullet.
+
+export const LINE_TRIGGERS = [
+  { from: '- ',  action: { type: 'list', value: 'bullet' } },
+  { from: '* ',  action: { type: 'list', value: 'bullet' } },
+  { from: '1. ', action: { type: 'list', value: 'number' } },
+  { from: '# ',  action: { type: 'heading', value: 1 } },
+  { from: '## ', action: { type: 'heading', value: 2 } },
+];
+
+/**
+ * The whole line so far, before the caret. Returns the action to run and how
+ * many characters of shorthand to delete, or null.
+ * @returns {{ take: number, action: {type: string, value: any} } | null}
+ */
+export function matchLineTrigger(lineBeforeCaret) {
+  if (!lineBeforeCaret) return null;
+  // Longest first so "## " beats "# ".
+  const sorted = [...LINE_TRIGGERS].sort((a, b) => b.from.length - a.from.length);
+  for (const rule of sorted) {
+    // Only when the shorthand IS the line so far — "a - b" must stay as typed.
+    if (lineBeforeCaret === rule.from) {
+      return { take: rule.from.length, action: rule.action };
+    }
+  }
+  return null;
+}
+
+export const INLINE_WRAPS = [
+  { marker: '**', flag: 'bold' },
+  { marker: '__', flag: 'underline' },
+  { marker: '~~', flag: 'strikethrough' },
+  { marker: '*',  flag: 'italic' },
+  { marker: '_',  flag: 'italic' },
+];
+
+/**
+ * Detect a just-closed **bold** / *italic* / ~~strike~~ pair ending at the
+ * caret. Returns the span to restyle and the markers to strip.
+ * @returns {{ start: number, end: number, inner: string, flag: string } | null}
+ */
+export function matchInlineWrap(textBeforeCaret) {
+  if (!textBeforeCaret) return null;
+  const sorted = [...INLINE_WRAPS].sort((a, b) => b.marker.length - a.marker.length);
+  for (const { marker, flag } of sorted) {
+    if (!textBeforeCaret.endsWith(marker)) continue;
+    const bodyEnd = textBeforeCaret.length - marker.length;
+    const openIdx = textBeforeCaret.lastIndexOf(marker, bodyEnd - 1);
+    if (openIdx < 0) continue;
+    const inner = textBeforeCaret.slice(openIdx + marker.length, bodyEnd);
+    // Needs actual content, and no stray marker inside it.
+    if (!inner || inner.includes(marker)) continue;
+    return { start: openIdx, end: textBeforeCaret.length, inner, flag };
+  }
+  return null;
+}

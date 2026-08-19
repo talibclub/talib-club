@@ -1,10 +1,16 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { autoformatPlainText } from './textAutoformat.js';
 
 // In-place editor for a sticky note's text, positioned over the note on canvas.
 // Presentational: the parent owns the value, the textarea ref, and the
 // commit/delete logic.
 export default function StickyNoteEditor({ x, y, scale, round, value, onChange, textareaRef, onCommit, onDelete }) {
+  // onBlur used to commit unconditionally. The textarea mounts in the same
+  // commit as the Konva pointer handling, which takes focus straight back off
+  // it — so the editor opened and closed again before the parent's 60ms
+  // re-focus could run, and tapping a note looked like it did nothing at all.
+  // A blur can only close the editor once the textarea has actually held focus.
+  const hasFocused = useRef(false);
   return (
     <div style={{ position: 'absolute', top: y, left: x, zIndex: 100, display: 'flex', flexDirection: 'column', gap: 8 }}>
       <textarea
@@ -27,7 +33,8 @@ export default function StickyNoteEditor({ x, y, scale, round, value, onChange, 
             }
           });
         }}
-        onBlur={onCommit}
+        onFocus={() => { hasFocused.current = true; }}
+        onBlur={() => { if (hasFocused.current) onCommit(); }}
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
         style={{
