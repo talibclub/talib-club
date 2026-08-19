@@ -112,7 +112,7 @@ export default function NotebookToolCapsule({ ui }) {
             <div style={{ height: TOOL_BTN + 12, background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, borderRadius: HW.radius, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`, display: 'flex', alignItems: 'center', padding: '0 8px', gap: isCoarse ? 4 : 6, maxWidth: '100%' }}>
                  {/* Typing vs handwriting. Sits first because it changes what
                      the rest of the row contains. */}
-                 <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0, background: 'rgba(35,31,27,0.05)', borderRadius: 999, padding: 2, marginRight: 2 }}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0, background: 'rgba(35,31,27,0.06)', borderRadius: 999, padding: 3, marginRight: 3 }}>
                    {Object.values(WRITE_MODES).map(m => {
                      const on = writeMode === m.id;
                      return (
@@ -135,7 +135,7 @@ export default function NotebookToolCapsule({ ui }) {
                            background: on ? '#fff' : 'transparent',
                            color: on ? HW.accent : HW.textDim,
                            fontFamily: 'Kanit, sans-serif', fontWeight: on ? 600 : 500,
-                           boxShadow: on ? '0 1px 3px rgba(35,31,27,0.14)' : 'none',
+                           boxShadow: on ? '0 2px 6px rgba(35,31,27,0.13)' : 'none',
                            transition: 'all 0.16s',
                          }}
                        >
@@ -155,7 +155,7 @@ export default function NotebookToolCapsule({ ui }) {
                     </button>
                  </div>
                  
-                 <div style={{ width: 1, background: '#E5E7EB', height: 24, flexShrink: 0, margin: '0 4px' }}></div>
+                 <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0, margin: '0 5px', borderRadius: 1 }}></div>
                  
                  {/* Tools (Scrollable with visual hint) */}
                  <div style={{ position: 'relative', display: 'flex', flex: 1, minWidth: 0, overflow: 'hidden' }}>
@@ -163,16 +163,26 @@ export default function NotebookToolCapsule({ ui }) {
                      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 16, background: 'linear-gradient(to right, white, transparent)', zIndex: 2, pointerEvents: 'none' }} />
                    )}
                    <div
-                      ref={toolsScrollRef}
+                      // useDragScroll returns a `ref` of its own, and spreading it
+                      // last quietly overwrote toolsScrollRef — so the ref the
+                      // scroll-hint logic reads was never attached, and
+                      // handleToolsScroll returned early every time. Both refs are
+                      // set explicitly now, and only the handlers are spread.
+                      ref={(el) => {
+                         toolsScrollRef.current = el;
+                         if (leftToolbarScroll?.ref) leftToolbarScroll.ref.current = el;
+                      }}
                       onScroll={handleToolsScroll}
                       className="hide-scroll"
-                      style={{ display: 'flex', alignItems: 'center', gap: 2, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth', flex: 1 }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 2, overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth', flex: 1, minWidth: 0, touchAction: 'pan-x' }}
                       onWheel={(e) => {
-                         if (e.deltaY !== 0) {
-                            e.currentTarget.scrollLeft += e.deltaY;
-                         }
+                         const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+                         if (d !== 0) e.currentTarget.scrollLeft += d;
                       }}
-                      {...leftToolbarScroll}
+                      onMouseDown={leftToolbarScroll?.onMouseDown}
+                      onMouseLeave={leftToolbarScroll?.onMouseLeave}
+                      onMouseUp={leftToolbarScroll?.onMouseUp}
+                      onMouseMove={leftToolbarScroll?.onMouseMove}
                    >
                   
                   {shownTools.map(t => {
@@ -206,7 +216,7 @@ export default function NotebookToolCapsule({ ui }) {
                             minWidth: TOOL_BTN,
                             height: showLabels ? TOOL_BTN + 14 : TOOL_BTN,
                             padding: showLabels ? '4px 10px' : 0,
-                            borderRadius: 13,
+                            borderRadius: 14,
                             border: 'none',
                             background: active ? HW.accentSoft : 'transparent',
                             color: active ? HW.accent : (t.id === 'mic' && isRecording ? '#c0392b' : HW.textDim),
@@ -244,7 +254,7 @@ export default function NotebookToolCapsule({ ui }) {
                       aria-expanded={inkOpen}
                       style={{
                         flexShrink: 0, minWidth: TOOL_BTN, height: showLabels ? TOOL_BTN + 14 : TOOL_BTN,
-                        padding: showLabels ? '4px 10px' : 0, borderRadius: 13, border: 'none',
+                        padding: showLabels ? '4px 10px' : 0, borderRadius: 14, border: 'none',
                         background: inkOpen ? HW.accentSoft : 'transparent',
                         color: inkOpen ? HW.accent : HW.textDim, cursor: 'pointer',
                         display: 'flex', flexDirection: showLabels ? 'column' : 'row',

@@ -10,16 +10,23 @@
 // reference it; only the values changed.
 export const HW = {
   accent: '#0f6e56',                       // --teal (light theme): the notebook paper is always light
-  accentSoft: 'rgba(15,110,86,0.10)',
-  accentRing: 'rgba(15,110,86,0.28)',
-  surface: 'rgba(252,250,246,0.92)',       // warm off-white rather than pure grey-white
+  accentSoft: 'rgba(15,110,86,0.12)',
+  accentRing: 'rgba(15,110,86,0.30)',
+  // Frosted, not opaque. The panels used to be near-solid slabs sitting on the
+  // page, which is what made the notebook look stiff — you could not see the
+  // paper through anything. They are glass now: the page shows through, and the
+  // blur is what keeps the text on top readable.
+  surface: 'rgba(252,250,246,0.72)',
+  surfaceStrong: 'rgba(252,250,246,0.86)', // for panels that sit over busy artwork
   paper: '#f7f5f1',                        // --bg (light): the canvas behind the page
-  blur: 'saturate(180%) blur(30px)',
-  hairline: 'rgba(35,31,27,0.09)',
+  blur: 'saturate(180%) blur(22px)',
+  hairline: 'rgba(35,31,27,0.07)',
   text: '#1a1916',                         // --acc (light)
   textDim: '#5d5850',                      // --t2 (light)
-  shadow: '0 6px 24px rgba(35,31,27,0.10), 0 1px 3px rgba(35,31,27,0.06)',
-  radius: 20,
+  // Two soft layers rather than one hard drop: a wide, very light ambient
+  // shadow plus a tight contact shadow reads as "floating" instead of "stuck on".
+  shadow: '0 12px 32px rgba(35,31,27,0.10), 0 2px 8px rgba(35,31,27,0.06)',
+  radius: 22,
 };
 
 export const ZERO_OFFSET = { x: 0, y: 0 };

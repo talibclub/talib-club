@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Minus, Plus } from 'lucide-react';
-import { FONT_OPTIONS, LINE_HEIGHT, TEXT_COLORS } from './theme.js';
+import { FONT_OPTIONS, LINE_HEIGHT, TEXT_COLORS, HW } from './theme.js';
 import { migrateText, makeLine, listPrefixes } from './geometry.js';
 
 // WYSIWYG in-place editor for a text object with PER-LINE formatting.
@@ -69,12 +69,12 @@ const caretToEnd = (el) => {
 // was a brand new component type on every render, so React unmounted and
 // remounted every format button on each keystroke — which is what made the
 // toolbar drop focus mid-typing.
-const FORMAT_BTN_STYLE = { width: 26, height: 26, borderRadius: 8, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer' };
+const FORMAT_BTN_STYLE = { width: 28, height: 28, borderRadius: 10, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', transition: 'background 0.15s, color 0.15s' };
 const FormatBtn = ({ icon, active, onClick }) => (
   <button
     onMouseDown={(e) => e.preventDefault()}
     onClick={onClick}
-    style={{ ...FORMAT_BTN_STYLE, background: active ? 'var(--teal-light)' : 'transparent', color: active ? 'var(--teal)' : '#4B5563' }}
+    style={{ ...FORMAT_BTN_STYLE, background: active ? HW.accentSoft : 'transparent', color: active ? HW.accent : HW.textDim }}
   >
     {icon}
   </button>
@@ -285,7 +285,7 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
   };
 
   // --- toolbar ------------------------------------------------------------
-  const toolBtn = (on) => ({ width: 30, height: 30, borderRadius: 8, border: 'none', background: on ? 'var(--teal-light)' : 'transparent', color: on ? 'var(--teal)' : '#4B5563', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 });
+  const toolBtn = (on) => ({ width: 30, height: 30, borderRadius: 10, border: 'none', background: on ? HW.accentSoft : 'transparent', color: on ? HW.accent : HW.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.15s, color 0.15s' });
   const sep = <div style={{ width: 1, height: 18, background: 'var(--br2)', margin: '0 3px', flexShrink: 0 }} />;
   const noFocusSteal = { onMouseDown: (e) => e.preventDefault() };
 
@@ -322,20 +322,26 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
         marginTop: y < 60 ? 6 : 0, 
         marginBottom: y >= 60 ? 6 : 0, 
         left: barShift,
-        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, background: 'white', padding: '6px 8px', borderRadius: 10, boxShadow: '0 4px 24px rgba(0,0,0,0.15)', border: '1px solid var(--br2)',
+        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 5,
+        // Frosted like the rest of the notebook chrome. A solid white slab over
+        // the page is what made this look bolted on.
+        background: HW.surfaceStrong,
+        backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur,
+        padding: '7px 9px', borderRadius: 16,
+        boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`,
         maxWidth: barMax ? `${barMax}px` : 'calc(100vw - 32px)'
       }} ref={barRef}>
         <select
           value={fontFamily}
           onChange={(e) => { onFont(e.target.value); setTimeout(() => edRef.current?.focus(), 0); }}
           title="เปลี่ยนฟอนต์"
-          style={{ height: 26, borderRadius: 6, border: '1px solid var(--br2)', background: '#F9FAFB', color: '#111827', fontSize: 12, padding: '0 4px', cursor: 'pointer', fontFamily, maxWidth: 100, flexShrink: 0 }}
+          style={{ height: 28, borderRadius: 9, border: 'none', background: 'rgba(35,31,27,0.05)', color: HW.text, fontSize: 12, padding: '0 6px', cursor: 'pointer', fontFamily, maxWidth: 104, flexShrink: 0 }}
         >
           {FONT_OPTIONS.map((f) => <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>{f.label}</option>)}
         </select>
 
         {onSize && (
-          <div style={{ display: 'flex', alignItems: 'center', background: '#F9FAFB', border: '1px solid var(--br2)', borderRadius: 6, height: 26 }}>
+          <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(35,31,27,0.05)', borderRadius: 9, height: 28 }}>
             <button {...noFocusSteal} onClick={() => onSize(Math.max(10, size - 2))} style={{ ...toolBtn(false), width: 24, height: 24 }} title="เล็กลง"><Minus size={13} /></button>
             <span style={{ fontSize: 12, color: '#4B5563', minWidth: 20, textAlign: 'center' }}>{size}</span>
             <button {...noFocusSteal} onClick={() => onSize(Math.min(96, size + 2))} style={{ ...toolBtn(false), width: 24, height: 24 }} title="ใหญ่ขึ้น"><Plus size={13} /></button>
@@ -431,8 +437,10 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
         style={{
           margin: 0,
           padding: 8,
-          border: '2px solid var(--teal)',
-          background: 'rgba(255,255,255,0.96)',
+          border: `2px solid ${HW.accent}`,
+          borderRadius: 12,
+          background: 'rgba(255,255,255,0.92)',
+          boxShadow: HW.shadow,
           color: t.color,
           fontSize: `${size * scale}px`,
           fontFamily,

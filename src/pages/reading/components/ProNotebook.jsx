@@ -3620,8 +3620,12 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   }}
                   // Pan selects the note so the context menu appears; the sticky-note
                   // tool goes straight into typing, which is what you want with it.
-                  onClick={(e) => { e.cancelBubble = true; if (tool === 'sticker') { setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); } else if (tool === 'pan' || tool === 'lasso') { selectShape(st.id); } }}
-                  onTap={(e) => { e.cancelBubble = true; if (tool === 'sticker') { setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); } else if (tool === 'pan' || tool === 'lasso') { selectShape(st.id); } }}
+                  // The text tool opens the note for typing too. It only listened
+                  // for the sticker tool, so in typing mode — where `text` is the
+                  // tool you land on — tapping a sticky note did nothing at all,
+                  // and there was no obvious way to write on one.
+                  onClick={(e) => { e.cancelBubble = true; if (tool === 'sticker' || tool === 'text') { setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); } else if (tool === 'pan' || tool === 'lasso') { selectShape(st.id); } }}
+                  onTap={(e) => { e.cancelBubble = true; if (tool === 'sticker' || tool === 'text') { setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); } else if (tool === 'pan' || tool === 'lasso') { selectShape(st.id); } }}
                 >
                   {st.style === 'polaroid' ? (
                      <>
