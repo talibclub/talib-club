@@ -24,7 +24,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: node scripts/generate-sitemap.mjs
+      # --write-public: this workflow is the only writer of the tracked file.
+      - run: node scripts/generate-sitemap.mjs --write-public
       - name: Commit if the sitemap changed
         run: |
           if git diff --quiet -- public/sitemap.xml; then

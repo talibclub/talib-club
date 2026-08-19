@@ -145,10 +145,20 @@ async function generate() {
   }
   xml += '</urlset>\n';
 
-  // 7. Write to public/sitemap.xml and dist/sitemap.xml (if dist exists)
-  const publicPath = path.resolve(process.cwd(), 'public/sitemap.xml');
-  fs.writeFileSync(publicPath, xml, 'utf8');
-  console.log(`[Sitemap] Written to ${publicPath}`);
+  // 7. Write dist/sitemap.xml always; public/sitemap.xml only when asked.
+  //
+  // public/sitemap.xml is tracked in git AND rewritten nightly by
+  // .github/workflows/refresh-sitemap.yml. When `npm run build` also rewrote it,
+  // every local build dirtied the working tree and every branch collided with
+  // main's sitemap commit — a merge conflict in a generated file, on every PR.
+  // The workflow passes --write-public; the build does not, and only needs the
+  // copy that actually ships.
+  const writePublic = process.argv.includes('--write-public');
+  if (writePublic) {
+    const publicPath = path.resolve(process.cwd(), 'public/sitemap.xml');
+    fs.writeFileSync(publicPath, xml, 'utf8');
+    console.log(`[Sitemap] Written to ${publicPath}`);
+  }
 
   const distPath = path.resolve(process.cwd(), 'dist/sitemap.xml');
   const distDir = path.dirname(distPath);
