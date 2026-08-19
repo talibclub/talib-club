@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyPlainListTrigger, continuePlainList, PLAIN_BULLET, matchAutoformat, autoformatPlainText, matchLineTrigger, matchInlineWrap } from "../pages/reading/components/notebook/textAutoformat.js";
+import { matchAutoformat, autoformatPlainText, matchLineTrigger, matchInlineWrap } from "../pages/reading/components/notebook/textAutoformat.js";
 
 describe("textAutoformat", () => {
   it("turns -> into an arrow", () => {
@@ -75,35 +75,5 @@ describe("markdown inline wraps", () => {
 
   it("ignores an unclosed marker", () => {
     expect(matchInlineWrap("**หนา")).toBeNull();
-  });
-});
-
-describe("plain-text bullets on a sticky note", () => {
-  it('turns "- " and "* " at the start of a line into a bullet', () => {
-    expect(applyPlainListTrigger("- ", 2)).toEqual({ value: PLAIN_BULLET, caret: 2 });
-    expect(applyPlainListTrigger("* ", 2)).toEqual({ value: PLAIN_BULLET, caret: 2 });
-  });
-
-  it("leaves a dash in the middle of a line alone", () => {
-    expect(applyPlainListTrigger("ก - ", 4)).toBeNull();
-    expect(applyPlainListTrigger("รายการ- ", 8)).toBeNull();
-  });
-
-  it("triggers on the line the caret is on, not just the first line", () => {
-    const v = "หนึ่ง\n- ";
-    expect(applyPlainListTrigger(v, v.length)).toEqual({ value: "หนึ่ง\n" + PLAIN_BULLET, caret: v.length });
-  });
-
-  it("carries the bullet to the next line on Enter", () => {
-    expect(continuePlainList("• นม", 4)).toEqual({ value: "• นม\n• ", caret: 7 });
-  });
-
-  it("ends the list when Enter is pressed on an empty bullet", () => {
-    expect(continuePlainList("• ", 2)).toEqual({ value: "", caret: 0 });
-    expect(continuePlainList("• นม\n• ", 7)).toEqual({ value: "• นม\n", caret: 5 });
-  });
-
-  it("does nothing on a line that is not a bullet", () => {
-    expect(continuePlainList("ธรรมดา", 6)).toBeNull();
   });
 });

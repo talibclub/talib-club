@@ -21,7 +21,7 @@ import { matchAutoformat, matchLineTrigger, matchInlineWrap } from './textAutofo
 // carries the format with the line the browser clones — no index bookkeeping to
 // drift out of sync.
 
-const DEF = { bold: false, italic: false, underline: false, strikethrough: false, list: 'none', align: 'left' };
+const DEF = { bold: false, italic: false, underline: false, strikethrough: false, list: 'none', align: 'left', size: null };
 const FLAGS = ['bold', 'italic', 'underline', 'strikethrough'];
 
 const readFmt = (el) => {
@@ -55,6 +55,18 @@ const makeLineEl = (text, fmt) => {
   if (text) d.textContent = text;
   else d.appendChild(document.createElement('br'));
   return d;
+};
+
+// True when the caret sits at the very end of this line's text.
+const caretAtEndOf = (el) => {
+  const sel = window.getSelection();
+  if (!sel || !sel.isCollapsed || !sel.rangeCount) return false;
+  const r = sel.getRangeAt(0);
+  if (!el.contains(r.startContainer)) return false;
+  const after = document.createRange();
+  after.selectNodeContents(el);
+  after.setStart(r.endContainer, r.endOffset);
+  return after.toString().length === 0;
 };
 
 const caretToEnd = (el) => {
@@ -160,6 +172,10 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
       // inherits the line above (so Enter continues a bullet).
       if (!d.dataset.fmt) writeFmt(d, i > 0 ? readFmt(els[i - 1]) : { ...DEF });
       else styleLine(d, readFmt(d));
+      // A heading line carries its own size. Set here rather than in styleLine,
+      // which is module scope and has no idea what the board zoom is.
+      const lf = readFmt(d);
+      d.style.fontSize = lf.size ? `${lf.size * scale}px` : '';
     });
 
     const prefixes = listPrefixes(els.map((d) => makeLine(textOfEl(d), readFmt(d))));
@@ -173,7 +189,7 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
     // flag instead of a CSS pseudo-class.
     if (els.length === 1 && !textOfEl(els[0])) el.dataset.empty = '1';
     else delete el.dataset.empty;
-  }, [edRef, active]);
+  }, [edRef, active, scale]);
 
   // --- selection ----------------------------------------------------------
   const rememberSelection = useCallback(() => {
@@ -282,7 +298,10 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
       sel.removeAllRanges();
       sel.addRange(range);
       if (line.action.type === 'list') toggleList(line.action.value);
-      else if (line.action.type === 'heading') onSize?.(line.action.value === 1 ? 32 : 26);
+      // "# " used to resize the entire box, which is not what a heading is: it
+      // marks one line. It sets that line's own size and weight now, so a title
+      // can sit above ordinary lines — the thing per-line formatting is for.
+      else if (line.action.type === 'heading') setHeading(line.action.value);
       return true;
     }
 
@@ -323,6 +342,14 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
   };
 
   const toggleFlag = (flag) => applyToLines((f, all) => ({ ...f, [flag]: !all.every((s) => s[flag]) }));
+  // Heading level 1 or 2, relative to the box's own size so a note set to small
+  // text gets proportionally small headings rather than fixed 32px ones.
+  const headingSize = (level) => Math.round(size * (level === 1 ? 1.45 : 1.2));
+  const setHeading = (level) => applyToLines((f, all) => {
+    const target = headingSize(level);
+    const alreadyThis = all.every((s) => s.size === target);
+    return { ...f, size: alreadyThis ? null : target, bold: !alreadyThis };
+  });
   const setAlign = (val) => applyToLines((f) => ({ ...f, align: val }));
   const toggleList = (val) => applyToLines((f, all) => ({ ...f, list: all.every((s) => s.list === val) ? 'none' : val }));
 
@@ -352,6 +379,26 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
 
   const handleKeyDown = (e) => {
     if (e.key === 'Escape') { e.preventDefault(); edRef.current?.blur(); return; }
+
+    // Enter at the end of a heading starts an ordinary line. The browser clones
+    // the current line to make the next one, data-fmt and all, so a title used
+    // to breed more titles — every line after it came out big and bold until you
+    // turned it off by hand. A bullet is worth carrying on; a heading is not.
+    // Alignment and list carry over either way.
+    if (e.key === 'Enter' && !e.shiftKey && !composing.current) {
+      const el = edRef.current;
+      const here = lineEls(el).find((d) => d.contains(window.getSelection()?.anchorNode));
+      const f = here ? readFmt(here) : null;
+      if (f?.size && caretAtEndOf(here)) {
+        e.preventDefault();
+        const next = makeLineEl('', { ...f, size: null, bold: false });
+        here.after(next);
+        caretToEnd(next);
+        reflow();
+        emit();
+        return;
+      }
+    }
     // Shift+Enter would insert a <br> inside the line; make it a real new line
     // so the canvas and the editor always agree on where lines break.
     if (e.key === 'Enter' && e.shiftKey) {
@@ -525,8 +572,15 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
           padding: 8,
           border: `1.5px solid ${HW.accentRing}`,
           borderRadius: 14,
-          background: 'rgba(255,255,255,0.90)',
-          boxShadow: `${HW.shadow}, 0 0 0 4px ${HW.accentSoft}`,
+          // Near-transparent rather than a white card. The editor sits over the
+          // page — and over a sticky note's own colour — so painting a panel
+          // behind the words hid exactly the thing being written on. The ring
+          // is what says "you are editing"; the fill only has to lift the text
+          // enough to stay legible over a dark PDF.
+          background: 'rgba(255,255,255,0.10)',
+          backdropFilter: 'saturate(120%) blur(1.5px)',
+          WebkitBackdropFilter: 'saturate(120%) blur(1.5px)',
+          boxShadow: `0 0 0 4px ${HW.accentSoft}`,
           color: t.color,
           fontSize: `${size * scale}px`,
           fontFamily,

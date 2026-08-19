@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { konvaFontStyle, stepTextSize, stickerTextStyle, STICKER_TEXT_SIZES } from '../pages/reading/components/notebook/stickerText.js';
+import { konvaFontStyle, stickerTextStyle } from '../pages/reading/components/notebook/stickerText.js';
+import { makeLine, migrateSticker, isUniformText } from '../pages/reading/components/notebook/geometry.js';
 
 describe('stickerTextStyle', () => {
   it('leaves notes saved before formatting existed looking exactly as they did', () => {
@@ -40,26 +41,42 @@ describe('konvaFontStyle', () => {
   });
 });
 
-describe('stepTextSize', () => {
-  it('walks the size list rather than a fixed amount', () => {
-    expect(stepTextSize(16, 1)).toBe(20);
-    expect(stepTextSize(16, -1)).toBe(14);
+describe('migrateSticker', () => {
+  it('splits a legacy note into lines that inherit its old format', () => {
+    const sk = migrateSticker({ text: 'หัวข้อ\nรอง', textAlign: 'center', bold: true });
+    expect(sk.lines.map((l) => l.text)).toEqual(['หัวข้อ', 'รอง']);
+    expect(sk.lines.every((l) => l.align === 'center' && l.bold)).toBe(true);
+    expect(sk.lines.every((l) => l.size === null)).toBe(true);
   });
 
-  it('stops at both ends instead of running off', () => {
-    const [min] = STICKER_TEXT_SIZES;
-    const max = STICKER_TEXT_SIZES[STICKER_TEXT_SIZES.length - 1];
-    expect(stepTextSize(min, -1)).toBe(min);
-    expect(stepTextSize(max, 1)).toBe(max);
+  it('gives an empty note one empty line to type into', () => {
+    expect(migrateSticker({ text: '' }).lines).toHaveLength(1);
+    expect(migrateSticker({}).lines[0].text).toBe('');
   });
 
-  it('snaps a size that is not on the list onto it', () => {
-    expect(stepTextSize(17, 1)).toBe(24);
-    expect(stepTextSize(17, -1)).toBe(16);
+  it('normalises a note that already has lines instead of re-splitting', () => {
+    const sk = migrateSticker({ lines: [{ text: 'ก', size: 26, bold: true }, { text: 'ข' }] });
+    expect(sk.lines[0].size).toBe(26);
+    expect(sk.lines[1].size).toBeNull();
+    expect(sk.lines[1].align).toBe('left');
   });
 
-  it('handles a size past the top of the list', () => {
-    expect(stepTextSize(99, -1)).toBe(24);
-    expect(stepTextSize(99, 1)).toBe(30);
+  it('survives being handed nothing', () => {
+    expect(migrateSticker(null)).toBeNull();
+  });
+});
+
+describe('per-line size', () => {
+  it('defaults to inheriting the object size', () => {
+    expect(makeLine('x').size).toBeNull();
+  });
+
+  it('rejects a size that is not a usable number', () => {
+    for (const bad of [0, -3, NaN, 'big', null]) expect(makeLine('x', { size: bad }).size).toBeNull();
+  });
+
+  it('stops treating a box as uniform once one line is a heading', () => {
+    expect(isUniformText({ lines: [makeLine('a'), makeLine('b')] })).toBe(true);
+    expect(isUniformText({ lines: [makeLine('a', { size: 30 }), makeLine('b')] })).toBe(false);
   });
 });

@@ -63,6 +63,10 @@ export const makeLine = (text = '', fmt = {}) => ({
   strikethrough: !!fmt.strikethrough,
   list: fmt.list || 'none',
   align: fmt.align || 'left',
+  // Per-line size, so one line can be a heading over ordinary lines beneath it.
+  // null means "inherit the object's size", which is what every line saved
+  // before this carried — so nothing that already exists changes appearance.
+  size: Number.isFinite(fmt.size) && fmt.size > 0 ? fmt.size : null,
 });
 
 // Return a copy of the text object guaranteed to have a well-formed `lines[]`.
@@ -88,7 +92,9 @@ export const isUniformText = (t) => {
   const lines = t?.lines;
   if (!Array.isArray(lines) || lines.length <= 1) return true;
   const first = lines[0];
-  return lines.every((l) => l.list === first.list && l.align === first.align && LINE_FLAGS.every((f) => !!l[f] === !!first[f]));
+  return lines.every((l) => l.list === first.list && l.align === first.align
+    && (l.size || null) === (first.size || null)
+    && LINE_FLAGS.every((f) => !!l[f] === !!first[f]));
 };
 
 // The shared format of a (uniform) box, read off its first line.
@@ -107,4 +113,21 @@ export const listPrefixes = (lines) => {
     n += 1;
     return `${n}.  `;
   });
+};
+
+// A sticky note's text, in the same per-line shape as a text box's.
+//
+// Notes used to hold one plain `text` string with a single format for the whole
+// note, so a heading line above a bulleted line was impossible. They carry
+// `lines[]` now. Legacy notes are split on newlines with every line inheriting
+// the note's old format, which renders identically to before.
+export const migrateSticker = (st) => {
+  if (!st) return st;
+  if (Array.isArray(st.lines)) {
+    return { ...st, lines: st.lines.map((l) => makeLine(l.text, l)) };
+  }
+  const box = { bold: st.bold, italic: st.italic, underline: st.underline, align: st.textAlign };
+  const raw = typeof st.text === 'string' ? st.text : '';
+  const parts = raw.length ? raw.split('\n') : [''];
+  return { ...st, lines: parts.map((line) => makeLine(line, box)) };
 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Path, Group, Circle, Text, Rect, Transformer, RegularPolygon, Line, Star as KonvaStar, Arrow as KonvaArrow } from 'react-konva';
-import { PenTool, Search, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Lasso, MonitorPlay, FileText, Bookmark, Cloud, Ruler, Camera, X, Star, Link2 } from 'lucide-react';
+import { PenTool, Search, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Lasso, MonitorPlay, FileText, Bookmark, Cloud, Ruler, Camera, X, Star, Link2, Trash2 } from 'lucide-react';
 import CropModal from './CropModal';
 import ColorPickerPanel from './ColorPickerPanel';
 import BookSnipModal from './BookSnipModal';
@@ -17,14 +17,13 @@ import { auth, db, storage } from '../../../lib/firebase.js';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { PDFPageImage, PaperPattern, getSvgPathFromStroke, PEN_STYLES, StrokeShape, CommittedStrokes, StickyStyleThumb } from './notebook/canvasElements.jsx';
-import { polygonBounds, polygonCentroid, polygonInteriorAngle, applyListPrefix, textDecorationOf, migrateText, textOf, isUniformText, uniformFormatOf, listPrefixes } from './notebook/geometry.js';
+import { polygonBounds, polygonCentroid, polygonInteriorAngle, applyListPrefix, textDecorationOf, migrateText, migrateSticker, textOf, isUniformText, uniformFormatOf, listPrefixes } from './notebook/geometry.js';
 import { HW, ZERO_OFFSET, TEXT_BOX_WIDTH, LINE_HEIGHT, STICKY_COLORS, DRAW_CURSOR } from './notebook/theme.js';
 import { useDragScroll } from './notebook/useDragScroll.js';
 import ImageSearchPanel from './notebook/ImageSearchPanel.jsx';
 import ObjectContextMenu from './notebook/ObjectContextMenu.jsx';
 import SelectionToolbar from './notebook/SelectionToolbar.jsx';
 import LassoToolbar from './notebook/LassoToolbar.jsx';
-import StickyNoteEditor from './notebook/StickyNoteEditor.jsx';
 import { konvaFontStyle, stickerTextStyle } from './notebook/stickerText.js';
 import TextEditor from './notebook/TextEditor.jsx';
 import PaperTemplateModal from './notebook/PaperTemplateModal.jsx';
@@ -3693,26 +3692,40 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   {/* Hidden only while this note is the one being edited, since
                       the HTML textarea sits on top of it then. Everything else
                       shows its text. */}
-                  {editingStickerId !== st.id && st.text && (() => {
-                     // Colour, size, alignment and bold/italic used to be
-                     // written straight into this node, so nothing about a
-                     // note's text could be changed. They come off the note now,
-                     // falling back to exactly these old values when unset.
+                  {editingStickerId !== st.id && (() => {
+                     // One <Text> per line, so a heading can sit above bulleted
+                     // lines. Colour and the base size still belong to the note;
+                     // weight, slant, underline, alignment, bullets and an
+                     // optional heading size belong to each line.
                      const ts = stickerTextStyle(st);
-                     return (
-                        <Text
-                           text={st.text}
-                           x={12} y={st.style === 'polaroid' ? 118 : 24}
-                           width={126} height={st.style === 'polaroid' ? 28 : 116}
-                           fontSize={ts.size}
-                           fill={ts.color}
-                           fontStyle={konvaFontStyle(ts)}
-                           textDecoration={ts.underline ? 'underline' : ''}
-                           fontFamily="Kanit, sans-serif"
-                           align={ts.align}
-                           listening={false}
-                        />
-                     );
+                     const sk = migrateSticker(st);
+                     if (!sk.lines.some((l) => l.text)) return null;
+                     const prefixes = listPrefixes(sk.lines);
+                     const top = st.style === 'polaroid' ? 118 : 24;
+                     let cursorY = top;
+                     return sk.lines.map((l, i) => {
+                        const lineSize = l.size || ts.size;
+                        const y = cursorY;
+                        cursorY += lineSize * LINE_HEIGHT;
+                        // Nothing below the note's text box gets drawn — a long
+                        // note clips rather than spilling over the paper.
+                        if (y > top + (st.style === 'polaroid' ? 28 : 116)) return null;
+                        return (
+                           <Text
+                              key={i}
+                              text={(prefixes[i] || '') + l.text}
+                              x={12} y={y}
+                              width={126}
+                              fontSize={lineSize}
+                              fill={ts.color}
+                              fontStyle={konvaFontStyle(l)}
+                              textDecoration={textDecorationOf(l)}
+                              fontFamily="Kanit, sans-serif"
+                              align={l.align || ts.align}
+                              listening={false}
+                           />
+                        );
+                     });
                   })()}
                 </Group>
               );
@@ -3792,7 +3805,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                     return (
                       <Text
                         text={applyListPrefix(textOf(tt), f.list)}
-                        fontSize={t.size}
+                        fontSize={tt.lines[0]?.size || t.size}
                         fill={t.color}
                         fontFamily={t.fontFamily || 'Kanit'}
                         fontStyle={[f.bold ? 'bold' : '', f.italic ? 'italic' : ''].filter(Boolean).join(' ') || 'normal'}
@@ -3805,14 +3818,22 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                     );
                   }
                   const prefixes = listPrefixes(tt.lines);
-                  const lh = t.size * LINE_HEIGHT; // must match the editor's line-height
+                  // Lines can differ in size now (a heading above body text), so
+                  // each one starts where the last ended instead of sitting on a
+                  // fixed grid.
+                  let cursorY = 4;
+                  const tops = tt.lines.map((l) => {
+                    const top = cursorY;
+                    cursorY += (l.size || t.size) * LINE_HEIGHT;
+                    return top;
+                  });
                   return tt.lines.map((l, i) => (
                     <Text
                       key={i}
                       x={4}
-                      y={4 + i * lh}
+                      y={tops[i]}
                       text={(prefixes[i] || '') + l.text}
-                      fontSize={t.size}
+                      fontSize={l.size || t.size}
                       fill={t.color}
                       fontFamily={t.fontFamily || 'Kanit'}
                       fontStyle={[l.bold ? 'bold' : '', l.italic ? 'italic' : ''].filter(Boolean).join(' ') || 'normal'}
@@ -4188,84 +4209,76 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
          );
       })()}
       
-      {/* Floating Textarea for Sticky Notes */}
+      {/* In-place editor for a sticky note.
+          This is the very same editor the text boxes use. A note used to have
+          its own cut-down one — a plain textarea with a single format for the
+          whole note — so laying out a heading above a bulleted line was not
+          possible, and every fix to typing had to be made twice. Sharing it
+          means notes get per-line formatting, the markdown shorthand and the
+          IME-safe input handling for free. */}
       {(() => {
          if (!editingStickerId) return null;
          const st = currentPage.stickers?.find(s => s.id === editingStickerId);
          if (!st || st.audioUrl) return null;
+         const ts = stickerTextStyle(st);
+         const sk = migrateSticker(st);
+         const polaroid = st.style === 'polaroid';
+         const z = scale * (st.scaleX || 1);
+         const updSticker = (mutate) => updatePage(currentPageIndex, (page) => {
+            // Replace rather than mutate: updatePage shallow-copies the page but
+            // not its arrays, so writing into the sticker would leave the object
+            // the last render holds unchanged by identity.
+            page.stickers = (page.stickers || []).map((x) => {
+               if (x.id !== st.id) return x;
+               const copy = { ...x };
+               mutate(copy);
+               return copy;
+            });
+         });
          return (
-           <StickyNoteEditor
-             x={(st.x + pageX) * scale + position.x}
-             y={(st.y + pageY) * scale + position.y}
-             scale={scale}
-             round={st.style === 'round'}
-             // The same numbers the Konva <Text> on the note uses, so the words
-             // do not move or re-wrap when the editor closes. Multiplied by the
-             // note's own scale as well as the board zoom, which the old fixed
-             // 150x150 box ignored entirely.
-             box={(() => {
-                const z = scale * (st.scaleX || 1);
-                const polaroid = st.style === 'polaroid';
-                const ts = stickerTextStyle(st);
-                return {
-                   left: 12 * z,
-                   top: (polaroid ? 118 : 24) * z,
-                   width: 126 * z,
-                   height: (polaroid ? 28 : 116) * z,
-                   // The note's own size and alignment, so the words do not jump
-                   // when the editor closes and the canvas takes over.
-                   fontSize: ts.size * z,
-                   align: ts.align,
-                   noteHeight: 150 * scale * (st.scaleY || 1),
-                };
-             })()}
-             format={stickerTextStyle(st)}
-             onFormat={(patch) => {
-                // Formatting applies to the note straight away rather than
-                // waiting for the text to be committed, so the bar's effect is
-                // visible while still typing. Same immutable replace as the
-                // text commit: the page's arrays are not deep-copied, so
-                // mutating the sticker in place would leave the object the last
-                // render already holds unchanged by identity.
-                const id = st.id;
-                updatePage(currentPageIndex, (page) => {
-                   page.stickers = (page.stickers || []).map(
-                      (x) => (x.id === id ? { ...x, ...patch } : x)
-                   );
-                });
-             }}
-             value={editingStickerValue}
-             onChange={setEditingStickerValue}
-             textareaRef={stickerTextareaRef}
-             onCommit={() => {
-                // Replace the sticker object rather than mutating it. updatePage
-                // shallow-copies the page but not its arrays, so assigning
-                // `sticker.text` wrote into the very object the previous render
-                // already holds — same identity, same array — and anything that
-                // compares by reference (React bailing out, a memo, the undo
-                // snapshot taken before this) can miss that the text changed.
-                // That is consistent with the reported "the text is not there
-                // until I resize the note", since resizing writes new numbers
-                // and forces the node to update.
-                const value = editingStickerValue;
-                const id = editingStickerId;
-                updatePage(currentPageIndex, (page) => {
-                   page.stickers = (page.stickers || []).map(
-                      (s) => (s.id === id ? { ...s, text: value } : s)
-                   );
-                });
-                setEditingStickerId(null);
-             }}
-             onDelete={() => {
-                const id = editingStickerId;
-                pushHistory();
-                updatePage(currentPageIndex, (page) => {
-                   page.stickers = (page.stickers || []).filter(s => s.id !== id);
-                });
-                setEditingStickerId(null);
-                toast.success('ลบโพสต์อิทแล้ว');
-             }}
-           />
+           <>
+             <TextEditor
+               key={editingStickerId}
+               // Anchored to the note's text area, not the note's corner, so the
+               // words sit where the canvas will draw them.
+               x={(st.x + pageX) * scale + position.x + 12 * z}
+               y={(st.y + pageY) * scale + position.y + (polaroid ? 118 : 24) * z}
+               scale={z}
+               t={{ ...sk, size: ts.size, color: ts.color, fontFamily: 'Kanit', width: 126 }}
+               textareaRef={stickerTextareaRef}
+               onChange={(val) => setEditingStickerValue(val)}
+               onLinesChange={(lines) => updSticker((x) => { x.lines = lines; x.text = lines.map(l => l.text).join('\n'); })}
+               onFont={() => {}}
+               onSize={(n) => updSticker((x) => { x.textSize = n; })}
+               onColor={(c) => updSticker((x) => { x.textColor = c; })}
+               onCommit={() => setEditingStickerId(null)}
+             />
+             {/* Delete stays reachable while editing: the selection bar that
+                 normally carries it is hidden for as long as an editor is open. */}
+             <button
+               onPointerDown={(e) => e.stopPropagation()}
+               onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+               onClick={() => {
+                  const id = editingStickerId;
+                  pushHistory();
+                  updatePage(currentPageIndex, (page) => {
+                     page.stickers = (page.stickers || []).filter(s => s.id !== id);
+                  });
+                  setEditingStickerId(null);
+                  toast.success('ลบโพสต์อิทแล้ว');
+               }}
+               title="ลบโพสต์อิท"
+               style={{ position: 'absolute', zIndex: 3001,
+                        left: (st.x + pageX) * scale + position.x,
+                        top: (st.y + pageY) * scale + position.y + 150 * scale * (st.scaleY || 1) + 8,
+                        width: 32, height: 32, borderRadius: 10, cursor: 'pointer',
+                        border: `1px solid ${HW.hairline}`, background: HW.surface,
+                        backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur,
+                        color: '#c0392b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+             >
+               <Trash2 size={16} strokeWidth={1.8} />
+             </button>
+           </>
          );
       })()}
       {/* Zoom-in writing strip */}
