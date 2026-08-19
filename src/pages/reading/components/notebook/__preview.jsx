@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import NotebookStyles from './NotebookStyles.jsx';
 import NotebookToolCapsule from './NotebookToolCapsule.jsx';
+import ImageSearchPanel from './ImageSearchPanel.jsx';
 import { HW } from './theme.js';
 
 const noop = () => {};
@@ -26,6 +27,8 @@ export default function NotebookPreview() {
   const [lassoFilter, setLassoFilter] = useState({ lines: true, shapes: true, images: true, texts: true, stickers: true });
   const [autoShape, setAutoShape] = useState(true);
   const [laserColor, setLaserColor] = useState('#c0392b');
+  const [imgQuery, setImgQuery] = useState('ดาว');
+  const [showImgSearch, setShowImgSearch] = useState(true);
 
   const ui = {
     TOOL_BTN: 40, WRITER_H: 200,
@@ -61,6 +64,20 @@ export default function NotebookPreview() {
           </div>
         </div>
       </div>
+      {showImgSearch && (
+        <ImageSearchPanel
+          query={imgQuery}
+          setQuery={setImgQuery}
+          results={[]}
+          loading={false}
+          filter=""
+          setFilter={noop}
+          onSearch={noop}
+          onInsert={noop}
+          onClose={() => setShowImgSearch(false)}
+          onPopupBlocked={noop}
+        />
+      )}
       <NotebookToolCapsule ui={ui} />
     </div>
   );

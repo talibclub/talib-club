@@ -3285,6 +3285,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           onSearch={searchWebImages}
           onInsert={insertWebImage}
           onClose={() => setShowImgSearch(false)}
+          onPopupBlocked={() => toast.error('เบราว์เซอร์บล็อกหน้าต่างใหม่ — อนุญาต pop-up ให้เว็บนี้ก่อน แล้วลองอีกครั้ง')}
         />
       )}
 

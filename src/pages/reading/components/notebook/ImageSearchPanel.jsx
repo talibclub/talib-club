@@ -1,7 +1,8 @@
 import React from 'react';
 import Draggable from 'react-draggable';
-import { Search, Image as ImageIcon, X } from 'lucide-react';
+import { Search, Image as ImageIcon, X, ExternalLink } from 'lucide-react';
 import { HW } from './theme.js';
+import { openImageSearchWindow, IMAGE_ENGINES } from './webImageWindow.js';
 
 const EXAMPLES = ['สติกเกอร์น่ารัก', 'หัวใจ', 'ดาว', 'ดอกไม้', 'cute sticker', 'emoji'];
 
@@ -18,7 +19,7 @@ const KINDS = [
 // Draggable panel for finding a web image and inserting it into the notebook.
 // Purely presentational: the parent owns the query/results state and the
 // search/insert logic, and passes them in.
-export default function ImageSearchPanel({ query, setQuery, results, loading, filter, setFilter, onSearch, onInsert, onClose }) {
+export default function ImageSearchPanel({ query, setQuery, results, loading, filter, setFilter, onSearch, onInsert, onClose, onPopupBlocked }) {
   return (
     <Draggable handle=".img-drag-handle" bounds="parent">
       <div style={{ position: 'absolute', top: 60, right: 20, width: 360, maxWidth: 'calc(100vw - 40px)', height: 520, maxHeight: 'calc(100vh - 90px)', zIndex: 60, background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(20px)', borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.15)', border: '1px solid rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', padding: 16 }}>
@@ -41,6 +42,35 @@ export default function ImageSearchPanel({ query, setQuery, results, loading, fi
             <Search size={17} /> {loading ? '...' : 'ค้นหา'}
           </button>
         </form>
+
+        {/* Open the query in a real browser window instead. Google and
+            DuckDuckGo both refuse to be embedded (X-Frame-Options: SAMEORIGIN),
+            so an in-app "Google panel" is not possible — but a floating window
+            beside the notebook is, and an image dragged out of it lands on the
+            page through the drop handler that is already there. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginBottom: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11.5, color: 'var(--t3)' }}>หรือเปิดหน้าต่างลอยแล้วลากรูปมาวางบนโน้ต:</span>
+          {Object.entries(IMAGE_ENGINES).map(([id, eng]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => {
+                const win = openImageSearchWindow(query, id);
+                if (!win) onPopupBlocked?.();
+              }}
+              title={`ค้นรูปใน ${eng.label} — เปิดหน้าต่างแยก ลากรูปมาวางบนสมุดได้เลย`}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '5px 10px', borderRadius: 999, cursor: 'pointer',
+                border: `1px solid ${HW.hairline}`, background: '#fff',
+                color: HW.accent, fontSize: 12, fontWeight: 600,
+                fontFamily: 'Kanit, sans-serif',
+              }}
+            >
+              <ExternalLink size={13} /> {eng.label}
+            </button>
+          ))}
+        </div>
 
         {/* Kind filter — re-runs the search straight away so it behaves like a
             tab strip rather than a setting you have to remember to apply. */}
