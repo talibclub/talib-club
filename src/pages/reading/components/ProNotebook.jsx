@@ -25,6 +25,7 @@ import ObjectContextMenu from './notebook/ObjectContextMenu.jsx';
 import SelectionToolbar from './notebook/SelectionToolbar.jsx';
 import LassoToolbar from './notebook/LassoToolbar.jsx';
 import StickyNoteEditor from './notebook/StickyNoteEditor.jsx';
+import { konvaFontStyle, stickerTextStyle } from './notebook/stickerText.js';
 import TextEditor from './notebook/TextEditor.jsx';
 import PaperTemplateModal from './notebook/PaperTemplateModal.jsx';
 import ExportModal from './notebook/ExportModal.jsx';
@@ -3692,9 +3693,27 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   {/* Hidden only while this note is the one being edited, since
                       the HTML textarea sits on top of it then. Everything else
                       shows its text. */}
-                  {editingStickerId !== st.id && st.text && (
-                     <Text text={st.text} x={12} y={st.style === 'polaroid' ? 118 : 24} width={126} height={st.style === 'polaroid' ? 28 : 116} fontSize={st.style === 'polaroid' ? 13 : 16} fill="#111827" fontFamily="Kanit, sans-serif" align={st.style === 'polaroid' ? 'center' : 'left'} listening={false} />
-                  )}
+                  {editingStickerId !== st.id && st.text && (() => {
+                     // Colour, size, alignment and bold/italic used to be
+                     // written straight into this node, so nothing about a
+                     // note's text could be changed. They come off the note now,
+                     // falling back to exactly these old values when unset.
+                     const ts = stickerTextStyle(st);
+                     return (
+                        <Text
+                           text={st.text}
+                           x={12} y={st.style === 'polaroid' ? 118 : 24}
+                           width={126} height={st.style === 'polaroid' ? 28 : 116}
+                           fontSize={ts.size}
+                           fill={ts.color}
+                           fontStyle={konvaFontStyle(ts)}
+                           textDecoration={ts.underline ? 'underline' : ''}
+                           fontFamily="Kanit, sans-serif"
+                           align={ts.align}
+                           listening={false}
+                        />
+                     );
+                  })()}
                 </Group>
               );
             })}
@@ -4187,16 +4206,34 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              box={(() => {
                 const z = scale * (st.scaleX || 1);
                 const polaroid = st.style === 'polaroid';
+                const ts = stickerTextStyle(st);
                 return {
                    left: 12 * z,
                    top: (polaroid ? 118 : 24) * z,
                    width: 126 * z,
                    height: (polaroid ? 28 : 116) * z,
-                   fontSize: (polaroid ? 13 : 16) * z,
-                   align: polaroid ? 'center' : 'left',
+                   // The note's own size and alignment, so the words do not jump
+                   // when the editor closes and the canvas takes over.
+                   fontSize: ts.size * z,
+                   align: ts.align,
                    noteHeight: 150 * scale * (st.scaleY || 1),
                 };
              })()}
+             format={stickerTextStyle(st)}
+             onFormat={(patch) => {
+                // Formatting applies to the note straight away rather than
+                // waiting for the text to be committed, so the bar's effect is
+                // visible while still typing. Same immutable replace as the
+                // text commit: the page's arrays are not deep-copied, so
+                // mutating the sticker in place would leave the object the last
+                // render already holds unchanged by identity.
+                const id = st.id;
+                updatePage(currentPageIndex, (page) => {
+                   page.stickers = (page.stickers || []).map(
+                      (x) => (x.id === id ? { ...x, ...patch } : x)
+                   );
+                });
+             }}
              value={editingStickerValue}
              onChange={setEditingStickerValue}
              textareaRef={stickerTextareaRef}

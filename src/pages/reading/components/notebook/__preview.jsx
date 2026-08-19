@@ -11,6 +11,7 @@ import NotebookTopBar from './NotebookTopBar.jsx';
 import ImageSearchPanel from './ImageSearchPanel.jsx';
 import TextEditor from './TextEditor.jsx';
 import StickyNoteEditor from './StickyNoteEditor.jsx';
+import { stickerTextStyle } from './stickerText.js';
 import { HW } from './theme.js';
 
 const noop = () => {};
@@ -41,6 +42,7 @@ export default function NotebookPreview() {
   // and the note is drawn behind the editor at the same size Konva draws it.
   const [noteScale, setNoteScale] = useState(0.43);
   const [stickyValue, setStickyValue] = useState('');
+  const [sticky, setSticky] = useState({ id: 's1', style: 'classic' });
   const [committed, setCommitted] = useState('(ยังไม่บันทึก)');
   const [demoText, setDemoText] = useState({ id: 'demo', text: '', color: '#1a1916', size: 24, fontFamily: 'Kanit', align: 'left', list: 'none', width: 340 });
 
@@ -121,6 +123,7 @@ export default function NotebookPreview() {
             </button>
           ))}
           <span style={{ color: HW.textDim, marginLeft: 8 }}>บันทึกแล้ว: <b style={{ color: HW.text }}>{committed || '(ว่าง)'}</b></span>
+          <span data-sticky-fmt style={{ color: HW.textDim, marginLeft: 8 }}>{JSON.stringify(stickerTextStyle(sticky))}</span>
         </div>
         {/* Stand-in for the Konva note underneath the editor. */}
         <div style={{ position: 'absolute', top: 0, left: 0, width: 150 * noteScale, height: 150 * noteScale,
@@ -130,9 +133,11 @@ export default function NotebookPreview() {
           y={0}
           scale={noteScale}
           round={false}
+          format={stickerTextStyle(sticky)}
+          onFormat={(patch) => setSticky(v => ({ ...v, ...patch }))}
           box={{ left: 12 * noteScale, top: 24 * noteScale, width: 126 * noteScale,
-                 height: 116 * noteScale, fontSize: 16 * noteScale, align: 'left',
-                 noteHeight: 150 * noteScale }}
+                 height: 116 * noteScale, fontSize: stickerTextStyle(sticky).size * noteScale,
+                 align: stickerTextStyle(sticky).align, noteHeight: 150 * noteScale }}
           value={stickyValue}
           onChange={setStickyValue}
           textareaRef={{ current: null }}
