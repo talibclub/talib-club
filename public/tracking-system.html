@@ -1063,7 +1063,30 @@ const fallbackConfig = {
 };
 
 const isCanvas = typeof __firebase_config !== 'undefined';
-const fbConfigStr = isCanvas ? __firebase_config : JSON.stringify(fallbackConfig);
+
+// This tool used to talk to a SEPARATE Firebase project (talib-trackingnumber)
+// and sign in with signInAnonymously(). Anonymous auth gives the rules nothing
+// to check — every visitor looks identical — so no ruleset could both let staff
+// use the tool and keep customer names, phone numbers and addresses private.
+// The project id sits in this file's source, which anyone can read.
+//
+// It now uses the MAIN project's config, handed over by the parent page (same
+// origin), where records/ and recipients/ are already staff-only in
+// firestore.rules and where the React tracking page already reads and writes.
+// Because it is the same origin and the same Firebase project, getAuth() picks
+// up the staff member's existing session from IndexedDB — so there is no
+// anonymous sign-in at all on this path, and the rules see a real user.
+let parentConfig = null;
+try {
+  if (window.self !== window.top && parent.location.origin === window.location.origin) {
+    parentConfig = parent.__talibFirebaseConfig || null;
+  }
+} catch (e) { /* cross-origin parent: leave it null */ }
+
+const usingParentProject = !isCanvas && !!(parentConfig && parentConfig.projectId);
+const fbConfigStr = isCanvas
+  ? __firebase_config
+  : JSON.stringify(usingParentProject ? parentConfig : fallbackConfig);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'talib-default-app';
 const initialToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
@@ -1102,6 +1125,20 @@ async function initSystem() {
         // ถ้าทำงานในสภาพแวดล้อมระบบ AI
         if (isCanvas && initialToken) {
             await signInWithCustomToken(auth, initialToken);
+        } else if (usingParentProject) {
+            // Inherit the staff member's session. Calling signInAnonymously()
+            // here would REPLACE it with an anonymous user and the rules would
+            // then reject every read and write.
+            if (!auth.currentUser) {
+                await new Promise((resolve) => {
+                    const stop = onAuthStateChanged(auth, (u) => { if (u !== undefined) { stop(); resolve(u); } });
+                    setTimeout(() => { stop(); resolve(null); }, 8000);
+                });
+            }
+            if (!auth.currentUser) {
+                toast("กรุณาเข้าสู่ระบบด้วยบัญชีทีมงานก่อนใช้งานหน้านี้", "err");
+                return;
+            }
         } else {
             // ถ้าทำงานในเครื่องส่วนตัว
             await signInAnonymously(auth);

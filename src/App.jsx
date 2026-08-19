@@ -1,6 +1,7 @@
 import { Component, useEffect, useState, lazy, Suspense, useRef, useMemo, useCallback } from "react"
 import { useNavigate, useLocation, useSearchParams, Routes, Route, Navigate } from "react-router-dom"
 import { useTheme } from "./hooks/useTheme.js"
+import { publicFirebaseConfig } from "./lib/firebase.js"
 import { useAuth } from "./hooks/useAuth.js"
 import Nav from "./components/Nav.jsx"
 // Eager, not lazyWithRetry: a 404 is often reached because a chunk or a route
@@ -160,6 +161,15 @@ export default function App() {
   useEffect(() => {
     window.__isStaff = authState?.isStaff;
   }, [authState?.isStaff])
+
+  // The tracking tool (public/tracking-system.html) runs in a same-origin
+  // iframe. It is a static file, so it cannot read the VITE_* config itself —
+  // it reads this. Sharing the main project's config is what lets it inherit
+  // the staff member's existing session instead of signing in anonymously to a
+  // second project where the rules cannot tell staff from anyone else.
+  useEffect(() => {
+    window.__talibFirebaseConfig = publicFirebaseConfig;
+  }, [])
 
   const uid = authState?.user?.uid
   const readingSessionsQueryOptions = useMemo(() => ({ limit: 20, orderByField: "completedAt", orderDirection: "desc", live: false }), [])

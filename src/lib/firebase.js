@@ -30,6 +30,12 @@ const firebaseConfig = hasWebFirebase ? webFirebaseConfig : {
 export const app = getApps().find(item => item.name === "talib-web")
   || initializeApp(firebaseConfig, "talib-web")
 
+// Handed to the tracking tool, which is a static file in public/ and so cannot
+// read import.meta.env itself. It runs in a same-origin iframe and used to point
+// at a whole separate Firebase project with signInAnonymously() — see the note
+// in public/tracking-system.html.
+export const publicFirebaseConfig = firebaseConfig
+
 export const auth = getAuth(app)
 
 // Initialize firestore with persistent multi-tab cache

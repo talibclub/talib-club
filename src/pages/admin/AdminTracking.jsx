@@ -10,9 +10,11 @@ export default function AdminTracking() {
           <a className="btn btn-outline" href="/tracking-system" target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
             <i className="ti ti-external-link" style={{ marginRight: 6 }}></i>หน้าเว็บผู้ใช้ (ไว้แชร์)
           </a>
-          <a className="btn btn-outline" href="/tracking-system.html?admin=staff" target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
-            <i className="ti ti-window-maximize" style={{ marginRight: 6 }}></i>แอดมินเต็มจอ
-          </a>
+          {/* The "แอดมินเต็มจอ" link used to be here. tracking-system.html
+              redirects to "/" whenever window.self === window.top, so opening it
+              in a new tab could never work — and it must stay that way: the tool
+              takes both its Firebase config and its staff check from the parent
+              page, which only exists inside this iframe. */}
         </div>
       </div>
 
