@@ -4328,8 +4328,12 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         </div>
       )}
 
-      {/* Floating action bar pinned just above a single selected object. */}
-      {selectedInfo && !readonly && !hasSelection && !croppingImageId && (() => {
+      {/* Floating action bar pinned just above a single selected object.
+          Hidden while a text editor is open: that editor puts its own bar in the
+          same place, so both were drawn on top of each other. The one that
+          belongs to what you are doing wins, and this bar's own "edit text"
+          button is redundant once you are already typing. */}
+      {selectedInfo && !readonly && !hasSelection && !croppingImageId && !editingStickerId && !editingTextId && (() => {
          const { kind, obj, box } = selectedInfo;
          const left = (box.minX + pageX) * scale + position.x + ((box.maxX - box.minX) * scale) / 2;
          const top = (box.minY + pageY) * scale + position.y - 54;

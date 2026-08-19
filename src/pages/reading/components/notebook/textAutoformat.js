@@ -122,3 +122,42 @@ export function matchInlineWrap(textBeforeCaret) {
   }
   return null;
 }
+
+// --- Plain-text lists -------------------------------------------------------
+//
+// The rich text boxes turn "- " into a real list block. A sticky note is a bare
+// <textarea>, which has no blocks to switch on, so there a list can only be
+// characters. Typing "- " or "* " at the start of a line becomes a bullet, and
+// Enter carries it to the next line — the behaviour people expect from typing a
+// dash, without pretending the note has structure it does not have.
+
+export const PLAIN_BULLET = '\u2022 ';
+
+// Where the line holding the caret begins.
+function lineStartAt(value, caret) {
+  return value.lastIndexOf('\n', caret - 1) + 1;
+}
+
+export function applyPlainListTrigger(value, caret) {
+  const start = lineStartAt(value, caret);
+  const line = value.slice(start, caret);
+  // Only when the shorthand IS the line so far, so "ก - ข" stays as typed.
+  if (line !== '- ' && line !== '* ') return null;
+  return {
+    value: value.slice(0, start) + PLAIN_BULLET + value.slice(caret),
+    caret: start + PLAIN_BULLET.length,
+  };
+}
+
+// Enter on a bulleted line starts the next bullet; Enter on an empty one ends
+// the list instead of adding a bullet nobody asked for.
+export function continuePlainList(value, caret) {
+  const start = lineStartAt(value, caret);
+  const line = value.slice(start, caret);
+  if (!line.startsWith(PLAIN_BULLET)) return null;
+  if (line.trim() === PLAIN_BULLET.trim()) {
+    return { value: value.slice(0, start) + value.slice(caret), caret: start };
+  }
+  const insert = '\n' + PLAIN_BULLET;
+  return { value: value.slice(0, caret) + insert + value.slice(caret), caret: caret + insert.length };
+}

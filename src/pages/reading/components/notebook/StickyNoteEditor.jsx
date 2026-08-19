@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { AlignCenter, AlignLeft, AlignRight, Bold, Italic, Minus, Plus, Trash2, Underline } from 'lucide-react';
-import { autoformatPlainText } from './textAutoformat.js';
+import { applyPlainListTrigger, autoformatPlainText, continuePlainList } from './textAutoformat.js';
 import { stepTextSize } from './stickerText.js';
 import { HW, TEXT_COLORS } from './theme.js';
 
@@ -36,6 +36,15 @@ export default function StickyNoteEditor({ x, y, scale, round, value, onChange, 
   const hasFocused = useRef(false);
 
   const fmt = format || {};
+
+  // React owns the value, so the caret has to be restored after the re-render
+  // that our rewrite causes — otherwise it jumps to the end of the text.
+  const putCaret = (caret) => queueMicrotask(() => {
+    if (textareaRef?.current) {
+      textareaRef.current.selectionStart = caret;
+      textareaRef.current.selectionEnd = caret;
+    }
+  });
   const set = (patch) => onFormat && onFormat(patch);
 
   // Every control here must leave focus on the textarea. A button that takes
@@ -135,15 +144,22 @@ export default function StickyNoteEditor({ x, y, scale, round, value, onChange, 
         // the caret back — done in a microtask because React controls the value.
         onChange={(e) => {
           const el = e.target;
-          const next = autoformatPlainText(el.value, el.selectionStart);
+          // "->" becomes an arrow, and "- " or "* " at the start of a line
+          // becomes a bullet.
+          const next = autoformatPlainText(el.value, el.selectionStart)
+            || applyPlainListTrigger(el.value, el.selectionStart);
           if (!next) { onChange(el.value); return; }
           onChange(next.value);
-          queueMicrotask(() => {
-            if (textareaRef?.current) {
-              textareaRef.current.selectionStart = next.caret;
-              textareaRef.current.selectionEnd = next.caret;
-            }
-          });
+          putCaret(next.caret);
+        }}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' || e.shiftKey) return;
+          const el = e.currentTarget;
+          const next = continuePlainList(el.value, el.selectionStart);
+          if (!next) return;
+          e.preventDefault();
+          onChange(next.value);
+          putCaret(next.caret);
         }}
         onFocus={() => { hasFocused.current = true; }}
         onBlur={(e) => {
