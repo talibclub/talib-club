@@ -4,7 +4,7 @@ import { autoformatPlainText } from './textAutoformat.js';
 // In-place editor for a sticky note's text, positioned over the note on canvas.
 // Presentational: the parent owns the value, the textarea ref, and the
 // commit/delete logic.
-export default function StickyNoteEditor({ x, y, scale, round, value, onChange, textareaRef, onCommit, onDelete }) {
+export default function StickyNoteEditor({ x, y, scale, round, value, onChange, textareaRef, onCommit, onDelete, box }) {
   // onBlur used to commit unconditionally. The textarea mounts in the same
   // commit as the Konva pointer handling, which takes focus straight back off
   // it — so the editor opened and closed again before the parent's 60ms
@@ -12,7 +12,7 @@ export default function StickyNoteEditor({ x, y, scale, round, value, onChange, 
   // A blur can only close the editor once the textarea has actually held focus.
   const hasFocused = useRef(false);
   return (
-    <div style={{ position: 'absolute', top: y, left: x, zIndex: 100, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ position: 'absolute', top: y, left: x, zIndex: 100 }}>
       <textarea
         ref={textareaRef}
         autoFocus
@@ -37,18 +37,27 @@ export default function StickyNoteEditor({ x, y, scale, round, value, onChange, 
         onBlur={() => { if (hasFocused.current) onCommit(); }}
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
+        // Mirrors the Konva <Text> on the note exactly. It used to sit at the
+        // note's origin with 16px of padding and a flat 150x150 box, while the
+        // canvas text is inset (12, 24) in a 126x116 box — so the words moved
+        // and re-wrapped the moment you stopped typing.
         style={{
+          position: 'absolute',
+          left: box.left,
+          top: box.top,
           margin: 0,
-          padding: 16,
-          border: '2px solid var(--teal)',
+          padding: 0,
+          border: 'none',
           background: 'transparent',
           color: '#111827',
-          fontSize: `${16 * scale}px`,
+          fontSize: `${box.fontSize}px`,
+          lineHeight: 1.2,
+          textAlign: box.align,
           fontFamily: 'Kanit, sans-serif',
           outline: 'none',
           resize: 'none',
-          width: 150 * scale,
-          height: 150 * scale,
+          width: box.width,
+          height: box.height,
           overflow: 'hidden',
           borderRadius: round ? 16 * scale : 2 * scale,
         }}
@@ -60,7 +69,8 @@ export default function StickyNoteEditor({ x, y, scale, round, value, onChange, 
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
         onClick={onDelete}
-        style={{ background: '#EF4444', color: 'white', border: 'none', padding: '6px 12px', borderRadius: 6, cursor: 'pointer', alignSelf: 'flex-start', fontSize: 13, boxShadow: '0 2px 8px rgba(239,68,68,0.2)' }}
+        // Sits just under the note now that the textarea is absolutely placed.
+        style={{ position: 'absolute', top: box.noteHeight + 8, left: 0, background: '#c0392b', color: 'white', border: 'none', padding: '6px 12px', borderRadius: 999, cursor: 'pointer', fontSize: 12.5, fontFamily: 'Kanit, sans-serif', whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(192,57,43,0.25)' }}
       >
         ลบโพสต์อิท
       </button>

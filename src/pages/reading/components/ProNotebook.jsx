@@ -3604,7 +3604,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   // the note for typing with the text tool, but a Konva node with
                   // listening=false never receives the event — so the handler
                   // could not fire and tapping a note in typing mode did nothing.
-                  listening={['pan', 'lasso', 'sticker', 'text'].includes(tool) || selectedId === st.id}
+                  listening={['pan', 'lasso', 'sticker', 'text', 'shape', 'image'].includes(tool) || selectedId === st.id}
                   onDragEnd={(e) => {
                    pushHistory();
                     updatePage(currentPageIndex, (page) => {
@@ -3630,6 +3630,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   // and there was no obvious way to write on one.
                   onClick={(e) => { e.cancelBubble = true; if (tool === 'sticker' || tool === 'text') { setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); } else if (tool === 'pan' || tool === 'lasso') { selectShape(st.id); } }}
                   onTap={(e) => { e.cancelBubble = true; if (tool === 'sticker' || tool === 'text') { setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); } else if (tool === 'pan' || tool === 'lasso') { selectShape(st.id); } }}
+                  // Double-tap starts typing whatever tool is in hand. Otherwise
+                  // you have to go back to the toolbar and pick the text tool
+                  // every time you have moved a note with the pan tool.
+                  onDblClick={(e) => { e.cancelBubble = true; setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); }}
+                  onDblTap={(e) => { e.cancelBubble = true; setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); }}
                 >
                   {st.style === 'polaroid' ? (
                      <>
@@ -4160,6 +4165,23 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              y={(st.y + pageY) * scale + position.y}
              scale={scale}
              round={st.style === 'round'}
+             // The same numbers the Konva <Text> on the note uses, so the words
+             // do not move or re-wrap when the editor closes. Multiplied by the
+             // note's own scale as well as the board zoom, which the old fixed
+             // 150x150 box ignored entirely.
+             box={(() => {
+                const z = scale * (st.scaleX || 1);
+                const polaroid = st.style === 'polaroid';
+                return {
+                   left: 12 * z,
+                   top: (polaroid ? 118 : 24) * z,
+                   width: 126 * z,
+                   height: (polaroid ? 28 : 116) * z,
+                   fontSize: (polaroid ? 13 : 16) * z,
+                   align: polaroid ? 'center' : 'left',
+                   noteHeight: 150 * scale * (st.scaleY || 1),
+                };
+             })()}
              value={editingStickerValue}
              onChange={setEditingStickerValue}
              textareaRef={stickerTextareaRef}
