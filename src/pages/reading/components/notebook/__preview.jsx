@@ -13,6 +13,9 @@ import { HW } from './theme.js';
 const noop = () => {};
 
 export default function NotebookPreview() {
+  // Width of the pane the capsule lives in. The real notebook is usually a
+  // split view beside the PDF, which is the case that overflowed.
+  const [paneWidth, setPaneWidth] = useState('100%');
   const [tool, setTool] = useState('text');
   const [showToolOptions, setShowToolOptions] = useState(false);
   const [penColor, setPenColor] = useState('#1a1916');
@@ -54,7 +57,17 @@ export default function NotebookPreview() {
   };
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100vh', background: HW.paper, overflow: 'hidden', fontFamily: 'Kanit, sans-serif' }}>
+    <>
+    <div style={{ position: 'fixed', top: 8, left: 8, zIndex: 9999, display: 'flex', gap: 6, fontFamily: 'Kanit, sans-serif', fontSize: 12 }}>
+      {['100%', '900px', '700px', '520px', '380px'].map(w => (
+        <button key={w} onClick={() => setPaneWidth(w)}
+          style={{ padding: '4px 9px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${HW.hairline}`,
+                   background: paneWidth === w ? HW.accent : '#fff', color: paneWidth === w ? '#fff' : HW.text }}>
+          {w}
+        </button>
+      ))}
+    </div>
+    <div style={{ position: 'relative', width: paneWidth, height: '100vh', background: HW.paper, overflow: 'hidden', fontFamily: 'Kanit, sans-serif', borderRight: `1px solid ${HW.hairline}` }}>
       <NotebookStyles />
       <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: HW.textDim }}>
         <div style={{ width: 'min(720px, 86vw)', height: '62vh', background: '#fff', borderRadius: 12, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`, display: 'grid', placeItems: 'center' }}>
@@ -80,5 +93,6 @@ export default function NotebookPreview() {
       )}
       <NotebookToolCapsule ui={ui} />
     </div>
+    </>
   );
 }

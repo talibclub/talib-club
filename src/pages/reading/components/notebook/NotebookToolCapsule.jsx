@@ -37,32 +37,78 @@ export default function NotebookToolCapsule({ ui }) {
     try { localStorage.setItem(WRITE_MODE_KEY, writeMode); } catch (e) { console.warn(e); }
   }, [writeMode]);
 
-  // Labels are what make an icon row readable to someone who does not already
-  // know the tools, so they are shown wherever there is room for them.
-  //
-  // Keyed off width, not pointer type: a tablet with a stylus reports a coarse
-  // pointer but has plenty of space — and is exactly where a beginner benefits
-  // most from reading "ข้อความ" instead of guessing at a glyph.
-  const [wideEnough, setWideEnough] = React.useState(
-    () => typeof window === 'undefined' || window.innerWidth >= 620
-  );
-  React.useEffect(() => {
-    const onResize = () => setWideEnough(window.innerWidth >= 620);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-  const showLabels = wideEnough;
-
   const visibleTools = React.useMemo(() => {
     const ink = (showInk || inkOpen) ? TOOL_GROUPS.ink : [];
     return [...TOOL_GROUPS.core, ...ink, ...TOOL_GROUPS.extras];
   }, [showInk, inkOpen]);
 
+  // Labels are what make an icon row readable to someone who does not already
+  // know the tools, so they are shown wherever there is room for them — and
+  // dropped when there is not, because a row that runs off the edge is worse
+  // than one without words.
+  //
+  // Measured from the capsule's own container, NOT window.innerWidth. The
+  // notebook usually sits in a split view beside the PDF, so the window can be
+  // 1400px wide while this strip only has 700 to work with; keying off the
+  // window made the labels appear and then overflow the pane.
+  const wrapRef = React.useRef(null);
+  const [availWidth, setAvailWidth] = React.useState(0);
+
+  // Measured after every commit, not only from a ResizeObserver. The observer
+  // is kept because it catches a pane resized by something outside React (the
+  // reader's split-view divider), but it cannot be the only source: its
+  // callbacks are delivered as part of the frame lifecycle, so a tab that is
+  // not compositing never receives them. Re-measuring on commit costs one
+  // getBoundingClientRect and is guarded against re-render loops by only
+  // setting state when the number actually moves.
+  React.useLayoutEffect(() => {
+    const host = wrapRef.current?.parentElement;
+    if (!host) return;
+    const next = host.getBoundingClientRect().width;
+    setAvailWidth((prev) => (Math.abs(prev - next) > 1 ? next : prev));
+  });
+
+  React.useEffect(() => {
+    const host = wrapRef.current?.parentElement;
+    if (!host) return undefined;
+    const measure = () => {
+      const next = host.getBoundingClientRect().width;
+      setAvailWidth((prev) => (Math.abs(prev - next) > 1 ? next : prev));
+    };
+    window.addEventListener('resize', measure);
+    let ro;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(measure);
+      ro.observe(host);
+    }
+    return () => {
+      window.removeEventListener('resize', measure);
+      ro?.disconnect();
+    };
+  }, []);
+
+  // A labelled button is ~56px, a bare icon ~40. Plus the mode switch, undo/redo
+  // and padding. Below the labelled threshold the row still scrolls, but it no
+  // longer promises more than it can show.
+  const chromeWidth = 220;
+  const fullCount = visibleTools.length + (showInk ? 0 : 1);
+  const showLabels = availWidth > 0 && availWidth >= fullCount * 58 + chromeWidth;
+  const compactModes = availWidth > 0 && availWidth < 560;
+
+  // On a genuinely narrow pane even bare icons run past the edge, so the
+  // occasional tools (สติกเกอร์ / เลเซอร์ / อัดเสียง) fold away behind the
+  // existing "เพิ่มเติม" panel rather than being pushed off-screen where nobody
+  // scrolls to find them.
+  const foldExtras = availWidth > 0 && availWidth < fullCount * 44 + chromeWidth;
+  const shownTools = foldExtras
+    ? visibleTools.filter((t) => !TOOL_GROUPS.extras.some((e) => e.id === t.id))
+    : visibleTools;
+
   return (
     <>
       {/* Huawei Notes floating tool capsule (bottom-centered, overlays the canvas) */}
       {!readonly && (
-         <div style={{ position: 'absolute', bottom: zoomWriter ? WRITER_H + 44 + 14 : 20, left: '50%', transform: 'translateX(-50%)', zIndex: 46, maxWidth: 'calc(100% - 24px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, transition: 'bottom 0.22s cubic-bezier(0.2,0.8,0.2,1)' }}>
+         <div ref={wrapRef} style={{ position: 'absolute', bottom: zoomWriter ? WRITER_H + 44 + 14 : 20, left: '50%', transform: 'translateX(-50%)', zIndex: 46, maxWidth: 'calc(100% - 24px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, transition: 'bottom 0.22s cubic-bezier(0.2,0.8,0.2,1)' }}>
             <div style={{ height: TOOL_BTN + 12, background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, borderRadius: HW.radius, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`, display: 'flex', alignItems: 'center', padding: '0 8px', gap: isCoarse ? 4 : 6, maxWidth: '100%' }}>
                  {/* Typing vs handwriting. Sits first because it changes what
                      the rest of the row contains. */}
@@ -84,10 +130,11 @@ export default function NotebookToolCapsule({ ui }) {
                          aria-pressed={on}
                          style={{
                            border: 'none', cursor: 'pointer', borderRadius: 999,
-                           padding: showLabels ? '5px 12px' : '5px 9px',
+                           padding: compactModes ? '5px 7px' : showLabels ? '5px 12px' : '5px 9px',
+                           fontSize: compactModes ? 11 : 12,
                            background: on ? '#fff' : 'transparent',
                            color: on ? HW.accent : HW.textDim,
-                           fontFamily: 'Kanit, sans-serif', fontSize: 12, fontWeight: on ? 600 : 500,
+                           fontFamily: 'Kanit, sans-serif', fontWeight: on ? 600 : 500,
                            boxShadow: on ? '0 1px 3px rgba(35,31,27,0.14)' : 'none',
                            transition: 'all 0.16s',
                          }}
@@ -128,7 +175,7 @@ export default function NotebookToolCapsule({ ui }) {
                       {...leftToolbarScroll}
                    >
                   
-                  {visibleTools.map(t => {
+                  {shownTools.map(t => {
                      const isAction = ACTION_TOOLS.includes(t.id);
                      const active = t.id === 'ruler' ? rulerOn
                         : t.id === 'protractor' ? protractorOn
