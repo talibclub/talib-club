@@ -172,12 +172,30 @@ async function ensureSourceTaxonomy() {
 }
 
 async function commitInChunks(ops) {
+  // A batch failing part way through used to throw straight out of main(), so
+  // the run ended with some batches applied, some not, and nothing on screen
+  // saying which. Firestore batches are atomic individually, so the recovery is
+  // simply to run the script again — but only if you can tell that is what
+  // happened. Report it, then rethrow.
+  let committed = 0;
   for (let i = 0; i < ops.length; i += BATCH_LIMIT) {
     const chunk = ops.slice(i, i + BATCH_LIMIT);
     const batch = destDb.batch();
     chunk.forEach((op) => op(batch));
-    await batch.commit();
-    console.log(`Committed batch ${i / BATCH_LIMIT + 1} (${chunk.length} ops)`);
+    try {
+      await batch.commit();
+    } catch (err) {
+      console.error(
+        `
+Batch ${i / BATCH_LIMIT + 1} failed after ${committed}/${ops.length} operations were already written.
+` +
+        `The import is half applied. Re-run this script — every operation is an idempotent set()/update() keyed on sourceId, so a second run finishes the rest without duplicating anything.
+`
+      );
+      throw err;
+    }
+    committed += chunk.length;
+    console.log(`Committed batch ${i / BATCH_LIMIT + 1} (${chunk.length} ops, ${committed}/${ops.length} total)`);
   }
 }
 
@@ -196,7 +214,14 @@ async function main() {
   for (const doc of existing.values()) {
     if (thaiIds.has(doc.sourceId)) continue;
     const stillUpstream = allIds.has(doc.sourceId);
-    if (stillUpstream || !THAI_SCRIPT.test(doc.title || "")) toPurge.push(doc);
+    // Hard-delete ONLY when the book is still upstream, because that is the one
+    // case where "not Thai" can actually be checked against the source. The old
+    // rule also purged anything whose *title* had no Thai characters — so a Thai
+    // book titled in Latin script ("Riyadus Solihin") that had merely gone
+    // restricted upstream was destroyed permanently, with nothing to restore
+    // from. Anything that vanished upstream is soft-deleted now, whatever its
+    // title looks like; it can come back.
+    if (stillUpstream) toPurge.push(doc);
     else if (!doc.deleted) toHide.push(doc);
   }
   // First run ever (nothing imported yet) is a historical backfill, not "new

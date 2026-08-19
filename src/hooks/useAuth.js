@@ -117,13 +117,13 @@ export function useAuth() {
                 if (currentSeq !== activeSeq || !snap.exists()) return
                 const freshData = snap.data()
                 if (freshData.role !== snapData.role) {
-                  try { localStorage.setItem(cacheKey, JSON.stringify({ data: freshData, timestamp: Date.now() })) } catch(e) {}
+                  try { localStorage.setItem(cacheKey, JSON.stringify({ data: freshData, timestamp: Date.now() })) } catch { /* ignore */ }
                   setProfile(prev => ({ ...DEFAULT_PROFILE, ...(prev || {}), ...freshData }))
                 }
               }).catch(() => {})
             }
           }
-        } catch(e) {}
+        } catch { /* ignore */ }
 
         if (!exists) {
           const snap = await withTimeout(getDoc(ref))
@@ -131,7 +131,7 @@ export function useAuth() {
           if (snap.exists()) {
             snapData = snap.data()
             exists = true;
-            try { localStorage.setItem(cacheKey, JSON.stringify({ data: snapData, timestamp: Date.now() })) } catch(e) {}
+            try { localStorage.setItem(cacheKey, JSON.stringify({ data: snapData, timestamp: Date.now() })) } catch { /* ignore */ }
           }
         } else {
           if (currentSeq !== activeSeq) return
@@ -154,7 +154,7 @@ export function useAuth() {
             const newData = { email, displayName, photoURL, updatedAt: serverTimestamp() };
             await setDoc(ref, newData, { merge: true }).catch(e => console.error("Sync profile to firestore failed", e))
             // Update cache
-            try { localStorage.setItem(cacheKey, JSON.stringify({ data: { ...snapData, email, displayName, photoURL }, timestamp: Date.now() })) } catch(e) {}
+            try { localStorage.setItem(cacheKey, JSON.stringify({ data: { ...snapData, email, displayName, photoURL }, timestamp: Date.now() })) } catch { /* ignore */ }
           }
           if (currentSeq !== activeSeq) return
           setProfile({
@@ -165,17 +165,25 @@ export function useAuth() {
             photoURL,
           })
         } else {
+          // Registration races this listener: createUserWithEmailAndPassword
+          // fires onAuthStateChanged straight away, before register() has run
+          // updateProfile(), so currentUser.displayName is still empty here.
+          // This used to be a full setDoc — no merge — so whichever of the two
+          // writes landed second won, and half the time the name the member had
+          // just typed was overwritten with "". Merge, and never write an empty
+          // displayName over one that is already there.
           const nextProfile = {
             role: "member",
-            displayName: currentUser.displayName || "",
             email: currentUser.email || "",
             createdAt: serverTimestamp(),
           }
+          if (currentUser.displayName) nextProfile.displayName = currentUser.displayName
           if (currentSeq !== activeSeq) return
-          await setDoc(ref, nextProfile)
+          await setDoc(ref, nextProfile, { merge: true })
           if (currentSeq !== activeSeq) return
-          try { localStorage.setItem(cacheKey, JSON.stringify({ data: nextProfile, timestamp: Date.now() })) } catch(e) {}
-          setProfile({ ...nextProfile, createdAt: new Date() })
+          const created = { displayName: "", ...nextProfile }
+          try { localStorage.setItem(cacheKey, JSON.stringify({ data: created, timestamp: Date.now() })) } catch { /* ignore */ }
+          setProfile({ ...created, createdAt: new Date() })
         }
       } catch (err) {
         console.error("Cannot load user profile", err)
@@ -200,14 +208,21 @@ export function useAuth() {
     async login(email, password) {
       return signInWithEmailAndPassword(auth, email, password)
     },
-    async loginWithGoogle() {
+    async loginWithGoogle(afterLogin) {
       try {
         const res = await signInWithPopup(auth, googleProvider)
         await saveGoogleProfile(res.user)
         return res
       } catch (err) {
         if (!POPUP_FALLBACK_CODES.has(err.code)) throw err
-        window.sessionStorage.setItem("talibAfterLogin", "member")
+        // The redirect reloads the whole app, so react-router's location.state
+        // — which carries the page the user was trying to reach — is gone by
+        // the time they come back. This used to store the literal string
+        // "member" and nothing ever read it, so every redirect sign-in landed
+        // on the dashboard instead of where the user was going.
+        try {
+          window.sessionStorage.setItem("talibAfterLogin", afterLogin || "/member")
+        } catch (e) { console.warn(e) }
         await signInWithRedirect(auth, googleProvider)
         return { redirecting: true }
       }
@@ -217,13 +232,16 @@ export function useAuth() {
       const cleanDisplayName = displayName ? displayName.trim() : ""
       const res = await createUserWithEmailAndPassword(auth, cleanEmail, password)
       if (cleanDisplayName) await updateProfile(res.user, { displayName: cleanDisplayName })
+      // Merged for the same reason as the listener above: both writes target
+      // this document within milliseconds of each other, and a plain setDoc
+      // from either side wipes whatever the other one had just put there.
       await setDoc(doc(db, "users", res.user.uid), {
         role: "member",
         displayName: cleanDisplayName,
         email: cleanEmail,
         emailVerified: res.user.emailVerified,
         createdAt: serverTimestamp(),
-      })
+      }, { merge: true })
       await sendEmailVerification(res.user)
       return res
     },
@@ -238,7 +256,7 @@ export function useAuth() {
       }
       await setDoc(doc(db, "users", auth.currentUser.uid), nextProfile, { merge: true })
       // H2: Invalidate localStorage cache so the updated profile is fetched fresh
-      try { localStorage.removeItem(`talib_user_profile_${auth.currentUser.uid}`) } catch(e) {}
+      try { localStorage.removeItem(`talib_user_profile_${auth.currentUser.uid}`) } catch { /* ignore */ }
       setProfile(prev => ({ ...DEFAULT_PROFILE, ...(prev || {}), ...nextProfile }))
     },
     async updateUserPassword(newPassword) {

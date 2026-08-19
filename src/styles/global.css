@@ -55,6 +55,21 @@ body.dark {
   --logo-c: #f7f2e9;
   --nav-bg: rgba(8, 9, 11, 0.9);
   --shadow: 0 18px 45px rgba(0, 0, 0, 0.32);
+  /* Aliases and one-off colours that components were already calling for but
+     that nothing ever defined. An undefined var() with no fallback makes the
+     whole declaration invalid, so these were silently rendering as transparent
+     backgrounds, inherited text colours and missing borders. */
+  --t1: #f7f2e9;
+  --text2: #c9c0b4;
+  --sub: #c9c0b4;
+  --gray-light: #1d2026;
+  --card-rgb: 17, 19, 24;
+  --teal-dark: #2fae94;
+  --teal-light: #7ae6cd;
+  --teal-alpha-30: rgba(69, 214, 182, 0.3);
+  --orange: #f59e0b;
+  --amber-bg: rgba(245, 158, 11, 0.14);
+  --red2: #f87171;
 }
 
 .app.light,
@@ -81,6 +96,21 @@ body.light {
   --logo-c: #0a0a0d;
   --nav-bg: rgba(247, 245, 241, 0.92);
   --shadow: 0 10px 28px rgba(35, 31, 27, 0.08);
+  /* Aliases and one-off colours that components were already calling for but
+     that nothing ever defined. An undefined var() with no fallback makes the
+     whole declaration invalid, so these were silently rendering as transparent
+     backgrounds, inherited text colours and missing borders. */
+  --t1: #111010;
+  --text2: #5d5850;
+  --sub: #5d5850;
+  --gray-light: #e2dfd8;
+  --card-rgb: 255, 255, 255;
+  --teal-dark: #0a5341;
+  --teal-light: #2f9b7f;
+  --teal-alpha-30: rgba(15, 110, 86, 0.3);
+  --orange: #d97706;
+  --amber-bg: rgba(217, 119, 6, 0.10);
+  --red2: #dc2626;
 }
 
 /* --- 3. BASE STYLES --- */

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react"
 import toast from 'react-hot-toast'
 import { db } from "../../lib/firebase.js"
 import { collection, query, where, getCountFromServer } from "firebase/firestore"
-import { useContentCollection, useUserCollection, useUserDoc } from "../../lib/contentStore.js"
+import { useContentCollection, useUserDoc } from "../../lib/contentStore.js"
 import { initials, parseHistoryTargetId, normalizeStreakSettings, fieldStyle } from "./dashboardUtils.js"
 
 const PROFILE_STATS_CACHE_TTL = 60 * 1000
@@ -16,6 +16,14 @@ export default function ProfilePanel({ authState, copied, copyText, go, setView,
   const email = user?.email || profile.email || "-"
   const photoURL = user?.photoURL || ""
   const isStaff = role === "staff"
+  const isAdmin = role === "admin" || role === "owner"
+  // The badge only knew "staff" vs everything else, so admins and the owner were
+  // labelled "Member" on their own profile.
+  const roleBadge = isAdmin
+    ? { label: role === "owner" ? "Owner" : "Admin", className: "badge-acc" }
+    : isStaff
+      ? { label: "Staff", className: "badge-teal" }
+      : { label: "Member", className: "badge-acc" }
 
   const subView = ctx?.sub || "stats"
   const setSubView = (newSub) => {
@@ -97,6 +105,9 @@ export default function ProfilePanel({ authState, copied, copyText, go, setView,
 
   const isGoogleUser = user?.providerData?.some(p => p.providerId === "google.com") || false;
 
+  // Reset the form when the account changes, not on every profile update. This
+  // ran on [displayName, email], so the profile doc re-emitting mid-edit — an
+  // unrelated write, a cache refresh — threw away whatever was half typed.
   useEffect(() => {
     setForm({
       displayName: displayName === "-" ? "" : displayName,
@@ -104,7 +115,8 @@ export default function ProfilePanel({ authState, copied, copyText, go, setView,
       currentPassword: "",
       newPassword: "",
     })
-  }, [displayName, email])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid])
 
   const set = (key, value) => setForm(prev => ({ ...prev, [key]: value }))
 
@@ -189,9 +201,10 @@ export default function ProfilePanel({ authState, copied, copyText, go, setView,
     }
   }
 
-  if (loadingDbStats) {
-    return <div style={{ textAlign: "center", padding: 40 }}><i className="ti ti-loader-2 spin" style={{ fontSize: 24, color: "var(--teal)" }}></i></div>
-  }
+  // This early return used to cover the whole panel, so the "ตั้งค่าบัญชี" tab —
+  // which needs none of these numbers — was unreachable until four
+  // getCountFromServer calls came back. The spinner now sits inside the stats
+  // tab only, further down.
 
   return (
     <div className="profile-layout" style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -210,7 +223,7 @@ export default function ProfilePanel({ authState, copied, copyText, go, setView,
               {photoURL ? <img src={photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : initials(displayName, email)}
             </div>
             <div>
-              <span className={`badge ${isStaff ? "badge-teal" : "badge-acc"}`}>{isStaff ? "Staff" : "Member"}</span>
+              <span className={`badge ${roleBadge.className}`}>{roleBadge.label}</span>
               <h2>{displayName}</h2>
               <p>{email}</p>
             </div>
@@ -232,7 +245,13 @@ export default function ProfilePanel({ authState, copied, copyText, go, setView,
           </button>
         </div>
 
-        {subView === "stats" && (
+        {subView === "stats" && loadingDbStats && (
+          <div style={{ textAlign: "center", padding: 40 }}>
+            <i className="ti ti-loader-2 spin" style={{ fontSize: 24, color: "var(--teal)" }}></i>
+          </div>
+        )}
+
+        {subView === "stats" && !loadingDbStats && (
           <div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
               <div className="card" style={{ padding: 16, display: "flex", gap: 12, alignItems: "center", background: "var(--bg2)" }}>

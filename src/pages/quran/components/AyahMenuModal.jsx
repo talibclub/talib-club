@@ -188,7 +188,7 @@ export default function AyahMenuModal({
                   borderColor: "var(--quran-br)"
                 }}
                 onClick={() => {
-                  const bookmark = getBookmarkForVerse(activeAyahMenu.aya)
+                  const bookmark = getBookmarkForVerse(activeAyahMenu.aya, activeAyahMenu.sura)
                   const tr = modalDetails.translation || getVerseTranslation(activeAyahMenu.sura, activeAyahMenu.aya)
                   handleOpenBookmarkModal(
                     {
@@ -203,8 +203,8 @@ export default function AyahMenuModal({
                   setActiveAyahMenu(null)
                 }}
               >
-                <i className={getBookmarkForVerse(activeAyahMenu.aya) ? "ti ti-bookmark-filled" : "ti ti-bookmark"} style={{ fontSize: 14 }}></i>
-                {getBookmarkForVerse(activeAyahMenu.aya) ? "แก้ไขหรือลบบันทึกข้อคิด" : "เขียนบันทึกข้อคิด / ประโยชน์"}
+                <i className={getBookmarkForVerse(activeAyahMenu.aya, activeAyahMenu.sura) ? "ti ti-bookmark-filled" : "ti ti-bookmark"} style={{ fontSize: 14 }}></i>
+                {getBookmarkForVerse(activeAyahMenu.aya, activeAyahMenu.sura) ? "แก้ไขหรือลบบันทึกข้อคิด" : "เขียนบันทึกข้อคิด / ประโยชน์"}
               </button>
             </div>
           </div>

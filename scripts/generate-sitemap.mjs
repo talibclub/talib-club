@@ -31,7 +31,10 @@ async function fetchDocuments(collectionName) {
       if (!pageToken) break;
     }
   } catch (err) {
+    // Swallowing this meant a network blip produced a sitemap missing a whole
+    // collection, written over the good one, with the build still green.
     console.error(`[Sitemap] Error fetching ${collectionName}:`, err.message);
+    throw new Error(`Could not fetch ${collectionName} for the sitemap: ${err.message}`);
   }
 
   return documents;
@@ -158,5 +161,17 @@ async function generate() {
 }
 
 generate().catch(err => {
-  console.error('[Sitemap] Generation failed:', err);
+  // Deliberately does NOT fail the build. Aborting before the write leaves the
+  // committed public/sitemap.xml in place, so the deploy still ships the last
+  // good sitemap instead of one that silently lost a whole collection — which
+  // is exactly what the swallowed per-collection error used to produce. That is
+  // also why public/sitemap.xml stays tracked in git: it is the fallback.
+  // What was missing was any way to notice, so say it loudly.
+  console.error('');
+  console.error('='.repeat(70));
+  console.error('[Sitemap] GENERATION FAILED — sitemap.xml was NOT updated.');
+  console.error('[Sitemap] The previously committed sitemap.xml will be deployed as-is.');
+  console.error('[Sitemap] Reason:', err?.message || err);
+  console.error('='.repeat(70));
+  console.error('');
 });

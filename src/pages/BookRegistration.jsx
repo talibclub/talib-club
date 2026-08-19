@@ -2,11 +2,11 @@ import React, { useState, useEffect } from "react"
 import { doc, getDoc } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { db, storage } from "../lib/firebase.js"
-import { useAuth } from "../hooks/useAuth.js"
 import toast from "react-hot-toast"
 
-export default function BookRegistration({ go, ctx }) {
-  const authState = useAuth()
+export default function BookRegistration({ authState, go, ctx }) {
+  // See StaffTranslation: this used its own useAuth() instance, duplicating
+  // App's auth listener and profile read for every visit to the form.
   const user = authState?.user
   const campaignId = ctx?.campaignId
 
@@ -159,6 +159,18 @@ export default function BookRegistration({ go, ctx }) {
       toast.error("กรุณาแนบสลิปโอนเงิน")
       return
     }
+    // storage.rules only accepts image/* under 5 MB. Without these checks the
+    // upload was attempted anyway and came back as a raw Firebase permission
+    // error, which reads as "something is broken" rather than "that file will
+    // not do".
+    if (!slipFile.type.startsWith("image/")) {
+      toast.error("สลิปต้องเป็นไฟล์รูปภาพเท่านั้น (JPG / PNG) — ไฟล์ PDF ใช้ไม่ได้")
+      return
+    }
+    if (slipFile.size > 5 * 1024 * 1024) {
+      toast.error(`ไฟล์ใหญ่เกินไป (${(slipFile.size / 1024 / 1024).toFixed(1)} MB) — รองรับไม่เกิน 5 MB`)
+      return
+    }
 
     setUploading(true)
     try {
@@ -239,7 +251,7 @@ export default function BookRegistration({ go, ctx }) {
         .form-card {
           padding: 32px;
         }
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
           .registration-container {
             padding: 20px 12px;
           }

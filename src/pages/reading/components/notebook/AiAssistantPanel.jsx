@@ -119,7 +119,7 @@ export default function AiAssistantPanel({ onClose, onInsertText }) {
       }
       const a = readAnswer(data);
       setAnswer(a || 'AI ตอบกลับมาว่าง');
-    } catch (e) {
+    } catch {
       setError('เชื่อมต่อไม่ได้ — ตรวจอินเทอร์เน็ต');
     } finally {
       setLoading(false);

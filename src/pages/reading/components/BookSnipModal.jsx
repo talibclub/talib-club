@@ -31,11 +31,20 @@ export default function BookSnipModal({ fileUrl, onInsert, onClose, initialPage 
     setSel(null);
     try {
       const page = await pdf.getPage(n);
-      // Scale 2 keeps text crisp after cropping without exploding memory.
-      const viewport = page.getViewport({ scale: 2 });
+      // Scale 2 keeps text crisp after cropping, but a fixed 2x on an A0 or a
+      // poster-sized page produces a canvas far past what mobile Safari will
+      // allocate — the render throws and the snip tool just goes blank. Cap the
+      // pixel budget the same way the notebook's PDF import does.
+      const isTouch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+      const maxPixels = isTouch ? 2.2e6 : 6e6;
+      const base = page.getViewport({ scale: 1 });
+      const area = base.width * base.height;
+      let renderScale = 2;
+      if (area * renderScale * renderScale > maxPixels) renderScale = Math.sqrt(maxPixels / area);
+      const viewport = page.getViewport({ scale: renderScale });
       const canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
       await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
       fullCanvasRef.current = canvas;
       setPageImg(canvas.toDataURL('image/jpeg', 0.9));

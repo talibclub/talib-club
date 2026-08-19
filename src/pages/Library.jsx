@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { BOOKS, DEFAULT_TAXONOMY } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 import toast from "react-hot-toast"
@@ -82,6 +82,16 @@ export default function Library({ go, authState, ctx }) {
     go("library", updated, { replace: true, noScroll: true })
   }
 
+  // Same as the article list: filtering is local, only the URL sync needs to
+  // wait, so a router navigate no longer fires on every keystroke.
+  const searchSyncRef = useRef(null)
+  const handleSearchChange = (value) => {
+    setSearch(value)
+    clearTimeout(searchSyncRef.current)
+    searchSyncRef.current = setTimeout(() => updateFilters({ search: value }), 350)
+  }
+  useEffect(() => () => clearTimeout(searchSyncRef.current), [])
+
   const handleDownloadClick = async (b) => {
     if (!b?.id) return
     try {
@@ -98,7 +108,10 @@ export default function Library({ go, authState, ctx }) {
       const matchSource = sourceFilter === "all" || b.source === sourceFilter
       const matchSearch =
         !search ||
-        b.title.toLowerCase().includes(search.toLowerCase()) ||
+        // Guarded like the two fields below it. A book document created
+        // outside the admin form — a console edit, an import script — has no
+        // title, and searching the library then threw on the first keystroke.
+        (b.title || "").toLowerCase().includes(search.toLowerCase()) ||
         (b.desc && b.desc.toLowerCase().includes(search.toLowerCase())) ||
         (b.author && b.author.toLowerCase().includes(search.toLowerCase()))
       return matchType && matchCategory && matchSource && matchSearch
@@ -186,7 +199,7 @@ export default function Library({ go, authState, ctx }) {
           <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
           <input
             value={search}
-            onChange={e => { setSearch(e.target.value); updateFilters({ search: e.target.value }) }}
+            onChange={e => handleSearchChange(e.target.value)}
             placeholder="ค้นหาชื่อหนังสือ, ผู้เขียน, หรือเนื้อหา..."
             style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "12px 16px 12px 42px", background: "var(--bg2)", border: "1px solid transparent", fontSize: 14, outline: "none", transition: "border 0.2s" }}
             onFocus={(e) => e.target.style.border = "1px solid var(--teal)"}

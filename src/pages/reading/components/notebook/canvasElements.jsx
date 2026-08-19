@@ -145,15 +145,19 @@ export const StrokeShape = ({ line, faded }) => {
 };
 
 // Committed ink. Re-renders only when the stroke list itself changes.
-export const CommittedStrokes = React.memo(({ lines, playbackTime, nowPlayingId }) => (
+export const CommittedStrokes = React.memo(function CommittedStrokes({ lines, playbackTime, nowPlayingId }) { return (
   <>
     {lines.map((line, i) => {
-      const isPlayingThis = nowPlayingId && (line.recordingId === nowPlayingId || (!line.recordingId && line.startTime != null));
+      // `|| (!line.recordingId && line.startTime != null)` used to pull in every
+      // timed stroke that had no recording attached, so ink written during one
+      // recording was faded in and out by the playback of a different one.
+      const isPlayingThis = !!nowPlayingId && line.recordingId === nowPlayingId;
       const inFuture = isPlayingThis && line.startTime !== undefined && line.startTime !== null && line.startTime > playbackTime * 1000;
-      return <StrokeShape key={i} line={line} faded={inFuture} />;
+      // Strokes drawn before ids existed fall back to the index.
+      return <StrokeShape key={line.id || `i${i}`} line={line} faded={inFuture} />;
     })}
   </>
-));
+); });
 
 // Little visual swatch of each sticky-note frame style, so the picker shows what
 // you get instead of only a Thai word for it.

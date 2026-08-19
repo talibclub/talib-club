@@ -1354,7 +1354,9 @@ async function parsePDFToRows(file) {
     const trMatch = cleanLine.match(/[A-Z]{2}\d{9}TH/i);
     if (!trMatch) continue;
 
-    let tracking = trMatch[0].toUpperCase().replace(/O(?=\d)/g, '0').replace(/(?<=\d)O/g, '0');
+    // Safari only got lookbehind in 16.4, and an unsupported regex literal is a
+    // parse error — it took the whole script down, not just this line.
+    let tracking = trMatch[0].toUpperCase().replace(/O(?=\d)/g, '0').replace(/(\d)O/g, (_m, d) => d + '0');
     if (seenTracks.has(tracking)) continue;
     seenTracks.add(tracking);
 
@@ -1955,11 +1957,13 @@ function matchCard(m, i) {
 function csvSide(csv) {
   if (!csv||!csv.fullName) return `<div class="mc-label">📋 Google Sheet</div><div class="mc-empty">ไม่มีข้อมูลใน Sheet</div>`;
   const addr = (csv.address||'').length>65 ? csv.address.slice(0,65)+'…' : csv.address;
+  // All four fields come from an operator-uploaded CSV / a scraped PDF, so they
+  // are untrusted text going straight into innerHTML.
   return `<div class="mc-label">📋 Google Sheet</div>
-    <div class="mc-name">${csv.fullName}</div>
-    ${csv.phone ? `<div class="mc-phone">📞 ${csv.phone}</div>` : ''}
-    <div class="mc-addr">📍 ${addr||'-'}</div>
-    ${csv.postalCode ? `<div class="mc-city" style="margin-top:4px">🏷️ ${csv.postalCode}</div>` : ''}`;
+    <div class="mc-name">${escapeHtml(csv.fullName)}</div>
+    ${csv.phone ? `<div class="mc-phone">📞 ${escapeHtml(csv.phone)}</div>` : ''}
+    <div class="mc-addr">📍 ${escapeHtml(addr||'-')}</div>
+    ${csv.postalCode ? `<div class="mc-city" style="margin-top:4px">🏷️ ${escapeHtml(csv.postalCode)}</div>` : ''}`;
 }
 
 function multiTrackingDisplay(m) {
@@ -1988,9 +1992,9 @@ function multiTrackingDisplay(m) {
     
     return `<div style="padding:${idx===0?'12px':'8px'} 14px;${idx>0?'border-top:1px solid var(--g3)':''};background:${idx%2?'var(--g1)':'transparent'}">
       ${m.pdfIndices.length > 1 ? `<div class="mc-label" style="color:var(--amber2);margin-bottom:6px">📦 พัสดุที่ ${idx+1} ${typeLabel}</div>` : `<div class="mc-label"><span>📄 ไปรษณีย์ ${isEdited?'(แก้ไขแล้ว)':''}</span></div>`}
-      <div class="mc-track" style="font-size:${m.pdfIndices.length>1?'1.15rem':'1.25rem'};font-weight:700;color:var(--navy2);border-color:var(--g4);padding:6px 10px">${track}</div>
-      ${pdf.recipientName&&!isEdited ? `<div class="mc-name" style="font-size:.75rem;color:var(--g5);font-weight:400;margin-top:2px;margin-bottom:6px">(จาก PDF: ${pdf.recipientName})</div>` : ''}
-      <div class="mc-city" style="color:var(--navy);font-weight:800;font-size:${m.pdfIndices.length>1?'1rem':'1.1rem'};margin-top:${idx>0?'4px':'8px'}">📍 <span style="font-size:${m.pdfIndices.length>1?'1.1rem':'1.3rem'};background:rgba(232,160,32,.15);padding:2px 6px;border-radius:4px">${zip||'-'}</span></div>
+      <div class="mc-track" style="font-size:${m.pdfIndices.length>1?'1.15rem':'1.25rem'};font-weight:700;color:var(--navy2);border-color:var(--g4);padding:6px 10px">${escapeHtml(track)}</div>
+      ${pdf.recipientName&&!isEdited ? `<div class="mc-name" style="font-size:.75rem;color:var(--g5);font-weight:400;margin-top:2px;margin-bottom:6px">(จาก PDF: ${escapeHtml(pdf.recipientName)})</div>` : ''}
+      <div class="mc-city" style="color:var(--navy);font-weight:800;font-size:${m.pdfIndices.length>1?'1rem':'1.1rem'};margin-top:${idx>0?'4px':'8px'}">📍 <span style="font-size:${m.pdfIndices.length>1?'1.1rem':'1.3rem'};background:rgba(232,160,32,.15);padding:2px 6px;border-radius:4px">${escapeHtml(zip||'-')}</span></div>
     </div>`;
   }).join('');
   
@@ -2141,8 +2145,8 @@ function renderCsvOpts(q) {
   opts.innerHTML = filtered.slice(0, 15).map(c => `
     <div style="background:var(--white);border:1px solid var(--g3);padding:10px;margin-bottom:8px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
       <div>
-        <div style="font-weight:700;color:var(--navy);font-size:.9rem;">${c.fullName}</div>
-        <div style="font-size:.8rem;color:var(--g6);">${c.phone ? '📞 ' + c.phone : ''} ${c.postalCode ? ' 📍 ' + c.postalCode : ''}</div>
+        <div style="font-weight:700;color:var(--navy);font-size:.9rem;">${escapeHtml(c.fullName)}</div>
+        <div style="font-size:.8rem;color:var(--g6);">${c.phone ? '📞 ' + escapeHtml(c.phone) : ''} ${c.postalCode ? ' 📍 ' + escapeHtml(c.postalCode) : ''}</div>
       </div>
       <button class="btn btn-primary btn-xs" onclick="selectCsvToBind(${c.idx})">เลือก</button>
     </div>
@@ -2267,9 +2271,17 @@ async function saveRecords() {
   btn.disabled = true; btn.textContent = '⏳ ตรวจสอบ...';
 
   try {
-    const snap = await getDocs(getRecordsCol());
+    // This used to pull the whole records collection on every save just to look
+    // for duplicates — a full-collection read per click, growing with the
+    // database. Ask only about the tracking numbers actually being saved.
     const existingTracks = new Set();
-    snap.forEach(d => { const r = d.data(); if (r.trackingNumber) existingTracks.add(r.trackingNumber); });
+    const IN_CHUNK = 30;
+    for (let i = 0; i < newTracks.length; i += IN_CHUNK) {
+      const part = newTracks.slice(i, i + IN_CHUNK);
+      if (!part.length) continue;
+      const snap = await getDocs(query(getRecordsCol(), where('trackingNumber', 'in', part)));
+      snap.forEach(d => { const t = d.data().trackingNumber; if (t) existingTracks.add(t); });
+    }
     const dupTracks = newTracks.filter(t => existingTracks.has(t));
     
     if (dupTracks.length) {
@@ -2355,13 +2367,21 @@ async function checkPrepDuplicates() {
   dupWarn.classList.add('hidden');
   if (!S.fbReady || !S.prepRows.length) return;
   try {
-    const snap = await getDocs(getRecipientsCol());
+    // Same as saveRecords(): query only the phone numbers being imported instead
+    // of reading every recipient in the database.
+    const phones = [...new Set(S.prepRows.map(r => r.phone).filter(Boolean))];
     const existing = new Set();
-    snap.forEach(d => { const r = d.data(); if (r.phone) existing.add(r.phone); });
+    const IN_CHUNK = 30;
+    for (let i = 0; i < phones.length; i += IN_CHUNK) {
+      const part = phones.slice(i, i + IN_CHUNK);
+      if (!part.length) continue;
+      const snap = await getDocs(query(getRecipientsCol(), where('phone', 'in', part)));
+      snap.forEach(d => { const ph = d.data().phone; if (ph) existing.add(ph); });
+    }
     const dups = S.prepRows.filter(r => r.phone && existing.has(r.phone));
     if (dups.length) {
       dupWarn.classList.remove('hidden');
-      dupWarn.innerHTML = `⚠️ พบ ${dups.length} รายชื่อที่เบอร์โทรซ้ำ: <strong>${dups.slice(0,5).map(d=>d.fullName).join(', ')}${dups.length>5?'...':''}</strong>`;
+      dupWarn.innerHTML = `⚠️ พบ ${dups.length} รายชื่อที่เบอร์โทรซ้ำ: <strong>${escapeHtml(dups.slice(0,5).map(d=>d.fullName).join(', '))}${dups.length>5?'...':''}</strong>`;
     }
   } catch(e) {}
 }
@@ -2421,10 +2441,10 @@ function renderPrepRecords(recs) {
   tbody.innerHTML = recs.map((r,i) => {
     const addrZip = `${r.address||'-'} ${r.postalCode||''}`.trim();
     return `<tr>
-      <td style="text-align:center"><input type="checkbox" class="chk-prep-row chk-box" value="${r.id}"></td>
-      <td>${i+1}</td><td>${r.fullName||'-'}</td><td>${escapeHtml(r.phone||'-')}</td>
-      <td><div style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${addrZip}">${addrZip}</div></td>
-      <td style="color:var(--amber2);font-weight:600">${r.bonusNote||'-'}</td>
+      <td style="text-align:center"><input type="checkbox" class="chk-prep-row chk-box" value="${escapeHtml(r.id)}"></td>
+      <td>${i+1}</td><td>${escapeHtml(r.fullName||'-')}</td><td>${escapeHtml(r.phone||'-')}</td>
+      <td><div style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(addrZip)}">${escapeHtml(addrZip)}</div></td>
+      <td style="color:var(--amber2);font-weight:600">${escapeHtml(r.bonusNote||'-')}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-ghost btn-xs" onclick="openEditPrep('${r.id}')">✏️</button>
         <button class="btn btn-red btn-xs" onclick="deletePrep('${r.id}')">🗑️</button>

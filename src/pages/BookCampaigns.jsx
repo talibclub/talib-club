@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react"
-import { collection, query, where, orderBy, getDocs } from "firebase/firestore"
+import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
-import { useAuth } from "../hooks/useAuth.js"
-
 export default function BookCampaigns({ go }) {
   const [campaigns, setCampaigns] = useState([])
   const [loading, setLoading] = useState(true)
@@ -118,7 +116,7 @@ export default function BookCampaigns({ go }) {
           flex-direction: column;
         }
         
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
           .campaigns-container {
             padding: 32px 12px;
           }

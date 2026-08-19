@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react"
-import { collection, getDocs, query, orderBy, where, getCountFromServer, deleteDoc, doc, writeBatch } from "firebase/firestore"
+import { collection, getDocs, query, orderBy, where, getCountFromServer, writeBatch } from "firebase/firestore"
 import { db } from "../../lib/firebase.js"
+import { updateCollectionMetadata } from "../../lib/contentStore.js"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
 export default function AdminDashboard() {
@@ -134,21 +135,24 @@ export default function AdminDashboard() {
     setFixing(true);
     try {
       const collections = ["content_articles", "content_books", "content_media", "content_scholars"];
+      // A single writeBatch caps at 500 operations. Any collection with more
+      // than 500 tombstones made commit() throw, so the "repair" silently did
+      // nothing at all on exactly the databases that needed it most.
+      const BATCH_LIMIT = 450;
       let totalDeleted = 0;
       for (const col of collections) {
         const snap = await getDocs(collection(db, col));
-        const batch = writeBatch(db);
-        let count = 0;
-        snap.forEach(docSnap => {
-          if (docSnap.data().deleted === true) {
-            batch.delete(docSnap.ref);
-            count++;
-            totalDeleted++;
-          }
-        });
-        if (count > 0) {
+        const stale = snap.docs.filter(docSnap => docSnap.data().deleted === true);
+        for (let i = 0; i < stale.length; i += BATCH_LIMIT) {
+          const batch = writeBatch(db);
+          stale.slice(i, i + BATCH_LIMIT).forEach(docSnap => batch.delete(docSnap.ref));
           await batch.commit();
         }
+        // Visitors hold these lists in localStorage and IndexedDB and only
+        // refetch when the metadata timestamp moves. Without this bump they
+        // would keep serving the rows that were just deleted.
+        if (stale.length > 0) await updateCollectionMetadata(col);
+        totalDeleted += stale.length;
       }
       alert(`ลบข้อมูลที่ตกค้างสำเร็จทั้งหมด ${totalDeleted} รายการ กรุณารีเฟรชหน้าเว็บ`);
     } catch (e) {

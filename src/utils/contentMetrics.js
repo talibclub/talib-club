@@ -20,7 +20,7 @@ export async function bumpContentMetric(collectionKey, id, field) {
       return // Already bumped this session
     }
     sessionStorageAvailable = true
-  } catch (e) {
+  } catch {
     // sessionStorage might be disabled (private browsing) - fall back to memory
     if (memoryBumpCache.has(cacheKey)) {
       return // Already bumped this session

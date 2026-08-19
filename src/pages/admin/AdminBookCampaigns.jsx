@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { collection, query, orderBy, getDocs, doc, setDoc, deleteDoc, serverTimestamp, updateDoc, where } from "firebase/firestore"
+import { collection, query, orderBy, getDocs, doc, setDoc, deleteDoc, serverTimestamp, updateDoc, where, writeBatch } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { db, storage } from "../../lib/firebase.js"
 import toast from "react-hot-toast"
@@ -105,18 +105,42 @@ export default function AdminBookCampaigns() {
   }
 
   const handleDelete = async (id) => {
-    const confirmed = await confirmAction("ยืนยันการลบ", "คุณต้องการลบแคมเปญนี้ใช่หรือไม่? ข้อมูลการลงทะเบียนที่ผูกอยู่ทั้งหมดจะถูกลบทิ้งถาวรด้วย")
+    // confirmAction takes ONE argument (an options object, or a bare string used
+    // as the message). Passing two dropped the second silently, so the only
+    // warning that this also deletes every registration attached to the campaign
+    // never reached the screen.
+    const confirmed = await confirmAction({
+      title: "ยืนยันการลบแคมเปญ",
+      message: "คุณต้องการลบแคมเปญนี้ใช่หรือไม่? ข้อมูลการลงทะเบียนที่ผูกอยู่ทั้งหมดจะถูกลบทิ้งถาวรด้วย",
+      confirmText: "ลบแคมเปญ",
+      danger: true,
+    })
     if (!confirmed) return
     const toastId = toast.loading("กำลังลบแคมเปญและข้อมูลที่เกี่ยวข้อง...")
     try {
+      // Fired as one unbounded Promise.all before: a campaign with a few hundred
+      // registrations opened that many parallel deletes, and if any of them
+      // failed the campaign document was already gone — leaving registrations
+      // pointing at a campaign that no longer exists and no way to retry from
+      // the UI. Deleted in batches, and the campaign itself goes last so a
+      // failure part way through can simply be run again.
+      const deleteAllInBatches = async (docs) => {
+        const BATCH_LIMIT = 450
+        for (let i = 0; i < docs.length; i += BATCH_LIMIT) {
+          const batch = writeBatch(db)
+          docs.slice(i, i + BATCH_LIMIT).forEach(d => batch.delete(d.ref))
+          await batch.commit()
+        }
+      }
+
       // 1. Delete associated registrations
       const regsQ = query(collection(db, "book_registrations"), where("campaignId", "==", id))
       const regsSnap = await getDocs(regsQ)
-      await Promise.all(regsSnap.docs.map(d => deleteDoc(d.ref)))
-      
+      await deleteAllInBatches(regsSnap.docs)
+
       // 2. Delete holds subcollection
       const holdsSnap = await getDocs(collection(db, `book_campaigns/${id}/holds`))
-      await Promise.all(holdsSnap.docs.map(d => deleteDoc(d.ref)))
+      await deleteAllInBatches(holdsSnap.docs)
 
       // 3. Delete campaign itself
       await deleteDoc(doc(db, "book_campaigns", id))
@@ -189,7 +213,7 @@ export default function AdminBookCampaigns() {
       } else {
         toast.error(`ส่งแจ้งเตือนล้มเหลว: ${result.error}`, { id: toastId })
       }
-    } catch (err) {
+    } catch {
       toast.error("เกิดข้อผิดพลาดในการส่งแจ้งเตือน", { id: toastId })
     }
   }

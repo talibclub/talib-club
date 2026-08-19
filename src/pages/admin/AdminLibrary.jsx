@@ -231,7 +231,7 @@ export default function AdminLibrary() {
       await saveItem(payload)
       setEdit(null)
       notifySuccess("บันทึกข้อมูลขึ้นเว็บไซต์เรียบร้อยแล้ว")
-    } catch (err) {
+    } catch {
       notifyError("บันทึกไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
     } finally {
       setBusy(false)
@@ -247,7 +247,7 @@ export default function AdminLibrary() {
       await deleteItem(book.id)
       setSelected(prev => prev.filter(id => id !== book.id))
       notifySuccess("ลบเรียบร้อยแล้ว")
-    } catch (err) {
+    } catch {
       notifyError("ลบไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
     } finally {
       setBusy(false)
@@ -262,7 +262,7 @@ export default function AdminLibrary() {
       await Promise.all(selected.map(id => deleteItem(id)))
       setSelected([])
       notifySuccess(`ลบ ${selected.length} รายการเรียบร้อยแล้ว`)
-    } catch (err) {
+    } catch {
       notifyError("เกิดข้อผิดพลาดในการลบข้อมูลบางส่วน")
     } finally {
       setBusy(false)
@@ -556,37 +556,37 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
     const file = e.target.files?.[0]
     if (!file) return
 
-    console.log("Starting Library Image Upload: v4 Diagnostic Logger active.");
-    console.log("Original File Name:", file.name, "Size:", file.size, "Type:", file.type);
+    if (import.meta.env.DEV) console.log("Starting Library Image Upload: v4 Diagnostic Logger active.");
+    if (import.meta.env.DEV) console.log("Original File Name:", file.name, "Size:", file.size, "Type:", file.type);
 
     setUploadingImage(true)
     try {
-      console.log("Compressing image...");
+      if (import.meta.env.DEV) console.log("Compressing image...");
       const compressedFile = await compressImage(file, { maxWidth: 1000, maxHeight: 1000, quality: 0.75 })
-      console.log("Image compression complete. Output Name:", compressedFile.name, "Size:", compressedFile.size);
+      if (import.meta.env.DEV) console.log("Image compression complete. Output Name:", compressedFile.name, "Size:", compressedFile.size);
       
       const safeName = compressedFile.name.replace(/[^a-zA-Z0-9.-]/g, "_")
       const usedStorage = storage || getStorage(app)
       let storageRef = null
       try {
         storageRef = ref(usedStorage, `library_covers/${Date.now()}_${safeName}`)
-        console.log("Uploading bytes to Firebase Storage reference:", storageRef.fullPath);
+        if (import.meta.env.DEV) console.log("Uploading bytes to Firebase Storage reference:", storageRef.fullPath);
         await uploadBytes(storageRef, compressedFile)
       } catch (uploadErr) {
         console.error("Upload error (storageRef):", uploadErr?.code || "-", uploadErr?.message || uploadErr, "ref:", storageRef?.fullPath)
         throw uploadErr
       }
 
-      console.log("Firebase upload completed. Retrieving download URL...");
+      if (import.meta.env.DEV) console.log("Firebase upload completed. Retrieving download URL...");
       const url = await getDownloadURL(storageRef)
-      console.log("Success! Cover URL obtained:", url);
+      if (import.meta.env.DEV) console.log("Success! Cover URL obtained:", url);
       set("coverUrl", url)
       notifySuccess("อัปโหลดรูปภาพปกเรียบร้อยแล้ว")
     } catch (err) {
       console.error("Diagnostic error caught inside handleUploadImage:", err?.code || "-", err?.message || err)
       notifyError("อัปโหลดรูปภาพล้มเหลว")
     } finally {
-      console.log("Finally block executed. Setting uploadingImage back to false.");
+      if (import.meta.env.DEV) console.log("Finally block executed. Setting uploadingImage back to false.");
       setUploadingImage(false)
     }
   }

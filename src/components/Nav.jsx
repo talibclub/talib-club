@@ -1,17 +1,14 @@
 import { useEffect, useRef, useState, useMemo } from "react"
 import { Link } from "react-router-dom"
-import { SITE } from "../data/index.js"
-
 import { getPagePath } from "../utils/url.js"
 import toast from "react-hot-toast"
 import { confirmAction } from "../utils/feedback.jsx"
-import { useContentCollection, useUserDoc, invalidateContentCache } from "../lib/contentStore.js"
-import { ARTICLES, BOOKS } from "../data/index.js"
+import { useUserDoc, invalidateContentCache } from "../lib/contentStore.js"
 import { usePWA } from "../hooks/usePWA.js"
 import { AccountDropdown, AccountDrawer } from "./nav/AccountComponents.jsx"
 import { NotificationDropdown, NotificationDrawer } from "./nav/NotificationComponents.jsx"
 // M2: Import shared utilities instead of duplicating them
-import { getMs as getTimeMs, getLocalDayKey } from "../utils/streak.js"
+import { getLocalDayKey } from "../utils/streak.js"
 import { safeDateNow } from "../utils/time.js"
 
 
@@ -51,11 +48,21 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
 
   useEffect(() => { goRef.current = go }, [go])
 
+  // The notification bell only renders for signed-in users, so this ran four
+  // permanent onSnapshot listeners on behalf of every anonymous visitor too —
+  // and kept them open for the whole session to show "what's the newest item",
+  // which never needs to be realtime. One getDocs per collection, once, and
+  // only once someone is actually signed in.
+  const notifUid = authState?.user?.uid
   useEffect(() => {
-    let unsubs = []
+    if (!notifUid) {
+      setDynamicNotifications([])
+      return undefined
+    }
+    let cancelled = false
     async function setupDynamicNotifications() {
       try {
-        const { collection, query, orderBy, limit, onSnapshot } = await import("firebase/firestore")
+        const { collection, query, orderBy, limit, getDocs } = await import("firebase/firestore")
         const { db } = await import("../lib/firebase.js")
         
         const latestDocs = { article: null, media: null, book: null, campaign: null }
@@ -115,26 +122,25 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
           setDynamicNotifications(newNotifs)
         }
 
-        const watchLatestDoc = (colName, orderField, key) => {
-          const q = query(collection(db, colName), orderBy(orderField, "desc"), limit(10))
-          const unsub = onSnapshot(q, (snap) => {
-            if (snap.empty) {
-              latestDocs[key] = null
-            } else {
-              const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-              const validDoc = docs.find(d => d.deleted !== true)
-              latestDocs[key] = validDoc || null
-            }
-            updateNotifs()
-          }, (err) => console.error("Error watching notifications:", err))
-          unsubs.push(unsub)
+        const fetchLatestDoc = async (colName, orderField, key) => {
+          try {
+            const q = query(collection(db, colName), orderBy(orderField, "desc"), limit(5))
+            const snap = await getDocs(q)
+            const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+            latestDocs[key] = docs.find(d => d.deleted !== true) || null
+          } catch (err) {
+            console.error(`Error loading notifications from ${colName}:`, err)
+          }
         }
 
-        watchLatestDoc("content_articles", "date", "article")
-        watchLatestDoc("content_media", "date", "media")
-        watchLatestDoc("content_books", "createdAt", "book")
-        watchLatestDoc("book_campaigns", "createdAt", "campaign")
-        
+        await Promise.all([
+          fetchLatestDoc("content_articles", "date", "article"),
+          fetchLatestDoc("content_media", "date", "media"),
+          fetchLatestDoc("content_books", "createdAt", "book"),
+          fetchLatestDoc("book_campaigns", "createdAt", "campaign"),
+        ])
+
+        if (!cancelled) updateNotifs()
       } catch(e) {
         console.error("Failed to setup dynamic notifications:", e)
       }
@@ -143,9 +149,9 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
     setupDynamicNotifications()
     
     return () => {
-      unsubs.forEach(unsub => unsub && unsub())
+      cancelled = true
     }
-  }, [])
+  }, [notifUid])
 
   useEffect(() => {
     document.body.classList.toggle("menu-open", menuOpen)
@@ -192,14 +198,24 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
     )
   }, [readingSessions, uid, todayDayKey])
 
-  const [currentHM, setCurrentHM] = useState("")
   const [timeRemaining, setTimeRemaining] = useState("") // Countdown timer for 23:00 - 00:00
 
   // We keep a record of times we've alerted today to prevent duplicate alerts in the same minute
   const alertedTimesRef = useRef({ date: "", times: new Set() })
 
+  // This used to be a one-second setInterval that every visitor paid for,
+  // signed in or not, and it wrote a currentHM state nothing ever read — so the
+  // whole nav re-rendered once a second, all day. Anonymous visitors have no
+  // streak and no reminders, so they get no timer at all now, and one-second
+  // resolution is only needed while the 23:00 countdown is on screen. Outside
+  // that hour a reminder can only come due once a minute, so it polls slowly.
   useEffect(() => {
-    const timer = setInterval(() => {
+    if (!uid) {
+      setTimeRemaining("")
+      return undefined
+    }
+    let timer = null
+    const tick = () => {
       const now = new Date(safeDateNow())
       const todayStr = getLocalDayKey(now.getTime())
       
@@ -212,7 +228,6 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
       const currentHours = String(now.getHours()).padStart(2, "0")
       const currentMinutes = String(now.getMinutes()).padStart(2, "0")
       const hm = `${currentHours}:${currentMinutes}`
-      setCurrentHM(hm)
 
       // Calculate countdown time if it's 23:00-00:00
       if (now.getHours() === 23) {
@@ -249,10 +264,13 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
           })
         }
       }
-    }, 1000)
 
-    return () => clearInterval(timer)
-  }, [userSettings, hasReadToday])
+      timer = setTimeout(tick, now.getHours() === 23 ? 1000 : 20000)
+    }
+    tick()
+
+    return () => clearTimeout(timer)
+  }, [uid, userSettings, hasReadToday])
 
 
   const notifications = useMemo(() => {
@@ -444,7 +462,7 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
         if (authState?.logout) await authState.logout();
         toast.success("ออกจากระบบสำเร็จ", { id: toastId });
         nav("home"); // เปลี่ยนหน้าแบบ SPA ลื่นๆ โดยไม่ต้องรีโหลดหน้าเว็บใหม่
-      } catch (error) {
+      } catch {
         toast.error("เกิดข้อผิดพลาดในการออกจากระบบ", { id: toastId });
       }
     }, 400);

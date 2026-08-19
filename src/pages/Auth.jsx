@@ -1,10 +1,25 @@
 import { useState, useEffect } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 
+function readAfterLogin() {
+  try {
+    const stored = window.sessionStorage.getItem("talibAfterLogin")
+    if (stored) window.sessionStorage.removeItem("talibAfterLogin")
+    // Only ever an in-app path, never an absolute URL from somewhere else.
+    return stored && stored.startsWith("/") && !stored.startsWith("//") ? stored : null
+  } catch (e) {
+    console.warn(e)
+    return null
+  }
+}
+
 export default function Auth({ authState, go }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const redirectTarget = location.state?.from || "/member"
+  // A Google redirect sign-in reloads the app, so location.state is empty when
+  // the user comes back. loginWithGoogle() parks the destination in
+  // sessionStorage for exactly that trip.
+  const redirectTarget = location.state?.from || readAfterLogin() || "/member"
 
   useEffect(() => {
     if (authState?.user) {
@@ -62,7 +77,7 @@ export default function Auth({ authState, go }) {
     setError("")
     setStatus("")
     try {
-      const res = await authState.loginWithGoogle()
+      const res = await authState.loginWithGoogle(redirectTarget)
       if (!res?.redirecting) {
         setStatus("")
         navigate(redirectTarget, { replace: true })

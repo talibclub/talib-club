@@ -8,7 +8,7 @@
     "dev:lan": "node ./scripts/vite-runner.mjs dev --lan",
     "build": "node ./scripts/vite-runner.mjs build",
     "preview": "node ./scripts/vite-runner.mjs preview",
-    "test": "node ./scripts/run-tests.mjs"
+    "test": "vitest run"
   },
   "dependencies": {
     "@vercel/functions": "^3.9.3",
@@ -19,6 +19,7 @@
     "jspdf": "^4.2.1",
     "konva": "^9.3.22",
     "lucide-react": "^1.25.0",
+    "papaparse": "^5.4.1",
     "pdfjs-dist": "^6.1.200",
     "perfect-freehand": "^1.2.3",
     "react": "^18.2.0",

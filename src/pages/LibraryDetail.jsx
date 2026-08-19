@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react"
 import toast from "react-hot-toast"
 import { BOOKS } from "../data/index.js"
-import { useContentCollection, useContentDoc, saveContentItem } from "../lib/contentStore.js"
+import { useContentDoc, saveContentItem } from "../lib/contentStore.js"
 import { bumpContentMetric } from "../utils/contentMetrics.js"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
 import SEOHead, { BASE_URL } from "../components/SEOHead.jsx"
@@ -31,6 +31,7 @@ function getPreviewUrl(url) {
 
 export default function LibraryDetail({ item, go, authState }) {
   const uid = authState?.user?.uid;
+  const isLoggedIn = !!uid;
   const bookId = useDetailId(item)
   const fallbackBook = useMemo(
     () => (bookId ? BOOKS.find(b => String(b.id) === String(bookId)) : null) ?? null,
@@ -198,8 +199,20 @@ export default function LibraryDetail({ item, go, authState }) {
                 {cleanDesc}
               </div>
 
+              {!isLoggedIn && (
+                <div className="card" style={{ padding: 16, marginBottom: 20, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", background: "var(--teal-bg)", border: ".5px solid var(--acc-br)" }}>
+                  <i className="ti ti-lock" style={{ fontSize: 20, color: "var(--teal)" }}></i>
+                  <span style={{ flex: 1, minWidth: 200, fontSize: 14, color: "var(--t2)" }}>
+                    เข้าสู่ระบบเพื่อดาวน์โหลดไฟล์ อ่านออนไลน์ และดูตัวอย่างเนื้อหา
+                  </span>
+                  <button className="btn btn-teal" onClick={() => go("auth")}>
+                    <i className="ti ti-login" style={{ marginRight: 6 }}></i>เข้าสู่ระบบ
+                  </button>
+                </div>
+              )}
+
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                {onlineUrl && (
+                {isLoggedIn && onlineUrl && (
                   <a 
                     href={onlineUrl} 
                     target="_blank" 
@@ -210,16 +223,22 @@ export default function LibraryDetail({ item, go, authState }) {
                     <i className="ti ti-book-open" style={{ marginRight: 6 }}></i>อ่านออนไลน์ (Flipbook)
                   </a>
                 )}
-                <a 
-                  href={getDownloadUrl(displayItem.fileUrl)} 
-                  target="_blank" 
-                  rel="noreferrer" 
-                  className={onlineUrl ? "btn btn-outline" : "btn btn-teal"} 
-                  onClick={handleDownloadClick} // บันทึกยอดดาวน์โหลดเมื่อถูกคลิก
-                  style={{ flex: 1, minWidth: 160, textAlign: "center", textDecoration: "none", pointerEvents: displayItem.fileUrl ? "auto" : "none", opacity: displayItem.fileUrl ? 1 : 0.5 }}
-                >
-                  <i className="ti ti-download" style={{ marginRight: 6 }}></i>ดาวน์โหลดไฟล์
-                </a>
+                {isLoggedIn ? (
+                  <a 
+                    href={getDownloadUrl(displayItem.fileUrl)} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className={onlineUrl ? "btn btn-outline" : "btn btn-teal"} 
+                    onClick={handleDownloadClick} // บันทึกยอดดาวน์โหลดเมื่อถูกคลิก
+                    style={{ flex: 1, minWidth: 160, textAlign: "center", textDecoration: "none", pointerEvents: displayItem.fileUrl ? "auto" : "none", opacity: displayItem.fileUrl ? 1 : 0.5 }}
+                  >
+                    <i className="ti ti-download" style={{ marginRight: 6 }}></i>ดาวน์โหลดไฟล์
+                  </a>
+                ) : (
+                  <button className="btn btn-teal" onClick={() => go("auth")} style={{ flex: 1, minWidth: 160 }}>
+                    <i className="ti ti-download" style={{ marginRight: 6 }}></i>เข้าสู่ระบบเพื่อดาวน์โหลด
+                  </button>
+                )}
                 <button onClick={handleShare} className="btn btn-outline" style={{ flex: 1, minWidth: 160 }}>
                   <i className="ti ti-share" style={{ marginRight: 6 }}></i>แชร์เนื้อหานี้
                 </button>
@@ -229,7 +248,7 @@ export default function LibraryDetail({ item, go, authState }) {
         })()}
       </div>
 
-      {displayItem.fileUrl && (
+      {isLoggedIn && displayItem.fileUrl && (
         <div style={{ marginBottom: 40 }}>
           <h3 style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
             <i className="ti ti-device-desktop" style={{ color: "var(--t2)" }}></i> ตัวอย่างเนื้อหา (Preview)

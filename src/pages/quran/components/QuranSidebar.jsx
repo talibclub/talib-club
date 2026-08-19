@@ -366,7 +366,14 @@ export default function QuranSidebar({
                           searchResults.map((match, i) => {
                             const highlightText = (text, query) => {
                               if (!query) return text
-                              const parts = text.split(new RegExp(`(${query})`, "gi"))
+                              // The query goes straight into a RegExp, so any
+                              // regex metacharacter the reader types — "(", "[",
+                              // "*", "\" — threw "Invalid regular expression"
+                              // and took the whole Quran page down into the error
+                              // boundary. The mobile drawer copy in Quran.jsx
+                              // already escaped; this one was missed.
+                              const safeQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                              const parts = text.split(new RegExp(`(${safeQuery})`, "gi"))
                               return parts.map((part, idx) =>
                                 part.toLowerCase() === query.toLowerCase()
                                   ? <span key={idx} className="search-highlight">{part}</span>

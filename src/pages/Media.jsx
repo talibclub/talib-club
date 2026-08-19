@@ -10,7 +10,10 @@ import { detailPath } from "../utils/slug.js"
 import { isPlainLeftClick } from "../utils/linkNavigation.js"
 
 export default function Media({ go, ctx }) {
-  const mediaQueryOptions = useMemo(() => ({ live: false, limit: 200 }), [])
+  // 200 silently truncated the list while Library uses 1000 and Articles has no
+  // cap at all — media past the 200th simply did not exist as far as the site
+  // was concerned, with nothing on screen to say so.
+  const mediaQueryOptions = useMemo(() => ({ live: false, limit: 1000 }), [])
   const { items: media, loading, error, isUsingFallback } = useContentCollection("media", MEDIA, null, mediaQueryOptions)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   const { site } = useSiteSettings(SITE)

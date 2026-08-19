@@ -16,6 +16,12 @@ import {
 export const collectionCache = new Map()
 export const countCache = new Map()
 export const userDocumentCache = new Map()
+// Separate map for public single documents. It used to share userDocumentCache,
+// with the same `collection:id` key shape but a 1-hour TTL against the user
+// cache's 5 minutes and a 100-entry cap against its 200 — so a personal document
+// written by one pair could be read back by the other and served for an hour,
+// and the two eviction limits fought over the same entries.
+export const publicDocumentCache = new Map()
 export const inFlightRequests = new Map()
 
 export function setWithLimit(map, key, value, limit = 100) {
@@ -30,7 +36,7 @@ export function readCachedUserDocument(collectionName, docId) {
   const cacheKey = `${collectionName}:${docId}`
   const entry = userDocumentCache.get(cacheKey)
   if (entry) {
-    if (Date.now() - entry.at < USER_DOC_CACHE_TTL_MS) {
+    if (safeDateNow() - entry.at < USER_DOC_CACHE_TTL_MS) {
       return entry.data
     }
     userDocumentCache.delete(cacheKey)
@@ -40,7 +46,7 @@ export function readCachedUserDocument(collectionName, docId) {
 
 export function writeCachedUserDocument(collectionName, docId, data) {
   const cacheKey = `${collectionName}:${docId}`
-  setWithLimit(userDocumentCache, cacheKey, { data, at: Date.now() }, 200)
+  setWithLimit(userDocumentCache, cacheKey, { data, at: safeDateNow() }, 200)
 }
 
 export function invalidateUserDocumentCache(collectionName, docId) {
@@ -153,7 +159,7 @@ let cachedMetadata = null
 let cachedMetadataAt = 0
 
 export async function fetchContentMetadata() {
-  if (cachedMetadata && (Date.now() - cachedMetadataAt < METADATA_TTL_MS)) {
+  if (cachedMetadata && (safeDateNow() - cachedMetadataAt < METADATA_TTL_MS)) {
     return cachedMetadata
   }
   try {
@@ -163,7 +169,7 @@ export async function fetchContentMetadata() {
     } else {
       cachedMetadata = {}
     }
-    cachedMetadataAt = Date.now()
+    cachedMetadataAt = safeDateNow()
   } catch (e) {
     console.warn("Could not fetch content metadata", e)
     cachedMetadata = cachedMetadata || {}
@@ -187,13 +193,14 @@ export async function invalidateContentCache(collectionName = null) {
     collectionCache.clear()
     countCache.clear()
     userDocumentCache.clear()
+    publicDocumentCache.clear()
     try {
       for (const key of Object.keys(localStorage)) {
         if (key.startsWith(LOCAL_STORAGE_CACHE_PREFIX)) {
           localStorage.removeItem(key)
         }
       }
-    } catch (e) { }
+    } catch { /* ignore */ }
     cachedMetadata = null
     cachedMetadataAt = 0
     return
@@ -203,7 +210,7 @@ export async function invalidateContentCache(collectionName = null) {
       collectionCache.delete(key)
       try {
         localStorage.removeItem(LOCAL_STORAGE_CACHE_PREFIX + key)
-      } catch (e) { }
+      } catch { /* ignore */ }
     }
   }
   for (const [key, val] of Object.entries(CONTENT_COLLECTIONS)) {
@@ -211,7 +218,7 @@ export async function invalidateContentCache(collectionName = null) {
       countCache.delete(`count_${key}`)
       try {
         localStorage.removeItem(LOCAL_STORAGE_CACHE_PREFIX + `count_${key}`)
-      } catch (e) { }
+      } catch { /* ignore */ }
     }
   }
 }
@@ -219,24 +226,24 @@ export async function invalidateContentCache(collectionName = null) {
 // Single document cache
 export function readCachedDocument(collectionName, docId) {
   const cacheKey = `${collectionName}:${docId}`
-  const entry = userDocumentCache.get(cacheKey)
+  const entry = publicDocumentCache.get(cacheKey)
   if (entry) {
-    if (Date.now() - entry.at < PUBLIC_CACHE_TTL_MS) {
+    if (safeDateNow() - entry.at < PUBLIC_CACHE_TTL_MS) {
       return entry.data
     }
-    userDocumentCache.delete(cacheKey)
+    publicDocumentCache.delete(cacheKey)
   }
   return null
 }
 
 export function writeCachedDocument(collectionName, docId, data) {
   const cacheKey = `${collectionName}:${docId}`
-  setWithLimit(userDocumentCache, cacheKey, { data, at: Date.now() }, 100)
+  setWithLimit(publicDocumentCache, cacheKey, { data, at: safeDateNow() }, 100)
 }
 
 export function invalidateDocumentCache(collectionName, docId) {
   const cacheKey = `${collectionName}:${docId}`
-  userDocumentCache.delete(cacheKey)
+  publicDocumentCache.delete(cacheKey)
 }
 export function invalidateCollectionCountOnly(collectionName) {
   for (const [key, val] of Object.entries(CONTENT_COLLECTIONS)) {
@@ -244,7 +251,7 @@ export function invalidateCollectionCountOnly(collectionName) {
       countCache.delete('count_' + key)
       try {
         localStorage.removeItem(LOCAL_STORAGE_CACHE_PREFIX + 'count_' + key)
-      } catch (e) { }
+      } catch { /* ignore */ }
     }
   }
 }

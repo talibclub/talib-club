@@ -40,7 +40,7 @@ try {
       tabManager: persistentMultipleTabManager()
     })
   })
-} catch (e) {
+} catch {
   firestoreInstance = getFirestore(app)
 }
 

@@ -95,20 +95,36 @@ export function mergeWithFallback(fallbackItems, remoteItems) {
   return Array.from(byId.values())
 }
 
+// Deterministic JSON: object keys sorted so the same query always produces the
+// same cache key.
+//
+// The previous version assigned the RECURSIVE RESULT (already a JSON string)
+// back into an object and ran JSON.stringify over it again, so every value came
+// out escaped twice:
+//
+//   want: {"collectionName":"content_articles",...}
+//   got:  {"collectionName":"\"content_articles\"",...}
+//
+// Nothing crashed, but every consumer matches on the un-escaped shape with
+// `key.includes('"collectionName":"' + name + '"')` — 14 call sites across
+// cache.js and hooks.js — so all of them silently matched nothing. That meant
+// the public-collection localStorage cache was never written or read, and
+// invalidation, optimistic updates and rollbacks after a save were all no-ops.
+// Building the JSON by hand keeps nested values encoded exactly once.
 export function stableStringify(obj) {
   if (obj === null) return "null"
-  if (typeof obj !== "object" || Array.isArray(obj)) return JSON.stringify(obj)
+  if (typeof obj !== "object") return JSON.stringify(obj)
+  if (Array.isArray(obj)) return `[${obj.map(stableStringify).join(",")}]`
 
-  const sorted = {}
   const keys = Object.keys(obj).sort()
-  for (const key of keys) {
-    sorted[key] = stableStringify(obj[key])
-  }
-  return JSON.stringify(sorted)
+  return `{${keys.map(key => `${JSON.stringify(key)}:${stableStringify(obj[key])}`).join(",")}}`
 }
 
+// `v` is bumped whenever the key shape changes so old entries are simply never
+// matched again instead of being read back under new semantics. v3 = the
+// double-escaping fix above.
 export function getQueryCacheKey(collectionName, uid, limitCount, orderByField, orderDirection) {
-  return stableStringify({ v: 2, collectionName, uid: uid || null, limitCount, orderByField, orderDirection })
+  return stableStringify({ v: 3, collectionName, uid: uid || null, limitCount, orderByField, orderDirection })
 }
 
 export function generateDocId(item) {
@@ -117,7 +133,7 @@ export function generateDocId(item) {
   if (item.seriesId && item.part) {
     const seriesSlug = String(item.seriesId).trim().toLowerCase()
       .replace(/[\s_]+/g, '-')
-      .replace(/[^\w\u0E00-\u0E7F\-]/g, '');
+      .replace(/[^\w\u0E00-\u0E7F-]/g, '');
     if (seriesSlug) return `${seriesSlug}-${item.part}`;
   }
   
@@ -125,7 +141,7 @@ export function generateDocId(item) {
   if (base) {
     const slug = base.trim().toLowerCase()
       .replace(/[\s_]+/g, '-')
-      .replace(/[^\w\u0E00-\u0E7F\-]/g, '');
+      .replace(/[^\w\u0E00-\u0E7F-]/g, '');
     
     if (slug) {
       const rand = Math.random().toString(36).substring(2, 7);

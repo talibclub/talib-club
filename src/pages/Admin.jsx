@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react"
+import { invalidateContentCache } from "../lib/contentStore.js"
+import { clearOfflineStore } from "../lib/offlineStore.js"
 import AdminArticles from "./admin/AdminArticles.jsx"
 import AdminLibrary from "./admin/AdminLibrary.jsx"
 import AdminMedia from "./admin/AdminMedia.jsx"
@@ -28,12 +30,21 @@ export default function Admin({ go, authState, initialTab = "dashboard" }) {
   const activeTabObj = TABS.find(t => t.id === tab) || TABS[0]
   const currentUser = authState?.profile?.displayName || authState?.user?.displayName || ""
 
-  const handleClearCache = () => {
-    Object.keys(localStorage).forEach(key => {
-      if (key.startsWith("talib_cache_")) {
-        localStorage.removeItem(key)
-      }
-    })
+  // This only ever removed the talib_cache_* localStorage keys. The content
+  // layer also mirrors collections into IndexedDB (`collections`), and that copy
+  // survived the reload — so "ล้างแคช" left the very data an admin presses it
+  // for still cached. Clear every layer, then reload.
+  const handleClearCache = async () => {
+    try {
+      await invalidateContentCache()
+    } catch (err) {
+      console.error("Clear memory/localStorage cache failed", err)
+    }
+    try {
+      await clearOfflineStore("collections")
+    } catch (err) {
+      console.error("Clear IndexedDB cache failed", err)
+    }
     window.location.reload()
   }
 

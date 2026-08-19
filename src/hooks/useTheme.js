@@ -5,7 +5,7 @@ export function useTheme() {
     try { return localStorage.getItem("talib-theme") || "dark" } catch { return "dark" }
   })
   useEffect(() => {
-    try { localStorage.setItem("talib-theme", theme) } catch {}
+    try { localStorage.setItem("talib-theme", theme) } catch { /* ignore */ }
     document.body.classList.remove("light", "dark")
     document.body.classList.add(theme)
   }, [theme])

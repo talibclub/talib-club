@@ -98,7 +98,10 @@ export default function ReflectionsPanel({ authState, setView, theme }) {
       } else {
         const session = sessionItems.find(s => String(s.id) === String(note.id))
         if (session) {
-          await saveSession({ ...session, reflection: "" })
+          // A verified session requires a reflection of at least
+          // MIN_REFLECTION_CHARS, so clearing the text has to clear the flag —
+          // otherwise the evidence is gone but the streak day still counts.
+          await saveSession({ ...session, reflection: "", verified: false })
         }
       }
       toast.success("ลบข้อคิดเรียบร้อยแล้ว")

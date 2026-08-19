@@ -2,8 +2,6 @@ import { useState, useEffect, useMemo } from "react"
 import { ARTICLES, BOOKS, MEDIA, SITE } from "../data/index.js"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 import { useContentCollection, useSiteSettings, useCollectionCount } from "../lib/contentStore.js"
-import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
-import ImageWithFallback from "../components/ImageWithFallback.jsx"
 import ArticleCard from "../components/ArticleCard.jsx"
 
 const QURAN_DUAS = [
@@ -58,8 +56,10 @@ const SURAH_NAMES = {
 }
 
 export default function Home({ go }) {
-  // Articles should reflect the current Firestore state immediately.
-  const articleQueryOptions = useMemo(() => ({ live: true, limit: 6, orderByField: "date", orderDirection: "desc" }), [])
+  // Matches books and media below: cached, invalidated by the metadata
+  // timestamp. This was the only live listener on the landing page, and it made
+  // every single visit re-read the six newest articles and hold a socket open.
+  const articleQueryOptions = useMemo(() => ({ live: false, limit: 6, orderByField: "date", orderDirection: "desc" }), [])
   const bookQueryOptions = useMemo(() => ({ live: false, limit: 6, orderByField: "year", orderDirection: "desc" }), [])
   const mediaQueryOptions = useMemo(() => ({ live: false, limit: 6, orderByField: "date", orderDirection: "desc" }), [])
   

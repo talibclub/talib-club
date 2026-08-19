@@ -4,13 +4,16 @@ import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.j
 import { clampPage } from "../utils/pagination.js"
 import PaginationBar from "../components/PaginationBar.jsx"
 import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
-import ImageWithFallback from "../components/ImageWithFallback.jsx"
 import ArticleCard from "../components/ArticleCard.jsx"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 
 export default function Articles({ go, authState, ctx }) {
-  // Keep the public article list fresh so it reflects the current Firestore state.
-  const articlesQueryOptions = useMemo(() => ({ live: true }), [])
+  // Not live. `live: true` opened a permanent onSnapshot on the entire
+  // content_articles collection for every visitor and bypassed the cache layer
+  // entirely, so each page view re-read every article. The cache is validated
+  // against content_settings/metadata, which every admin save bumps, so a new
+  // article still shows up within the metadata TTL without the standing listener.
+  const articlesQueryOptions = useMemo(() => ({ live: false }), [])
   const { items: articles, loading, error, isUsingFallback } = useContentCollection("articles", ARTICLES, null, articlesQueryOptions)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
 
@@ -92,6 +95,19 @@ export default function Articles({ go, authState, ctx }) {
     }
     go("articles", updated, { replace: true, noScroll: true })
   }
+
+  // Typing used to call go() — a router navigate plus a full ctx rebuild — on
+  // every keystroke. The list itself filters from local state, so only the URL
+  // sync needs to wait.
+  const searchSyncRef = useRef(null)
+  const handleSearchChange = (value) => {
+    setSearch(value)
+    clearTimeout(searchSyncRef.current)
+    searchSyncRef.current = setTimeout(() => {
+      updateFilters({ search: value, showAllBrowse: value ? true : showAllBrowse })
+    }, 350)
+  }
+  useEffect(() => () => clearTimeout(searchSyncRef.current), [])
 
   const viewArticle = (article) => {
     go("article", {
@@ -228,7 +244,7 @@ export default function Articles({ go, authState, ctx }) {
               <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
               <input
                 value={search}
-                onChange={e => { setSearch(e.target.value); updateFilters({ search: e.target.value, showAllBrowse: e.target.value ? true : showAllBrowse }) }}
+                onChange={e => handleSearchChange(e.target.value)}
                 placeholder="ค้นหาบทความ..."
                 style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "12px 16px 12px 42px", background: "var(--bg2)", border: "1px solid transparent", fontSize: 14, outline: "none", transition: "border 0.2s" }}
                 onFocus={(e) => e.target.style.border = "1px solid var(--teal)"}

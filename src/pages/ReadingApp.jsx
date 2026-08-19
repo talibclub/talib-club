@@ -1,19 +1,16 @@
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { createPortal } from "react-dom"
 import Draggable from "react-draggable"
 import toast from "react-hot-toast"
 import { BOOKS, DEFAULT_TAXONOMY } from "../data/index.js"
-import { useContentCollection, useTaxonomySettings, useUserDoc } from "../lib/contentStore.js"
+import { useContentCollection, useTaxonomySettings, useUserDoc, invalidateUserDocumentCache } from "../lib/contentStore.js"
 import { confirmAction } from "../utils/feedback.jsx"
 import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage"
-import { doc, getDoc } from "firebase/firestore"
+import { doc, getDoc, setDoc, serverTimestamp, runTransaction } from "firebase/firestore"
 import { storage, app, db } from "../lib/firebase.js"
 import { safeDateNow } from "../utils/time.js"
 import { getLocalDayKey, addDaysToKey, todayKey, calculateReadingStreak } from "../utils/streak.js"
 import { useReadingTimer } from "./reading/hooks/useReadingTimer.js"
-import { TutorialModal } from "./reading/components/TutorialModal.jsx"
-import { QuizModal } from "./reading/components/QuizModal.jsx"
-import { MissionRow } from "./reading/components/MissionRow.jsx"
 import ReadingDashboard from "./reading/components/ReadingDashboard.jsx"
 import TimerPanel from "./reading/components/TimerPanel.jsx"
 import ProNotebook from "./reading/components/ProNotebook.jsx"
@@ -31,6 +28,10 @@ const DAILY_READING_GOAL_MINUTES = 10
 const MIN_VERIFIED_SECONDS = 180
 const MIN_REFLECTION_CHARS = 20
 const DEFAULT_FREEZE_CREDITS = 2
+// Mission claims older than this are pruned on the next claim. Nothing reads
+// past days, and the streak document is the hottest one a user has.
+const MISSION_HISTORY_DAYS = 14
+const MISSION_HISTORY_FLOOR = () => addDaysToKey(getLocalDayKey(safeDateNow()), -MISSION_HISTORY_DAYS)
 const DEFAULT_LEAVE_CREDITS = 1
 
 // --- Helper Functions ---
@@ -117,7 +118,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   const { items: books } = useContentCollection("books", BOOKS, null, readOnlyQueryOptions)
   const { items: shelfItems, saveItem: saveShelfItem, deleteItem: deleteShelfItem } = useContentCollection("bookshelf", [], uid, liveQueryOptions)
   const { items: readingSessions, loading: loadingSessions, saveItem: saveReadingSession } = useContentCollection("reading_sessions", [], uid, liveQueryOptions)
-  const { item: streakRecord, loading: loadingStreaks, saveItem: saveStreakSettings } = useUserDoc("reading_streaks", uid, uid, null)
+  const { item: streakRecord, loading: loadingStreaks, saveItem: saveStreakSettings, refetch: refetchStreak } = useUserDoc("reading_streaks", uid, uid, null)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
 
   // Reading Mode State
@@ -165,7 +166,16 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   const [activeQuizShelfItem, setActiveQuizShelfItem] = useState(null)
 
   // Reading Reminders states
-  const [notifEnabled, setNotifEnabled] = useState(() => localStorage.getItem("talib_notif_enabled") === "true")
+  const [notifEnabled, setNotifEnabled] = useState(() => {
+    // Permission can be withdrawn from the browser's own settings at any time,
+    // which left this switch stuck in the "on" position forever.
+    if (localStorage.getItem("talib_notif_enabled") !== "true") return false
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") {
+      localStorage.setItem("talib_notif_enabled", "false")
+      return false
+    }
+    return true
+  })
   const [notifTime, setNotifTime] = useState(() => localStorage.getItem("talib_notif_time") || "20:00")
 
   // --- Normalized Streak & Sessions ---
@@ -245,8 +255,13 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     const dayNames = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."]
     for (let i = 6; i >= 0; i--) {
       const key = addDaysToKey(streak.todayKey, -i)
-      const dateObj = new Date(`${key}T00:00:00`)
-      const name = dayNames[dateObj.getDay()]
+      // `key` is a Bangkok day key. Parsing it as a local Date and asking for
+      // getDay() leaves the answer at the mercy of the reader's timezone and of
+      // how the engine parses a bare date-time string, so the label could land
+      // a day out for anyone outside Thailand. Derive it from the key's own
+      // year/month/day instead.
+      const [ky, km, kd] = key.split("-").map(Number)
+      const name = dayNames[new Date(Date.UTC(ky, km - 1, kd)).getUTCDay()]
 
       const daySessions = readingSessions.filter(
         item => item.uid === uid && item.verified && (item.dayKey || getLocalDayKey(item.completedAt)) === key
@@ -357,20 +372,33 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     else if (isM2) gemsReward = 8
     else if (isM3) gemsReward = 10
 
-    const nextClaimed = {
-      ...streakSettings.claimedMissions,
-      [streak.todayKey]: {
-        ...(streakSettings.claimedMissions?.[streak.todayKey] || {}),
-        [missionId]: true
+    const awarded = await mutateStreakDoc((current) => {
+      // Re-check the claim against the stored document, not the cached copy:
+      // otherwise a double click (or a second tab) paid the reward twice.
+      if (current.claimedMissions?.[streak.todayKey]?.[missionId]) return null
+      // claimedMissions kept one key per day and nothing ever removed them, so
+      // this document — the one read and written most often for a user — grew
+      // by a key a day forever. Only recent days are ever consulted.
+      const trimmed = {}
+      for (const dayKey of Object.keys(current.claimedMissions || {})) {
+        if (dayKey >= MISSION_HISTORY_FLOOR()) trimmed[dayKey] = current.claimedMissions[dayKey]
       }
-    }
-
-    await saveStreakSettings({
-      ...streakSettings,
-      gems: Number(streakSettings.gems || 0) + gemsReward,
-      claimedMissions: nextClaimed
+      return {
+        gems: Number(current.gems || 0) + gemsReward,
+        claimedMissions: {
+          ...trimmed,
+          [streak.todayKey]: {
+            ...(current.claimedMissions?.[streak.todayKey] || {}),
+            [missionId]: true
+          }
+        }
+      }
     })
 
+    if (!awarded) {
+      toast.success("คุณรับรางวัลภารกิจนี้ไปแล้ว")
+      return
+    }
     toast.success(`สำเร็จ! รับรางวัล +${gemsReward} 💎`)
   }
 
@@ -385,32 +413,68 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       return
     }
 
-    if (isFreeze) {
-      if (streakSettings.freezeCredits >= 2) {
-        toast.error("คุณมีน้ำแข็งเต็มจำนวนจำกัดแล้ว (สูงสุด 2 ชิ้น)")
-        return
-      }
-      await saveStreakSettings({
-        ...streakSettings,
-        gems: currentGems - cost,
-        freezeCredits: Number(streakSettings.freezeCredits || 0) + 1,
-      })
-      toast.success("ซื้อน้ำแข็งสำเร็จ! 🧊")
-    } else {
-      if (streakSettings.leaveCredits >= 2) {
-        toast.error("คุณมีสิทธิ์ลากิจเต็มจำนวนจำกัดแล้ว (สูงสุด 2 ชิ้น)")
-        return
-      }
-      await saveStreakSettings({
-        ...streakSettings,
-        gems: currentGems - cost,
-        leaveCredits: Number(streakSettings.leaveCredits || 0) + 1,
-      })
-      toast.success("ซื้อสิทธิ์ลากิจสำเร็จ! 📅")
+    const creditKey = isFreeze ? "freezeCredits" : "leaveCredits"
+    if (Number(streakSettings[creditKey] || 0) >= 2) {
+      toast.error(isFreeze
+        ? "คุณมีน้ำแข็งเต็มจำนวนจำกัดแล้ว (สูงสุด 2 ชิ้น)"
+        : "คุณมีสิทธิ์ลากิจเต็มจำนวนจำกัดแล้ว (สูงสุด 2 ชิ้น)")
+      return
     }
+
+    // The balance check above is only for the message — the authoritative one
+    // runs inside the transaction, so two quick clicks can't both pass a check
+    // made against the same cached balance and buy two items for the price of one.
+    const bought = await mutateStreakDoc((current) => {
+      if (Number(current.gems || 0) < cost) return null
+      if (Number(current[creditKey] || 0) >= 2) return null
+      return {
+        gems: Number(current.gems) - cost,
+        [creditKey]: Number(current[creditKey] || 0) + 1,
+      }
+    })
+
+    if (!bought) {
+      toast.error("ซื้อไม่สำเร็จ — เพชรไม่พอ หรือมีของชิ้นนี้เต็มแล้ว")
+      return
+    }
+    toast.success(isFreeze ? "ซื้อน้ำแข็งสำเร็จ! 🧊" : "ซื้อสิทธิ์ลากิจสำเร็จ! 📅")
   }
 
+  // Every mutation that SPENDS something on the streak document — gems, freeze
+  // credits, leave credits — goes through here.
+  //
+  // They all used to be `saveStreakSettings({ ...streakSettings, x: x - 1 })`,
+  // i.e. read-modify-write against a copy this component holds in a five-minute
+  // cache (useUserDoc → readCachedUserDocument). Two tabs, or one tab whose
+  // effect fired twice before the first write landed, each computed the new
+  // balance from the same stale snapshot and the second silently overwrote the
+  // first — a purchase could be free, a freeze credit could be burned twice.
+  // The transaction re-reads the document inside Firestore, so `mutate` always
+  // sees what is actually stored. Returning null from `mutate` aborts without
+  // writing.
+  const mutateStreakDoc = useCallback(async (mutate) => {
+    if (!uid) return null
+    const streakRef = doc(db, "content_reading_streaks", uid)
+    const next = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(streakRef)
+      const current = normalizeStreakSettings(snap.exists() ? snap.data() : null, uid)
+      const patch = mutate(current)
+      if (!patch) return null
+      const merged = { ...current, ...patch, uid, id: uid, deleted: false }
+      tx.set(streakRef, { ...merged, updatedAt: serverTimestamp() }, { merge: true })
+      return merged
+    })
+    if (next) {
+      // useUserDoc caches this document, and its refetch() honours that cache —
+      // so the copy on screen would stay stale until the TTL expired.
+      invalidateUserDocumentCache("content_reading_streaks", uid)
+      await refetchStreak?.()
+    }
+    return next
+  }, [uid, refetchStreak])
+
   // Auto-applied freeze logic for yesterday
+  const autoFreezeAppliedRef = useRef(null)
   useEffect(() => {
     if (!uid || loadingSessions || loadingStreaks || !streakSettings) return
 
@@ -430,24 +494,41 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     const hadStreakBeforeYesterday = streak.coveredDays && streak.coveredDays.has(addDaysToKey(yesterdayKey, -1))
 
     if (!readYesterday && !protectedYesterday && streakSettings.freezeCredits > 0 && hadStreakBeforeYesterday && streak.totalDays > 0) {
+      // `readingSessions` is a live listener, so a snapshot arriving mid-write
+      // re-ran this effect with `protectedYesterday` still false and deducted a
+      // second credit for the same day. The ref claims the day synchronously,
+      // before the first await.
+      if (autoFreezeAppliedRef.current === yesterdayKey) return
+      autoFreezeAppliedRef.current = yesterdayKey
+
       const applyAutoFreeze = async () => {
         try {
-          await saveStreakSettings({
-            ...streakSettings,
-            freezeCredits: Number(streakSettings.freezeCredits || 0) - 1,
-            protectedDays: [
-              ...streakSettings.protectedDays,
-              { date: yesterdayKey, type: "freeze", usedAt: safeDateNow() },
-            ],
+          const applied = await mutateStreakDoc((current) => {
+            // Re-checked against the stored document: another tab may have
+            // already protected yesterday, or spent the last credit.
+            const already = current.protectedDays.some(
+              p => (p.date || p.dayKey || getLocalDayKey(p.createdAt || p.usedAt)) === yesterdayKey
+            )
+            if (already || Number(current.freezeCredits || 0) <= 0) return null
+            return {
+              freezeCredits: Number(current.freezeCredits) - 1,
+              protectedDays: [
+                ...current.protectedDays,
+                { date: yesterdayKey, type: "freeze", usedAt: safeDateNow() },
+              ],
+            }
           })
-          toast.success("เมื่อวานนี้คุณไม่ได้เข้าอ่านหนังสือ! ระบบได้ใช้น้ำแข็งช่วยปกป้อง Streak ของคุณอัตโนมัติ 🧊", { duration: 5000 })
+          if (applied) {
+            toast.success("เมื่อวานนี้คุณไม่ได้เข้าอ่านหนังสือ! ระบบได้ใช้น้ำแข็งช่วยปกป้อง Streak ของคุณอัตโนมัติ 🧊", { duration: 5000 })
+          }
         } catch (err) {
           console.error("Auto freeze failed", err)
+          autoFreezeAppliedRef.current = null   // let a later render retry
         }
       }
       applyAutoFreeze()
     }
-  }, [uid, loadingSessions, loadingStreaks, streakSettings, readingSessions, streak.todayKey, streak.coveredDays, saveStreakSettings])
+  }, [uid, loadingSessions, loadingStreaks, streakSettings, readingSessions, streak.todayKey, streak.coveredDays, streak.totalDays, mutateStreakDoc])
 
   // Sync calculated streak count and user display name to Firestore for leaderboard
   useEffect(() => {
@@ -470,6 +551,19 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
             displayName: userDisplayName,
             updatedAt: safeDateNow()
           })
+          // Mirror the three public numbers into their own collection.
+          // content_reading_streaks cannot be listed by members — and must not
+          // be, because the same document holds gems, freeze/leave credits and
+          // claimedMissions — so the leaderboard used to query a collection the
+          // rules always rejected and silently rendered empty for everyone
+          // except staff. This doc holds nothing private.
+          await setDoc(doc(db, "leaderboard", uid), {
+            uid,
+            displayName: userDisplayName,
+            streakCount: currentStreakCount,
+            bestStreak: currentBestStreak,
+            updatedAt: serverTimestamp(),
+          }, { merge: true })
         } catch (err) {
           console.error("Failed to sync streak count to Firestore", err)
         }
@@ -503,14 +597,25 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       toast.error(isLeave ? "สิทธิ์ลากิจหมดแล้ว" : "น้ำแข็งหมดแล้ว")
       return
     }
-    await saveStreakSettings({
-      ...streakSettings,
-      [creditKey]: Number(streakSettings[creditKey] || 0) - 1,
-      protectedDays: [
-        ...streakSettings.protectedDays,
-        { date: key, type, usedAt: safeDateNow() },
-      ],
+    const used = await mutateStreakDoc((current) => {
+      const alreadyProtected = current.protectedDays.some(
+        p => (p.date || p.dayKey || getLocalDayKey(p.createdAt || p.usedAt)) === key
+      )
+      if (alreadyProtected) return null
+      if (Number(current[creditKey] || 0) <= 0) return null
+      return {
+        [creditKey]: Number(current[creditKey]) - 1,
+        protectedDays: [
+          ...current.protectedDays,
+          { date: key, type, usedAt: safeDateNow() },
+        ],
+      }
     })
+
+    if (!used) {
+      toast.error(isLeave ? "สิทธิ์ลากิจหมดแล้ว" : "น้ำแข็งหมดแล้ว")
+      return
+    }
     toast.success(isLeave ? "บันทึกวันลากิจแล้ว" : "ใช้น้ำแข็งคุ้มครอง streak วันนี้แล้ว")
   }
 
@@ -758,15 +863,11 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       // Calculate session rewards
       const sessionGems = Math.min(10, Math.floor(seconds / 120)) // 1 Gem per 2 mins, max 10
 
-      // Get latest streak document to avoid overwriting recent gems
-      const latestStreakSnap = await getDoc(doc(db, "content_reading_streaks", uid))
-      const currentGems = latestStreakSnap.exists() ? Number(latestStreakSnap.data().gems || 0) : Number(streakSettings?.gems || 0)
-
-      // Update user's streak document with gems
-      await saveStreakSettings({
-        ...streakSettings,
-        gems: currentGems + sessionGems,
-      })
+      // Awarding gems used to read the document, then write the whole cached
+      // settings object back with a new total — the read-then-write left a gap
+      // where a concurrent claim or purchase was overwritten. The transaction
+      // reads and writes as one step.
+      await mutateStreakDoc((current) => ({ gems: Number(current.gems || 0) + sessionGems }))
 
       const nextProgress = getProgressFromSession(activeBook, end, report.pagesRead)
 
@@ -967,7 +1068,13 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
             .reader-form-card {
               display: ${showNotebook ? "none" : "flex"} !important;
             }
-            @media (max-width: 900px) {
+            /* 768, not 900: ProNotebook carries its own guard (isMobile =
+               innerWidth < 768) that shows "หน้าจอเล็กเกินไป" on phones, so it
+               already considers a tablet supported. Hiding the panel at 900
+               knocked out the 768-899 band — iPad portrait included — where the
+               notebook would have rendered fine: the toggle flipped state but
+               the container stayed display:none, so the button looked dead. */
+            @media (max-width: 767px) {
               .desktop-only-btn {
                 display: none !important;
               }
@@ -1114,6 +1221,11 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
                     body: "ระบบจะแจ้งเตือนเมื่อถึงเวลาอ่านหนังสือที่คุณตั้งค่าไว้"
                   })
                 } else {
+                  // The switch used to stay on after the browser said no, so the
+                  // settings screen claimed reminders were enabled while nothing
+                  // could ever fire.
+                  setNotifEnabled(false)
+                  localStorage.setItem("talib_notif_enabled", "false")
                   toast.error("เบราว์เซอร์ปฏิเสธสิทธิ์การแจ้งเตือน กรุณาเปิดสิทธิ์ในตั้งค่าเบราว์เซอร์")
                 }
               } else {

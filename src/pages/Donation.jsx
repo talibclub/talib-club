@@ -8,18 +8,25 @@ export default function Donation() {
   // ดึงข้อมูลการตั้งค่าเว็บล่าสุดจากฐานข้อมูล
   const { site } = useSiteSettings(SITE)
 
-  // ข้อมูลบัญชีธนาคารจากโปสเตอร์
-  const bankAccounts = [
-    {
-      id: 1,
-      bankName: "ธนาคารไทยพาณิชย์ (SCB)",
-      accountName: "นายสอบรีย์ บิลังโหลด",
-      accountNumber: "704-287501-5",
-      tag: "สมทบทุน",
-      logo: "/scb-logo.png",
-      qrImage: "/scb-qr.png"
-    }
-  ]
+  // ข้อมูลบัญชีธนาคาร — อ่านจาก content_settings/site ก่อน
+  //
+  // These were a hardcoded array while the same page already pulled site
+  // settings for its social links, so changing an account number meant editing
+  // source and redeploying. The literal below is now only the fallback for a
+  // site document that has no bankAccounts yet.
+  const bankAccounts = (Array.isArray(site?.bankAccounts) && site.bankAccounts.length > 0)
+    ? site.bankAccounts
+    : [
+      {
+        id: 1,
+        bankName: "ธนาคารไทยพาณิชย์ (SCB)",
+        accountName: "นายสอบรีย์ บิลังโหลด",
+        accountNumber: "704-287501-5",
+        tag: "สมทบทุน",
+        logo: "/scb-logo.png",
+        qrImage: "/scb-qr.png"
+      }
+    ]
 
   // ฟังก์ชันกดคัดลอกเลขบัญชี
   const handleCopy = async (number) => {

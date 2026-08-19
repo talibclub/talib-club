@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { collection, doc, getDocs, serverTimestamp, writeBatch } from "firebase/firestore"
+import { collection, doc, getDocs, runTransaction, serverTimestamp, writeBatch } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
-import { useAuth } from "../hooks/useAuth.js"
 import { confirmAction, notifyError, notifySuccess } from "../utils/feedback.jsx"
 import { buildPageRange } from "../utils/pagination.js"
 
@@ -14,6 +13,12 @@ const STATUS_LABEL = {
   [STATUS.completed]: "แปลเสร็จแล้ว",
 }
 
+// NOT CHANGED ON PURPOSE: slicing base64 to 120 chars keeps only the first ~90
+// bytes of the URL, so two articles under a long shared path can collapse onto
+// the same document. Lengthening or hashing the id would give every already
+// scraped article a new id on the next run — the old documents, with the
+// translations attached to them, would be orphaned and re-created empty. Fixing
+// this needs a migration script, not an edit here.
 function docId(url) {
   return btoa(unescape(encodeURIComponent(url))).replace(/[+/=]/g, "_").slice(0, 120)
 }
@@ -90,8 +95,13 @@ function EditModal({ item, onClose, onSave }) {
 }
 
 // ── Main ───────────────────────────────────────────────────────────
-export default function StaffTranslation({ go }) {
-  const { user, profile } = useAuth()
+export default function StaffTranslation({ authState, go }) {
+  // Was `useAuth()`. Each call builds a whole extra auth instance — its own
+  // onAuthStateChanged subscription and its own users/{uid} read — while App
+  // already holds one and passes it down. App was passing authState here and
+  // the prop was simply ignored.
+  const user = authState?.user
+  const profile = authState?.profile
   const myName = getMyName(profile)
 
   const [items, setItems] = useState([])
@@ -107,6 +117,9 @@ export default function StaffTranslation({ go }) {
   const [pageSize, setPageSize] = useState(10)
 
   const [activeWorkspaceItem, setActiveWorkspaceItem] = useState(null)
+  // Revision of the document as it was when this workspace was opened; the save
+  // refuses to run if the stored one has moved on. See saveWorkspace().
+  const workspaceRevisionRef = useRef(0)
   const [workspaceParagraphs, setWorkspaceParagraphs] = useState([])
   const [workspaceThaiTitle, setWorkspaceThaiTitle] = useState("")
   const [translating, setTranslating] = useState(false)
@@ -140,6 +153,7 @@ export default function StaffTranslation({ go }) {
     setWorkspaceParagraphs(item.paragraphs || [])
     setWorkspaceThaiTitle(item.thaiTitle || "")
     setWorkspaceDirty(false)
+    workspaceRevisionRef.current = Number(item.revision || 0)
   }
 
   async function closeWorkspace() {
@@ -190,21 +204,59 @@ export default function StaffTranslation({ go }) {
 
   async function saveWorkspace(markCompleted = false) {
     const name = profile?.displayName || profile?.email || "ไม่ระบุ"
-    const patch = {
-      paragraphs: workspaceParagraphs,
-      thaiTitle: workspaceThaiTitle.trim(),
-      status: markCompleted ? STATUS.completed : STATUS.progress,
-      assignee: activeWorkspaceItem.assignee || name,
-      claimedAt: activeWorkspaceItem.claimedAt || serverTimestamp(),
+    const nextStatus = markCompleted ? STATUS.completed : STATUS.progress
+    const thaiTitle = workspaceThaiTitle.trim()
+
+    // `paragraphs` is written as one whole array, so whoever saved last used to
+    // erase everything the other person had typed since they opened the page —
+    // silently, with a success toast. The document now carries a revision
+    // counter: the save only lands if nobody else has written since this
+    // workspace was opened.
+    const expected = workspaceRevisionRef.current
+    let outcome
+    try {
+      outcome = await runTransaction(db, async (tx) => {
+        const itemRef = doc(db, COLLECTION, activeWorkspaceItem.id)
+        const snap = await tx.get(itemRef)
+        const current = snap.exists() ? snap.data() : {}
+        const stored = Number(current.revision || 0)
+        if (stored !== expected) return { ok: false, by: current.assignee || "" }
+        tx.set(itemRef, {
+          paragraphs: workspaceParagraphs,
+          thaiTitle,
+          status: nextStatus,
+          assignee: activeWorkspaceItem.assignee || name,
+          claimedAt: activeWorkspaceItem.claimedAt || serverTimestamp(),
+          revision: stored + 1,
+          updatedAt: serverTimestamp(),
+        }, { merge: true })
+        return { ok: true, revision: stored + 1 }
+      })
+    } catch (err) {
+      console.error("Failed to save translation workspace:", err)
+      notifyError("บันทึกไม่สำเร็จ: " + (err.message || err))
+      return
     }
-    await updateItem(activeWorkspaceItem, patch)
+
+    if (!outcome.ok) {
+      notifyError(
+        outcome.by
+          ? `มีคนอื่น (${outcome.by}) บันทึกงานนี้ไปแล้วหลังจากคุณเปิดหน้านี้ — กรุณาปิดแล้วเปิดใหม่เพื่อดึงฉบับล่าสุด (งานที่พิมพ์ค้างไว้ยังอยู่ในหน้าจอ)`
+          : "มีคนอื่นบันทึกงานนี้ไปแล้วหลังจากคุณเปิดหน้านี้ — กรุณาปิดแล้วเปิดใหม่เพื่อดึงฉบับล่าสุด"
+      )
+      return
+    }
+
+    workspaceRevisionRef.current = outcome.revision
     const saved = {
       ...activeWorkspaceItem,
       paragraphs: workspaceParagraphs,
-      thaiTitle: workspaceThaiTitle.trim(),
-      status: markCompleted ? STATUS.completed : STATUS.progress,
+      thaiTitle,
+      status: nextStatus,
       assignee: activeWorkspaceItem.assignee || myName,
+      revision: outcome.revision,
     }
+    setItems(prev => prev.map(r => r.id === saved.id ? { ...r, ...saved, claimedAt: r.claimedAt } : r))
     setActiveWorkspaceItem(saved)
     setWorkspaceDirty(false)
     notifySuccess(markCompleted ? "บันทึกและทำเครื่องหมายว่าแปลเสร็จแล้ว" : "บันทึกร่างแล้ว")

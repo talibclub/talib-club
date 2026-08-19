@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, deleteDoc } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, deleteDoc, arrayUnion, where, getDocs, limit } from "firebase/firestore"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { toast } from "react-hot-toast"
 import { db, app } from "../../lib/firebase.js"
@@ -63,6 +63,18 @@ export default function StaffTasks({ currentUser, staffTeam, sendBotNotification
           const isVideo = file.type.startsWith("video/") || file.name.match(/\.(mp4|mov|webm|avi|mkv|ogg)$/i)
           
           if (isVideo) {
+             // NOTE: `talib_videos` is an UNSIGNED Cloudinary preset, so the
+             // cloud name and preset below are necessarily visible in the
+             // bundle and anyone can upload to that account with them. This
+             // cannot be fixed from the client — restrict the preset in the
+             // Cloudinary console (allowed formats, max file size, a fixed
+             // folder, and Access Control) or move the upload behind a signed
+             // serverless endpoint. The size check here only stops honest
+             // mistakes.
+             const MAX_VIDEO_BYTES = 200 * 1024 * 1024
+             if (file.size > MAX_VIDEO_BYTES) {
+               throw new Error(`ไฟล์วิดีโอ "${file.name}" ใหญ่เกิน 200MB`)
+             }
              const formData = new FormData()
              formData.append("file", file)
              formData.append("upload_preset", "talib_videos")
@@ -112,11 +124,27 @@ export default function StaffTasks({ currentUser, staffTeam, sendBotNotification
       })
       
       notifySuccess("มอบหมายงานเรียบร้อยแล้ว")
+      // This went out to every staff member with the wording "มอบหมายถึงคุณ",
+      // so everyone was told a task was theirs. staffTeam holds display names,
+      // not uids, so look the assignee up; if the name is not exactly one
+      // account, fall back to the whole team with wording that says who it is
+      // actually for.
+      let targetUserId = null
+      try {
+        const matches = await getDocs(query(
+          collection(db, "users"),
+          where("displayName", "==", form.assignee),
+          limit(2)
+        ))
+        if (matches.size === 1) targetUserId = matches.docs[0].id
+      } catch (lookupErr) {
+        console.error("Assignee lookup failed", lookupErr)
+      }
       triggerPushNotification(
-        "📋 มีงานใหม่มอบหมายถึงคุณ",
+        targetUserId ? "📋 มีงานใหม่มอบหมายถึงคุณ" : `📋 งานใหม่ของ ${form.assignee}`,
         `เรื่อง: ${form.title} (จาก: ${currentUser})`,
         "/staff-work",
-        { isStaffOnly: true } 
+        targetUserId ? { targetUserId } : { isStaffOnly: true }
       )
       
       if (sendBotNotification) {
@@ -142,8 +170,12 @@ export default function StaffTasks({ currentUser, staffTeam, sendBotNotification
         user: currentUser,
         date: new Date().toISOString()
       }
+      // arrayUnion appends server-side. Rebuilding the array from `task`, which
+      // is a local snapshot, meant two staff updating the same task at once each
+      // wrote their own entry onto the same base list — and the second write
+      // erased the first one's note.
       await updateDoc(doc(db, "staff_tasks", task.id), {
-        progressLog: [...(task.progressLog || []), newEntry],
+        progressLog: arrayUnion(newEntry),
         updatedAt: serverTimestamp()
       })
       if (sendBotNotification) {
@@ -397,7 +429,7 @@ export default function StaffTasks({ currentUser, staffTeam, sendBotNotification
                   <i className="ti ti-info-circle" style={{ color: "orange", fontSize: 18, marginTop: 2 }}></i>
                   <span>
                     <strong>หมายเหตุ:</strong> หากวิดีโอแสดงผลเป็นจอดำ (เล่นได้แค่เสียง) เกิดจากเบราว์เซอร์ไม่รองรับการถอดรหัสวิดีโอนี้ (มักพบในไฟล์ที่อัดจากมือถือ) <br/>
-                    กรุณากดปุ่ม <strong>"ดาวน์โหลดไฟล์"</strong> เพื่อนำไปเปิดรับชมด้วยโปรแกรมในคอมพิวเตอร์แทนครับ
+                    กรุณากดปุ่ม <strong>&quot;ดาวน์โหลดไฟล์&quot;</strong> เพื่อนำไปเปิดรับชมด้วยโปรแกรมในคอมพิวเตอร์แทนครับ
                   </span>
                 </p>
               </div>

@@ -205,7 +205,10 @@ export default function OpenHouseCampus({ go, ctx }) {
             <div className="buildings-grid">
               {campuses.map(campus => (
                 <div key={campus.id} className="building-card">
-                  <div className="building-header" style={{ borderBottomColor: `${booth.themeColor}40` || "var(--br)" }}>
+                  {/* A template literal is never falsy, so the fallback was dead
+                      and a booth without themeColor got the literal colour
+                      "undefined40". */}
+                  <div className="building-header" style={{ borderBottomColor: booth.themeColor ? `${booth.themeColor}40` : "var(--br)" }}>
                     <h3 className="building-name">
                       <i className="ti ti-building-arch"></i> {campus.name}
                     </h3>

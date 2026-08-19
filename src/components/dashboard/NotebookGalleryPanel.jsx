@@ -1,8 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../../lib/firebase.js";
 import toast from "react-hot-toast";
 import ProNotebook from "../../pages/reading/components/ProNotebook.jsx";
+
+// Matches NOTEBOOK_COVERS in ProNotebook. Only 'red' had a colour before, so
+// every other notebook fell through to the teal default.
+const COVER_GRADIENTS = {
+  red: '#ef4444, #b91c1c',
+  teal: 'var(--teal), var(--teal-dark)',
+  indigo: '#6366f1, #3730a3',
+  amber: '#f59e0b, #b45309',
+  plum: '#a855f7, #6b21a8',
+  forest: '#22c55e, #15803d',
+};
 
 export default function NotebookGalleryPanel({ authState, setView }) {
   const [notebooks, setNotebooks] = useState([]);
@@ -134,7 +145,7 @@ export default function NotebookGalleryPanel({ authState, setView }) {
               {/* Notebook Cover */}
               <div style={{ 
                 height: 140, 
-                background: `linear-gradient(135deg, ${nb.coverColor === 'red' ? '#ef4444, #b91c1c' : 'var(--teal), var(--teal-dark)'})`,
+                background: `linear-gradient(135deg, ${COVER_GRADIENTS[nb.coverColor] || COVER_GRADIENTS.teal})`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",

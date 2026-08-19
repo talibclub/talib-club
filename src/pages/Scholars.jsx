@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo } from "react"
 import { DEFAULT_TAXONOMY, SCHOLARS } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'

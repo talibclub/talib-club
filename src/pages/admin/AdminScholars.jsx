@@ -119,7 +119,7 @@ export default function AdminScholars() {
       await saveItem(editing)
       setEdit(null)
       notifySuccess("บันทึกข้อมูลเรียบร้อยแล้ว")
-    } catch (err) {
+    } catch {
       notifyError("บันทึกไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
     } finally {
       setBusy(false)
@@ -135,7 +135,7 @@ export default function AdminScholars() {
       await deleteItem(scholar.id)
       setSelected(prev => prev.filter(id => id !== scholar.id))
       notifySuccess("ลบเรียบร้อยแล้ว")
-    } catch (err) {
+    } catch {
       notifyError("ลบไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
     } finally {
       setBusy(false)
@@ -155,7 +155,7 @@ export default function AdminScholars() {
       } else {
         notifyError(`ลบสำเร็จ ${deleted} รายการ แต่ล้มเหลว ${failed} รายการ — กรุณาตรวจสิทธิ์ Firestore`)
       }
-    } catch (err) {
+    } catch {
       notifyError("เกิดข้อผิดพลาดในการลบข้อมูล")
     } finally {
       setBusy(false)

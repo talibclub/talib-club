@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react"
-import { useContentCollection, useContentDoc, saveContentItem } from "../lib/contentStore.js"
+import { useContentDoc, saveContentItem } from "../lib/contentStore.js"
 import { MEDIA } from "../data/index.js"
 import SEOHead, { toIsoDate, BASE_URL } from '../components/SEOHead.jsx'
 import { detailUrl } from "../utils/slug.js"

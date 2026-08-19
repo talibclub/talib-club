@@ -12,6 +12,13 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState([])
   const [holds, setHolds] = useState([])
+  // The "minutes left" figure was computed with a bare Date.now() during render,
+  // so it only moved when something else re-rendered the page. Tick it.
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 30000)
+    return () => clearInterval(timer)
+  }, [])
 
   const fetchRegistrations = async () => {
     setLoading(true)
@@ -73,8 +80,12 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
 
     const toastId = toast.loading("กำลังซิงค์ข้อมูล...")
     try {
-      // Add to trackingDb recipients collection
-      const docRef = doc(collection(trackingDb, "recipients"))
+      // Deterministic id derived from the registration, so pressing the button
+      // twice (or after a failed-looking-but-successful run) overwrites the same
+      // row instead of adding a second copy of the same recipient to the
+      // shipping list. `reg.id` is `${campaignId}_${uid}`, which is already a
+      // valid document id.
+      const docRef = doc(trackingDb, "recipients", `reg_${reg.id}`)
       await setDoc(docRef, {
         fullName: reg.name,
         phone: reg.phone,
@@ -108,8 +119,10 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
 
     const toastId = toast.loading("กำลังบันทึกเลขพัสดุ...")
     try {
-      // Add to trackingDb records collection
-      const docRef = doc(collection(trackingDb, "records"))
+      // Same deterministic id as the recipient row above — re-entering a
+      // tracking number for a registration corrects the existing record instead
+      // of leaving a stale duplicate behind it.
+      const docRef = doc(trackingDb, "records", `reg_${reg.id}`)
       await setDoc(docRef, {
         fullName: reg.name,
         phone: reg.phone,
@@ -194,7 +207,7 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
         `"${(r.zipcode || '').replace(/"/g, '""')}"`,
         `"${(r.contact || '').replace(/"/g, '""')}"`,
         r.status || 'submitted',
-        r.createdAt ? new Date(r.createdAt.toMillis()).toLocaleString('th-TH') : ''
+        r.createdAt?.toMillis ? new Date(r.createdAt.toMillis()).toLocaleString('th-TH') : ''
       ].join(",")
     })
     
@@ -241,7 +254,11 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
           </h3>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
             {holds.map(h => {
-              const minutesLeft = Math.ceil((h.expiresAt.toMillis() - Date.now()) / 60000)
+              // A hold written without expiresAt — or with a plain number from
+              // the optimistic path rather than a Timestamp — used to take the
+              // whole admin page down here.
+              const expiresMs = h.expiresAt?.toMillis ? h.expiresAt.toMillis() : Number(h.expiresAt) || 0
+              const minutesLeft = expiresMs ? Math.ceil((expiresMs - nowMs) / 60000) : 0
               return (
                 <div key={h.id} style={{ padding: "8px 12px", background: "var(--bg)", border: "1px solid var(--br)", borderRadius: 8, fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
                   <i className="ti ti-user" style={{ color: "var(--t3)" }}></i>

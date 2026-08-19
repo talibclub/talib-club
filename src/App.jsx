@@ -1,4 +1,4 @@
-import { Component, useEffect, useState, lazy, Suspense, useRef, useMemo } from "react"
+import { Component, useEffect, useState, lazy, Suspense, useRef, useMemo, useCallback } from "react"
 import { useNavigate, useLocation, useSearchParams, Routes, Route, Navigate } from "react-router-dom"
 import { useTheme } from "./hooks/useTheme.js"
 import { useAuth } from "./hooks/useAuth.js"
@@ -60,7 +60,7 @@ import "./styles/dashboard.css"
 import { useContentCollection } from "./lib/contentStore.js"
 import { syncServerTime, safeDateNow } from "./utils/time.js"
 
-import { getMs, getLocalDayKey } from "./utils/streak.js"
+import { getLocalDayKey } from "./utils/streak.js"
 import { attemptStaleBundleRecovery } from "./utils/recovery.js"
 
 // <main> width policy: "wide"/"gallery" pages are dashboards or card-grids
@@ -176,7 +176,13 @@ export default function App() {
       const todayKey = getLocalDayKey(now.getTime())
       const notifTime = localStorage.getItem("talib_notif_time") || "20:00"
       const [prefHour, prefMin] = notifTime.split(":").map(Number)
-      if (now.getHours() === prefHour && now.getMinutes() === prefMin) {
+      // Matching the minute exactly meant a single missed tick — a sleeping
+      // tab, a throttled background timer, any drift past 60s — skipped the
+      // reminder for the whole day. Fire once the preferred time has passed,
+      // as long as today's reminder has not gone out yet.
+      const nowMinutes = now.getHours() * 60 + now.getMinutes()
+      const prefMinutes = prefHour * 60 + prefMin
+      if (Number.isFinite(prefMinutes) && nowMinutes >= prefMinutes) {
         const lastSent = localStorage.getItem("talib_last_pref_notif_sent")
         if (lastSent !== todayKey) {
           localStorage.setItem("talib_last_pref_notif_sent", todayKey)
@@ -224,8 +230,14 @@ export default function App() {
       }
     }
 
-    const start = () => { if (!interval) interval = setInterval(tick, 1000) }
-    const stopTick = () => { clearInterval(interval); interval = null }
+    // Only the 23:00 banner needs a per-second tick; the other 23 hours this
+    // just re-confirmed that there is nothing to show.
+    const schedule = () => {
+      const nextDelay = new Date(safeDateNow()).getHours() === 23 ? 1000 : 30000
+      interval = setTimeout(() => { tick(); schedule() }, nextDelay)
+    }
+    const start = () => { if (!interval) { tick(); schedule() } }
+    const stopTick = () => { clearTimeout(interval); interval = null }
     const onVisibility = () => document.hidden ? stopTick() : start()
 
     document.addEventListener('visibilitychange', onVisibility)
@@ -242,7 +254,10 @@ export default function App() {
 
 
 
-  const go = (p, data = null, options = {}) => {
+  // `go` is handed to Nav and to every page below. A fresh identity on each
+  // App render invalidated their memoised props and effect deps, so the whole
+  // tree re-rendered on every unrelated App state change.
+  const go = useCallback((p, data = null, options = {}) => {
     const urlPath = getPagePath(p, data);
     
     if (options.replace) {
@@ -253,7 +268,7 @@ export default function App() {
     if (!options.noScroll) {
       window.scrollTo(0, 0)
     }
-  }
+  }, [navigate])
 
   // Public pages (home, articles, library, media, scholars, donate) render
   // immediately — they don't depend on auth. Blocking the whole app on Firebase
@@ -311,21 +326,16 @@ export default function App() {
               <Route path="/article/:idOrCategory" element={<ArticleDetail item={ctx} go={go} authState={authState} />} />
               <Route path="/article/:idOrCategory/:slug" element={<ArticleDetail item={ctx} go={go} authState={authState} />} />
               <Route path="/library" element={<Library go={go} authState={authState} ctx={ctx} />} />
-              <Route path="/library-detail" element={
-                <RequireLogin authState={authState}>
-                  <LibraryDetail item={ctx} go={go} authState={authState} />
-                </RequireLogin>
-              } />
-              <Route path="/library-detail/:idOrCategory" element={
-                <RequireLogin authState={authState}>
-                  <LibraryDetail item={ctx} go={go} authState={authState} />
-                </RequireLogin>
-              } />
-              <Route path="/library-detail/:idOrCategory/:slug" element={
-                <RequireLogin authState={authState}>
-                  <LibraryDetail item={ctx} go={go} authState={authState} />
-                </RequireLogin>
-              } />
+              {/* Not behind RequireLogin. api/seo-prerender.js serves crawlers a
+                  full book page — title, author, cover, description — while a
+                  person following that search result landed on a login form.
+                  Google calls that cloaking and it risks a manual action. The
+                  page now shows the same thing the crawler is shown; the file
+                  itself, the online reader and the preview are still gated
+                  inside LibraryDetail. */}
+              <Route path="/library-detail" element={<LibraryDetail item={ctx} go={go} authState={authState} />} />
+              <Route path="/library-detail/:idOrCategory" element={<LibraryDetail item={ctx} go={go} authState={authState} />} />
+              <Route path="/library-detail/:idOrCategory/:slug" element={<LibraryDetail item={ctx} go={go} authState={authState} />} />
               <Route path="/media" element={<Media go={go} ctx={ctx} />} />
               <Route path="/media-detail" element={<MediaDetail item={ctx} go={go} authState={authState} />} />
               <Route path="/media-detail/:idOrCategory" element={<MediaDetail item={ctx} go={go} authState={authState} />} />
@@ -372,7 +382,7 @@ export default function App() {
               <Route path="/openhouse" element={<OpenHouse go={go} />} />
               <Route path="/openhouse-campus" element={<OpenHouseCampus go={go} ctx={ctx} />} />
               <Route path="/books" element={<BookCampaigns go={go} />} />
-              <Route path="/book-register" element={<BookRegistration go={go} ctx={ctx} />} />
+              <Route path="/book-register" element={<BookRegistration authState={authState} go={go} ctx={ctx} />} />
               <Route path="/reader" element={
                 <RequireLogin authState={authState}>
                   <ReadingApp authState={authState} go={go} ctx={ctx} theme={theme} />
@@ -496,7 +506,11 @@ class PageErrorBoundary extends Component {
         <p style={{ marginBottom: 16 }}>
           ระบบเจอข้อผิดพลาดระหว่างแสดงผลหน้า ลองโหลดใหม่ หรือกลับหน้าแรกเพื่อใช้งานต่อได้เลย
         </p>
-        {this.state.error && (
+        {/* The full stack trace used to be printed for everyone. It means
+            nothing to a reader, it leaks internal file and function names, and
+            it made a recoverable glitch look like the site had fallen over.
+            Developers still get it in the console and in the DEV build. */}
+        {this.state.error && import.meta.env.DEV && (
           <div style={{ textAlign: "left", background: "var(--bg3)", padding: 12, borderRadius: 8, marginBottom: 16, fontSize: 12, overflowX: "auto" }}>
             <strong style={{ color: "var(--red)" }}>{this.state.error.toString()}</strong>
             <pre style={{ margin: "8px 0 0", color: "var(--t2)", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>

@@ -90,7 +90,11 @@ export default function ImageSearchPanel({ query, setQuery, results, loading, fi
             </div>
           )}
         </div>
-        <p style={{ flexShrink: 0, marginTop: 8, fontSize: 10.5, color: 'var(--t3)', textAlign: 'center' }}>รูปจาก DuckDuckGo · Wikipedia · Commons · Openverse — โปรดตรวจลิขสิทธิ์/ให้เครดิตก่อนเผยแพร่</p>
+        {/* The credit line named four sources and left out Google, which is
+            where most results actually come from. Each tile already carries its
+            own source badge, so this only needs to say where they can come
+            from — accurately. */}
+        <p style={{ flexShrink: 0, marginTop: 8, fontSize: 10.5, color: 'var(--t3)', textAlign: 'center' }}>รูปจาก Google · DuckDuckGo · Wikipedia · Commons · Openverse — แหล่งที่มาแสดงบนรูปแต่ละใบ โปรดตรวจลิขสิทธิ์/ให้เครดิตก่อนเผยแพร่</p>
       </div>
     </Draggable>
   );

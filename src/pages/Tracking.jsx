@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
+import Papa from "papaparse";
 import { collection, getDocs, writeBatch, doc, updateDoc, Timestamp } from "firebase/firestore";
 import { trackingDb as db } from "../lib/trackingFirebase.js";
 import { auth } from "../lib/firebase.js";
@@ -34,25 +35,16 @@ export default function Tracking({ authState }) {
   const [editData, setEditData] = useState({});
   const [labelSettings, setLabelSettings] = useState({ name: "สมาคม Talib Club", phone: "", addr: "", size: "therm-150x100" });
 
-  // Load PapaParse script
+  // PapaParse used to be injected from cdnjs at runtime with no integrity hash,
+  // so whatever that CDN served got full access to this page — and to the CSV of
+  // names, phone numbers and addresses being parsed on it. It is a bundled
+  // dependency now, imported at the top of the file.
   useEffect(() => {
-    let script;
-    if (!window.Papa && !document.getElementById("papa-parse-script")) {
-      script = document.createElement("script");
-      script.src = "https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js";
-      script.id = "papa-parse-script";
-      document.head.appendChild(script);
-    }
     if (isTrackingStaff) {
       setIsAdminAuthenticated(true);
       setView("admin-dashboard");
     }
-    return () => {
-      if (script && document.head.contains(script)) {
-        document.head.removeChild(script);
-        delete window.Papa;
-      }
-    };
+    return () => {};
   }, [isTrackingStaff]);
 
   useEffect(() => {
@@ -138,14 +130,21 @@ export default function Tracking({ authState }) {
   // ==========================================
   // ★ PUBLIC SEARCH (หน้าบ้านผู้ใช้)
   // ==========================================
+  // Every click scheduled another 1.5s reset without clearing the previous one,
+  // so an earlier timer could fire mid-sequence and reset the counter just as
+  // the third tap landed.
+  const secretResetRef = useRef(null);
+  useEffect(() => () => clearTimeout(secretResetRef.current), []);
   const handleSecretClick = () => {
+    clearTimeout(secretResetRef.current);
     const newCount = secretClicks + 1;
     setSecretClicks(newCount);
     if (newCount >= 3) {
       setView(isAdminAuthenticated ? "admin-dashboard" : "admin-login");
       setSecretClicks(0);
+      return;
     }
-    setTimeout(() => setSecretClicks(0), 1500);
+    secretResetRef.current = setTimeout(() => setSecretClicks(0), 1500);
   };
 
   // Search goes through /api/track-lookup (exact match, trimmed fields) instead
@@ -188,10 +187,10 @@ export default function Tracking({ authState }) {
   // ==========================================
   const handleCSVUpload = (e, targetCollection) => {
     const f = e.target.files[0];
-    if (!f || !window.Papa) return;
+    if (!f) return;
     
     setIsLoading(true);
-    window.Papa.parse(f, {
+    Papa.parse(f, {
       header: true, skipEmptyLines: true,
       complete: async (res) => {
         try {
@@ -199,9 +198,24 @@ export default function Tracking({ authState }) {
           const rows = [];
 
           res.data.forEach((row, idx) => {
+            // Header matching used to be a bare `includes`, so a column headed
+            // "เลขที่บ้าน" satisfied the tracking-number key "เลข" and a house
+            // number was imported as a tracking code. Prefer an exact header
+            // match, fall back to "starts with", and only then to `includes`.
+            const norm = (v) => String(v).replace(/\s/g, '').toLowerCase();
             const getVal = (keys) => {
-              for (const k of Object.keys(row)) {
-                if (keys.some(key => k.replace(/\s/g,'').toLowerCase().includes(key))) return row[k];
+              const cols = Object.keys(row);
+              for (const key of keys) {
+                const exact = cols.find(k => norm(k) === key);
+                if (exact) return row[exact];
+              }
+              for (const key of keys) {
+                const starts = cols.find(k => norm(k).startsWith(key));
+                if (starts) return row[starts];
+              }
+              for (const key of keys) {
+                const loose = cols.find(k => norm(k).includes(key));
+                if (loose) return row[loose];
               }
               return "";
             };
@@ -238,10 +252,22 @@ export default function Tracking({ authState }) {
             commitPromises.push(batch.commit());
           }
           
-          await Promise.all(commitPromises);
+          // Promise.all's result was thrown away and the success message always
+          // quoted rows.length, so an import where one 450-row batch failed
+          // still reported every row as saved. allSettled lets the operator see
+          // how many actually landed.
+          const results = await Promise.allSettled(commitPromises);
+          const failedBatches = results.filter(r => r.status === "rejected");
 
           const count = rows.length;
-          if (count > 0) {
+          if (failedBatches.length > 0) {
+            console.error("CSV import: some batches failed", failedBatches.map(f => f.reason));
+            const savedCount = Math.max(0, count - failedBatches.length * BATCH_LIMIT);
+            await myAlert(
+              `บันทึกได้เพียงบางส่วน — สำเร็จประมาณ ${savedCount} จาก ${count} รายการ (ล้มเหลว ${failedBatches.length} ชุด) กรุณาตรวจสอบข้อมูลในระบบก่อนนำเข้าไฟล์เดิมซ้ำ เพราะรายการที่บันทึกไปแล้วจะถูกเพิ่มเข้าไปอีก`,
+              "บันทึกไม่ครบ"
+            );
+          } else if (count > 0) {
             await myAlert(`บันทึกข้อมูลสำเร็จ ${count} รายการเข้าสู่ระบบ`, "สำเร็จ");
             if (targetCollection === "recipients") setAdminTab(2);
             else setAdminTab(4);
@@ -535,7 +561,9 @@ export default function Tracking({ authState }) {
                  <p style={{ fontSize: "12px", opacity: 0.8, margin: 0 }}>จัดการข้อมูลแบบครบวงจร</p>
                </div>
             </div>
-            <button onClick={() => { setIsAdminAuthenticated(false); localStorage.removeItem("talib_admin_auth"); setView("home"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.3)", color: "white", padding: "6px 16px", borderRadius: "20px", cursor: "pointer", fontSize: "13px" }}>ออกจากระบบแอดมิน</button>
+            {/* talib_admin_auth is a leftover from the old password gate — nothing
+                writes that key any more, so removing it did nothing. */}
+            <button onClick={() => { setIsAdminAuthenticated(false); setView("home"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.3)", color: "white", padding: "6px 16px", borderRadius: "20px", cursor: "pointer", fontSize: "13px" }}>ออกจากระบบแอดมิน</button>
           </div>
 
           {/* Admin Tabs */}
@@ -755,22 +783,22 @@ export default function Tracking({ authState }) {
                <button onClick={() => setActiveModal(null)} style={{ background: "none", border: "none", fontSize: "18px", color: "white", cursor: "pointer", opacity: 0.7 }}>✕</button>
              </div>
              <div style={{ padding: "clamp(12px, 3vw, 24px)", display: "grid", gap: "16px", background: "var(--card)" }}>
-               <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>ชื่อ-นามสกุล</label><input type="text" className="inp" value={editData.fullName} onChange={e => setEditData({...editData, fullName: e.target.value})} /></div>
-               <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>เบอร์โทร</label><input type="text" className="inp" value={editData.phone} onChange={e => setEditData({...editData, phone: e.target.value})} /></div>
+               <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>ชื่อ-นามสกุล</label><input type="text" className="inp" value={editData.fullName || ""} onChange={e => setEditData({...editData, fullName: e.target.value})} /></div>
+               <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>เบอร์โทร</label><input type="text" className="inp" value={editData.phone || ""} onChange={e => setEditData({...editData, phone: e.target.value})} /></div>
                
                {activeModal === 'edit-recipient' && (
-                 <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>ที่อยู่จัดส่ง</label><textarea className="inp" rows="2" value={editData.address} onChange={e => setEditData({...editData, address: e.target.value})}></textarea></div>
+                 <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>ที่อยู่จัดส่ง</label><textarea className="inp" rows="2" value={editData.address || ""} onChange={e => setEditData({...editData, address: e.target.value})}></textarea></div>
                )}
 
                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                 <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>รหัสไปรษณีย์</label><input type="text" className="inp" value={editData.postalCode} onChange={e => setEditData({...editData, postalCode: e.target.value})} /></div>
+                 <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>รหัสไปรษณีย์</label><input type="text" className="inp" value={editData.postalCode || ""} onChange={e => setEditData({...editData, postalCode: e.target.value})} /></div>
                  {activeModal === 'edit-record' && (
-                   <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>เมือง/จังหวัด</label><input type="text" className="inp" value={editData.city} onChange={e => setEditData({...editData, city: e.target.value})} /></div>
+                   <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>เมือง/จังหวัด</label><input type="text" className="inp" value={editData.city || ""} onChange={e => setEditData({...editData, city: e.target.value})} /></div>
                  )}
                </div>
 
                {activeModal === 'edit-record' && (
-                 <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>เลข Tracking</label><input type="text" className="inp" style={{ fontFamily: "monospace", fontWeight: "700", color: "var(--teal)" }} value={editData.trackingNumber} onChange={e => setEditData({...editData, trackingNumber: e.target.value})} /></div>
+                 <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>เลข Tracking</label><input type="text" className="inp" style={{ fontFamily: "monospace", fontWeight: "700", color: "var(--teal)" }} value={editData.trackingNumber || ""} onChange={e => setEditData({...editData, trackingNumber: e.target.value})} /></div>
                )}
 
                <div><label style={{ fontSize: "12px", fontWeight: "600", color: "#d97706" }}>🎁 โบนัสพิเศษ</label><input type="text" className="inp" style={{ borderColor: "#fcd34d", background: "var(--teal-bg)" }} value={editData.bonusNote || ""} onChange={e => setEditData({...editData, bonusNote: e.target.value})} /></div>

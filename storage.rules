@@ -36,14 +36,17 @@ service firebase.storage {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // 4. เสียงโน้ตในสมุด (path เดิมไม่มี uid) — สมาชิกที่ login อัปโหลด/อ่านได้
-    //    จำกัดชนิดและขนาดไฟล์ไว้กันการใช้เป็นที่ฝากไฟล์
-    match /notebook_audios/{fileName} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null
-                    && request.resource.size < 20 * 1024 * 1024
-                    && request.resource.contentType.matches('audio/.*');
+    // 4. ไฟล์หนังสือที่สมาชิกอัปโหลดเข้าชั้นของตัวเอง (ReadingApp.addExternalBook)
+    //    เดิมไม่มี match block นี้ — Storage จึง deny by default และปุ่ม
+    //    "อัปโหลดไฟล์" ในห้องอ่านหนังสือล้มเหลวทุกครั้ง เหลือแต่การวางลิงก์
+    match /members/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+
+    // เดิมมี /notebook_audios/{fileName} ที่ allow read ให้สมาชิกที่ล็อกอินทุกคน
+    // (อ่านไฟล์เสียงของคนอื่นได้ถ้ารู้ชื่อไฟล์) กฎนั้นเขียนไว้ให้
+    // components/AudioShapeUtil.jsx ซึ่งเป็นซากของสมุดโน้ตเวอร์ชัน tldraw และถูก
+    // ลบไปแล้ว — ระบบเสียงที่ใช้จริงเก็บที่ /user_audio/{uid}/ ตามกฎข้อ 3
 
     // 5. ไฟล์งานทีม — ทีมงานเท่านั้น
     match /staff_submissions/{allPaths=**} {

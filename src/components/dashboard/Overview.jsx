@@ -48,7 +48,7 @@ export default function Overview({ authState, go, setView, onOpenQuran, onOpenSa
            setCounts(cachedOverviewCounts)
            setLoadingCounts(false)
         }
-      } catch (e) {
+      } catch {
          setLoadingCounts(false)
       }
       return
@@ -57,7 +57,11 @@ export default function Overview({ authState, go, setView, onOpenQuran, onOpenSa
     setLoadingCounts(true)
     
     inFlightOverviewPromise = Promise.all([
-      getCountFromServer(query(collection(db, "content_bookshelf"), where("uid", "==", userId), where("status", "!=", "finished"))),
+      // Counted as total-minus-finished rather than with where("status","!=","finished"),
+      // because a `!=` filter drops documents that have no `status` field at
+      // all — and the reading page counts those as "กำลังอ่าน". The two screens
+      // showed different numbers for the same shelf.
+      getCountFromServer(query(collection(db, "content_bookshelf"), where("uid", "==", userId))),
       getCountFromServer(query(collection(db, "content_bookshelf"), where("uid", "==", userId), where("status", "==", "finished"))),
       getCountFromServer(query(collection(db, "content_quran_bookmarks"), where("uid", "==", userId))),
       getCountFromServer(query(collection(db, "content_reading_sessions"), where("uid", "==", userId), where("verified", "==", true))),
@@ -65,15 +69,16 @@ export default function Overview({ authState, go, setView, onOpenQuran, onOpenSa
     
     try {
       const [
-        activeBooksSnap,
+        allBooksSnap,
         finishedBooksSnap,
         bookmarkSnap,
         sessionSnap,
       ] = await inFlightOverviewPromise
       
+      const finishedBooks = finishedBooksSnap.data().count
       const newCounts = {
-        activeBooks: activeBooksSnap.data().count,
-        finishedBooks: finishedBooksSnap.data().count,
+        activeBooks: Math.max(0, allBooksSnap.data().count - finishedBooks),
+        finishedBooks,
         bookmarkCount: bookmarkSnap.data().count,
         sessionCount: sessionSnap.data().count,
       }

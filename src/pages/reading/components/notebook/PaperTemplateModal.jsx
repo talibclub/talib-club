@@ -72,7 +72,11 @@ export default function PaperTemplateModal({ page, onClose, onApply }) {
         </div>
 
         <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={() => { if (!cur.src) onApply({ paperType: cur.paperType, paperColor: cur.paperColor }, true); }} disabled={!!cur.src} style={{ flex: 1, height: 42, borderRadius: 11, border: '1px solid #D1D5DB', background: 'white', color: cur.src ? '#D1D5DB' : '#4B5563', fontWeight: 600, cursor: cur.src ? 'default' : 'pointer', fontFamily: 'Kanit, sans-serif', fontSize: 13.5 }}>ใช้กับทุกหน้า</button>
+          {/* cur.paperType / cur.paperColor are undefined on a page that has
+              never had a template set, and this wrote those undefined values
+              onto every page in the notebook. Fall back to the same defaults
+              the swatches show as selected. */}
+          <button onClick={() => { if (!cur.src) onApply({ paperType: cur.paperType || 'blank', paperColor: cur.paperColor || 'white' }, true); }} disabled={!!cur.src} style={{ flex: 1, height: 42, borderRadius: 11, border: '1px solid #D1D5DB', background: 'white', color: cur.src ? '#D1D5DB' : '#4B5563', fontWeight: 600, cursor: cur.src ? 'default' : 'pointer', fontFamily: 'Kanit, sans-serif', fontSize: 13.5 }}>ใช้กับทุกหน้า</button>
           <button onClick={onClose} style={{ flex: 1, height: 42, borderRadius: 11, border: 'none', background: HW.accent, color: 'white', fontWeight: 600, cursor: 'pointer', fontFamily: 'Kanit, sans-serif', fontSize: 13.5 }}>ปิด</button>
         </div>
       </div>

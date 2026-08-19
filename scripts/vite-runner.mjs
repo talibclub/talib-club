@@ -1,21 +1,16 @@
-import react from "@vitejs/plugin-react"
 import { build, createServer, preview } from "vite"
-import path from "path"
+import fileConfig from "../vite.config.js"
 
 const command = process.argv[2] || "dev"
 
+// `configFile: false` plus a second copy of the settings inline meant
+// vite.config.js was never loaded by anything — editing it looked like it
+// worked and changed nothing. The config file is now the single source of
+// truth; configFile stays false only so Vite does not go looking for it again.
 const viteConfig = {
+  ...(typeof fileConfig === "function" ? fileConfig({ command, mode: command }) : fileConfig),
   configFile: false,
   root: process.cwd(),
-  plugins: [react()],
-  resolve: {
-    alias: {
-      "@": path.resolve(process.cwd(), "./src"),
-    },
-  },
-  build: {
-    chunkSizeWarningLimit: 800,
-  }
 }
 
 if (command === "build") {

@@ -160,6 +160,15 @@ import { storage, app } from "../../lib/firebase.js"
 import { compressImage } from "../../utils/image.js"
 import { triggerPushNotification } from "../../utils/pushNotifications.js"
 
+// EMPTY is evaluated once when the module loads, so a hardcoded date here was
+// the date the tab was opened — an admin who left the page open overnight filed
+// the next day's articles under yesterday. `date` is filled in by newArticle()
+// at the moment the form is actually opened.
+const todayBE = () => {
+  const d = new Date()
+  return `${d.getFullYear() + 543}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
+
 const EMPTY = {
   type: "general",
   seriesId: "",
@@ -169,7 +178,7 @@ const EMPTY = {
   category: "aqeedah",
   excerpt: "",
   author: "Talib Club",
-  date: `${new Date().getFullYear() + 543}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
+  date: "",
   tags: [],
   body: "",
   coverUrl: "",
@@ -195,9 +204,16 @@ export default function AdminArticles() {
     } catch { return null }
   })
 
+  // An article with a base64 cover pasted into it can exceed the localStorage
+  // quota on its own. setItem then throws, and an uncaught throw inside an
+  // effect takes the whole admin page down mid-edit — losing the draft this is
+  // meant to protect.
   useEffect(() => {
-    if (editing) {
+    if (!editing) return
+    try {
       localStorage.setItem("talib_article_draft", JSON.stringify(editing))
+    } catch (err) {
+      console.warn("Could not save the article draft locally", err)
     }
   }, [editing])
 
@@ -289,7 +305,7 @@ export default function AdminArticles() {
   }
 
   function openNew() {
-    setEdit({ ...EMPTY })
+    setEdit({ ...EMPTY, date: todayBE() })
   }
 
   function openEdit(article) {
@@ -329,7 +345,7 @@ export default function AdminArticles() {
       await deleteItem(article.id)
       setSelected(prev => prev.filter(id => id !== article.id))
       notifySuccess("ลบบทความเรียบร้อยแล้ว")
-    } catch (err) {
+    } catch {
       notifyError("ลบไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
     } finally {
       setBusy(false)
@@ -349,7 +365,7 @@ export default function AdminArticles() {
       } else {
         notifyError(`ลบสำเร็จ ${deleted} รายการ แต่ล้มเหลว ${failed} รายการ — กรุณาตรวจสิทธิ์ Firestore`)
       }
-    } catch (err) {
+    } catch {
       notifyError("เกิดข้อผิดพลาดในการลบข้อมูล")
     } finally {
       setBusy(false)
@@ -428,7 +444,7 @@ export default function AdminArticles() {
       } else {
         notifyError(`ส่งแจ้งเตือนล้มเหลว: ${result.error}`)
       }
-    } catch (err) {
+    } catch {
       notifyError("เกิดข้อผิดพลาดในการส่งแจ้งเตือน")
     } finally {
       setBusy(false)
@@ -787,7 +803,7 @@ const QuillPromptModal = ({ isOpen, type, onClose, onSubmit, initialData }) => {
   return createPortal(modalContent, document.body);
 }
 
-const CustomToolbar = React.memo(() => (
+const CustomToolbar = React.memo(function CustomToolbar() { return (
   <div id="admin-article-toolbar" className="ql-toolbar ql-snow">
     <span className="ql-formats">
       <select className="ql-header" defaultValue="">
@@ -844,7 +860,7 @@ const CustomToolbar = React.memo(() => (
       <button className="ql-insertPdf" data-title="แนบไฟล์ PDF" />
     </span>
   </div>
-), () => true);
+); }, () => true);
 
 function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articlesList }) {
   const set = (key, value) => setItem(prev => ({ ...prev, [key]: value }))
@@ -1008,7 +1024,7 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articles
           let nextNum = 1;
           const matches = content.match(/\[(\d+)\]/g);
           if (matches && matches.length > 0) {
-            const nums = matches.map(m => parseInt(m.replace(/[\[\]]/g, '')));
+            const nums = matches.map(m => parseInt(m.replace(/[[\]]/g, '')));
             nextNum = Math.max(...nums) + 1;
           }
 
@@ -1040,37 +1056,37 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articles
     const file = e.target.files?.[0]
     if (!file) return
 
-    console.log("Starting Article Image Upload: v4 Diagnostic Logger active.");
-    console.log("Original File Name:", file.name, "Size:", file.size, "Type:", file.type);
+    if (import.meta.env.DEV) console.log("Starting Article Image Upload: v4 Diagnostic Logger active.");
+    if (import.meta.env.DEV) console.log("Original File Name:", file.name, "Size:", file.size, "Type:", file.type);
     
     setUploadingImage(true)
     try {
-      console.log("Compressing image...");
+      if (import.meta.env.DEV) console.log("Compressing image...");
       const compressedFile = await compressImage(file, { maxWidth: 1000, maxHeight: 1000, quality: 0.75 })
-      console.log("Image compression complete. Output Name:", compressedFile.name, "Size:", compressedFile.size);
+      if (import.meta.env.DEV) console.log("Image compression complete. Output Name:", compressedFile.name, "Size:", compressedFile.size);
       
       const safeName = compressedFile.name.replace(/[^a-zA-Z0-9.-]/g, "_")
       const usedStorage = storage || getStorage(app)
       let storageRef = null
       try {
         storageRef = ref(usedStorage, `article_covers/${Date.now()}_${safeName}`)
-        console.log("Uploading bytes to Firebase Storage reference:", storageRef.fullPath);
+        if (import.meta.env.DEV) console.log("Uploading bytes to Firebase Storage reference:", storageRef.fullPath);
         await uploadBytes(storageRef, compressedFile)
       } catch (uploadErr) {
         console.error("Upload error (storageRef):", uploadErr?.code || "-", uploadErr?.message || uploadErr, "ref:", storageRef?.fullPath)
         throw uploadErr
       }
 
-      console.log("Firebase upload completed. Retrieving download URL...");
+      if (import.meta.env.DEV) console.log("Firebase upload completed. Retrieving download URL...");
       const url = await getDownloadURL(storageRef)
-      console.log("Success! Cover URL obtained:", url);
+      if (import.meta.env.DEV) console.log("Success! Cover URL obtained:", url);
       set("coverUrl", url)
       notifySuccess("อัปโหลดรูปภาพปกเรียบร้อยแล้ว")
     } catch (err) {
       console.error("Diagnostic error caught inside handleUploadImage:", err?.code || "-", err?.message || err)
       notifyError("อัปโหลดรูปภาพล้มเหลว")
     } finally {
-      console.log("Finally block executed. Setting uploadingImage back to false.");
+      if (import.meta.env.DEV) console.log("Finally block executed. Setting uploadingImage back to false.");
       setUploadingImage(false)
     }
   }

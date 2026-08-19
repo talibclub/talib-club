@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { collection, query, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp, updateDoc } from "firebase/firestore"
+import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp, updateDoc } from "firebase/firestore"
 import { toast } from "react-hot-toast"
 import { db } from "../../lib/firebase.js"
 import { triggerPushNotification } from "../../utils/pushNotifications.js"
@@ -18,10 +18,18 @@ export default function StaffCalendar({ currentUser, staffTeam, sendBotNotificat
   const [form, setForm] = useState({ title: "", assignee: currentUser, platforms: ["Facebook"] })
   const [editingId, setEditingId] = useState(null)
 
+  const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}`
+
   useEffect(() => {
-    // In a real app we might filter by month, but for a small team, loading all is fine
-    // or filter by date >= first day of month. Here we just load all to keep it simple.
-    const q = query(collection(db, "content_calendar"))
+    // This used to hold a live listener on the entire content_calendar
+    // collection for as long as the panel was open, and it grew forever — every
+    // post ever planned was streamed down to render one month. `date` is stored
+    // as "YYYY-MM-DD", so a range query over the month on screen is exact.
+    const q = query(
+      collection(db, "content_calendar"),
+      where("date", ">=", `${monthKey}-01`),
+      where("date", "<=", `${monthKey}-31`)
+    )
     const unsub = onSnapshot(q, (snap) => {
       setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)
@@ -30,7 +38,7 @@ export default function StaffCalendar({ currentUser, staffTeam, sendBotNotificat
       setLoading(false)
     })
     return () => unsub()
-  }, [])
+  }, [monthKey])
 
   const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()
   const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay()

@@ -122,7 +122,7 @@ export default function AdminMedia() {
       await saveItem(editing)
       setEdit(null)
       notifySuccess("บันทึกข้อมูลสื่อขึ้นเว็บไซต์เรียบร้อยแล้ว")
-    } catch (err) {
+    } catch {
       notifyError("บันทึกไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
     } finally {
       setBusy(false)
@@ -138,7 +138,7 @@ export default function AdminMedia() {
       await deleteItem(mediaItem.id)
       setSelected(prev => prev.filter(id => id !== mediaItem.id))
       notifySuccess("ลบเรียบร้อยแล้ว")
-    } catch (err) {
+    } catch {
       notifyError("ลบไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
     } finally {
       setBusy(false)
@@ -158,7 +158,7 @@ export default function AdminMedia() {
       } else {
         notifyError(`ลบสำเร็จ ${deleted} รายการ แต่ล้มเหลว ${failed} รายการ — กรุณาตรวจสิทธิ์ Firestore`)
       }
-    } catch (err) {
+    } catch {
       notifyError("เกิดข้อผิดพลาดในการลบข้อมูล")
     } finally {
       setBusy(false)

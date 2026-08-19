@@ -26,6 +26,13 @@ function send(res, status, data) {
 
 function parseBody(req) {
   if (!req.body) return {}
+  // Buffer case was missing here while every other endpoint handles it. When
+  // Vercel hands the body over as a Buffer this fell through to `return
+  // req.body` and the caller got a Buffer where it expected an object — so the
+  // quiz silently fell back to the generic questions instead of the book's.
+  if (Buffer.isBuffer(req.body)) {
+    try { return JSON.parse(req.body.toString("utf8")) } catch { return {} }
+  }
   if (typeof req.body === "string") {
     try {
       return JSON.parse(req.body)

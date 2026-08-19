@@ -4,6 +4,20 @@ import DOMPurify from "dompurify"
 import { useUserCollection } from "../../lib/contentStore.js"
 import { confirmAction } from "../../utils/feedback.jsx"
 
+// Shared across every row and every mount of the panel: the text of an ayah
+// does not change, so it is fetched once per session at most.
+// Firestore Timestamp, the optimistic-path number, or an ISO string.
+const toMillis = (v) => {
+  if (!v) return 0
+  if (typeof v.toMillis === "function") return v.toMillis()
+  if (typeof v.seconds === "number") return v.seconds * 1000
+  const n = typeof v === "number" ? v : Date.parse(v)
+  return Number.isFinite(n) ? n : 0
+}
+
+const verseCache = new Map()
+const inFlight = new Map()
+
 const VerseDisplay = ({ item }) => {
   const [data, setData] = useState({
     arabic: item.arabicText || "",
@@ -15,24 +29,44 @@ const VerseDisplay = ({ item }) => {
   useEffect(() => {
     let active = true
     if (!item.arabicText && active) {
-      // Fetch missing data
-      Promise.all([
-        fetch(`https://api.quran.com/api/v4/quran/verses/uthmani_tajweed?verse_key=${item.sura}:${item.aya}`).then(r => r.json()),
-        fetch(`https://api.quran.com/api/v4/quran/translations/155?verse_key=${item.sura}:${item.aya}`).then(r => r.json()),
-        fetch(`https://api.alquran.cloud/v1/ayah/${item.sura}:${item.aya}/th.thai`).then(r => r.json())
-      ])
-      .then(([tajweedRes, tafsirRes, translationRes]) => {
-        if (!active) return
-        const arabic = tajweedRes.verses?.[0]?.text_uthmani_tajweed || ""
-        const tafsir = tafsirRes.translations?.[0]?.text || ""
-        const translation = translationRes.data?.text || ""
-        
-        setData({ arabic, translation, tafsir })
+      const key = `${item.sura}:${item.aya}`
+      const cached = verseCache.get(key)
+      if (cached) {
+        setData(cached)
         setLoading(false)
-      })
-      .catch(() => {
-        if (active) setLoading(false)
-      })
+        return () => { active = false }
+      }
+      // Three network calls per saved verse with nothing in front of them: a
+      // member with 50 bookmarks fired 150 requests every time this panel
+      // opened, and the same three again on the next visit. One in-flight
+      // promise per verse, memoised for the session.
+      const pending = inFlight.get(key) || (() => {
+        const p = Promise.all([
+          fetch(`https://api.quran.com/api/v4/quran/verses/uthmani_tajweed?verse_key=${key}`).then(r => r.json()),
+          fetch(`https://api.quran.com/api/v4/quran/translations/155?verse_key=${key}`).then(r => r.json()),
+          fetch(`https://api.alquran.cloud/v1/ayah/${key}/th.thai`).then(r => r.json())
+        ]).then(([tajweedRes, tafsirRes, translationRes]) => {
+          const next = {
+            arabic: tajweedRes.verses?.[0]?.text_uthmani_tajweed || "",
+            tafsir: tafsirRes.translations?.[0]?.text || "",
+            translation: translationRes.data?.text || "",
+          }
+          verseCache.set(key, next)
+          return next
+        }).finally(() => inFlight.delete(key))
+        inFlight.set(key, p)
+        return p
+      })()
+
+      pending
+        .then((next) => {
+          if (!active) return
+          setData(next)
+          setLoading(false)
+        })
+        .catch(() => {
+          if (active) setLoading(false)
+        })
     }
     return () => { active = false }
   }, [item])
@@ -82,7 +116,10 @@ export default function SavedVersesPanel({ authState, go, setView, setQuranSura,
 
   const userSaved = useMemo(() => {
     if (!uid) return [];
-    return savedVerses.filter(v => v.uid === uid).sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+    // `updatedAt` comes back from Firestore as a Timestamp, not a date string.
+    // new Date(Timestamp) is an Invalid Date, so every comparison was NaN and
+    // the list was left in whatever order it arrived in.
+    return savedVerses.filter(v => v.uid === uid).sort((a, b) => toMillis(b.updatedAt) - toMillis(a.updatedAt));
   }, [savedVerses, uid]);
 
   const filteredSaved = useMemo(() => {
@@ -117,7 +154,7 @@ export default function SavedVersesPanel({ authState, go, setView, setQuranSura,
       });
       toast.success("บันทึกข้อคิดเรียบร้อยแล้ว", { id: toastId });
       setEditingId(null);
-    } catch (err) {
+    } catch {
       toast.error("ไม่สามารถบันทึกได้", { id: toastId });
     }
   };
@@ -134,7 +171,7 @@ export default function SavedVersesPanel({ authState, go, setView, setQuranSura,
       try {
         await deleteItem(id);
         toast.success("ลบรายการแล้ว", { id: toastId });
-      } catch (err) {
+      } catch {
         toast.error("ลบไม่สำเร็จ", { id: toastId });
       }
     }

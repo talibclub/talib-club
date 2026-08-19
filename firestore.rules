@@ -29,7 +29,14 @@ service cloud.firestore {
     }
 
     function ownsExistingDocument() {
-      return signedIn() && (resource == null || resource.data.get('uid', request.auth.uid) == request.auth.uid);
+      // `resource.data.get('uid', request.auth.uid)` defaulted a MISSING uid
+      // field to the caller's own uid, so any document that happened to have no
+      // uid could be updated or deleted by any signed-in user — on collections
+      // whose read rule they could not even pass. `resource == null` was dead
+      // too: update and delete only ever run on a document that exists.
+      // Every create rule here already forces uid == request.auth.uid, so a
+      // document without one was never made through the app.
+      return signedIn() && resource != null && resource.data.uid == request.auth.uid;
     }
 
     function keepsOwnership() {
@@ -63,19 +70,46 @@ service cloud.firestore {
     }
 
     // --- Public Content Collections ---
+
+    // Engagement counters (views / downloads / shares) are bumped from the
+    // browser by utils/contentMetrics.js on a plain visitor's page view. The
+    // old `allow write: if isStaff()` denied every one of those writes, so the
+    // numbers only ever moved when a staff member happened to open the page —
+    // and every other visitor got a permission error in the console.
+    //
+    // Rather than opening the documents up, the rule proves the exact shape of
+    // an increment(1): one counter field touched, and its new value is exactly
+    // the old value plus one. A visitor can therefore add one to a counter and
+    // nothing else — they cannot edit the article, and cannot set a counter to
+    // an arbitrary total. Guests are allowed for the same reason site_visits
+    // allows them: most reads of a public article are not signed in.
+    function bumpsCounter(field) {
+      return resource != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([field])
+        && request.resource.data[field] is int
+        && request.resource.data[field] == resource.data.get(field, 0) + 1;
+    }
+
+    function isCounterBump() {
+      return bumpsCounter('views') || bumpsCounter('downloads') || bumpsCounter('shares');
+    }
+
     match /content_articles/{docId} {
       allow read: if true;
-      allow write: if isStaff();
+      allow update: if isStaff() || isCounterBump();
+      allow create, delete: if isStaff();
     }
 
     match /content_books/{docId} {
       allow read: if true;
-      allow write: if isStaff();
+      allow update: if isStaff() || isCounterBump();
+      allow create, delete: if isStaff();
     }
 
     match /content_media/{docId} {
       allow read: if true;
-      allow write: if isStaff();
+      allow update: if isStaff() || isCounterBump();
+      allow create, delete: if isStaff();
     }
 
     match /content_scholars/{docId} {
@@ -121,6 +155,26 @@ service cloud.firestore {
       allow read: if signedIn() && (docId == request.auth.uid || isStaff());
       allow create, update: if signedIn() && docId == request.auth.uid && request.resource.data.uid == request.auth.uid;
       allow delete: if signedIn() && docId == request.auth.uid;
+    }
+
+    // Public half of a member's streak, mirrored from content_reading_streaks so
+    // LeaderboardPanel has something it is actually allowed to list. The streaks
+    // document itself must stay owner-only — it also carries gems, freeze/leave
+    // credits and claimedMissions — so the leaderboard's
+    // `orderBy(streakCount).limit(10)` query was rejected for every member and
+    // the board rendered empty (staff saw it work, which is why it looked fine).
+    // Only the three numbers the board prints live here, and each member may
+    // write only their own row.
+    match /leaderboard/{userId} {
+      allow read: if signedIn();
+      allow create, update: if isSignedInUser(userId)
+        && request.resource.data.keys().hasOnly(["uid", "displayName", "streakCount", "bestStreak", "updatedAt"])
+        && request.resource.data.uid == userId
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 120
+        && request.resource.data.streakCount is int
+        && request.resource.data.bestStreak is int;
+      allow delete: if isSignedInUser(userId) || isAdmin();
     }
 
     match /content_quran_bookmarks/{docId} {

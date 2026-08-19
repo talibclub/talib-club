@@ -224,6 +224,14 @@ export default function ArticleDetail({ item, go, authState }) {
       await navigator.clipboard.writeText(window.location.href)
       toast.success("คัดลอกลิงก์สำหรับแชร์แล้ว")
       if (displayItem) bumpContentMetric("articles", displayItem.id, "shares")
+      // The "ผู้ส่งต่อความรู้" achievement on the member dashboard reads this
+      // counter, but nothing had ever written it — so the badge could never
+      // unlock for anybody. Kept in localStorage (not Firestore) because the
+      // dashboard reads it synchronously and it is a per-device tally.
+      try {
+        const next = Number(localStorage.getItem("talib_shared_articles_count") || 0) + 1
+        localStorage.setItem("talib_shared_articles_count", String(next))
+      } catch { /* private mode: the badge just stays locked */ }
     } catch {
       toast.error("คัดลอกลิงก์ไม่สำเร็จ กรุณาคัดลอกจากแถบที่อยู่ด้วยตนเอง")
     }
@@ -501,7 +509,7 @@ export default function ArticleDetail({ item, go, authState }) {
             const url = new URL(href, window.location.origin);
             sura = url.searchParams.get('sura');
             ayah = url.searchParams.get('ayah');
-          } catch (err) {
+          } catch {
             // ignore
           }
         }

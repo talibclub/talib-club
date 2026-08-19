@@ -83,7 +83,21 @@ async function getDocOrPredecessor(collection, id) {
 // documents to render a link list would drag every article body across the
 // wire, and the list pages are the ones that most need to stay fast enough
 // that a crawler does not give up on them.
+// Rendering a single article page calls listDocs('content_articles') just to
+// pick six related links — and that pages through up to 4 x 300 = 1,200
+// documents. The CDN caches the finished HTML for an hour, but a crawler works
+// through hundreds of distinct URLs, and every one of them was a cold render
+// paying the full 1,200 reads. Serverless instances are reused between
+// invocations, so a short in-process memo collapses a whole crawl burst onto
+// one fetch per collection.
+const listCache = new Map();
+const LIST_CACHE_TTL_MS = 60 * 1000;
+
 async function listDocs(collection, fields) {
+  const cacheKey = `${collection}:${fields.join(',')}`;
+  const cached = listCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < LIST_CACHE_TTL_MS) return cached.items;
+
   const items = [];
   let pageToken = '';
 
@@ -103,6 +117,7 @@ async function listDocs(collection, fields) {
     if (!pageToken) break;
   }
 
+  listCache.set(cacheKey, { items, at: Date.now() });
   return items;
 }
 

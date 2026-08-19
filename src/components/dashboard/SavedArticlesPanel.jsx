@@ -72,7 +72,7 @@ export default function SavedArticlesPanel({ authState, go, setView }) {
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(a =>
-        a.title.toLowerCase().includes(q) ||
+        (a.title || "").toLowerCase().includes(q) ||
         (a.excerpt && a.excerpt.toLowerCase().includes(q)) ||
         (a.author && a.author.toLowerCase().includes(q)) ||
         (a.tags && a.tags.some(t => t.toLowerCase().includes(q)))

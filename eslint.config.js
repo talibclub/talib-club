@@ -20,6 +20,8 @@ const browserGlobals = {
   confirm: "readonly",
   btoa: "readonly",
   atob: "readonly",
+  TextEncoder: "readonly",
+  TextDecoder: "readonly",
   setTimeout: "readonly",
   clearTimeout: "readonly",
   setInterval: "readonly",

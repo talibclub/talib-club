@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Stage, Layer, Image as KonvaImage, Path, Group, Circle, Text, Rect, Transformer, RegularPolygon, Line, Star as KonvaStar, Arrow as KonvaArrow } from 'react-konva';
-import Draggable from 'react-draggable';
-import { PenTool, Highlighter, Eraser, Pen, MousePointer2, Type, Square, Hand, Search, Save, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, GripHorizontal, GripVertical, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, FileStack, LayoutList, Check, Lock, MousePointerClick, Move3d, Triangle, Cloud, CheckCircle, Trash2, Scissors, Crop, Brush, Feather, Maximize2, Ruler, PanelLeftClose, PanelLeftOpen, Wand2, Camera, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Underline, Strikethrough, Smile, Upload, ChevronsUp, ChevronsDown, ListMusic, X, ArrowRight, Star, Hexagon, Compass, Link2, ScanText, Spline } from 'lucide-react';
+import { Stage, Layer, Path, Group, Circle, Text, Rect, Transformer, RegularPolygon, Line, Star as KonvaStar, Arrow as KonvaArrow } from 'react-konva';
+import { PenTool, Highlighter, Eraser, Type, Square, Search, Download, Undo2, Redo2, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Settings, FilePlus, Circle as CircleIcon, Minus, Lasso, MonitorPlay, Zap, Pencil, Pointer, LayoutGrid, Plus, Columns, StickyNote, FileText, Bookmark, Check, Triangle, Cloud, CheckCircle, Trash2, Scissors, Brush, Feather, Maximize2, Ruler, PanelLeftClose, PanelLeftOpen, Wand2, Camera, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Underline, Strikethrough, Smile, ListMusic, X, ArrowRight, Star, Hexagon, Compass, Link2, Spline } from 'lucide-react';
 import CropModal from './CropModal';
 import ColorPickerPanel from './ColorPickerPanel';
 import BookSnipModal from './BookSnipModal';
 import EmojiStickerPicker from './EmojiStickerPicker';
 import { RecordingsPanel, PlaybackBar } from './AudioRecordings';
 import { recognizeShape, shapeFromRecognition, pointInPolygon, distToSegmentXY } from '../utils/shapeRecognition.js';
+import { confirmAction } from '../../../utils/feedback.jsx';
 import getStroke from 'perfect-freehand';
 import toast from 'react-hot-toast';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -32,6 +32,69 @@ import ExportModal from './notebook/ExportModal.jsx';
 import AiAssistantPanel from './notebook/AiAssistantPanel.jsx';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
+// Photos off a phone are 3-8 MB, and base64 makes a copy about a third bigger
+// again. Every picture is stored inline in the page JSON, so two or three of
+// them made the notebook slow to upload and blew straight past the localStorage
+// backup quota — the fallback that is supposed to save the work when the cloud
+// save fails. Downscale and re-encode before an image ever enters a page.
+// Two images inserted in the same millisecond — a multi-page PDF import, or a
+// quick drag of several files — used to land with identical ids, which made
+// selection and delete hit the wrong picture.
+// Every notebook was written with coverColor: 'red' on every save, so the
+// gallery was a wall of identical red covers. Derived from the notebook id so
+// it is stable across sessions and devices without needing to be read back.
+export const NOTEBOOK_COVERS = ['red', 'teal', 'indigo', 'amber', 'plum', 'forest'];
+function pickCoverColor(notebookId) {
+  const key = String(notebookId || '');
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (Math.imul(h, 31) + key.charCodeAt(i)) >>> 0;
+  return NOTEBOOK_COVERS[h % NOTEBOOK_COVERS.length];
+}
+
+let strokeIdSeq = 0;
+const nextStrokeId = () => `s-${Date.now().toString(36)}-${++strokeIdSeq}`;
+
+let imageIdSeq = 0;
+const nextImageId = () => `img-${Date.now()}-${++imageIdSeq}`;
+
+const MAX_IMAGE_DIM = 1600;
+const IMAGE_PASSTHROUGH_BYTES = 700 * 1024;
+
+const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
+  const fr = new FileReader();
+  fr.onload = () => resolve(fr.result);
+  fr.onerror = reject;
+  fr.readAsDataURL(file);
+});
+
+async function compressImageFile(file) {
+  const original = await readFileAsDataUrl(file);
+  // A GIF would lose its animation and an SVG is already small and lossless.
+  if (/^image\/(gif|svg\+xml)$/.test(file.type || '')) return original;
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = reject;
+      el.src = original;
+    });
+    const scale = Math.min(1, MAX_IMAGE_DIM / Math.max(img.width, img.height));
+    if (scale === 1 && original.length < IMAGE_PASSTHROUGH_BYTES) return original;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(img.width * scale));
+    canvas.height = Math.max(1, Math.round(img.height * scale));
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    // webp keeps transparency; a PNG screenshot re-encoded as JPEG would come
+    // back with a black background.
+    let out = canvas.toDataURL('image/webp', 0.85);
+    if (!out.startsWith('data:image/webp')) out = canvas.toDataURL('image/jpeg', 0.85);
+    return out.length < original.length ? out : original;
+  } catch (err) {
+    console.warn('Image compression failed, inserting the original', err);
+    return original;
+  }
+}
 
 // Tools whose options popover opens with the tool.
 const TOOLS_WITH_OPTIONS = ['pen', 'fountain', 'marker', 'pencil', 'highlighter', 'shape', 'sticker', 'eraser', 'text', 'laser', 'lasso'];
@@ -126,14 +189,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      } else {
         const saved = localStorage.getItem(`talib_notebook_${notebookId}`);
         if (saved) {
-           try { setPages(JSON.parse(saved)); } catch (e) {}
+           try { setPages(JSON.parse(saved)); } catch { /* ignore */ }
         }
         loadStateRef.current = 'ready';
      }
   }, [notebookId, uid]);
   
   const [loadingPdf, setLoadingPdf] = useState(false);
-  const [showModeSelection, setShowModeSelection] = useState(false);
   
   const [tool, setTool] = useState('pen'); // 'pen', 'pencil', 'highlighter', 'eraser', 'pan', 'text', 'laser', 'shape', 'lasso'
   const [shapeType, setShapeType] = useState('rect'); // 'rect', 'circle', 'line'
@@ -325,6 +387,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const [imgQuery, setImgQuery] = useState("");
   const [imgResults, setImgResults] = useState([]);
   const [imgLoading, setImgLoading] = useState(false);
+  const imgSearchRunRef = useRef(0);
   // Kind of picture wanted: '' (anything), photo, clipart, transparent, gif.
   // Only the DuckDuckGo proxy understands these, so a filtered search queries it
   // alone rather than padding the grid with unfiltered results from elsewhere.
@@ -336,6 +399,12 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // Wikimedia Commons adds broader media, and Openverse covers stickers/clip-art.
   const searchWebImages = async (q, filter = imgFilter) => {
      if (!q.trim()) return;
+     // Six sources are raced per search and each one pushes into the shared
+     // results as it lands. Without a run id, a slow source from the previous
+     // query kept appending to — and then overwriting — the results of the
+     // query after it.
+     const runId = ++imgSearchRunRef.current;
+     const isStale = () => runId !== imgSearchRunRef.current;
      setImgLoading(true);
      setImgResults([]);
      const merged = [];
@@ -344,8 +413,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
      // Pasting a direct image link should just work instead of being searched for.
      if (/^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg)(\?\S*)?$/i.test(q.trim())) {
-        setImgResults([{ id: 'pasted', title: 'ลิงก์ที่วาง', thumbnail: q.trim(), url: q.trim(), source: 'ลิงก์', license: 'ตรวจสอบเอง' }]);
-        setImgLoading(false);
+        if (!isStale()) {
+           setImgResults([{ id: 'pasted', title: 'ลิงก์ที่วาง', thumbnail: q.trim(), url: q.trim(), source: 'ลิงก์', license: 'ตรวจสอบเอง' }]);
+           setImgLoading(false);
+        }
         return;
      }
 
@@ -354,11 +425,18 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      // and we fall through to the keyless sources below — no error shown.
      const google = (async () => {
         try {
-           // Fallback for local development using Vite variables if available
-           const localKey = import.meta.env.VITE_GOOGLE_CSE_KEY;
-           const localCx = import.meta.env.VITE_GOOGLE_CSE_CX;
-           
-           if (import.meta.env.DEV && localKey && localCx) {
+           // Fallback for local development using Vite variables if available.
+           //
+           // The two env reads MUST stay inside the `import.meta.env.DEV` block.
+           // When they sat outside it, Vite inlined the key as a plain string and
+           // Rollup kept that const alive even though the branch was dead — so the
+           // Google CSE key shipped inside dist/assets/ProNotebook-*.js and anyone
+           // could lift it out of the deployed bundle and burn the quota. Inside
+           // the guard, `DEV` becomes `false` at build time and the whole block
+           // (key included) is eliminated from the production output.
+           if (import.meta.env.DEV && import.meta.env.VITE_GOOGLE_CSE_KEY && import.meta.env.VITE_GOOGLE_CSE_CX) {
+              const localKey = import.meta.env.VITE_GOOGLE_CSE_KEY;
+              const localCx = import.meta.env.VITE_GOOGLE_CSE_CX;
               const start = 1;
               const api = new URL('https://www.googleapis.com/customsearch/v1');
               api.searchParams.set('key', localKey);
@@ -412,7 +490,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               id: `wp-${lang}-${p.pageid}`, title: p.title, thumbnail: p.thumbnail.source, url: p.thumbnail.source,
               width: p.thumbnail.width, height: p.thumbnail.height, source: 'Wikipedia', license: 'สาธารณะ/CC'
            }));
-        } catch (_) { /* one source failing shouldn't sink the search */ }
+        } catch { /* one source failing shouldn't sink the search */ }
      })();
 
      const commons = (async () => {
@@ -427,7 +505,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                  license: ii.extmetadata?.LicenseShortName?.value || 'CC', creator: ii.extmetadata?.Artist?.value?.replace(/<[^>]+>/g, '')
               });
            });
-        } catch (_) { /* ignore */ }
+        } catch { /* ignore */ }
      })();
 
      const openverse = (async () => {
@@ -438,43 +516,27 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               id: `ov-${im.id}`, title: im.title, thumbnail: im.thumbnail || im.url, url: im.url,
               width: im.width, height: im.height, source: 'Openverse', license: im.license, creator: im.creator
            }));
-        } catch (_) { /* ignore */ }
+        } catch { /* ignore */ }
      })();
 
-     const ddgClient = (async () => {
-        try {
-           const htmlUrl = `https://duckduckgo.com/?q=${encodeURIComponent(q)}&iax=images&ia=images`;
-           const htmlRes = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(htmlUrl)}`);
-           if (!htmlRes.ok) return;
-           const html = await htmlRes.text();
-           const m = html.match(/vqd="([^"]+)"/) || html.match(/vqd=([\d-]+)&/);
-           if (!m) return;
-           const vqd = m[1];
-           
-           const fStr = ['', '', '', filter === 'clipart' ? 'type:clipart' : filter === 'transparent' ? 'type:transparent' : filter === 'photo' ? 'type:photo' : '', '', ''].join(',');
-           const imgUrl = `https://duckduckgo.com/i.js?l=us-en&o=json&q=${encodeURIComponent(q)}&vqd=${vqd}&f=${encodeURIComponent(fStr)}&p=1`;
-           const imgRes = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(imgUrl)}`);
-           if (!imgRes.ok) return;
-           const data = await imgRes.json();
-           
-           (data.results || []).forEach((it, i) => add({
-              id: `ddg-c-${i}`, title: it.title, thumbnail: it.thumbnail || it.image, url: it.image,
-              width: it.width, height: it.height, source: 'DuckDuckGo', license: 'เว็บ', context: it.url
-           }));
-        } catch (e) { console.error(e) }
-     })();
+     // The DuckDuckGo path used to run here in the browser, routing every member's
+     // search term through corsproxy.io — an unrelated third party — before it
+     // ever reached DDG. /api/image-search already queries DuckDuckGo
+     // server-side as a fallback behind Pixabay, so those results are still
+     // reachable without handing anyone's queries to a stranger.
 
      try {
-        const sources = [google, ddgClient, commons, openverse, wikiArticles('th'), wikiArticles('en')];
-        sources.forEach((p) => p.then(() => setImgResults([...merged])));
+        const sources = [google, commons, openverse, wikiArticles('th'), wikiArticles('en')];
+        sources.forEach((p) => p.then(() => { if (!isStale()) setImgResults([...merged]); }));
         await Promise.allSettled(sources);
+        if (isStale()) return;
         setImgResults([...merged]);
         if (!merged.length) toast('ไม่พบรูปภาพที่ค้นหา — ลองคำอื่น หรือเปลี่ยนตัวกรอง');
      } catch (e) {
         console.error('Image search failed', e);
-        toast.error('ค้นหารูปไม่สำเร็จ (ตรวจสอบอินเทอร์เน็ต)');
+        if (!isStale()) toast.error('ค้นหารูปไม่สำเร็จ (ตรวจสอบอินเทอร์เน็ต)');
      } finally {
-        setImgLoading(false);
+        if (!isStale()) setImgLoading(false);
      }
   };
 
@@ -493,14 +555,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               fr.onerror = reject;
               fr.readAsDataURL(blob);
            });
-        } catch (_) { /* CORS-blocked: fall back to referencing the remote URL */ }
+        } catch { /* CORS-blocked: fall back to referencing the remote URL */ }
         const ratio = item.width && item.height ? item.height / item.width : 1;
         const w = 260;
         const h = Math.round(w * (ratio || 1));
         pushHistory();
         updatePage(currentPageIndex, (page) => {
            if (!page.images) page.images = [];
-           page.images.push({ id: `img-${Date.now()}`, src, x: 120, y: 120, width: w, height: h });
+           page.images.push({ id: nextImageId(), src, x: 120, y: 120, width: w, height: h });
         });
         toast.success('แทรกรูปแล้ว', { id: 'web-img' });
         setShowImgSearch(false);
@@ -513,10 +575,23 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const searchResults = React.useMemo(() => {
      if (!searchQuery.trim()) return [];
      const results = [];
+     const needle = searchQuery.toLowerCase();
      pages.forEach((p, i) => {
+        // Text objects edited through TextEditor store their content as a
+        // `lines` array; only the legacy shape has a flat `text`. Reading
+        // `t.text` alone meant search never found anything that had been edited
+        // — and threw outright on any object that had. textOf() handles both.
         p.texts?.forEach(t => {
-           if (t.text.toLowerCase().includes(searchQuery.toLowerCase())) {
-              results.push({ pageIndex: i, text: t.text, id: t.id });
+           const body = textOf(t);
+           if (body && body.toLowerCase().includes(needle)) {
+              results.push({ pageIndex: i, text: body, id: t.id });
+           }
+        });
+        // Sticky notes carry text too and were never searched at all.
+        p.stickers?.forEach(st => {
+           const body = st?.text || '';
+           if (body.toLowerCase().includes(needle)) {
+              results.push({ pageIndex: i, text: body, id: st.id });
            }
         });
      });
@@ -561,16 +636,19 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // browsers, so an in-app picker panel replaces it; picked colours are kept as
   // reusable swatches.
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showLassoPalette, setShowLassoPalette] = useState(false);
   const [customColors, setCustomColors] = useState(() => {
     try { return JSON.parse(localStorage.getItem('talib_custom_colors')) || []; } catch { return []; }
   });
   const rememberCustomColor = (c) => {
-    setCustomColors((prev) => {
-      const next = [c, ...prev.filter((x) => x.toLowerCase() !== c.toLowerCase())].slice(0, 8);
-      localStorage.setItem('talib_custom_colors', JSON.stringify(next));
-      return next;
-    });
+    setCustomColors((prev) => [c, ...prev.filter((x) => x.toLowerCase() !== c.toLowerCase())].slice(0, 8));
   };
+  // The localStorage write used to live inside the setState updater above.
+  // React may call an updater more than once for the same update (and does in
+  // StrictMode), so persisting belongs in an effect, not in the reducer.
+  useEffect(() => {
+    try { localStorage.setItem('talib_custom_colors', JSON.stringify(customColors)); } catch (e) { console.warn(e); }
+  }, [customColors]);
   // Live colour changes flow into the text being edited/selected too, so the
   // picker behaves the same as tapping a preset swatch while on the text tool.
   const applyColorToActiveText = (c) => {
@@ -798,7 +876,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       if (pagesRef.current && pagesRef.current.length > 0) {
         uploadNotebookData(uid, notebookId, pagesRef.current).catch(console.error);
         writeNotebookMeta().catch(console.error);
-        try { localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pagesRef.current)); } catch(e){}
+        try { localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pagesRef.current)); } catch { /* ignore */ }
       }
     };
   }, [readonly, uid, notebookId]);
@@ -809,7 +887,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     const flush = () => {
       if (readonly || loadStateRef.current !== 'ready') return;
       if (pagesRef.current && pagesRef.current.length > 0) {
-        try { localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pagesRef.current)); } catch(e){}
+        try { localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pagesRef.current)); } catch { /* ignore */ }
       }
     };
     window.addEventListener('beforeunload', flush);
@@ -825,19 +903,29 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // Audio Recording State
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
+  // Held so the microphone can be released even when onstop never runs — the
+  // user navigating away mid-recording used to leave the mic light on until the
+  // tab was closed.
+  const mediaStreamRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingStartTimeRef = useRef(null);
   const recordingIdRef = useRef(null);
   const [playbackTime, setPlaybackTime] = useState(Number.MAX_SAFE_INTEGER);
   const animationRef = useRef(null);
   
+  // playbackTime feeds CommittedStrokes, which re-renders every stroke on the
+  // page when it changes. audioProgress ticks about four times a second, so the
+  // whole canvas used to be rebuilt at that rate for the entire length of a
+  // recording. Quantising to a quarter second keeps the reveal looking the same
+  // while collapsing most of those updates, and React bails out when the value
+  // is unchanged.
   useEffect(() => {
     if (nowPlaying) {
-      setPlaybackTime(audioProgress.current);
+      setPlaybackTime(Math.floor(audioProgress.current * 4) / 4);
     } else {
       setPlaybackTime(Number.MAX_SAFE_INTEGER);
     }
-  }, [nowPlaying, audioProgress.current]);
+  }, [nowPlaying, audioProgress]);
   
   const isDrawing = useRef(false);
   // The stroke currently under the pointer. Kept out of `pages` so that only the
@@ -891,8 +979,21 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     setPosition({ x: 0, y: 40 });
   }, [dimensions.width, dimensions.height, currentPageIndex, isMobile]);
 
-  // Auto-fit on mount, on resize, and when moving to another page.
-  useEffect(() => { fitToScreen(); }, [fitToScreen, readonly]);
+  // Auto-fit on mount, on a real resize, and when moving to another page.
+  //
+  // This used to depend on `dimensions` as a whole, which includes the height.
+  // On a phone the address bar collapsing as you scroll changes only the height
+  // — so the zoom and pan reset themselves in the middle of writing. Refit on
+  // width (rotation, window resize) and on page change only.
+  const lastFitRef = useRef({ w: 0, page: -1 });
+  useEffect(() => {
+    if (dimensions.width <= 0 || dimensions.height <= 0) return;
+    const w = Math.round(dimensions.width);
+    if (lastFitRef.current.w === w && lastFitRef.current.page === currentPageIndex) return;
+    lastFitRef.current = { w, page: currentPageIndex };
+    fitToScreen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dimensions.width, currentPageIndex, readonly]);
 
   // Update a specific page's data safely
   const updatePage = (index, updater) => {
@@ -906,7 +1007,25 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   };
 
   const startLoadingPDF = async (pdfUrl = null) => {
-    setShowModeSelection(false);
+    // Importing a PDF REPLACES every page in the notebook. That used to happen
+    // with no warning and no undo entry, so one tap on "นำเข้า PDF" could wipe a
+    // notebook full of handwriting for good. Ask first when there is anything to
+    // lose, and push a history snapshot so Undo can bring it back.
+    const hasWork = pagesRef.current.some(p =>
+      (p.lines?.length || 0) + (p.texts?.length || 0) + (p.images?.length || 0) +
+      (p.shapes?.length || 0) + (p.stickers?.length || 0) > 0
+    );
+    if (hasWork) {
+      const ok = await confirmAction({
+        title: "นำเข้า PDF ทับสมุดเล่มนี้?",
+        message: `สมุดโน้ตปัจจุบันมี ${pagesRef.current.length} หน้าที่มีงานอยู่ การนำเข้า PDF จะแทนที่ทุกหน้าทั้งหมด (กด Undo เพื่อเรียกคืนได้)`,
+        confirmText: "นำเข้าและแทนที่",
+        danger: true,
+      });
+      if (!ok) return;
+      pushHistory();
+    }
+
     setLoadingPdf(true);
     
     try {
@@ -916,7 +1035,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       const pdf = pdfUrl
         ? await pdfjsLib.getDocument({ url: pdfUrl }).promise
         : await loadBookPdf(activeBook.book.fileUrl);
-      const numPages = Math.min(pdf.numPages, 30);
+      const MAX_IMPORT_PAGES = 30;
+      const numPages = Math.min(pdf.numPages, MAX_IMPORT_PAGES);
+      // Say so rather than silently dropping the rest — a 200-page book used to
+      // come in as 30 pages with nothing to explain where the others went.
+      if (pdf.numPages > MAX_IMPORT_PAGES) {
+        toast(`ไฟล์นี้มี ${pdf.numPages} หน้า — นำเข้าได้สูงสุด ${MAX_IMPORT_PAGES} หน้าแรก`, { icon: 'ℹ️', duration: 5000 });
+      }
 
       toast.loading(`กำลังแยกหน้า PDF (0/${numPages})...`, { id: 'pdf-load' });
 
@@ -987,6 +1112,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       toast.error(`โหลด PDF ไม่สำเร็จ จะใช้เป็นกระดานเปล่าแทน${why ? `\n(${why})` : ''}`, { id: 'pdf-load', duration: 7000 });
     } finally {
       setLoadingPdf(false);
+      // The blob URL minted by the file picker was never released, so every
+      // imported PDF pinned its whole file in memory for the life of the tab.
+      if (pdfUrl && pdfUrl.startsWith('blob:')) URL.revokeObjectURL(pdfUrl);
     }
   };
 
@@ -1011,6 +1139,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     e.target.value = null;
   };
 
+  // Leaving the notebook while the recorder is running skips onstop entirely,
+  // so the microphone has to be released here as well.
+  useEffect(() => () => {
+    try { mediaRecorderRef.current?.state === 'recording' && mediaRecorderRef.current.stop(); } catch (e) { console.warn(e); }
+    mediaStreamRef.current?.getTracks().forEach(track => track.stop());
+    mediaStreamRef.current = null;
+  }, []);
+
   const toggleRecording = async () => {
     if (isRecording) {
       if (mediaRecorderRef.current) mediaRecorderRef.current.stop();
@@ -1020,6 +1156,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const mediaRecorder = new MediaRecorder(stream);
         mediaRecorderRef.current = mediaRecorder;
+        mediaStreamRef.current = stream;
         audioChunksRef.current = [];
         
         mediaRecorder.ondataavailable = (e) => {
@@ -1033,6 +1170,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         recordingStartTimeRef.current = Date.now();
         
         mediaRecorder.onstop = async () => {
+          // Release the mic first. It used to be released only after the upload
+          // finished, so a slow or failed upload held the microphone open — and
+          // anything that threw in between never released it at all.
+          stream.getTracks().forEach(track => track.stop());
+          mediaStreamRef.current = null;
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
           const localUrl = URL.createObjectURL(audioBlob);
           
@@ -1080,8 +1222,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                 if (s) s.isUploading = false;
              });
           }
-          
-          stream.getTracks().forEach(track => track.stop());
         };
         
         mediaRecorder.start();
@@ -1182,12 +1322,16 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // gallery's "updated at" always tracks the real content.
   const writeNotebookMeta = () => {
      const metadataRef = doc(db, 'content_notebooks', `${uid}_${notebookId}`);
+     // coverColor used to be hardcoded to 'red' and written on every single
+     // save, so the gallery showed every notebook with the same red cover and
+     // any colour set elsewhere was overwritten within seconds. Only seed it
+     // when the document does not have one yet.
      return setDoc(metadataRef, {
         uid,
         bookId: notebookId,
         title: activeBook?.book?.title || 'สมุดโน้ต',
         updatedAt: serverTimestamp(),
-        coverColor: 'red',
+        coverColor: pickCoverColor(notebookId),
      }, { merge: true });
   };
 
@@ -1492,11 +1636,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
            if (textareaRef.current) textareaRef.current.blur();
            return; // Prevent spawning a new text box when just clicking outside to finish typing
        }
-       if (hitExistingObject) {
-           toast.error("โดนออบเจ็กต์เดิม! (hitExistingObject=true)");
-           return;
-       }
-       toast.success("กำลังสร้างกล่องข้อความบนกระดาษ...");
+       // Landing on an existing object means "edit that one", handled by the
+       // object's own tap handler — just don't also drop a new box underneath.
+       if (hitExistingObject) return;
        const newText = {
           id: `text-${Date.now()}`, text: '', x: pos.x, y: pos.y, color: penColor,
           size: textStyle.fontSize,
@@ -1700,6 +1842,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     }
 
     const stroke = {
+      // Strokes were rendered with key={index}. Erasing one in the middle of a
+      // page shifted every later index, so React re-created the whole list
+      // instead of removing one node.
+      id: nextStrokeId(),
       tool: strokeTool,
       color: penColor,
       size: strokeTool === 'eraser' ? eraserSettings.size : penSize,
@@ -1842,7 +1988,21 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       if (kind === 'shapes') return { minX: Math.min(o.x1, o.x2), minY: Math.min(o.y1, o.y2), maxX: Math.max(o.x1, o.x2), maxY: Math.max(o.y1, o.y2) };
       if (kind === 'images') return { minX: o.x, minY: o.y, maxX: o.x + (o.width || 0) * (o.scaleX || 1), maxY: o.y + (o.height || 0) * (o.scaleY || 1) };
       if (kind === 'stickers') { const w = o.audioUrl ? 130 : 150, h = o.audioUrl ? 44 : 150; return { minX: o.x, minY: o.y, maxX: o.x + w * (o.scaleX || 1), maxY: o.y + h * (o.scaleY || 1) }; }
-      return { minX: o.x, minY: o.y, maxX: o.x + Math.max(60, (o.text?.length || 1) * (o.size || 16) * 0.6), maxY: o.y + (o.size || 16) * 1.4 };
+      // Text objects: `o.text` only exists on the legacy flat shape. Anything
+      // edited through TextEditor stores `lines`, so this measured a
+      // one-character box for it — and for a flat multi-line string it laid the
+      // whole character count out on a single line and gave it one line of
+      // height. Measure the longest line for width and count the lines for
+      // height.
+      {
+        const body = textOf(o);
+        const rows = body ? body.split(/\r?\n/) : [''];
+        const longest = rows.reduce((n, r) => Math.max(n, r.length), 1);
+        const size = o.size || 16;
+        const width = o.width || Math.max(60, longest * size * 0.6);
+        const height = Math.max(1, rows.length) * size * LINE_HEIGHT;
+        return { minX: o.x, minY: o.y, maxX: o.x + width, maxY: o.y + height };
+      }
     }
     return null;
   };
@@ -2018,7 +2178,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     pushHistory();
     updatePage(currentPageIndex, (page) => {
        if (clip.lines.length) {
-          const newLines = clip.lines.map((l) => ({ ...l, points: l.points.map((pt) => pt + off) }));
+          const newLines = clip.lines.map((l) => ({ ...l, id: nextStrokeId(), points: l.points.map((pt) => pt + off) }));
           page.lines = [...(page.lines || []), ...newLines];
        }
        clip.objects.forEach(({ kind, obj }) => {
@@ -2184,7 +2344,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const recolorSelectedObject = (color) => {
     if (!selectedInfo) return;
     const { kind, obj } = selectedInfo;
-    const patch = kind === 'stickers' ? { color } : { color };
+    // Was `kind === 'stickers' ? { color } : { color }` — both branches the
+    // same, so the condition never meant anything.
+    const patch = { color };
     pushHistory();
     updatePage(currentPageIndex, (page) => {
       page[kind] = (page[kind] || []).map((o) => (o.id === obj.id ? { ...o, ...patch } : o));
@@ -2634,10 +2796,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     setPosition({ x: pos.x + (oldPageX - newPageX) * s, y: pos.y });
   };
   
-  useEffect(() => {
-    // Re-render when scale changes for textarea positioning
-  }, [scale, position]);
-
   // Two-pointer pinch/pan, driven off the activePointers map so it works for
   // fingers on a tablet and for a pen resting alongside them.
   const handlePinch = () => {
@@ -2736,29 +2894,24 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     }
   };
   
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
-    if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64 = event.target.result;
-        pushHistory();
-        updatePage(currentPageIndex, (page) => {
-           if (!page.images) page.images = [];
-           page.images.push({
-             id: `img-${Date.now()}`,
-             src: base64,
-             x: 100,
-             y: 100,
-             width: 300,
-             height: 300
-           });
-        });
-        toast.success('แทรกรูปภาพเรียบร้อย');
-      };
-      reader.readAsDataURL(file);
-    }
     e.target.value = null;
+    if (!file || !file.type.startsWith('image/')) return;
+    const base64 = await compressImageFile(file);
+    pushHistory();
+    updatePage(currentPageIndex, (page) => {
+       if (!page.images) page.images = [];
+       page.images.push({
+         id: nextImageId(),
+         src: base64,
+         x: 100,
+         y: 100,
+         width: 300,
+         height: 300
+       });
+    });
+    toast.success('แทรกรูปภาพเรียบร้อย');
   };
 
   const currentPage = pages[currentPageIndex] || { width: 800, height: 1130, lines: [], stickers: [], images: [], texts: [], shapes: [] };
@@ -2791,7 +2944,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         pushHistory();
         updatePage(currentPageIndex, (page) => {
            if (!page.images) page.images = [];
-           page.images.push({ id: `img-${Date.now()}`, src, x: pt.x - w / 2, y: pt.y - h / 2, width: w, height: h });
+           page.images.push({ id: nextImageId(), src, x: pt.x - w / 2, y: pt.y - h / 2, width: w, height: h });
         });
         toast.success('แทรกรูปแล้ว', { id: 'drop-img' });
      };
@@ -2824,7 +2977,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         if (blob.type.startsWith('image/')) {
            return await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob); });
         }
-     } catch (_) { /* CORS or network: reference the remote URL instead */ }
+     } catch { /* CORS or network: reference the remote URL instead */ }
      return url;
   };
 
@@ -2839,9 +2992,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      // 1) An actual image file (from the desktop or another app)
      const file = Array.from(dt.files || []).find(f => f.type.startsWith('image/'));
      if (file) {
-        const reader = new FileReader();
-        reader.onload = (ev) => insertImageSrcAt(ev.target.result, cx, cy);
-        reader.readAsDataURL(file);
+        insertImageSrcAt(await compressImageFile(file), cx, cy);
         return;
      }
      // 2) An image dragged out of a web page (Google Images, an article, ...)
@@ -2868,9 +3019,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
            const file = item.getAsFile();
            if (file) {
               e.preventDefault();
-              const reader = new FileReader();
-              reader.onload = (ev) => insertImageSrcAt(ev.target.result, null, null);
-              reader.readAsDataURL(file);
+              insertImageSrcAt(await compressImageFile(file), null, null);
               return;
            }
         }
@@ -2880,6 +3029,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
            toast.loading('กำลังแทรกรูป...', { id: 'drop-img' });
            const src = await fetchAsDataUrlOrRemote(text.trim());
            insertImageSrcAt(src, null, null);
+           return;
+        }
+        // Nothing pasteable came from the system clipboard, so this is a plain
+        // Ctrl/Cmd+V meant for the notebook's own copy buffer (strokes/objects
+        // copied with Ctrl+C inside the canvas).
+        if (clipboardRef.current) {
+           e.preventDefault();
+           pasteClipboard();
         }
      };
      document.addEventListener('paste', onPaste);
@@ -2964,7 +3121,12 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
       if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); saveNotebook(); return; }
       if (mod && e.key.toLowerCase() === 'c') { e.preventDefault(); copySelection(); return; }
-      if (mod && e.key.toLowerCase() === 'v') { e.preventDefault(); pasteClipboard(); return; }
+      // Ctrl/Cmd+V is deliberately NOT handled here. Calling preventDefault on
+      // the keydown cancels the browser's `paste` event outright, which killed
+      // the document-level paste listener below — the one whose whole job is to
+      // drop a copied image onto the page. The listener now handles both: it
+      // takes an image off the system clipboard when there is one, and falls
+      // back to the notebook's own copy buffer when there isn't.
       if (mod) return;
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -3194,10 +3356,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                     </button>
                     <button onClick={() => { setShowMoreMenu(false); runExport('png', 'current'); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
                        <ImageIcon size={20} strokeWidth={1.5} color="#4B5563" /> บันทึกรูปหน้านี้ (PNG)
-                    </button>
-                    <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>
-                    <button style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Lock size={20} strokeWidth={1.5} color="#4B5563" /> เพิ่มการล็อค
                     </button>
                  </div>
              </>
@@ -3716,21 +3874,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         </div>
       )}
 
-      {showModeSelection && (
-         <div style={{ position: 'absolute', inset: 0, zIndex: 20, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-           <h3 style={{ fontSize: 24, fontWeight: 600, color: '#111827', marginBottom: 8 }}>Start your visual thinking</h3>
-           <p style={{ fontSize: 15, color: '#4B5563', marginBottom: 32, textAlign: 'center' }}>Choose a starting canvas for your notebook.</p>
-           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
-             <button onClick={() => setShowModeSelection(false)} style={{ padding: '12px 24px', borderRadius: 12, border: '1px solid var(--br2)', background: 'white', color: '#111827', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
-               <SquareSquare size={20} /> Blank Canvas
-             </button>
-             <button onClick={() => document.getElementById('pdf-upload').click()} style={{ padding: '12px 24px', borderRadius: 12, border: '1px solid #10B981', background: 'white', color: '#10B981', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
-               <Download size={20} /> Upload PDF
-             </button>
-           </div>
-         </div>
-      )}
-      
       {isMobile && (
          <div style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
            <MonitorPlay size={48} color="#10B981" style={{ marginBottom: 16 }} />
@@ -3848,65 +3991,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         />
       )}
 
-      {/* Paper template / colour picker (was a dead menu item before) */}
-      {showPageSettings && (
-        <div style={{ position: 'absolute', inset: 0, zIndex: 55, background: 'rgba(243,244,246,0.96)', backdropFilter: 'blur(10px)', display: 'flex', flexDirection: 'column', padding: 24, overflowY: 'auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: 'var(--text)' }}>แม่แบบกระดาษ</h3>
-            <button onClick={() => setShowPageSettings(false)} style={{ border: 'none', background: 'var(--gray-light)', padding: '9px 16px', borderRadius: 10, cursor: 'pointer', fontWeight: 600, color: 'var(--text)' }}>ปิด</button>
-          </div>
-
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 10 }}>ลายกระดาษ</span>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 14, marginBottom: 24 }}>
-            {[
-              { t: 'blank', label: 'เปล่า', bg: 'white' },
-              { t: 'lines', label: 'เส้นบรรทัด', bg: 'repeating-linear-gradient(white, white 15px, #cbd5e1 15px, #cbd5e1 16px)' },
-              { t: 'grid', label: 'ตาราง', bg: 'repeating-linear-gradient(white, white 15px, #cbd5e1 15px, #cbd5e1 16px), repeating-linear-gradient(90deg, white, white 15px, #cbd5e1 15px, #cbd5e1 16px)' },
-              { t: 'dots', label: 'จุดไข่ปลา', bg: 'radial-gradient(#94a3b8 1.5px, white 1.5px)', size: '16px 16px' },
-            ].map(({ t, label, bg, size }) => (
-              <button
-                key={t}
-                onClick={() => { pushHistory(); updatePage(currentPageIndex, (p) => { p.paperType = t; }); }}
-                style={{ border: (currentPage.paperType || 'lines') === t ? `2px solid ${HW.accent}` : '1px solid var(--br2)', borderRadius: 10, overflow: 'hidden', background: 'white', cursor: 'pointer', padding: 0, display: 'flex', flexDirection: 'column' }}
-              >
-                <div style={{ height: 80, background: bg, backgroundSize: size || 'auto', borderBottom: '1px solid var(--br2)' }} />
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', padding: '8px 0' }}>{label}</span>
-              </button>
-            ))}
-          </div>
-
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 10 }}>สีกระดาษ</span>
-          <div style={{ display: 'flex', gap: 14, marginBottom: 24 }}>
-            {[
-              { c: 'white', label: 'ขาว', bg: 'white' },
-              { c: 'yellow', label: 'ครีม', bg: '#FEF3C7' },
-              { c: 'dark', label: 'มืด', bg: '#1F2937' },
-            ].map(({ c, label, bg }) => (
-              <button
-                key={c}
-                onClick={() => { pushHistory(); updatePage(currentPageIndex, (p) => { p.paperColor = c; }); }}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, border: 'none', background: 'transparent', cursor: 'pointer' }}
-              >
-                <div style={{ width: 56, height: 56, borderRadius: 12, background: bg, boxShadow: `inset 0 0 0 1px var(--br2)`, outline: (currentPage.paperColor || 'white') === c ? `2px solid ${HW.accent}` : 'none', outlineOffset: 2 }} />
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)' }}>{label}</span>
-              </button>
-            ))}
-          </div>
-
-          <button
-            onClick={() => {
-              pushHistory();
-              const pt = currentPage.paperType, pc = currentPage.paperColor;
-              setPages((prev) => prev.map((p) => ({ ...p, paperType: pt, paperColor: pc })));
-              toast.success('ใช้แม่แบบนี้กับทุกหน้าแล้ว');
-            }}
-            style={{ alignSelf: 'flex-start', padding: '10px 18px', borderRadius: 10, border: `1px solid ${HW.hairline}`, background: 'white', color: HW.accent, fontWeight: 600, cursor: 'pointer' }}
-          >
-            ใช้แม่แบบนี้กับทุกหน้า
-          </button>
-          {currentPage.src && <p style={{ marginTop: 12, fontSize: 12, color: 'var(--t3)' }}>* หน้านี้เป็นหน้า PDF ลายกระดาษจะไม่แสดงทับเนื้อหา PDF</p>}
-        </div>
-      )}
 
       <input type="file" id="pdf-upload" accept="application/pdf" style={{ display: 'none' }} onChange={handleFileUpload} />
       <input type="file" id="image-upload" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
@@ -3999,6 +4083,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                 draggable={tool === 'pan'}
                 listening={['pan', 'lasso', 'select'].includes(tool) || selectedId === img.id}
                 onDragEnd={(e) => {
+                   pushHistory();
                   const { x, y } = e.target.position();
                   updatePage(currentPageIndex, (page) => {
                     const i = page.images.find(im => im.id === img.id);
@@ -4072,6 +4157,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                      onDblClick={() => insertPolygonVertex(s.id)}
                      onDblTap={() => insertPolygonVertex(s.id)}
                      onDragEnd={(e) => {
+                   pushHistory();
                         const dx = e.target.x(), dy = e.target.y();
                         e.target.position({ x: 0, y: 0 });
                         updatePage(currentPageIndex, (page) => {
@@ -4093,6 +4179,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                  onClick: () => { if (tool === 'pan' || tool === 'lasso') selectShape(s.id); },
                  onTap: () => { if (tool === 'pan' || tool === 'lasso') selectShape(s.id); },
                  onDragEnd: (e) => {
+                   pushHistory();
                     const { x, y } = e.target.position();
                     updatePage(currentPageIndex, (page) => {
                        const shp = page.shapes.find(sh => sh.id === s.id);
@@ -4160,6 +4247,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   draggable={tool === 'pan' || tool === 'sticker'} 
                   listening={['pan', 'lasso', 'sticker'].includes(tool) || selectedId === st.id}
                   onDragEnd={(e) => {
+                   pushHistory();
                     updatePage(currentPageIndex, (page) => {
                        const sticker = page.stickers.find(s => s.id === st.id);
                        if (sticker) { sticker.x = e.target.x(); sticker.y = e.target.y(); }
@@ -4242,6 +4330,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                 draggable={tool === 'pan' || tool === 'text'}
                 listening={['pan', 'lasso', 'text'].includes(tool) || selectedId === t.id}
                 onDragEnd={(e) => {
+                   pushHistory();
                    const { x, y } = e.target.position();
                    updatePage(currentPageIndex, (page) => {
                      const txt = page.texts.find(tx => tx.id === t.id);
@@ -4472,64 +4561,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
             })()}
 
             {/* Shows which slice of the page the zoom-in writing strip is showing */}
-            {protractorOn && !readonly && (() => {
-               const r = protractor.radius;
-               const rad = (protractor.angle * Math.PI) / 180;
-               const hx = protractor.x + Math.cos(rad) * r;
-               const hy = protractor.y + Math.sin(rad) * r;
-               const rim = [];
-               for (let d = 0; d <= 180; d += 3) { const a = (d * Math.PI) / 180; rim.push(r * Math.cos(a), -r * Math.sin(a)); }
-               const ticks = [];
-               const labels = [];
-               for (let d = 0; d <= 180; d += 10) {
-                  const a = (d * Math.PI) / 180;
-                  const long = d % 30 === 0;
-                  const tl = long ? 15 : 8;
-                  ticks.push(<Line key={`pt-${d}`} points={[r * Math.cos(a), -r * Math.sin(a), (r - tl) * Math.cos(a), -(r - tl) * Math.sin(a)]} stroke="rgba(10,89,247,0.6)" strokeWidth={1} />);
-                  if (long) labels.push(<Text key={`pl-${d}`} text={`${d}`} x={(r - 30) * Math.cos(a) - 8} y={-(r - 30) * Math.sin(a) - 6} fontSize={12} fill={HW.accent} fontFamily="Kanit, sans-serif" />);
-               }
-               return (
-                 <>
-                   <Group
-                     name="protractor"
-                     x={protractor.x}
-                     y={protractor.y}
-                     rotation={protractor.angle}
-                     draggable
-                     onDragEnd={(e) => setProtractor(p => ({ ...p, x: e.target.x(), y: e.target.y() }))}
-                   >
-                     <Line points={rim} closed fill="rgba(10,89,247,0.06)" stroke="rgba(10,89,247,0.5)" strokeWidth={1} />
-                     <Line points={[-r, 0, r, 0]} stroke="rgba(10,89,247,0.55)" strokeWidth={1.5} />
-                     {ticks}
-                     {labels}
-                     <Circle x={0} y={0} radius={4} fill={HW.accent} />
-                     <Text text={`${Math.round(((protractor.angle % 360) + 360) % 360)}°`} x={-14} y={12} fontSize={13} fill={HW.accent} fontFamily="Kanit, sans-serif" />
-                   </Group>
-                   <Circle
-                     name="protractor-handle"
-                     x={hx}
-                     y={hy}
-                     radius={12}
-                     fill="white"
-                     stroke={HW.accent}
-                     strokeWidth={2}
-                     draggable
-                     onDragMove={(e) => {
-                        const nx = e.target.x(), ny = e.target.y();
-                        let deg = (Math.atan2(ny - protractor.y, nx - protractor.x) * 180) / Math.PI;
-                        const near = Math.round(deg / 15) * 15;
-                        if (Math.abs(deg - near) < 3) deg = near;
-                        setProtractor(p => ({ ...p, angle: deg }));
-                     }}
-                     onDragEnd={(e) => {
-                        const r2 = (protractor.angle * Math.PI) / 180;
-                        e.target.position({ x: protractor.x + Math.cos(r2) * protractor.radius, y: protractor.y + Math.sin(r2) * protractor.radius });
-                     }}
-                   />
-                 </>
-               );
-            })()}
-
             {zoomWriter && (
                <Rect
                  x={writerFocus.x}
@@ -4893,11 +4924,26 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              onDuplicate={duplicateLassoSelection}
              onScale={scaleLassoSelection}
              onRecolor={recolorLassoSelection}
+             onOpenPalette={() => setShowLassoPalette(true)}
              onDelete={deleteLassoSelection}
              onDone={bakeLassoSelection}
            />
          );
       })()}
+
+      {/* Full palette for a lasso selection, in the same in-app picker the pen
+          uses — the toolbar's native colour input was inert on tablets. */}
+      {showLassoPalette && lassoBounds && hasSelection && (
+        <div style={{ position: 'absolute', left: '50%', bottom: 100, transform: 'translateX(-50%)', zIndex: 4000 }}>
+          <ColorPickerPanel
+            color={penColor}
+            recentColors={customColors}
+            onChange={(c) => recolorLassoSelection(c)}
+            onCommit={(c) => { recolorLassoSelection(c); rememberCustomColor(c); setShowLassoPalette(false); }}
+            onClose={() => setShowLassoPalette(false)}
+          />
+        </div>
+      )}
 
       {/* Paper template picker. The "เปลี่ยนแม่แบบกระดาษ" button set this flag but
           nothing ever rendered — so the whole feature looked broken. */}
@@ -4963,7 +5009,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              updatePage(currentPageIndex, (page) => {
                if (!page.images) page.images = [];
                // sourcePage lets the image show a 🔗 that jumps back to the book page.
-               page.images.push({ id: `img-${Date.now()}`, src, x: (currentPage.width - w) / 2, y: 60, width: w, height: h, sourcePage: pageNum });
+               page.images.push({ id: nextImageId(), src, x: (currentPage.width - w) / 2, y: 60, width: w, height: h, sourcePage: pageNum });
              });
              setShowBookSnip(false);
              toast.success('แปะภาพจากหนังสือลงโน้ตแล้ว เลือกเครื่องมือเลื่อน (มือ) เพื่อจัดตำแหน่ง');

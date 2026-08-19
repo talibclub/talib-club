@@ -247,12 +247,16 @@ function repairParagraphs(html) {
   return result.join("")
 }
 
+// The Thai transliterations below were mojibake — UTF-8 Thai that had been
+// decoded as Latin-1 and written back out, so the model was handed a glossary
+// of replacement characters and fell back to its own spellings. Restored to the
+// spellings the rest of the site uses.
 function translationPrompt(elements) {
   return `You are an expert English-to-Thai translator specializing in Islamic studies (Aqeedah, Manhaj, Tawhid) and the understanding of the Salaf.
 Translate the following English article blocks into Thai.
 Requirements:
 1. Translate line-by-line and retain the exact array length and element mapping.
-2. Translate accurately and naturally into Thai, ensuring correct Islamic terminology transliterations (e.g., Aqeedah -> เธญเธฐเธเธตเธ”เธฐเธฎเน, Manhaj -> เธกเธฑเธเธฎเธฑเธเธเน, Tawhid -> เน€เธ•เธฒเธฎเธตเธ”, Salaf -> เธชเธฅเธฑเธ, Sunnah -> เธเธธเธเธเธฐเธฎเน, Bid'ah -> เธเธดเธ”เธญเธฐเธฎเน, Jahiliyyah -> เธเธฒเธฎเธดเธฅเธตเธขเธฐเธฎเน, Shirk -> เธเธดเธฃเธดเธ).
+2. Translate accurately and naturally into Thai, ensuring correct Islamic terminology transliterations (e.g., Aqeedah -> อะกีดะฮ์, Manhaj -> มันฮัจญ์, Tawhid -> เตาฮีด, Salaf -> สะลัฟ, Sunnah -> สุนนะฮ์, Bid'ah -> บิดอะฮ์, Jahiliyyah -> ญาฮิลียะฮ์, Shirk -> ชิริก).
 3. Do not add any commentary or extra text outside the translation.
 4. Return the result strictly as a JSON object containing a "translations" field, which is an array of the translated objects: { id: number, tag: string, english: string, thai: string }.
 

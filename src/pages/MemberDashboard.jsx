@@ -70,7 +70,7 @@ export default function MemberDashboard({ authState, go, initialView = "overview
       setCopied(label)
       toast.success("คัดลอกข้อความแล้ว")
       window.setTimeout(() => setCopied(""), 1800)
-    } catch (err) {
+    } catch {
       toast.error("คัดลอกไม่สำเร็จ")
       setCopied("")
     }

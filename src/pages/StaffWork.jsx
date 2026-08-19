@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from "react"
 import { createPortal } from "react-dom"
 import {
-  collection, query, updateDoc, doc, getDocs, getDoc,
+  collection, query, updateDoc, doc, getDocs, runTransaction,
   serverTimestamp, addDoc, deleteDoc, setDoc, orderBy, onSnapshot
 } from "firebase/firestore"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
@@ -155,7 +155,10 @@ export default function StaffWork({ authState, go }) {
       unsubStaff()
       unsubMag()
     }
-  }, [])
+    // The deps were empty while the body reads uid and currentUser, so signing
+    // out and back in as someone else left the previous account's listeners
+    // attached and never started the new one's.
+  }, [uid, currentUser])
 
   // ━━━ ออโต้แจ้งเตือนคิววารสารทุกต้นเดือน ━━━
   // Only check once per month using useRef to avoid duplicate notifications
@@ -193,17 +196,30 @@ export default function StaffWork({ authState, go }) {
       
       try {
         const notifyDocRef = doc(db, "system", "magazine_notify")
-        const snap = await getDoc(notifyDocRef)
-        const data = snap.exists() ? snap.data() : {}
-        
-        if (!data[notifyKey]) {
+
+        // Claim the slot before sending, inside a transaction. The old code did
+        // read -> send -> write, so two admins with the page open at the same
+        // time both read "not sent yet" and both fired the Telegram message.
+        // The write was also a full setDoc of the object read earlier, which
+        // wiped any key another tab had added in between.
+        const claimed = await runTransaction(db, async (tx) => {
+          const snap = await tx.get(notifyDocRef)
+          if (snap.exists() && snap.data()?.[notifyKey]) return false
+          tx.set(notifyDocRef, { [notifyKey]: true }, { merge: true })
+          return true
+        })
+
+        notifiedMonthRef.current = notifyKey
+
+        if (claimed) {
           const sent = await sendBotNotification(message)
-          if (sent) {
-            await setDoc(notifyDocRef, { ...data, [notifyKey]: true })
+          // Release the claim so the next mount retries rather than losing the
+          // month's notification to a transient Telegram failure.
+          if (!sent) {
+            notifiedMonthRef.current = null
+            await setDoc(notifyDocRef, { [notifyKey]: false }, { merge: true })
           }
         }
-        
-        notifiedMonthRef.current = notifyKey
       } catch (err) {
         console.error("Failed to process magazine notification", err)
       }
@@ -241,7 +257,7 @@ export default function StaffWork({ authState, go }) {
       await setDoc(doc(db, "settings", "staff"), { members: updatedTeam }, { merge: true })
       setNewStaffName("")
       notifySuccess(`เพิ่ม "${name}" เข้าระบบแล้ว`)
-    } catch (e) {
+    } catch {
       notifyError("เกิดข้อผิดพลาดในการเพิ่มทีมงาน")
     }
   }
@@ -263,13 +279,17 @@ export default function StaffWork({ authState, go }) {
   }
 
   const handleUpdateMagazine = async (index, newUser) => {
-    const updatedQueue = [...magazineQueue]
-    updatedQueue[index].user = newUser
+    // `[...magazineQueue]` copies the array but not the objects inside it, so
+    // `updatedQueue[index].user = newUser` wrote straight through into the
+    // existing state object — the old value was gone before the save was even
+    // attempted, and a failed write left the screen showing the new name anyway.
+    const updatedQueue = magazineQueue.map((entry, i) => (i === index ? { ...entry, user: newUser } : entry))
     try {
       await setDoc(doc(db, "settings", "magazine"), { queue: updatedQueue }, { merge: true })
       notifySuccess(`อัปเดตคิววารสารสำเร็จ`)
       await sendBotNotification(`📚 [คิววารสาร]\nเปลี่ยนผู้รับผิดชอบเดือน ${magazineQueue[index].month} เป็น "${newUser}"\nอัปเดตโดย: ${currentUser}\n\n📌 ดูคิวงาน: https://talibclub.org/staff-work`)
     } catch (e) {
+      console.error("Update magazine queue failed", e)
       notifyError("เกิดข้อผิดพลาดในการอัปเดตคิววารสาร")
     }
   }
@@ -309,6 +329,18 @@ export default function StaffWork({ authState, go }) {
             
             if (isVideo) {
                // อัปโหลดวิดีโอเข้า Cloudinary
+               // NOTE: `talib_videos` is an UNSIGNED Cloudinary preset, so the
+               // cloud name and preset below are necessarily visible in the
+               // bundle and anyone can upload to that account with them. This
+               // cannot be fixed from the client — restrict the preset in the
+               // Cloudinary console (allowed formats, max file size, a fixed
+               // folder, and Access Control) or move the upload behind a signed
+               // serverless endpoint. The size check here only stops honest
+               // mistakes.
+               const MAX_VIDEO_BYTES = 200 * 1024 * 1024
+               if (file.size > MAX_VIDEO_BYTES) {
+                 throw new Error(`ไฟล์วิดีโอ "${file.name}" ใหญ่เกิน 200MB`)
+               }
                const formData = new FormData()
                formData.append("file", file)
                formData.append("upload_preset", "talib_videos")
@@ -419,7 +451,7 @@ export default function StaffWork({ authState, go }) {
           { isStaffOnly: true }
         )
       }
-    } catch (e) {
+    } catch {
       notifyError("อัปเดตสถานะล้มเหลว")
     }
   }
@@ -448,7 +480,7 @@ export default function StaffWork({ authState, go }) {
         "/staff-work",
         { isStaffOnly: true }
       )
-    } catch (e) {
+    } catch {
       notifyError("บันทึกการโพสต์ล้มเหลว")
     }
   }
@@ -465,7 +497,7 @@ export default function StaffWork({ authState, go }) {
           notifySuccess("ลบงานเรียบร้อยแล้ว")
           await sendBotNotification(`🗑️ [ลบงาน]\nงานเรื่อง "${title}" ถูกลบทิ้งโดย ${currentUser}\n\n📌 ดูหน้างาน: https://talibclub.org/staff-work`)
           setConfirmDialog({ isOpen: false })
-        } catch (e) {
+        } catch {
           notifyError("ลบงานล้มเหลว")
         }
       }
@@ -965,7 +997,7 @@ export default function StaffWork({ authState, go }) {
                   <i className="ti ti-info-circle" style={{ color: "orange", fontSize: 18, marginTop: 2 }}></i>
                   <span>
                     <strong>หมายเหตุ:</strong> หากวิดีโอแสดงผลเป็นจอดำ (เล่นได้แค่เสียง) เกิดจากเบราว์เซอร์ไม่รองรับการถอดรหัสวิดีโอนี้ (มักพบในไฟล์ที่อัดจากมือถือ) <br/>
-                    กรุณากดปุ่ม <strong>"ดาวน์โหลดไฟล์"</strong> เพื่อนำไปเปิดรับชมด้วยโปรแกรมในคอมพิวเตอร์แทนครับ
+                    กรุณากดปุ่ม <strong>&quot;ดาวน์โหลดไฟล์&quot;</strong> เพื่อนำไปเปิดรับชมด้วยโปรแกรมในคอมพิวเตอร์แทนครับ
                   </span>
                 </p>
               </div>

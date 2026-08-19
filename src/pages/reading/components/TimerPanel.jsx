@@ -32,7 +32,7 @@ export default function TimerPanel({
         lineHeight: 1.6
       }}>
         <i className="ti ti-alert-triangle" style={{ marginRight: 6 }}></i>
-        <strong>โปรดทราบ:</strong> คุณต้องสะสมเวลาให้ครบ {Math.round(MIN_VERIFIED_SECONDS / 60)} นาทีขึ้นไป, ระบุเลขหน้าให้ถูกต้อง และบันทึกข้อคิดอย่างน้อย {MIN_REFLECTION_CHARS} ตัวอักษร จึงจะสามารถกดบันทึกความคืบหน้าได้ หากคุณกด "ออก" ก่อนกดบันทึก เวลาและสถิติทั้งหมดในรอบนี้จะสูญหายทันที
+        <strong>โปรดทราบ:</strong> คุณต้องสะสมเวลาให้ครบ {Math.round(MIN_VERIFIED_SECONDS / 60)} นาทีขึ้นไป, ระบุเลขหน้าให้ถูกต้อง และบันทึกข้อคิดอย่างน้อย {MIN_REFLECTION_CHARS} ตัวอักษร จึงจะสามารถกดบันทึกความคืบหน้าได้ หากคุณกด &quot;ออก&quot; ก่อนกดบันทึก เวลาและสถิติทั้งหมดในรอบนี้จะสูญหายทันที
       </div>
       
       {onOpenBook && (

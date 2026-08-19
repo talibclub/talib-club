@@ -84,7 +84,9 @@ export function normalizeStreakSettings(settings, uid) {
 }
 
 export function initials(name, email) {
-  const source = name && name !== "-" ? name : email
+  // Both can be empty at once while a profile is still loading, and
+  // undefined.split() took the whole dashboard down with it.
+  const source = (name && name !== "-" ? name : email) || ""
   return source.split(/\s|@/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join("") || "TC"
 }
 

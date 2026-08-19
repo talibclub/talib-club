@@ -25,7 +25,7 @@ export async function syncServerTime() {
       const latency = (end - start) / 2
       timeOffset = (serverTime + latency) - end
       synced = true
-      console.log(`[TimeSync] Server time synchronized. Offset: ${timeOffset}ms. Latency: ${latency}ms.`)
+      if (import.meta.env.DEV) console.log(`[TimeSync] Server time synchronized. Offset: ${timeOffset}ms. Latency: ${latency}ms.`)
     }
   } catch (err) {
     console.warn("[TimeSync] Failed to synchronize time with server, falling back to device clock.", err)

@@ -22,8 +22,13 @@ export default function LeaderboardPanel({ authState, setView }) {
 
       try {
         setLoading(true)
+        // Reads the public mirror, not content_reading_streaks. Listing the
+        // streaks collection is (correctly) denied for members because that
+        // document also holds gems and credits, so this query used to fail with
+        // permission-denied for everyone except staff — and the catch below only
+        // logs in DEV, so in production the board just sat empty with no clue why.
         const q = query(
-          collection(db, "content_reading_streaks"),
+          collection(db, "leaderboard"),
           orderBy("streakCount", "desc"),
           limit(10)
         )
@@ -36,9 +41,10 @@ export default function LeaderboardPanel({ authState, setView }) {
         cachedLeadersAt = now
         setLeaders(data)
       } catch (err) {
-        if (import.meta.env.DEV) {
-          console.error("Error fetching leaderboard", err)
-        }
+        // Logged unconditionally on purpose: this used to be DEV-only, which is
+        // exactly why a permission-denied here went unnoticed in production for
+        // as long as it did.
+        console.error("Error fetching leaderboard", err)
       } finally {
         setLoading(false)
       }

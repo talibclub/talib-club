@@ -65,6 +65,21 @@ const caretToEnd = (el) => {
   sel.addRange(r);
 };
 
+// Declared at module scope. As a function defined inside the component body it
+// was a brand new component type on every render, so React unmounted and
+// remounted every format button on each keystroke — which is what made the
+// toolbar drop focus mid-typing.
+const FORMAT_BTN_STYLE = { width: 26, height: 26, borderRadius: 8, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer' };
+const FormatBtn = ({ icon, active, onClick }) => (
+  <button
+    onMouseDown={(e) => e.preventDefault()}
+    onClick={onClick}
+    style={{ ...FORMAT_BTN_STYLE, background: active ? 'var(--teal-light)' : 'transparent', color: active ? 'var(--teal)' : '#4B5563' }}
+  >
+    {icon}
+  </button>
+);
+
 export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLinesChange, onFont, onSize, onColor, onCommit }) {
   const localRef = useRef(null);
   const edRef = textareaRef || localRef;
@@ -249,9 +264,6 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
   const sep = <div style={{ width: 1, height: 18, background: 'var(--br2)', margin: '0 3px', flexShrink: 0 }} />;
   const noFocusSteal = { onMouseDown: (e) => e.preventDefault() };
 
-  const FormatBtn = ({ icon, active, onClick }) => (
-    <button {...noFocusSteal} onClick={onClick} style={{...toolBtn(active), width: 26, height: 26}}>{icon}</button>
-  );
 
   return (
     <div data-text-editor style={{ position: 'absolute', top: y, left: x, zIndex: 3000, isolation: 'isolate' }}>

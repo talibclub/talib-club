@@ -25,7 +25,7 @@ export default function VerseList({
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
                     {verses.map(v => {
-                      const bookmark = getBookmarkForVerse(v.aya)
+                      const bookmark = getBookmarkForVerse(v.aya, v.sura)
                       const isReciting = Number(playingAudio?.sura) === Number(v.sura) && Number(playingAudio?.aya) === Number(v.aya)
                       return (
                         <div

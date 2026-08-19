@@ -10,6 +10,9 @@
 
         .app, .quran-container {
           --quran-bg: var(--bg);
+          /* QuranSidebar section headers used --quran-bg2, which was never
+             defined — so they rendered transparent instead of raised. */
+          --quran-bg2: var(--bg2);
           --quran-card-bg: var(--card);
           --quran-text: var(--text);
           --quran-t2: var(--t2);
@@ -137,7 +140,7 @@
           color: var(--quran-text);
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 767px) {
           .mushaf-flow,
           .mushaf-flow span,
           .arabic-font,

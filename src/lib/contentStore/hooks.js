@@ -3,7 +3,7 @@ import { collection, doc, getDoc, getDocs, onSnapshot, serverTimestamp, setDoc, 
 import { db } from "../firebase.js"
 import { getOfflineItem } from "../offlineStore.js"
 import { CONTENT_COLLECTIONS, USER_SPECIFIC_COLLECTIONS, PUBLIC_COLLECTIONS, LOCAL_STORAGE_CACHE_PREFIX, CACHE_MAX_AGE_MS } from "./constants.js"
-import { cleanForFirestore, getMs, byNewest, mergeWithFallback, getQueryCacheKey, generateDocId } from "./utils.js"
+import { cleanForFirestore, byNewest, mergeWithFallback, getQueryCacheKey } from "./utils.js"
 import { 
   collectionCache, countCache, inFlightRequests, setWithLimit,
   readCachedCollection, writeCachedCollection, readLocalStorageCacheEntry, invalidateCollectionCache,
@@ -167,7 +167,7 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
                     isValid = false
                   }
                 } catch (metaErr) {
-                  console.log("[contentStore] Failed to fetch server metadata, using offline cache fallback.", metaErr)
+                  if (import.meta.env.DEV) console.log("[contentStore] Failed to fetch server metadata, using offline cache fallback.", metaErr)
                 }
               }
               if (isValid && active) {
@@ -369,7 +369,7 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
       for (const [key, entry] of backupCacheEntries) {
         collectionCache.set(key, entry)
         if (PUBLIC_COLLECTIONS.includes(collectionName)) {
-          try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: entry.items, at: Date.now() })) } catch (e) { }
+          try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: entry.items, at: safeDateNow() })) } catch { /* ignore */ }
         }
       }
       throw err
@@ -394,7 +394,7 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
         const newItems = entry.items.filter(d => String(d.id) !== String(id))
         collectionCache.set(key, { ...entry, items: newItems })
         if (PUBLIC_COLLECTIONS.includes(collectionName)) {
-          try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: newItems, at: Date.now() })) } catch (e) { }
+          try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: newItems, at: safeDateNow() })) } catch { /* ignore */ }
         }
       }
     }
@@ -416,7 +416,7 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
       for (const [key, entry] of backupCacheEntries) {
         collectionCache.set(key, entry)
         if (PUBLIC_COLLECTIONS.includes(collectionName)) {
-          try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: entry.items, at: Date.now() })) } catch (e) { }
+          try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: entry.items, at: safeDateNow() })) } catch { /* ignore */ }
         }
       }
       throw err
@@ -476,7 +476,7 @@ export async function saveContentItem(name, item, uid = null) {
         : [localPayload, ...entry.items]
       collectionCache.set(key, { ...entry, items: newItems })
       if (PUBLIC_COLLECTIONS.includes(collectionName)) {
-        try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: newItems, at: Date.now() })) } catch (e) { }
+        try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: newItems, at: safeDateNow() })) } catch { /* ignore */ }
       }
     }
   }
@@ -501,7 +501,7 @@ export async function deleteContentItem(name, id) {
       const newItems = entry.items.filter(d => String(d.id) !== String(id))
       collectionCache.set(key, { ...entry, items: newItems })
       if (PUBLIC_COLLECTIONS.includes(collectionName)) {
-        try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: newItems, at: Date.now() })) } catch (e) { }
+        try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: newItems, at: safeDateNow() })) } catch { /* ignore */ }
       }
     }
   }
@@ -522,13 +522,24 @@ export async function bulkDeleteItems(name, ids) {
   let deleted = 0
   let failed = 0
   const succeededIds = new Set()
+  // Match deleteItem(): a hard delete on a public collection leaves no
+  // tombstone, so mergeWithFallback brings the item straight back from the
+  // static fallback data on the next cold load. This function hard-deleted
+  // everything while still marking the local cache `deleted: true` — so the row
+  // vanished from the screen and reappeared after a reload.
+  const isUserSpecific = USER_SPECIFIC_COLLECTIONS.includes(name)
 
   // Process in chunks of 500 (Firestore writeBatch limit)
   for (let i = 0; i < ids.length; i += BATCH_LIMIT) {
     const chunk = ids.slice(i, i + BATCH_LIMIT)
     const batch = writeBatch(db)
     chunk.forEach(id => {
-      batch.delete(doc(db, collectionName, String(id)))
+      const ref = doc(db, collectionName, String(id))
+      if (isUserSpecific) {
+        batch.delete(ref)
+      } else {
+        batch.set(ref, { id: String(id), deleted: true, updatedAt: serverTimestamp() }, { merge: true })
+      }
     })
     try {
       await batch.commit()
@@ -547,7 +558,7 @@ export async function bulkDeleteItems(name, ids) {
       const newItems = entry.items.map(d => succeededIds.has(String(d.id)) ? { ...d, deleted: true } : d)
       collectionCache.set(key, { ...entry, items: newItems })
       if (PUBLIC_COLLECTIONS.includes(collectionName)) {
-        try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: newItems, at: Date.now() })) } catch (e) { }
+        try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: newItems, at: safeDateNow() })) } catch { /* ignore */ }
       }
     }
   }
@@ -614,7 +625,7 @@ export async function bulkSaveItems(name, items, uid = null) {
       })
       collectionCache.set(key, { ...entry, items: newItems })
       if (PUBLIC_COLLECTIONS.includes(collectionName)) {
-        try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: newItems, at: Date.now() })) } catch (e) { }
+        try { localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + key, JSON.stringify({ items: newItems, at: safeDateNow() })) } catch { /* ignore */ }
       }
     }
   }
@@ -634,7 +645,7 @@ export function useCollectionCount(name) {
   const getCachedValue = () => {
     // 1. Check memory cache
     const memEntry = countCache.get(cacheKey)
-    if (memEntry && (Date.now() - memEntry.at < COUNT_CACHE_TTL_MS)) {
+    if (memEntry && (safeDateNow() - memEntry.at < COUNT_CACHE_TTL_MS)) {
       return memEntry.count
     }
     // 2. Check localStorage cache
@@ -642,12 +653,12 @@ export function useCollectionCount(name) {
       const localData = localStorage.getItem(LOCAL_STORAGE_CACHE_PREFIX + cacheKey)
       if (localData) {
         const parsed = JSON.parse(localData)
-        if (Date.now() - parsed.at < COUNT_LOCAL_STORAGE_TTL_MS) {
+        if (safeDateNow() - parsed.at < COUNT_LOCAL_STORAGE_TTL_MS) {
           countCache.set(cacheKey, { count: parsed.count, at: parsed.at })
           return parsed.count
         }
       }
-    } catch (e) { }
+    } catch { /* ignore */ }
     return null
   }
 
@@ -669,15 +680,23 @@ export function useCollectionCount(name) {
 
     let active = true
     setLoading(true)
-    getCountFromServer(collection(db, collectionName))
-      .then(snapshot => {
+    // Counted every document in the collection, tombstones included, so the
+    // "178 บทความ / 301 หนังสือ" figures on the landing page counted content
+    // that had been deleted. A `where("deleted","!=",true)` filter cannot be
+    // used: it drops the documents that have no `deleted` field at all, which
+    // is nearly all of them. Total minus tombstones is exact.
+    Promise.all([
+      getCountFromServer(collection(db, collectionName)),
+      getCountFromServer(query(collection(db, collectionName), where("deleted", "==", true))),
+    ])
+      .then(([allSnap, deletedSnap]) => {
         if (!active) return
-        const cnt = snapshot.data().count
-        const now = Date.now()
+        const cnt = Math.max(0, allSnap.data().count - deletedSnap.data().count)
+        const now = safeDateNow()
         countCache.set(cacheKey, { count: cnt, at: now })
         try {
           localStorage.setItem(LOCAL_STORAGE_CACHE_PREFIX + cacheKey, JSON.stringify({ count: cnt, at: now }))
-        } catch (e) { }
+        } catch { /* ignore */ }
         setCount(cnt)
         setLoading(false)
       })
@@ -722,7 +741,7 @@ function readQuranBookmarksSession(uid) {
   try {
     const raw = sessionStorage.getItem(`talib_quran_bookmarks_${uid}`)
     return raw ? JSON.parse(raw) : []
-  } catch (e) {
+  } catch {
     return []
   }
 }
@@ -731,7 +750,7 @@ function writeQuranBookmarksSession(uid, items) {
   if (!uid) return
   try {
     sessionStorage.setItem(`talib_quran_bookmarks_${uid}`, JSON.stringify(items))
-  } catch (e) {
+  } catch {
     /* ignore quota errors */
   }
 }
@@ -989,7 +1008,7 @@ export function invalidateDocumentCache(collectionName, docId) {
   documentCache.delete(cacheKey)
   try {
     localStorage.removeItem(LOCAL_STORAGE_CACHE_PREFIX + cacheKey)
-  } catch (e) { }
+  } catch { /* ignore */ }
 }
 
 /**
@@ -1024,7 +1043,7 @@ export function useContentDoc(collectionKey, docId, fallback = null) {
           }
         }
       }
-    } catch (e) { }
+    } catch { /* ignore */ }
     return null
   }, [collectionName, docId])
 
