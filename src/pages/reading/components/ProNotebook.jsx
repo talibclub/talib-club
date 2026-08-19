@@ -3600,7 +3600,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   scaleY={st.scaleY || 1}
                   rotation={st.rotation || 0}
                   draggable={tool === 'pan' || tool === 'sticker'} 
-                  listening={['pan', 'lasso', 'sticker'].includes(tool) || selectedId === st.id}
+                  // 'text' belongs here too. The tap handler below already opened
+                  // the note for typing with the text tool, but a Konva node with
+                  // listening=false never receives the event — so the handler
+                  // could not fire and tapping a note in typing mode did nothing.
+                  listening={['pan', 'lasso', 'sticker', 'text'].includes(tool) || selectedId === st.id}
                   onDragEnd={(e) => {
                    pushHistory();
                     updatePage(currentPageIndex, (page) => {

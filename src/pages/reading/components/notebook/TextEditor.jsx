@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Minus, Plus, MoreHorizontal, Bold, Italic, Underline, Strikethrough } from 'lucide-react';
 import { FONT_OPTIONS, LINE_HEIGHT, TEXT_COLORS, HW } from './theme.js';
 import { migrateText, makeLine, listPrefixes } from './geometry.js';
+import { matchAutoformat } from './textAutoformat.js';
 
 // WYSIWYG in-place editor for a text object with PER-LINE formatting.
 //
@@ -232,7 +233,35 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
   }, [edRef, rememberSelection, syncActive]);
 
   // --- editing events -----------------------------------------------------
+  // Rewrite "->" into an arrow and friends as you type, the way Samong does.
+  // Runs on the text node under the caret and puts the caret back where it
+  // belongs, so it is invisible unless you were looking for it. Skipped while an
+  // IME is composing — rewriting mid-composition would eat Thai input.
+  const applyAutoformat = () => {
+    if (composing.current) return false;
+    const sel = window.getSelection();
+    if (!sel || !sel.isCollapsed || sel.rangeCount === 0) return false;
+    const node = sel.anchorNode;
+    if (!node || node.nodeType !== 3) return false;
+    if (!edRef.current?.contains(node)) return false;
+
+    const caret = sel.anchorOffset;
+    const hit = matchAutoformat(node.textContent.slice(0, caret));
+    if (!hit) return false;
+
+    const start = caret - hit.take;
+    node.textContent = node.textContent.slice(0, start) + hit.insert + node.textContent.slice(caret);
+    const range = document.createRange();
+    const pos = Math.min(start + hit.insert.length, node.textContent.length);
+    range.setStart(node, pos);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    return true;
+  };
+
   const handleInput = () => {
+    applyAutoformat();
     if (!composing.current) reflow();
     emit();
   };

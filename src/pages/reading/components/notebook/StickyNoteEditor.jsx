@@ -1,4 +1,5 @@
 import React from 'react';
+import { autoformatPlainText } from './textAutoformat.js';
 
 // In-place editor for a sticky note's text, positioned over the note on canvas.
 // Presentational: the parent owns the value, the textarea ref, and the
@@ -11,7 +12,21 @@ export default function StickyNoteEditor({ x, y, scale, round, value, onChange, 
         autoFocus
         placeholder="พิมพ์ข้อความที่นี่..."
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        // Same "->" becomes an arrow behaviour as the text boxes. This is a
+        // real <textarea>, so the rewrite is a plain string edit plus putting
+        // the caret back — done in a microtask because React controls the value.
+        onChange={(e) => {
+          const el = e.target;
+          const next = autoformatPlainText(el.value, el.selectionStart);
+          if (!next) { onChange(el.value); return; }
+          onChange(next.value);
+          queueMicrotask(() => {
+            if (textareaRef?.current) {
+              textareaRef.current.selectionStart = next.caret;
+              textareaRef.current.selectionEnd = next.caret;
+            }
+          });
+        }}
         onBlur={onCommit}
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
