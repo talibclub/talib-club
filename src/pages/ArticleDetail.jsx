@@ -10,6 +10,9 @@ import { bumpContentMetric } from "../utils/contentMetrics.js"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
 import SEOHead, { stripHtml, truncate, toIsoDate, BASE_URL } from '../components/SEOHead.jsx'
 import { detailPath, detailUrl } from "../utils/slug.js"
+
+// How long the page has to be open, and visible, before it counts as a view.
+const VIEW_DWELL_MS = 8000
 import { useCanonicalDetailUrl, useDetailId } from "../hooks/useDetailRoute.js"
 import { isPlainLeftClick } from "../utils/linkNavigation.js"
 
@@ -140,14 +143,33 @@ export default function ArticleDetail({ item, go, authState }) {
   const nextEpisode = currentIdx >= 0 && currentIdx < seriesArticles.length - 1 ? seriesArticles[currentIdx + 1] : null;
 
   // อัปเดตยอดวิวขึ้น Firestore
+  //
+  // Counted on mount before, so a link opened and closed a second later — or a
+  // tab restored on startup, or a prefetch — was worth a full view. Wait until
+  // someone has actually had the page open, and in front of them, for a few
+  // seconds. bumpContentMetric() handles the per-reader deduplication.
   useEffect(() => {
-    if (displayItem && !loadingArticles && hasIncrementedView.current !== displayItem.id) {
-      hasIncrementedView.current = displayItem.id
-      const viewKey = `talib_viewed_article_${displayItem.id}`
-      if (!sessionStorage.getItem(viewKey)) {
-        sessionStorage.setItem(viewKey, "1")
-        bumpContentMetric("articles", displayItem.id, "views")
-      }
+    if (!displayItem || loadingArticles) return
+    if (hasIncrementedView.current === displayItem.id) return
+
+    const articleId = displayItem.id
+    let timer = null
+
+    const start = () => {
+      if (timer || document.visibilityState !== "visible") return
+      timer = setTimeout(() => {
+        hasIncrementedView.current = articleId
+        bumpContentMetric("articles", articleId, "views")
+      }, VIEW_DWELL_MS)
+    }
+    const stop = () => { clearTimeout(timer); timer = null }
+    const onVisibility = () => (document.visibilityState === "visible" ? start() : stop())
+
+    start()
+    document.addEventListener("visibilitychange", onVisibility)
+    return () => {
+      stop()
+      document.removeEventListener("visibilitychange", onVisibility)
     }
   }, [displayItem, loadingArticles])
 

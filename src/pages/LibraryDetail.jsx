@@ -29,6 +29,9 @@ function getPreviewUrl(url) {
   return url
 }
 
+// How long the page has to be open, and visible, before it counts as a view.
+const VIEW_DWELL_MS = 8000
+
 export default function LibraryDetail({ item, go, authState }) {
   const uid = authState?.user?.uid;
   const isLoggedIn = !!uid;
@@ -68,10 +71,31 @@ export default function LibraryDetail({ item, go, authState }) {
   }, [displayItem, authState?.user?.uid])
 
   // --- ระบบนับยอดเข้าชมของจริง (ยิงขึ้น Firebase) ---
+  //
+  // Same as the article page: this fired the moment the page mounted, so a tab
+  // opened and closed straight away still counted. Require a few seconds with
+  // the page actually visible; bumpContentMetric() deduplicates per reader.
   useEffect(() => {
-    if (displayItem && !loading && hasIncrementedView.current !== displayItem.id) {
-      hasIncrementedView.current = displayItem.id
-      bumpContentMetric("books", displayItem.id, "views")
+    if (!displayItem || loading) return
+    if (hasIncrementedView.current === displayItem.id) return
+
+    const bookId = displayItem.id
+    let timer = null
+    const start = () => {
+      if (timer || document.visibilityState !== "visible") return
+      timer = setTimeout(() => {
+        hasIncrementedView.current = bookId
+        bumpContentMetric("books", bookId, "views")
+      }, VIEW_DWELL_MS)
+    }
+    const stop = () => { clearTimeout(timer); timer = null }
+    const onVisibility = () => (document.visibilityState === "visible" ? start() : stop())
+
+    start()
+    document.addEventListener("visibilitychange", onVisibility)
+    return () => {
+      stop()
+      document.removeEventListener("visibilitychange", onVisibility)
     }
   }, [displayItem, loading])
 
