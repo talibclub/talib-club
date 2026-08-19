@@ -186,6 +186,16 @@ export default function NotebookTopBar({ ui }) {
 
             </div>
          </div>
+         {/* Which build this page is running. Deploy questions kept costing a
+             round trip — "is this the new code or a cached copy?" — and a
+             screenshot can now answer it. __BUILD_ID__ is the short commit hash,
+             stamped in by vite.config.js. */}
+         <span
+           title="รหัสเวอร์ชันของโค้ดที่กำลังรันอยู่"
+           style={{ position: 'absolute', right: 6, bottom: -1, fontSize: 8.5, lineHeight: 1, color: HW.textDim, opacity: 0.5, pointerEvents: 'none', fontFamily: 'monospace', zIndex: 3 }}
+         >
+           {typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : 'dev'}
+         </span>
        </div>
 
          {/* Recordings list panel — rendered outside the scrollable header. */}

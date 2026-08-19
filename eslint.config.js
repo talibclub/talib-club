@@ -35,6 +35,7 @@ const browserGlobals = {
   AbortSignal: "readonly",
   AbortController: "readonly",
   queueMicrotask: "readonly",
+  __BUILD_ID__: "readonly",
   CustomEvent: "readonly",
   ResizeObserver: "readonly",
   IntersectionObserver: "readonly",

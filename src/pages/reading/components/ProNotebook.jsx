@@ -3218,11 +3218,23 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 44, maxWidth: 'calc(100% - 24px)', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 12, background: 'rgba(255,251,235,0.97)', border: '1px solid #FDE68A', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', backdropFilter: 'blur(8px)' }}>
           <FileText size={18} color="#B45309" style={{ flexShrink: 0 }} />
           <span style={{ fontSize: 12.5, color: '#92400E', lineHeight: 1.4 }}>หน้า PDF ของหนังสือ <b>เขียนทับตรงๆ ไม่ได้</b> — ต้องดึงเข้ามาในโน้ตก่อน</span>
+          {/* The primary action said "ดึงหน้าจากหนังสือ" and opened the snip
+              tool, which captures a region of one page. That is not what the
+              words promise, and it is not what someone reading this hint wants:
+              they want the book in the notebook. Full import is the main button
+              now, and snipping is offered as what it actually is. */}
           <button
-            onClick={() => { setBookSnipInitialPage(1); setShowBookSnip(true); dismissPdfHint(); }}
+            onClick={() => { startLoadingPDF(); dismissPdfHint(); }}
             style={{ flexShrink: 0, border: 'none', background: HW.accent, color: 'white', fontWeight: 600, fontSize: 12, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
           >
-            <Camera size={14} /> ดึงหน้าจากหนังสือ
+            <BookOpen size={14} /> ดึง PDF ทุกหน้าเข้าโน้ต
+          </button>
+          <button
+            onClick={() => { setBookSnipInitialPage(1); setShowBookSnip(true); dismissPdfHint(); }}
+            title="เลือกกรอบเฉพาะส่วนที่ต้องการจากหน้าใดหน้าหนึ่ง"
+            style={{ flexShrink: 0, border: '1px solid #FDE68A', background: 'transparent', color: '#92400E', fontWeight: 600, fontSize: 12, padding: '6px 10px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
+          >
+            <Camera size={14} /> แคปเฉพาะบางส่วน
           </button>
           <button onClick={dismissPdfHint} title="เข้าใจแล้ว" style={{ flexShrink: 0, border: 'none', background: 'transparent', color: '#92400E', cursor: 'pointer', display: 'flex', padding: 2 }}><X size={16} /></button>
         </div>
