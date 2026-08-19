@@ -60,53 +60,22 @@ export default function StaffTasks({ currentUser, staffTeam, sendBotNotification
       const storage = getStorage(app)
       if (form.files && form.files.length > 0) {
         for (const file of form.files) {
-          const isVideo = file.type.startsWith("video/") || file.name.match(/\.(mp4|mov|webm|avi|mkv|ogg)$/i)
-          
-          if (isVideo) {
-             // NOTE: `talib_videos` is an UNSIGNED Cloudinary preset, so the
-             // cloud name and preset below are necessarily visible in the
-             // bundle and anyone can upload to that account with them. This
-             // cannot be fixed from the client — restrict the preset in the
-             // Cloudinary console (allowed formats, max file size, a fixed
-             // folder, and Access Control) or move the upload behind a signed
-             // serverless endpoint. The size check here only stops honest
-             // mistakes.
-             const MAX_VIDEO_BYTES = 200 * 1024 * 1024
-             if (file.size > MAX_VIDEO_BYTES) {
-               throw new Error(`ไฟล์วิดีโอ "${file.name}" ใหญ่เกิน 200MB`)
-             }
-             const formData = new FormData()
-             formData.append("file", file)
-             formData.append("upload_preset", "talib_videos")
-             
-             try {
-               const res = await fetch("https://api.cloudinary.com/v1_1/dldqlklcf/video/upload", {
-                 method: "POST",
-                 body: formData
-               })
-               const data = await res.json()
-               if (data.secure_url) {
-                  const secureUrl = data.secure_url
-                  const extIndex = secureUrl.lastIndexOf('.')
-                  let optimizedUrl = secureUrl
-                  if (extIndex !== -1) {
-                     optimizedUrl = secureUrl.substring(0, extIndex) + ".mp4"
-                  }
-                  fileLinks.push({ name: file.name, url: optimizedUrl, source: "cloudinary" })
-               } else {
-                  throw new Error("Cloudinary upload failed: " + JSON.stringify(data))
-               }
-             } catch (uploadErr) {
-               console.error("Cloudinary upload error:", uploadErr)
-               throw uploadErr
-             }
-          } else {
-             const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
-             const storageRef = ref(storage, `staff_tasks/${Date.now()}_${safeName}`)
-             await uploadBytes(storageRef, file)
-             const url = await getDownloadURL(storageRef)
-             fileLinks.push({ name: file.name, url, source: "firebase" })
+          // Video used to go to Cloudinary through an UNSIGNED upload preset,
+          // which meant the cloud name and preset sat in the JS bundle and
+          // anyone could upload to that account. It cannot be secured from the
+          // browser. Nobody was using video attachments, so the whole path is
+          // gone and every file now takes the same route as the rest:
+          // staff_tasks/ in Firebase Storage, which storage.rules already
+          // restricts to staff.
+          const MAX_UPLOAD_BYTES = 200 * 1024 * 1024
+          if (file.size > MAX_UPLOAD_BYTES) {
+            throw new Error(`ไฟล์ "${file.name}" ใหญ่เกิน 200MB`)
           }
+          const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
+          const storageRef = ref(storage, `staff_tasks/${Date.now()}_${safeName}`)
+          await uploadBytes(storageRef, file)
+          const url = await getDownloadURL(storageRef)
+          fileLinks.push({ name: file.name, url, source: "firebase" })
         }
       }
 
