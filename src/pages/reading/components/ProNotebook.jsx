@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Path, Group, Circle, Text, Rect, Transformer, RegularPolygon, Line, Star as KonvaStar, Arrow as KonvaArrow } from 'react-konva';
-import { PenTool, Search, Image as ImageIcon, Mic, SquareSquare, ChevronLeft, ChevronRight, Lasso, MonitorPlay, FileText, Bookmark, Cloud, Ruler, Camera, X, Star, Link2, Trash2 } from 'lucide-react';
+import { Bookmark, BookOpen, Camera, ChevronLeft, ChevronRight, Cloud, FileText, Image as ImageIcon, Lasso, Link2, Mic, MonitorPlay, PenTool, Ruler, Search, SquareSquare, Star, Trash2, X } from 'lucide-react';
 import CropModal from './CropModal';
 import ColorPickerPanel from './ColorPickerPanel';
 import BookSnipModal from './BookSnipModal';
