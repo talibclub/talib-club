@@ -81,3 +81,17 @@ export const FONT_OPTIONS = [
   { value: 'serif', label: 'Serif' },
   { value: 'monospace', label: 'Monospace' },
 ];
+
+// Text colours offered as swatches in the text toolbar. Kept short on purpose:
+// a row you can hit in one tap beats a full picker for the thing people
+// actually want, which is black plus a handful of highlights. The pen's
+// ColorPickerPanel is still there for anything else.
+export const TEXT_COLORS = [
+  { value: '#1a1916', label: 'ดำ' },
+  { value: '#5d5850', label: 'เทา' },
+  { value: '#c0392b', label: 'แดง' },
+  { value: '#d97706', label: 'ส้ม' },
+  { value: '#0f6e56', label: 'เขียว' },
+  { value: '#1d4ed8', label: 'น้ำเงิน' },
+  { value: '#6b21a8', label: 'ม่วง' },
+];

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Minus, Plus } from 'lucide-react';
-import { FONT_OPTIONS, LINE_HEIGHT } from './theme.js';
+import { FONT_OPTIONS, LINE_HEIGHT, TEXT_COLORS } from './theme.js';
 import { migrateText, makeLine, listPrefixes } from './geometry.js';
 
 // WYSIWYG in-place editor for a text object with PER-LINE formatting.
@@ -317,9 +317,38 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
         )}
 
         {onColor && (
-          <label title="สีข้อความ" {...noFocusSteal} style={{ width: 22, height: 22, borderRadius: '50%', background: t.color || '#111827', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.15)', cursor: 'pointer', flexShrink: 0, display: 'block', overflow: 'hidden', marginLeft: 2 }}>
-            <input type="color" value={t.color || '#111827'} onChange={(e) => onColor(e.target.value)} style={{ opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }} />
-          </label>
+          <>
+            <div style={{ width: 1, height: 16, background: 'var(--br2)', margin: '0 2px' }} />
+            {/* Swatches, not a colour well. The well opened the native
+                <input type="color">, which does nothing at all on several
+                tablet browsers — the same reason ColorPickerPanel exists — and
+                even where it worked it took two taps and a system dialog to
+                pick black. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+              {TEXT_COLORS.map((c) => {
+                const on = (t.color || '#1a1916').toLowerCase() === c.value.toLowerCase();
+                return (
+                  <button
+                    key={c.value}
+                    {...noFocusSteal}
+                    onClick={(e) => { e.stopPropagation(); onColor(c.value); }}
+                    title={c.label}
+                    aria-label={c.label}
+                    aria-pressed={on}
+                    style={{
+                      width: 18, height: 18, borderRadius: '50%', padding: 0, cursor: 'pointer',
+                      background: c.value, flexShrink: 0,
+                      border: on ? '2px solid #fff' : 'none',
+                      boxShadow: on
+                        ? `0 0 0 2px ${c.value}, inset 0 0 0 1px rgba(0,0,0,0.12)`
+                        : 'inset 0 0 0 1px rgba(0,0,0,0.14)',
+                      transition: 'box-shadow 0.15s',
+                    }}
+                  />
+                );
+              })}
+            </div>
+          </>
         )}
         
         <div style={{ width: 1, height: 16, background: 'var(--br2)', margin: '0 2px' }} />

@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import NotebookStyles from './NotebookStyles.jsx';
 import NotebookToolCapsule from './NotebookToolCapsule.jsx';
 import ImageSearchPanel from './ImageSearchPanel.jsx';
+import TextEditor from './TextEditor.jsx';
 import { HW } from './theme.js';
 
 const noop = () => {};
@@ -31,7 +32,8 @@ export default function NotebookPreview() {
   const [autoShape, setAutoShape] = useState(true);
   const [laserColor, setLaserColor] = useState('#c0392b');
   const [imgQuery, setImgQuery] = useState('ดาว');
-  const [showImgSearch, setShowImgSearch] = useState(true);
+  const [showImgSearch, setShowImgSearch] = useState(false);
+  const [demoText, setDemoText] = useState({ id: 'demo', text: '', color: '#1a1916', size: 24, fontFamily: 'Kanit', align: 'left', list: 'none', width: 340 });
 
   const ui = {
     TOOL_BTN: 40, WRITER_H: 200,
@@ -77,6 +79,21 @@ export default function NotebookPreview() {
           </div>
         </div>
       </div>
+      {/* The text toolbar, so its layout can be looked at directly. */}
+      <TextEditor
+        x={40}
+        y={90}
+        scale={1}
+        t={demoText}
+        textareaRef={{ current: null }}
+        onChange={noop}
+        onLinesChange={noop}
+        onFont={(f) => setDemoText(v => ({ ...v, fontFamily: f }))}
+        onSize={(n) => setDemoText(v => ({ ...v, size: n }))}
+        onColor={(c) => setDemoText(v => ({ ...v, color: c }))}
+        onCommit={noop}
+      />
+
       {showImgSearch && (
         <ImageSearchPanel
           query={imgQuery}
