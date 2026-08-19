@@ -1,4 +1,4 @@
-import { Component, useEffect, useState, lazy, Suspense, useRef, useMemo, useCallback } from "react"
+import { Component, useEffect, useState, lazy, Suspense, useRef, useMemo, useCallback, createElement } from "react"
 import { useNavigate, useLocation, useSearchParams, Routes, Route, Navigate } from "react-router-dom"
 import { useTheme } from "./hooks/useTheme.js"
 import { publicFirebaseConfig } from "./lib/firebase.js"
@@ -31,8 +31,11 @@ const lazyWithRetry = (componentImport) => {
   );
 };
 
-// Dev-only design harness; the route below is compiled out of production.
-const NotebookPreview = lazyWithRetry(() => import("./pages/reading/components/notebook/__preview.jsx"))
+// Dev-only design harness. The route is compiled out of production by the
+// import.meta.env.DEV guard below, but declaring the lazy component here still
+// left Rollup emitting its chunk into dist/ — dead weight that shipped. Building
+// the component inside the guarded branch keeps the dynamic import out of the
+// production graph entirely.
 const Home = lazyWithRetry(() => import("./pages/Home.jsx"))
 const Articles = lazyWithRetry(() => import("./pages/Articles.jsx"))
 const ReadingApp = lazyWithRetry(() => import("./pages/ReadingApp.jsx"))
@@ -405,7 +408,12 @@ export default function App() {
                   is false in a production build, so Rollup drops this and the
                   lazy chunk with it. */}
               {import.meta.env.DEV && (
-                <Route path="/notebook-preview" element={<NotebookPreview />} />
+                <Route
+                  path="/notebook-preview"
+                  element={createElement(
+                    lazyWithRetry(() => import("./pages/reading/components/notebook/__preview.jsx"))
+                  )}
+                />
               )}
               <Route path="*" element={<NotFound go={go} />} />
             </Routes>
