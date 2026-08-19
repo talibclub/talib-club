@@ -4,6 +4,7 @@ import Draggable from "react-draggable"
 import toast from "react-hot-toast"
 import { BOOKS, DEFAULT_TAXONOMY } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings, useUserDoc, invalidateUserDocumentCache } from "../lib/contentStore.js"
+import { loadBookPdf } from "./reading/utils/pdfCache.js"
 import { confirmAction } from "../utils/feedback.jsx"
 import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage"
 import { doc, getDoc, setDoc, serverTimestamp, runTransaction } from "firebase/firestore"
@@ -771,6 +772,20 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   function startReading(shelfItem) {
     setActiveBook(shelfItem)
     setRealPdfPages(0)
+    // Find out how many pages the book really has, so the page fields can be
+    // checked against it. This used to arrive only when the notebook opened the
+    // file, so a reader who never opened the notebook had no limit at all and
+    // could log "read pages 1 to 3222" of a 31-page book — pagesRead feeds the
+    // session score. The preview beside it is a Google Drive iframe, so its own
+    // page count is behind a cross-origin boundary and cannot be read.
+    // Backgrounded and failure-tolerant: the bytes are cached and shared with
+    // the notebook, so this is not a second download when both are used.
+    const fileUrl = shelfItem?.book?.fileUrl
+    if (fileUrl) {
+      loadBookPdf(fileUrl)
+        .then((pdf) => { if (pdf?.numPages > 0) setRealPdfPages(pdf.numPages) })
+        .catch((err) => console.warn("Could not read the book's page count", err))
+    }
     sessionStorage.setItem("activeReadingSession", shelfItem.id)
     resumeTimer()
     setStartPage(shelfItem.currentPage || 1)
