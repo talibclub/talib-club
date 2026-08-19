@@ -10,6 +10,7 @@ import NotebookToolCapsule from './NotebookToolCapsule.jsx';
 import NotebookTopBar from './NotebookTopBar.jsx';
 import ImageSearchPanel from './ImageSearchPanel.jsx';
 import TextEditor from './TextEditor.jsx';
+import StickyNoteEditor from './StickyNoteEditor.jsx';
 import { HW } from './theme.js';
 
 const noop = () => {};
@@ -35,6 +36,12 @@ export default function NotebookPreview() {
   const [imgQuery, setImgQuery] = useState('ดาว');
   const [showImgSearch, setShowImgSearch] = useState(false);
   const [demoX, setDemoX] = useState(40);
+  // A sticky note at a board zoom you choose. The reported bug only shows
+  // at the zoom the reading room actually uses, so the zoom is adjustable
+  // and the note is drawn behind the editor at the same size Konva draws it.
+  const [noteScale, setNoteScale] = useState(0.43);
+  const [stickyValue, setStickyValue] = useState('');
+  const [committed, setCommitted] = useState('(ยังไม่บันทึก)');
   const [demoText, setDemoText] = useState({ id: 'demo', text: '', color: '#1a1916', size: 24, fontFamily: 'Kanit', align: 'left', list: 'none', width: 340 });
 
   const ui = {
@@ -102,6 +109,38 @@ export default function NotebookPreview() {
           </div>
         </div>
       </div>
+      {/* The sticky note editor over a stand-in note, at an adjustable zoom. */}
+      <div style={{ position: 'absolute', top: 150, left: 40, zIndex: 50 }}>
+        <div style={{ position: 'absolute', top: -34, left: 0, display: 'flex', gap: 6, alignItems: 'center', fontSize: 12 }}>
+          <span style={{ color: HW.textDim }}>zoom</span>
+          {[0.3, 0.43, 0.6, 1, 1.6].map(z => (
+            <button key={'z'+z} onClick={() => setNoteScale(z)}
+              style={{ padding: '3px 8px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${HW.hairline}`,
+                       background: noteScale === z ? HW.accent : '#fff', color: noteScale === z ? '#fff' : HW.text }}>
+              {z}
+            </button>
+          ))}
+          <span style={{ color: HW.textDim, marginLeft: 8 }}>บันทึกแล้ว: <b style={{ color: HW.text }}>{committed || '(ว่าง)'}</b></span>
+        </div>
+        {/* Stand-in for the Konva note underneath the editor. */}
+        <div style={{ position: 'absolute', top: 0, left: 0, width: 150 * noteScale, height: 150 * noteScale,
+                      background: '#FDE68A', boxShadow: '2px 3px 8px rgba(0,0,0,0.18)' }} />
+        <StickyNoteEditor
+          x={0}
+          y={0}
+          scale={noteScale}
+          round={false}
+          box={{ left: 12 * noteScale, top: 24 * noteScale, width: 126 * noteScale,
+                 height: 116 * noteScale, fontSize: 16 * noteScale, align: 'left',
+                 noteHeight: 150 * noteScale }}
+          value={stickyValue}
+          onChange={setStickyValue}
+          textareaRef={{ current: null }}
+          onCommit={() => setCommitted(stickyValue)}
+          onDelete={() => { setStickyValue(''); setCommitted('(ลบแล้ว)'); }}
+        />
+      </div>
+
       {/* The text toolbar, so its layout can be looked at directly. */}
       <TextEditor
         x={demoX}

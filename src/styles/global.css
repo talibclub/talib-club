@@ -363,6 +363,14 @@ button {
   color: var(--teal)
 }
 
+/* Note the `width: 100%` and `max-width: 100%` below: they suit the form fields
+   this rule was written for, but they also apply to every input on the site,
+   including ones positioned over a canvas. If such a field sits in a wrapper
+   that has no width of its own (a `position:absolute` box whose children are
+   all absolutely positioned is zero by zero), 100% of zero wins over the
+   element's own width and it renders 0px wide — present, focusable, and
+   invisible. The notebook's sticky-note editor hit exactly this. Overlay fields
+   should set `max-width: none` and give their wrapper a real size. */
 input,
 select,
 textarea {

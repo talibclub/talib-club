@@ -20,6 +20,11 @@ export default function StickyNoteEditor({ x, y, scale, round, value, onChange, 
   const boxHeight = Math.max(48, safe(box?.height, 116 * scale));
   const noteHeight = safe(box?.noteHeight, 150 * scale);
 
+  // At a small board zoom the readable floors above make the editor wider than
+  // the note itself. Let it read as a deliberate little editing card in that
+  // case rather than a misaligned overlay.
+  const overflowsNote = boxWidth > safe(box?.width, boxWidth) + 1;
+
   // onBlur used to commit unconditionally. The textarea mounts in the same
   // commit as the Konva pointer handling, which takes focus straight back off
   // it — so the editor opened and closed again before the parent's 60ms
@@ -27,7 +32,14 @@ export default function StickyNoteEditor({ x, y, scale, round, value, onChange, 
   // A blur can only close the editor once the textarea has actually held focus.
   const hasFocused = useRef(false);
   return (
-    <div style={{ position: 'absolute', top: y, left: x, zIndex: 100 }}>
+    // The wrapper used to be a zero-by-zero box, because everything inside it
+    // is absolutely positioned. Harmless on its own — but global.css styles
+    // every input on the site with `width:100%; max-width:100%`, and 100% of
+    // zero is zero. The textarea's own `width` was set and simply lost to that
+    // max-width, so it rendered 0px wide: the text was there the whole time
+    // (scrollHeight said so) with no width to show it in. Giving the wrapper the
+    // note's real size, and taking the max-width cap off below, fixes it.
+    <div style={{ position: 'absolute', top: y, left: x, width: noteHeight, height: noteHeight, zIndex: 100 }}>
       <textarea
         ref={textareaRef}
         autoFocus
@@ -65,9 +77,11 @@ export default function StickyNoteEditor({ x, y, scale, round, value, onChange, 
           // A faint wash and ring, so an open editor always reads as a field you
           // can type into rather than a blank note.
           border: 'none',
-          boxShadow: '0 0 0 2px rgba(15,110,86,0.35)',
+          boxShadow: overflowsNote
+            ? '0 0 0 2px rgba(15,110,86,0.45), 0 6px 20px rgba(0,0,0,0.18)'
+            : '0 0 0 2px rgba(15,110,86,0.35)',
           borderRadius: 6,
-          background: 'rgba(255,255,255,0.55)',
+          background: overflowsNote ? '#FFFDF5' : 'rgba(255,255,255,0.55)',
           color: '#111827',
           caretColor: '#0f6e56',
           fontSize: `${fontSize}px`,
@@ -78,6 +92,10 @@ export default function StickyNoteEditor({ x, y, scale, round, value, onChange, 
           resize: 'none',
           width: boxWidth,
           height: boxHeight,
+          // Both of these override the site-wide input rule. Without them the
+          // box collapses to nothing and typing looks like it does not work.
+          maxWidth: 'none',
+          minWidth: 0,
           overflow: 'auto',
         }}
       />
