@@ -10,6 +10,8 @@ import NotebookToolCapsule from './NotebookToolCapsule.jsx';
 import NotebookTopBar from './NotebookTopBar.jsx';
 import ImageSearchPanel from './ImageSearchPanel.jsx';
 import TextEditor from './TextEditor.jsx';
+import { migrateSticker } from './geometry.js';
+import { stickerTextStyle } from './stickerText.js';
 import { HW } from './theme.js';
 
 const noop = () => {};
@@ -35,13 +37,12 @@ export default function NotebookPreview() {
   const [imgQuery, setImgQuery] = useState('ดาว');
   const [showImgSearch, setShowImgSearch] = useState(false);
   const [demoX, setDemoX] = useState(40);
-  // A sticky note at a board zoom you choose. The reported bug only shows
-  // at the zoom the reading room actually uses, so the zoom is adjustable
-  // and the note is drawn behind the editor at the same size Konva draws it.
-  const [noteScale, setNoteScale] = useState(0.43);
-  const [stickyValue, setStickyValue] = useState('');
-  const [sticky, setSticky] = useState({ id: 's1', style: 'classic' });
-  const [committed, setCommitted] = useState('(ยังไม่บันทึก)');
+  // A sticky note driven through exactly the path ProNotebook uses: the shared
+  // TextEditor, seeded by migrateSticker, writing lines back to the note. The
+  // reading room needs a login and a book, so this is the only place the note's
+  // editing can actually be run.
+  const [noteScale, setNoteScale] = useState(0.6);
+  const [sticker, setSticker] = useState({ id: 'st1', x: 0, y: 0, style: 'classic', color: '#FEF08A', text: '' });
   const [demoText, setDemoText] = useState({ id: 'demo', text: '', color: '#1a1916', size: 24, fontFamily: 'Kanit', align: 'left', list: 'none', width: 340 });
 
   const ui = {
@@ -109,6 +110,38 @@ export default function NotebookPreview() {
           </div>
         </div>
       </div>
+      {/* --- sticky note, wired the way ProNotebook wires it --- */}
+      <div data-sticky-case style={{ position: 'absolute', top: 330, left: 40 }}>
+        <div style={{ position: 'absolute', top: -30, left: 0, display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, whiteSpace: 'nowrap' }}>
+          <span style={{ color: HW.textDim }}>โน้ต zoom</span>
+          {[0.35, 0.6, 1].map(z => (
+            <button key={'nz'+z} onClick={() => setNoteScale(z)}
+              style={{ padding: '3px 8px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${HW.hairline}`,
+                       background: noteScale === z ? HW.accent : '#fff', color: noteScale === z ? '#fff' : HW.text }}>{z}</button>
+          ))}
+          <span data-sticky-lines style={{ color: HW.textDim }}>{JSON.stringify((sticker.lines || []).map(l => [l.text, l.size, l.list]))}</span>
+        </div>
+        {/* stand-in for the Konva note */}
+        <div style={{ position: 'absolute', top: 0, left: 0, width: 150 * noteScale, height: 150 * noteScale, background: sticker.color, boxShadow: '2px 3px 8px rgba(0,0,0,0.18)' }} />
+        {/* the note's text area, so the editor's fit can be judged */}
+        <div style={{ position: 'absolute', left: 12 * noteScale, top: 24 * noteScale, width: 126 * noteScale, height: 116 * noteScale, outline: '1px dashed rgba(192,57,43,0.45)' }} />
+        <TextEditor
+          key={'sticky-' + noteScale}
+          x={12 * noteScale}
+          y={24 * noteScale}
+          scale={Math.max(noteScale, 13 / Math.max(1, stickerTextStyle(sticker).size))}
+          boxWidth={126}
+          t={{ ...migrateSticker(sticker), size: stickerTextStyle(sticker).size, color: stickerTextStyle(sticker).color, fontFamily: 'Kanit', width: 126 }}
+          textareaRef={{ current: null }}
+          onChange={noop}
+          onLinesChange={(lines) => setSticker(v => ({ ...v, lines, text: lines.map(l => l.text).join('\n') }))}
+          onFont={noop}
+          onSize={(n) => setSticker(v => ({ ...v, textSize: n }))}
+          onColor={(c) => setSticker(v => ({ ...v, textColor: c }))}
+          onCommit={noop}
+        />
+      </div>
+
       {/* The text toolbar, so its layout can be looked at directly. */}
       <TextEditor
         x={demoX}

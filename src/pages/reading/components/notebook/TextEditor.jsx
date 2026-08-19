@@ -93,7 +93,7 @@ const FormatBtn = ({ icon, active, onClick }) => (
   </button>
 );
 
-export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLinesChange, onFont, onSize, onColor, onCommit }) {
+export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLinesChange, onFont, onSize, onColor, onCommit, boxWidth }) {
   // The format bar is anchored to the text box's left edge with
   // `width: max-content` and `maxWidth: calc(100vw - 32px)`. Two problems: a box
   // near the right of the notebook pushed the bar off the edge, and the clamp
@@ -593,9 +593,15 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
           fontFamily,
           lineHeight: LINE_HEIGHT,
           outline: 'none',
-          minWidth: 240,
+          // A sticky note's text is drawn into a fixed 126-unit column, so the
+          // editor has to break lines in the same places or every line rewraps
+          // the moment the editor closes. When a caller gives its column width
+          // the editor matches it exactly; free-floating text boxes keep the
+          // roomy default.
+          width: boxWidth ? boxWidth * scale : undefined,
+          minWidth: boxWidth ? 0 : 240,
           minHeight: 44,
-          maxWidth: '90vw',
+          maxWidth: boxWidth ? 'none' : '90vw',
           whiteSpace: 'pre-wrap',
           overflowWrap: 'break-word',
           // `borderRadius: 10` and a plain drop shadow used to be repeated here,

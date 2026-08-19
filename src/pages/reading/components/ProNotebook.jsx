@@ -4223,7 +4223,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
          const ts = stickerTextStyle(st);
          const sk = migrateSticker(st);
          const polaroid = st.style === 'polaroid';
-         const z = scale * (st.scaleX || 1);
+         const noteZ = scale * (st.scaleX || 1);
+         // Editing scale, not drawing scale. A note zoomed out renders its text
+         // at a handful of pixels — legible as a shape on the page, not as
+         // something to type into. Scaling the font AND the column by the same
+         // factor keeps every line breaking exactly where the canvas breaks it,
+         // so nothing rewraps when the editor closes; the box simply sits a
+         // little proud of the note while being written in.
+         const z = Math.max(noteZ, 13 / Math.max(1, ts.size));
          const updSticker = (mutate) => updatePage(currentPageIndex, (page) => {
             // Replace rather than mutate: updatePage shallow-copies the page but
             // not its arrays, so writing into the sticker would leave the object
@@ -4241,10 +4248,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                key={editingStickerId}
                // Anchored to the note's text area, not the note's corner, so the
                // words sit where the canvas will draw them.
-               x={(st.x + pageX) * scale + position.x + 12 * z}
-               y={(st.y + pageY) * scale + position.y + (polaroid ? 118 : 24) * z}
+               x={(st.x + pageX) * scale + position.x + 12 * noteZ}
+               y={(st.y + pageY) * scale + position.y + (polaroid ? 118 : 24) * noteZ}
                scale={z}
                t={{ ...sk, size: ts.size, color: ts.color, fontFamily: 'Kanit', width: 126 }}
+               boxWidth={126}
                textareaRef={stickerTextareaRef}
                onChange={(val) => setEditingStickerValue(val)}
                onLinesChange={(lines) => updSticker((x) => { x.lines = lines; x.text = lines.map(l => l.text).join('\n'); })}
