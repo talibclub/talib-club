@@ -215,16 +215,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   }, [editingTextId, editingTextValue]);
 
   const [editingStickerId, setEditingStickerId] = useState(null);
-  const [editingStickerValue, setEditingStickerValue] = useState("");
-  const stickerTextareaRef = useRef(null);
-
-  // autoFocus alone did not stick: the textarea mounts in the same commit as the
-  // Konva pointer handling, and focus was being taken straight back off it.
-  useEffect(() => {
-     if (!editingStickerId) return;
-     const t = setTimeout(() => stickerTextareaRef.current?.focus(), 60);
-     return () => clearTimeout(t);
-  }, [editingStickerId]);
+  // The note's text lives on the note itself, written there line by line as it
+  // is typed. There used to be a second copy of it in state here, kept only so
+  // the old textarea could commit it on close — nothing read it any more, and
+  // setting it on every keystroke re-rendered this entire component for nothing.
+  // The focus timer that went with it is gone too: the shared editor focuses
+  // itself on mount and places the caret at the end, which a later blind
+  // focus() call would have undone.
   
   // Which kinds of thing the lasso picks up. Remembered between sessions — a
   // "handwriting only" habit shouldn't have to be re-set every time.
@@ -3702,30 +3699,38 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                      if (!sk.lines.some((l) => l.text)) return null;
                      const prefixes = listPrefixes(sk.lines);
                      const top = st.style === 'polaroid' ? 118 : 24;
+                     const boxH = st.style === 'polaroid' ? 28 : 116;
                      let cursorY = top;
-                     return sk.lines.map((l, i) => {
-                        const lineSize = l.size || ts.size;
-                        const y = cursorY;
-                        cursorY += lineSize * LINE_HEIGHT;
-                        // Nothing below the note's text box gets drawn — a long
-                        // note clips rather than spilling over the paper.
-                        if (y > top + (st.style === 'polaroid' ? 28 : 116)) return null;
-                        return (
-                           <Text
-                              key={i}
-                              text={(prefixes[i] || '') + l.text}
-                              x={12} y={y}
-                              width={126}
-                              fontSize={lineSize}
-                              fill={ts.color}
-                              fontStyle={konvaFontStyle(l)}
-                              textDecoration={textDecorationOf(l)}
-                              fontFamily="Kanit, sans-serif"
-                              align={l.align || ts.align}
-                              listening={false}
-                           />
-                        );
-                     });
+                     return (
+                        // Clipped to the note's text area. Dropping whole lines
+                        // that start past the bottom is not enough on its own —
+                        // one long line wraps into several and spills over the
+                        // page below the note. Konva clips at the group, so the
+                        // note can hold as much text as it likes and never paint
+                        // outside itself.
+                        <Group key="sticker-text" clipX={12} clipY={top} clipWidth={126} clipHeight={boxH}>
+                           {sk.lines.map((l, i) => {
+                              const lineSize = l.size || ts.size;
+                              const y = cursorY;
+                              cursorY += lineSize * LINE_HEIGHT;
+                              return (
+                                 <Text
+                                    key={i}
+                                    text={(prefixes[i] || '') + l.text}
+                                    x={12} y={y}
+                                    width={126}
+                                    fontSize={lineSize}
+                                    fill={ts.color}
+                                    fontStyle={konvaFontStyle(l)}
+                                    textDecoration={textDecorationOf(l)}
+                                    fontFamily="Kanit, sans-serif"
+                                    align={l.align || ts.align}
+                                    listening={false}
+                                 />
+                              );
+                           })}
+                        </Group>
+                     );
                   })()}
                 </Group>
               );
@@ -4253,8 +4258,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                scale={z}
                t={{ ...sk, size: ts.size, color: ts.color, fontFamily: 'Kanit', width: 126 }}
                boxWidth={126}
-               textareaRef={stickerTextareaRef}
-               onChange={(val) => setEditingStickerValue(val)}
                onLinesChange={(lines) => updSticker((x) => { x.lines = lines; x.text = lines.map(l => l.text).join('\n'); })}
                onFont={() => {}}
                onSize={(n) => updSticker((x) => { x.textSize = n; })}
