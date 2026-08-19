@@ -579,14 +579,14 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
           padding: 8,
           border: `1.5px solid ${HW.accentRing}`,
           borderRadius: 14,
-          // Near-transparent rather than a white card. The editor sits over the
-          // page — and over a sticky note's own colour — so painting a panel
-          // behind the words hid exactly the thing being written on. The ring
-          // is what says "you are editing"; the fill only has to lift the text
-          // enough to stay legible over a dark PDF.
-          background: 'rgba(255,255,255,0.10)',
-          backdropFilter: 'saturate(120%) blur(1.5px)',
-          WebkitBackdropFilter: 'saturate(120%) blur(1.5px)',
+          // Fully transparent. Two earlier attempts left it looking like a white
+          // card anyway: first a 90% white fill, then a 10% one plus a 1.5px
+          // backdrop blur — and the blur was the real problem, because blurring
+          // the ruled paper behind the box flattened those lines into a milky
+          // wash, so the inside read as lighter than the outside even though the
+          // fill was nearly nothing. No fill and no blur: the page shows through
+          // untouched, and the ring alone says "you are editing".
+          background: 'transparent',
           boxShadow: `0 0 0 4px ${HW.accentSoft}`,
           color: t.color,
           fontSize: `${size * scale}px`,
