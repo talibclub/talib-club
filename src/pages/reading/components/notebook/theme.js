@@ -1,16 +1,24 @@
 // Shared design tokens and static option lists for the notebook (ProNotebook).
 // Pure data — no React, no side effects — so it's cheap to import anywhere.
 
-// HarmonyOS / Huawei Notes design tokens
+// Notebook design tokens, in Talib Club's colours.
+//
+// These were HarmonyOS blue (#0A59F7) — the notebook was built to look like
+// Huawei Notes and ended up as the one screen on the site that belonged to a
+// different product. The accent is now the site's teal and the surfaces carry
+// its warm paper tone. The export is still called HW because ~130 call sites
+// reference it; only the values changed.
 export const HW = {
-  accent: '#0A59F7',
-  accentSoft: 'rgba(10,89,247,0.10)',
-  surface: 'rgba(255,255,255,0.86)',
+  accent: '#0f6e56',                       // --teal (light theme): the notebook paper is always light
+  accentSoft: 'rgba(15,110,86,0.10)',
+  accentRing: 'rgba(15,110,86,0.28)',
+  surface: 'rgba(252,250,246,0.92)',       // warm off-white rather than pure grey-white
+  paper: '#f7f5f1',                        // --bg (light): the canvas behind the page
   blur: 'saturate(180%) blur(30px)',
-  hairline: 'rgba(0,0,0,0.06)',
-  text: '#181818',
-  textDim: '#6B7280',
-  shadow: '0 6px 24px rgba(0,0,0,0.10), 0 1px 3px rgba(0,0,0,0.06)',
+  hairline: 'rgba(35,31,27,0.09)',
+  text: '#1a1916',                         // --acc (light)
+  textDim: '#5d5850',                      // --t2 (light)
+  shadow: '0 6px 24px rgba(35,31,27,0.10), 0 1px 3px rgba(35,31,27,0.06)',
   radius: 20,
 };
 

@@ -31,6 +31,8 @@ const lazyWithRetry = (componentImport) => {
   );
 };
 
+// Dev-only design harness; the route below is compiled out of production.
+const NotebookPreview = lazyWithRetry(() => import("./pages/reading/components/notebook/__preview.jsx"))
 const Home = lazyWithRetry(() => import("./pages/Home.jsx"))
 const Articles = lazyWithRetry(() => import("./pages/Articles.jsx"))
 const ReadingApp = lazyWithRetry(() => import("./pages/ReadingApp.jsx"))
@@ -398,6 +400,13 @@ export default function App() {
                   <ReadingApp authState={authState} go={go} ctx={ctx} theme={theme} />
                 </RequireLogin>
               } />
+              {/* Dev-only: the notebook toolbars on their own, so their design
+                  can be looked at without a login and a book. import.meta.env.DEV
+                  is false in a production build, so Rollup drops this and the
+                  lazy chunk with it. */}
+              {import.meta.env.DEV && (
+                <Route path="/notebook-preview" element={<NotebookPreview />} />
+              )}
               <Route path="*" element={<NotFound go={go} />} />
             </Routes>
           </Suspense>

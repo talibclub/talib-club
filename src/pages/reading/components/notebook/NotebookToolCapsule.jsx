@@ -1,10 +1,11 @@
 import React from 'react';
-import { Undo2, Redo2, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Underline, Strikethrough, Scissors, Wand2, ChevronRight, Image as ImageIcon, PenTool, Highlighter, Eraser, Type, Square, Circle as CircleIcon, Minus, Lasso, Pencil, Pointer, StickyNote, Brush, Feather, Ruler, Compass, Triangle, Star, Hexagon, ArrowRight, Spline, Smile, Mic, Trash2, Plus } from 'lucide-react';
+import { Undo2, Redo2, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Underline, Strikethrough, Scissors, ChevronRight, PenTool, Square, Circle as CircleIcon, Minus, Triangle, Star, Hexagon, ArrowRight, Spline, Trash2 } from 'lucide-react';
 import { HW, STICKY_COLORS, STICKY_STYLES, FONT_OPTIONS } from './theme.js';
 import { StickyStyleThumb } from './canvasElements.jsx';
 import ColorPickerPanel from '../ColorPickerPanel';
 import EmojiStickerPicker from '../EmojiStickerPicker';
 import { LASSO_KINDS, TOOLS_WITH_OPTIONS, DEFAULT_LASSO_FILTER } from './notebookConstants.js';
+import { TOOL_GROUPS, WRITE_MODES, ACTION_TOOLS, readWriteMode, WRITE_MODE_KEY } from './notebookTools.js';
 
 // The floating tool capsule at the bottom of the notebook: pen/eraser/shape
 // pickers and every tool's options popover. This was ~450 lines inside
@@ -26,12 +27,77 @@ export default function NotebookToolCapsule({ ui }) {
     undo, redo, canUndo, canRedo,
   } = ui;
 
+  // Typing vs handwriting. Remembered per person, because which one you are is
+  // not something you switch between minute to minute.
+  const [writeMode, setWriteMode] = React.useState(readWriteMode);
+  const [inkOpen, setInkOpen] = React.useState(false);
+  const showInk = WRITE_MODES[writeMode].showInk;
+
+  React.useEffect(() => {
+    try { localStorage.setItem(WRITE_MODE_KEY, writeMode); } catch (e) { console.warn(e); }
+  }, [writeMode]);
+
+  // Labels are what make an icon row readable to someone who does not already
+  // know the tools, so they are shown wherever there is room for them.
+  //
+  // Keyed off width, not pointer type: a tablet with a stylus reports a coarse
+  // pointer but has plenty of space — and is exactly where a beginner benefits
+  // most from reading "ข้อความ" instead of guessing at a glyph.
+  const [wideEnough, setWideEnough] = React.useState(
+    () => typeof window === 'undefined' || window.innerWidth >= 620
+  );
+  React.useEffect(() => {
+    const onResize = () => setWideEnough(window.innerWidth >= 620);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const showLabels = wideEnough;
+
+  const visibleTools = React.useMemo(() => {
+    const ink = (showInk || inkOpen) ? TOOL_GROUPS.ink : [];
+    return [...TOOL_GROUPS.core, ...ink, ...TOOL_GROUPS.extras];
+  }, [showInk, inkOpen]);
+
   return (
     <>
       {/* Huawei Notes floating tool capsule (bottom-centered, overlays the canvas) */}
       {!readonly && (
          <div style={{ position: 'absolute', bottom: zoomWriter ? WRITER_H + 44 + 14 : 20, left: '50%', transform: 'translateX(-50%)', zIndex: 46, maxWidth: 'calc(100% - 24px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, transition: 'bottom 0.22s cubic-bezier(0.2,0.8,0.2,1)' }}>
             <div style={{ height: TOOL_BTN + 12, background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, borderRadius: HW.radius, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`, display: 'flex', alignItems: 'center', padding: '0 8px', gap: isCoarse ? 4 : 6, maxWidth: '100%' }}>
+                 {/* Typing vs handwriting. Sits first because it changes what
+                     the rest of the row contains. */}
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0, background: 'rgba(35,31,27,0.05)', borderRadius: 999, padding: 2, marginRight: 2 }}>
+                   {Object.values(WRITE_MODES).map(m => {
+                     const on = writeMode === m.id;
+                     return (
+                       <button
+                         key={m.id}
+                         onClick={() => {
+                           setWriteMode(m.id);
+                           setInkOpen(false);
+                           // Land on the tool the mode is named after, so the
+                           // switch is immediately useful rather than a setting.
+                           setTool(m.defaultTool);
+                           closeOverlays(null);
+                         }}
+                         title={m.id === 'type' ? 'โหมดพิมพ์ — แตะกระดาษเพื่อพิมพ์ได้เลย' : 'โหมดเขียนมือ — ปากกาและดินสอ'}
+                         aria-pressed={on}
+                         style={{
+                           border: 'none', cursor: 'pointer', borderRadius: 999,
+                           padding: showLabels ? '5px 12px' : '5px 9px',
+                           background: on ? '#fff' : 'transparent',
+                           color: on ? HW.accent : HW.textDim,
+                           fontFamily: 'Kanit, sans-serif', fontSize: 12, fontWeight: on ? 600 : 500,
+                           boxShadow: on ? '0 1px 3px rgba(35,31,27,0.14)' : 'none',
+                           transition: 'all 0.16s',
+                         }}
+                       >
+                         {m.label}
+                       </button>
+                     );
+                   })}
+                 </div>
+
                  {/* FIXED Undo / Redo */}
                  <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
                     <button onClick={undo} disabled={!canUndo} className="cancel-drag" style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: 'none', background: 'transparent', color: canUndo ? '#4B5563' : '#D1D5DB', cursor: canUndo ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -62,51 +128,87 @@ export default function NotebookToolCapsule({ ui }) {
                       {...leftToolbarScroll}
                    >
                   
-                  {[
-                    { id: 'pan', icon: Pointer, title: 'เลื่อนกระดาน' },
-                    { id: 'pen', icon: PenTool, title: 'ปากกาลูกลื่น' },
-                    { id: 'fountain', icon: Feather, title: 'ปากกาหมึกซึม' },
-                    { id: 'pencil', icon: Pencil, title: 'ดินสอ' },
-                    { id: 'marker', icon: Brush, title: 'มาร์กเกอร์' },
-                    { id: 'highlighter', icon: Highlighter, title: 'ไฮไลท์' },
-                    { id: 'eraser', icon: Eraser, title: 'ยางลบ' },
-                    { id: 'lasso', icon: Lasso, title: 'Lasso' },
-                    { id: 'ruler', icon: Ruler, title: 'ไม้บรรทัด' },
-                    { id: 'protractor', icon: Compass, title: 'ไม้โปรแทรกเตอร์ (วัดมุม)' },
-                    { id: 'text', icon: Type, title: 'ข้อความ' },
-                    { id: 'shape', icon: Square, title: 'รูปร่าง' },
-                    { id: 'image', icon: ImageIcon, title: 'แทรกรูปภาพ' },
-                    { id: 'sticker', icon: StickyNote, title: 'โพสต์อิท' },
-                    { id: 'emoji', icon: Smile, title: 'อิโมจิ & สติกเกอร์' },
-                    { id: 'laser', icon: Wand2, title: 'เลเซอร์พอยเตอร์' },
-                    { id: 'mic', icon: Mic, title: 'อัดเสียง' }
-                  ].map(t => (
-                     <button 
-                       key={t.id}
-                       title={t.title}
-                       onClick={() => {
-                          if (t.id === 'image') { document.getElementById('image-upload').click(); return; }
-                          if (t.id === 'mic') { toggleRecording(); return; }
-                          if (t.id === 'emoji') { togglePanel('emoji', setShowEmojiPicker, showEmojiPicker); return; }
-                          if (t.id === 'ruler') { setRulerOn(v => !v); return; }
-                          if (t.id === 'protractor') { setProtractorOn(v => !v); return; }
-                          // One tap does it all: selecting a tool also opens its
-                          // options right away (nobody discovers a second tap), and
-                          // the popover tucks itself away as soon as drawing starts.
-                          // Tapping the active tool toggles the popover.
-                          const hasOptions = TOOLS_WITH_OPTIONS.includes(t.id);
-                          if (tool === t.id) togglePanel('tools', setShowToolOptions, showToolOptions);
-                          else { setTool(t.id); closeOverlays(hasOptions ? 'tools' : null); setShowToolOptions(hasOptions); }
-                       }}
-                       style={(() => {
-                          const active = t.id === 'ruler' ? rulerOn : t.id === 'protractor' ? protractorOn : t.id === 'emoji' ? showEmojiPicker : (tool === t.id && !['image','mic'].includes(t.id));
-                          return { flexShrink: 0, width: TOOL_BTN, height: TOOL_BTN, borderRadius: 12, border: 'none', background: active ? HW.accentSoft : 'transparent', color: active ? HW.accent : (t.id === 'mic' && isRecording ? '#EF4444' : HW.textDim), cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.18s cubic-bezier(0.2,0.8,0.2,1), background 0.18s, color 0.18s', position: 'relative', transform: active ? 'translateY(-4px)' : 'none' };
-                       })()}
-                     >
-                       <t.icon size={20} strokeWidth={1.6} />
-                       {t.id === 'mic' && isRecording && <div style={{ position: 'absolute', top: -4, right: -4, width: 8, height: 8, borderRadius: '50%', background: '#EF4444' }}></div>}
-                     </button>
-                  ))}
+                  {visibleTools.map(t => {
+                     const isAction = ACTION_TOOLS.includes(t.id);
+                     const active = t.id === 'ruler' ? rulerOn
+                        : t.id === 'protractor' ? protractorOn
+                        : t.id === 'emoji' ? showEmojiPicker
+                        : (tool === t.id && !['image', 'mic'].includes(t.id));
+                     return (
+                       <button
+                         key={t.id}
+                         title={t.title}
+                         aria-label={t.title}
+                         aria-pressed={active}
+                         onClick={() => {
+                            if (t.id === 'image') { document.getElementById('image-upload').click(); return; }
+                            if (t.id === 'mic') { toggleRecording(); return; }
+                            if (t.id === 'emoji') { togglePanel('emoji', setShowEmojiPicker, showEmojiPicker); return; }
+                            if (t.id === 'ruler') { setRulerOn(v => !v); return; }
+                            if (t.id === 'protractor') { setProtractorOn(v => !v); return; }
+                            // One tap does it all: selecting a tool also opens its
+                            // options right away (nobody discovers a second tap), and
+                            // the popover tucks itself away as soon as drawing starts.
+                            // Tapping the active tool toggles the popover.
+                            const hasOptions = TOOLS_WITH_OPTIONS.includes(t.id);
+                            if (tool === t.id) togglePanel('tools', setShowToolOptions, showToolOptions);
+                            else { setTool(t.id); closeOverlays(hasOptions ? 'tools' : null); setShowToolOptions(hasOptions); }
+                         }}
+                         style={{
+                            flexShrink: 0,
+                            minWidth: TOOL_BTN,
+                            height: showLabels ? TOOL_BTN + 14 : TOOL_BTN,
+                            padding: showLabels ? '4px 10px' : 0,
+                            borderRadius: 13,
+                            border: 'none',
+                            background: active ? HW.accentSoft : 'transparent',
+                            color: active ? HW.accent : (t.id === 'mic' && isRecording ? '#c0392b' : HW.textDim),
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: showLabels ? 'column' : 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: showLabels ? 2 : 0,
+                            fontFamily: 'Kanit, sans-serif',
+                            fontSize: 10.5,
+                            fontWeight: active ? 600 : 500,
+                            lineHeight: 1.1,
+                            transition: 'transform 0.18s cubic-bezier(0.2,0.8,0.2,1), background 0.18s, color 0.18s',
+                            position: 'relative',
+                            transform: active && !showLabels ? 'translateY(-4px)' : 'none',
+                            boxShadow: active ? `inset 0 0 0 1px ${HW.accentRing}` : 'none',
+                         }}
+                       >
+                         <t.icon size={showLabels ? 19 : 20} strokeWidth={active ? 2 : 1.6} />
+                         {showLabels && <span style={{ whiteSpace: 'nowrap' }}>{t.label}</span>}
+                         {isAction && !showLabels && null}
+                         {t.id === 'mic' && isRecording && <div style={{ position: 'absolute', top: -3, right: -3, width: 8, height: 8, borderRadius: '50%', background: '#c0392b' }}></div>}
+                       </button>
+                     );
+                  })}
+
+                  {/* Fold the pens away for people who only type, and let them
+                      back with one tap. This is the whole point of the grouping:
+                      "ข้อความ" used to be the 11th icon in a scrolling strip. */}
+                  {!showInk && (
+                    <button
+                      onClick={() => setInkOpen(v => !v)}
+                      title="เครื่องมือเขียนด้วยมือ — ปากกา ดินสอ ไฮไลต์"
+                      aria-expanded={inkOpen}
+                      style={{
+                        flexShrink: 0, minWidth: TOOL_BTN, height: showLabels ? TOOL_BTN + 14 : TOOL_BTN,
+                        padding: showLabels ? '4px 10px' : 0, borderRadius: 13, border: 'none',
+                        background: inkOpen ? HW.accentSoft : 'transparent',
+                        color: inkOpen ? HW.accent : HW.textDim, cursor: 'pointer',
+                        display: 'flex', flexDirection: showLabels ? 'column' : 'row',
+                        alignItems: 'center', justifyContent: 'center', gap: showLabels ? 2 : 0,
+                        fontFamily: 'Kanit, sans-serif', fontSize: 10.5, fontWeight: 500, lineHeight: 1.1,
+                      }}
+                    >
+                      <PenTool size={showLabels ? 19 : 20} strokeWidth={1.6} />
+                      {showLabels && <span style={{ whiteSpace: 'nowrap' }}>เขียนมือ</span>}
+                    </button>
+                  )}
 
                   {selectedId && (
                      <>
