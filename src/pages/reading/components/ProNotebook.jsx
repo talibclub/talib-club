@@ -802,10 +802,16 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // Autosave: idle debounce (5s) + max-wait flush. A pure debounce resets on
   // every stroke, so 30 minutes of continuous writing never reached the cloud
   // even once — the max-wait guarantees a save at least every 45s while active.
-  const lastAutoSaveRef = useRef(Date.now());
+  // Seeded on the first run rather than in useRef(Date.now()), which called the
+  // clock on every single render and threw the answer away each time bar the
+  // first. null means "no save has happened yet", which starts the max-wait
+  // window here instead of at whatever time the component happened to mount.
+  const lastAutoSaveRef = useRef(null);
   useEffect(() => {
     if (readonly || !pages || pages.length === 0) return;
     if (loadStateRef.current !== 'ready') return; // never overwrite before load settles
+
+    if (lastAutoSaveRef.current === null) lastAutoSaveRef.current = Date.now();
 
     const MAX_WAIT = 45000;
     const sinceLast = Date.now() - lastAutoSaveRef.current;
