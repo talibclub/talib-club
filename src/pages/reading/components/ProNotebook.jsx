@@ -1589,7 +1589,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           page.stickers.push(newSticker);
        });
        setEditingStickerId(newSticker.id);
-       setEditingStickerValue('');
        return;
     }
     
@@ -3637,13 +3636,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   // for the sticker tool, so in typing mode — where `text` is the
                   // tool you land on — tapping a sticky note did nothing at all,
                   // and there was no obvious way to write on one.
-                  onClick={(e) => { e.cancelBubble = true; if (tool === 'sticker' || tool === 'text') { setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); } else if (tool === 'pan' || tool === 'lasso') { selectShape(st.id); } }}
-                  onTap={(e) => { e.cancelBubble = true; if (tool === 'sticker' || tool === 'text') { setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); } else if (tool === 'pan' || tool === 'lasso') { selectShape(st.id); } }}
+                  onClick={(e) => { e.cancelBubble = true; if (tool === 'sticker' || tool === 'text') { setEditingStickerId(st.id); } else if (tool === 'pan' || tool === 'lasso') { selectShape(st.id); } }}
+                  onTap={(e) => { e.cancelBubble = true; if (tool === 'sticker' || tool === 'text') { setEditingStickerId(st.id); } else if (tool === 'pan' || tool === 'lasso') { selectShape(st.id); } }}
                   // Double-tap starts typing whatever tool is in hand. Otherwise
                   // you have to go back to the toolbar and pick the text tool
                   // every time you have moved a note with the pan tool.
-                  onDblClick={(e) => { e.cancelBubble = true; setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); }}
-                  onDblTap={(e) => { e.cancelBubble = true; setEditingStickerId(st.id); setEditingStickerValue(st.text || ''); }}
+                  onDblClick={(e) => { e.cancelBubble = true; setEditingStickerId(st.id); }}
+                  onDblTap={(e) => { e.cancelBubble = true; setEditingStickerId(st.id); }}
                 >
                   {st.style === 'polaroid' ? (
                      <>
@@ -4373,7 +4372,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                if (kind === 'texts') {
                  setEditingTextId(obj.id); setEditingTextValue(obj.text || ''); isEditingText.current = true;
                } else {
-                 setEditingStickerId(obj.id); setEditingStickerValue(obj.text || '');
+                 setEditingStickerId(obj.id);
                }
                selectShape(null);
              }}

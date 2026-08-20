@@ -14,6 +14,9 @@ const viteConfig = {
 }
 
 if (command === "build") {
+  // Undefined identifiers do not fail a Vite build — they throw once the code
+  // runs, in front of a user. Catch them here, before anything is emitted.
+  await import("./check-undefined.mjs")
   await build(viteConfig)
   try {
     console.log("Running sitemap generator...")

@@ -8,7 +8,9 @@
     "dev:lan": "node ./scripts/vite-runner.mjs dev --lan",
     "build": "node ./scripts/vite-runner.mjs build",
     "preview": "node ./scripts/vite-runner.mjs preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint src --ext .js,.jsx",
+    "check:undefined": "node ./scripts/check-undefined.mjs"
   },
   "dependencies": {
     "@vercel/functions": "^3.9.3",
