@@ -1,5 +1,6 @@
 import { detailPath } from '../src/utils/slug.js';
-import { isoDuration, mediaSummary, mediaThumbnail } from '../src/utils/mediaSeo.js';
+import { isoDuration, mediaDescription, mediaSummary, mediaThumbnail } from '../src/utils/mediaSeo.js';
+import { comparableDate, toSchemaDate } from '../src/utils/dates.js';
 
 const BASE_URL = 'https://talibclub.org';
 const SITE_NAME = 'Talib Club';
@@ -121,8 +122,10 @@ async function listDocs(collection, fields) {
   return items;
 }
 
+// comparableDate(), not the raw field: the admin enters Buddhist years, so a
+// string sort reads every Gregorian-dated record as older than everything else.
 function byNewestFirst(a, b) {
-  return String(b.date || b.updateTime || '').localeCompare(String(a.date || a.updateTime || ''));
+  return comparableDate(b.date || b.updateTime).localeCompare(comparableDate(a.date || a.updateTime));
 }
 
 function stripHtml(html) {
@@ -518,17 +521,63 @@ async function renderScholars() {
   };
 }
 
+// The prerendered copy used to be a heading and one sentence — 126 characters
+// of body text, which is not a page Google has any reason to index. It now
+// carries what src/pages/Donation.jsx actually shows a visitor: what the money
+// is for and how to give. The account number deliberately stays out of it; the
+// page reads that from content_settings/site at runtime, and a copy frozen into
+// the crawler's HTML is one that goes stale silently.
 function renderDonate() {
+  const purposes = [
+    'แปลและจัดพิมพ์หนังสืออิสลาม แจกจ่ายทั้งรูปแบบเล่มและไฟล์ดาวน์โหลดฟรี',
+    'พัฒนาเว็บไซต์และระบบห้องสมุดออนไลน์ของ Talib Club',
+    'ค่าใช้จ่ายด้านอาคาร คลังเก็บหนังสือ และอุปกรณ์',
+    'ผลิตเนื้อหาออนไลน์ ทั้งบทความ วิดีโอ และพอดแคสต์',
+    'พัฒนากลุ่มและจัดหาอุปกรณ์สำหรับงานดะวะฮฺ',
+  ];
+
+  const steps = [
+    ['สแกน QR Code หรือคัดลอกเลขบัญชี', 'ใช้แอปพลิเคชันธนาคารของท่านสแกน QR Code หรือคัดลอกเลขบัญชีธนาคารไทยพาณิชย์ (SCB) ที่แสดงอยู่บนหน้าร่วมบริจาค'],
+    ['สนับสนุนการทำงานของกลุ่ม', 'ญะซากุมุลลอฮุค็อยร็อน — ขออัลลอฮฺทรงตอบแทนความดีงามแก่ท่าน สำหรับการมีส่วนร่วมในงานดะวะฮฺครั้งนี้'],
+  ];
+
+  const description = 'ร่วมสมทบทุนกับกลุ่มฏอลิบ (Talib Club) เพื่อแปลและแจกหนังสืออิสลามแนวทางสะลัฟ ผลิตสื่อการเรียนรู้ และดูแลห้องสมุดออนไลน์ โอนผ่านธนาคารไทยพาณิชย์หรือสแกน QR Code';
+
   return {
     canonical: `${BASE_URL}/donate`,
     html: generateHtml({
-      title: 'ร่วมบริจาค | Talib Club',
-      description: 'ร่วมสนับสนุนการเผยแพร่ความรู้อิสลามแนวทางสะลัฟกับ Talib Club',
+      title: 'ร่วมบริจาคสมทบทุนงานดะวะฮฺ | Talib Club',
+      description,
       canonical: `${BASE_URL}/donate`,
-      jsonLd: breadcrumbs([{ name: 'หน้าแรก', path: '/' }, { name: 'ร่วมบริจาค', path: '/donate' }]),
+      jsonLd: [
+        {
+          '@context': 'https://schema.org',
+          '@type': 'DonateAction',
+          name: 'ร่วมสมทบทุนกับกลุ่มฏอลิบ',
+          description,
+          recipient: {
+            '@type': 'Organization',
+            name: SITE_NAME,
+            url: BASE_URL,
+            logo: { '@type': 'ImageObject', url: `${BASE_URL}/logo.png` },
+          },
+          url: `${BASE_URL}/donate`,
+        },
+        breadcrumbs([{ name: 'หน้าแรก', path: '/' }, { name: 'ร่วมบริจาค', path: '/donate' }]),
+      ],
       bodyContent: `
-      <h1>ร่วมบริจาค</h1>
-      <p>ร่วมสนับสนุนการเผยแพร่ความรู้อิสลามแนวทางสะลัฟกับ Talib Club</p>
+      <h1>ร่วมสมทบทุน</h1>
+      <p>เป็นส่วนหนึ่งในการทำงานดะวะฮฺของกลุ่มฏอลิบ ทุกยอดบริจาคถูกใช้ไปกับการเผยแพร่ความรู้อิสลามตามแนวทางสะลัฟให้เข้าถึงผู้คนได้กว้างที่สุดโดยไม่มีค่าใช้จ่ายกับผู้อ่าน</p>
+
+      <h2>เงินบริจาคจะถูกนำไปใช้ในการ</h2>
+      <ul>${purposes.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+
+      <h2>วิธีการบริจาค</h2>
+      <ol>${steps.map(([title, detail]) => `<li><strong>${escapeHtml(title)}</strong> — ${escapeHtml(detail)}</li>`).join('')}</ol>
+
+      <h2>ผลงานที่เงินบริจาคสนับสนุนอยู่</h2>
+      <p>ติดตามสิ่งที่กลุ่มฏอลิบทำได้จาก <a href="/library">ห้องสมุดหนังสือแปลที่เปิดให้ดาวน์โหลดฟรี</a>,
+         <a href="/articles">บทความวิชาการ</a>, และ <a href="/media">สื่อการเรียนรู้</a> ทั้งหมดบนเว็บไซต์นี้</p>
     `,
     }),
   };
@@ -563,8 +612,8 @@ async function renderArticle(id) {
           headline: article.title,
           inLanguage: 'th',
           author: { '@type': 'Person', name: article.author || SITE_NAME },
-          datePublished: article.date || undefined,
-          dateModified: article.updateTime || article.date || undefined,
+          datePublished: toSchemaDate(article.date),
+          dateModified: toSchemaDate(article.updateTime || article.date),
           articleSection: article.category || undefined,
           keywords: Array.isArray(article.tags) && article.tags.length ? article.tags.join(', ') : undefined,
           image: article.coverUrl || undefined,
@@ -588,7 +637,7 @@ async function renderArticle(id) {
         <h1>${escapeHtml(article.title)}</h1>
         <p><strong>ผู้เขียน:</strong> ${escapeHtml(article.author || '-')} |
            <strong>หมวด:</strong> ${escapeHtml(article.category || '-')} |
-           <strong>วันที่:</strong> <time datetime="${escapeHtml(article.date || '')}">${escapeHtml(article.date || '-')}</time></p>
+           <strong>วันที่:</strong> <time datetime="${escapeHtml(toSchemaDate(article.date) || '')}">${escapeHtml(article.date || '-')}</time></p>
         ${article.coverUrl ? `<img src="${escapeHtml(article.coverUrl)}" alt="${escapeHtml(article.title)}">` : ''}
         ${articleBodyHtml(article.body)}
       </article>
@@ -605,6 +654,18 @@ async function renderBook(id) {
   const path = detailPath('library-detail', book.id, book.title);
   const canonical = `${BASE_URL}${path}`;
   const description = book.desc || book.description || `ดาวน์โหลดหนังสือ ${book.title}`;
+
+  // Book pages were the only detail pages with no outgoing links to their own
+  // kind: every one of them was reachable from /library and from nowhere else,
+  // which is a poor shape to ask a crawler to work through 56 of.
+  const related = (await listDocs('content_books', ['title', 'author', 'category', 'type']))
+    .filter(b => b.id !== book.id && b.category && b.category === book.category)
+    .slice(0, 8)
+    .map(b => ({
+      path: detailPath('library-detail', b.id, b.title),
+      name: b.title,
+      meta: [b.author, b.type].filter(Boolean).join(' · '),
+    }));
 
   return {
     canonical,
@@ -638,6 +699,7 @@ async function renderBook(id) {
         ${book.coverUrl ? `<img src="${escapeHtml(book.coverUrl)}" alt="${escapeHtml(book.title)}">` : ''}
         ${articleBodyHtml(description)}
       </article>
+      ${related.length ? `<h2>หนังสือเล่มอื่นในหมวด${escapeHtml(book.category || '')}</h2>${linkList(related)}` : ''}
     `,
     }),
   };
@@ -657,17 +719,24 @@ async function renderMediaItem(id) {
   const watchUrl = media.embedId ? `https://www.youtube.com/watch?v=${encodeURIComponent(media.embedId)}` : null;
   const spotifyUrl = safeUrl(media.spotifyUrl);
 
-  const sameSeries = media.series
-    ? (await listDocs('content_media', ['title', 'series', 'channel', 'date', 'duration']))
-        .filter(m => m.id !== media.id && m.series === media.series)
-        .sort(byNewestFirst)
-        .slice(0, 10)
-        .map(m => ({
-          path: detailPath('media-detail', m.id, m.title),
-          name: m.title,
-          meta: [m.date, m.duration].filter(Boolean).join(' · '),
-        }))
-    : [];
+  const written = mediaDescription(media);
+
+  // A clip with no playlist used to be a dead end: description, four facts and
+  // no way out but the nav. Falling back to the rest of the channel keeps every
+  // media page linking to ten others.
+  const siblings = (await listDocs('content_media', ['title', 'series', 'channel', 'date', 'duration']))
+    .filter(m => m.id !== media.id)
+    .filter(m => (media.series ? m.series === media.series : m.channel && m.channel === media.channel))
+    .sort(byNewestFirst)
+    .slice(0, 10)
+    .map(m => ({
+      path: detailPath('media-detail', m.id, m.title),
+      name: m.title,
+      meta: [m.date, m.duration].filter(Boolean).join(' · '),
+    }));
+  const siblingsHeading = media.series
+    ? `ตอนอื่นในซีรีส์ ${media.series}`
+    : `สื่ออื่นจากช่อง ${media.channel || SITE_NAME}`;
 
   return {
     canonical,
@@ -685,7 +754,7 @@ async function renderMediaItem(id) {
           inLanguage: 'th',
           description: summary,
           thumbnailUrl: thumbnail || undefined,
-          uploadDate: media.date || media.updateTime || undefined,
+          uploadDate: toSchemaDate(media.date || media.updateTime),
           duration: isoDuration(media.duration),
           embedUrl: media.embedId ? `https://www.youtube.com/embed/${media.embedId}` : undefined,
           contentUrl: watchUrl || spotifyUrl || undefined,
@@ -708,17 +777,17 @@ async function renderMediaItem(id) {
       <article>
         <h1>${escapeHtml(media.title)}</h1>
         ${thumbnail ? `<img src="${escapeHtml(thumbnail)}" alt="${escapeHtml(media.title)}">` : ''}
-        <p>${escapeHtml(summary)}</p>
+        ${written ? articleBodyHtml(written) : `<p>${escapeHtml(summary)}</p>`}
         <ul>
           ${media.series ? `<li><strong>ซีรีส์:</strong> ${escapeHtml(media.series)}</li>` : ''}
           ${media.channel ? `<li><strong>ช่อง:</strong> ${escapeHtml(media.channel)}</li>` : ''}
           ${media.duration ? `<li><strong>ความยาว:</strong> ${escapeHtml(media.duration)} นาที</li>` : ''}
-          ${media.date ? `<li><strong>วันที่เผยแพร่:</strong> <time datetime="${escapeHtml(media.date)}">${escapeHtml(media.date)}</time></li>` : ''}
+          ${media.date ? `<li><strong>วันที่เผยแพร่:</strong> <time datetime="${escapeHtml(toSchemaDate(media.date) || '')}">${escapeHtml(media.date)}</time></li>` : ''}
         </ul>
         ${watchUrl ? `<p><a href="${escapeHtml(watchUrl)}" rel="noopener">รับชมวิดีโอ "${escapeHtml(media.title)}" บน YouTube</a></p>` : ''}
         ${spotifyUrl ? `<p><a href="${escapeHtml(spotifyUrl)}" rel="noopener">ฟังตอนนี้บน Spotify</a></p>` : ''}
       </article>
-      ${sameSeries.length ? `<h2>ตอนอื่นในซีรีส์ ${escapeHtml(media.series)}</h2>${linkList(sameSeries)}` : ''}
+      ${siblings.length ? `<h2>${escapeHtml(siblingsHeading)}</h2>${linkList(siblings)}` : ''}
     `,
     }),
   };
@@ -729,6 +798,19 @@ const DETAIL_RENDERERS = {
   'library-detail': renderBook,
   'media-detail': renderMediaItem,
 };
+
+// Routes that exist in the SPA but have nothing to offer a search engine: the
+// member area, the staff tools, the reader, the campaign forms. Since the bot
+// rewrite in vercel.json became a catch-all, a crawler asking for one of these
+// now reaches this function, and answering 404 for a page that is really there
+// would be a lie Search Console would eventually notice. They get a 200 that
+// says "do not index" instead — which is also what robots.txt already asks for
+// on every one of them except /books.
+const APP_ROUTES = new Set([
+  'quran', 'tracking-system', 'auth', 'member',
+  'staff', 'staff-work', 'staff-translation', 'staff-members', 'admin',
+  'openhouse', 'openhouse-campus', 'books', 'book-register', 'reader',
+]);
 
 const LIST_RENDERERS = {
   '': renderHome,
@@ -747,6 +829,18 @@ function notFoundHtml(canonical) {
     noIndex: true,
     bodyContent: '<h1>ไม่พบเนื้อหา</h1><p>ขออภัย ไม่พบหน้าที่คุณต้องการ</p><a href="/">กลับหน้าแรก</a>',
   });
+}
+
+function sendAppRoute(res, canonical) {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, s-maxage=3600');
+  return res.status(200).send(generateHtml({
+    title: 'Talib Club',
+    description: 'ส่วนนี้ของ Talib Club ใช้งานผ่านแอปพลิเคชันบนเว็บ',
+    canonical,
+    noIndex: true,
+    bodyContent: '<h1>Talib Club</h1><p>ส่วนนี้ของเว็บไซต์ใช้งานผ่านแอปพลิเคชัน กรุณาเปิดในเบราว์เซอร์ปกติ</p><a href="/">กลับหน้าแรก</a>',
+  }));
 }
 
 // A real 404, not a 200 with an apology on it: Search Console reported ids that
@@ -795,6 +889,8 @@ export default async function handler(req, res) {
       if (!rendered) return sendNotFound(res, `${BASE_URL}/${route}`);
     } else if (LIST_RENDERERS[route]) {
       rendered = await LIST_RENDERERS[route]();
+    } else if (APP_ROUTES.has(route)) {
+      return sendAppRoute(res, `${BASE_URL}/${route}`);
     }
 
     if (!rendered) return sendNotFound(res, `${BASE_URL}/${route}`);

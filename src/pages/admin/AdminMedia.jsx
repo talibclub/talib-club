@@ -476,6 +476,12 @@ function MediaForm({ item, setItem, onSave, onCancel, taxonomy, existingPlaylist
         {item.type === "spotify" && <Field label="Spotify URL" span><input value={item.spotifyUrl || ""} onChange={e => set("spotifyUrl", e.target.value)} placeholder="https://open.spotify.com/episode/..." /></Field>}
         <Field label="วันที่เผยแพร่"><input type="date" value={item.date || ""} onChange={e => set("date", e.target.value)} /></Field>
         <Field label="ลิงก์รูปปก (ใส่เฉพาะถ้าต้องการใช้รูปอื่นแทนของ YouTube)"><input value={item.coverUrl || ""} onChange={e => set("coverUrl", e.target.value)} placeholder="https://..." /></Field>
+        {/* สื่อทุกชิ้นมีแต่ชื่อ ช่อง เพลย์ลิสต์ และความยาว — ข้อมูลชุดเดียวกันทั้งซีรีส์
+            จนกูเกิลอ่านหน้าเหล่านี้เป็นหน้าเนื้อหาบางและไม่จัดทำดัชนีให้
+            คำอธิบายตรงนี้คือข้อความเดียวที่บอกได้ว่าคลิปนี้ต่างจากตอนอื่นอย่างไร */}
+        <Field label="คำอธิบาย (ช่วยให้ Google จัดทำดัชนีหน้านี้ — เขียนสัก 2-3 ประโยคว่าคลิปนี้พูดเรื่องอะไร)" span>
+          <textarea value={item.desc || ""} onChange={e => set("desc", e.target.value)} rows={4} placeholder="สรุปเนื้อหาของคลิปนี้..." style={{ lineHeight: 1.6 }} />
+        </Field>
       </div>
 
       <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>

@@ -24,10 +24,21 @@ export function mediaThumbnail(media) {
   return media.embedId ? `https://i.ytimg.com/vi/${encodeURIComponent(media.embedId)}/hqdefault.jpg` : null
 }
 
+// A description written in the admin wins: it is the only field that can say
+// something about *this* clip that its series-mates do not also say. Without
+// one the summary can only be assembled from the record's own metadata, which
+// is why these pages stayed thin enough for Google to skip.
+export function mediaDescription(media) {
+  const text = String(media?.description || media?.desc || '').trim()
+  return text || ''
+}
+
 // The title leads, so every clip's description differs even when the rest of
 // the record is shared across a whole series.
 export function mediaSummary(media) {
   if (!media) return ''
+  const written = mediaDescription(media)
+  if (written) return `${media.title || ''}${media.title ? ' — ' : ''}${written}`
   const facts = [
     media.series ? `ซีรีส์ ${media.series}` : '',
     media.channel ? `เผยแพร่โดยช่อง ${media.channel}` : '',

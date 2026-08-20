@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { toSchemaDate } from '../utils/dates.js'
 
 export const BASE_URL = 'https://talibclub.org'
 const SITE_NAME = 'Talib Club'
@@ -15,19 +16,11 @@ export function truncate(text, maxLen = 160) {
   return clean.substring(0, maxLen - 3).trim() + '...'
 }
 
-// schema.org dates have to be ISO 8601 strings. `updatedAt` is written with
-// serverTimestamp() (a Firestore Timestamp) online and Date.now() (a number)
-// from the offline queue, neither of which survives JSON.stringify as a date.
-export function toIsoDate(value) {
-  if (!value) return undefined
-  try {
-    if (typeof value === 'object' && typeof value.toDate === 'function') return value.toDate().toISOString()
-    const parsed = new Date(typeof value === 'number' ? value : String(value))
-    return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString()
-  } catch {
-    return undefined
-  }
-}
+// Kept as a named export because the detail pages import it; the rules for
+// what a schema.org date has to look like — including the Buddhist-year
+// conversion the admin's `date` field needs — live in src/utils/dates.js, so
+// the crawler prerender and this page agree on every date they both print.
+export const toIsoDate = toSchemaDate
 
 function setMetaTag(attr, attrValue, content) {
   let el = document.querySelector(`meta[${attr}="${attrValue}"]`)

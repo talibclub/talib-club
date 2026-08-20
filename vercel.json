@@ -10,11 +10,24 @@
     },
     {
       "source": "/(article|articles|library|library-detail|media|media-detail|scholars|donate)(/.*)?",
-      "has": [{
-        "type": "header",
-        "key": "user-agent",
-        "value": "(?i).*(Googlebot|Google-InspectionTool|GoogleOther|AdsBot-Google|Storebot-Google|bingbot|Baiduspider|YandexBot|Applebot|DuckDuckBot|PetalBot|facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|WhatsApp|LINE|Discordbot|TelegramBot).*"
-      }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(Googlebot|Google-InspectionTool|GoogleOther|AdsBot-Google|Storebot-Google|bingbot|Baiduspider|YandexBot|Applebot|DuckDuckBot|PetalBot|facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|WhatsApp|LINE|Discordbot|TelegramBot).*"
+        }
+      ],
+      "destination": "/api/seo-prerender"
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(Googlebot|Google-InspectionTool|GoogleOther|AdsBot-Google|Storebot-Google|bingbot|Baiduspider|YandexBot|Applebot|DuckDuckBot|PetalBot|facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|WhatsApp|LINE|Discordbot|TelegramBot).*"
+        }
+      ],
       "destination": "/api/seo-prerender"
     },
     {

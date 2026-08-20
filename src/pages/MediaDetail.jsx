@@ -3,7 +3,7 @@ import { useContentDoc, saveContentItem } from "../lib/contentStore.js"
 import { MEDIA } from "../data/index.js"
 import SEOHead, { toIsoDate, BASE_URL } from '../components/SEOHead.jsx'
 import { detailUrl } from "../utils/slug.js"
-import { isoDuration, mediaSummary, mediaThumbnail } from "../utils/mediaSeo.js"
+import { isoDuration, mediaDescription, mediaSummary, mediaThumbnail } from "../utils/mediaSeo.js"
 import { useCanonicalDetailUrl, useDetailId } from "../hooks/useDetailRoute.js"
 
 export default function MediaDetail({ item: initialItem, go, authState }) {
@@ -189,6 +189,15 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
         </div>
 
         <h1 style={{ fontSize: 22, marginBottom: 20, lineHeight: 1.4, wordBreak: "break-word" }}>{item.title}</h1>
+
+        {/* The crawler's copy of this page prints the same description
+            (api/seo-prerender.js). When the two disagree about what a URL says,
+            Search Console reads them as competing versions of one page. */}
+        {mediaDescription(item) && (
+          <p style={{ fontSize: 15, lineHeight: 1.8, color: "var(--t2)", marginBottom: 20, whiteSpace: "pre-wrap" }}>
+            {mediaDescription(item)}
+          </p>
+        )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 20, borderTop: ".5px solid var(--br2)", paddingTop: 16, flexWrap: "wrap" }}>
 
