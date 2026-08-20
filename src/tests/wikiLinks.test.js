@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterPages, matchWikiLink, pageLabel } from '../pages/reading/components/notebook/wikiLinks.js';
+import { backlinksTo, filterPages, matchWikiLink, pageLabel } from '../pages/reading/components/notebook/wikiLinks.js';
 
 describe('matchWikiLink', () => {
   it('opens on "[["', () => {
@@ -70,5 +70,37 @@ describe('filterPages', () => {
   it('survives an empty notebook', () => {
     expect(filterPages([], '', 0)).toEqual([]);
     expect(filterPages(null, '', 0)).toEqual([]);
+  });
+});
+
+describe('backlinksTo', () => {
+  const linkLine = (page) => ({ text: 'ไป', link: { page } });
+  const pages = [
+    { name: 'บทนำ', texts: [{ lines: [linkLine(2)] }] },
+    { name: 'กลาง', texts: [{ lines: [{ text: 'ธรรมดา' }] }] },
+    { name: 'ปลายทาง', texts: [] },
+    { name: 'อีกหน้า', texts: [{ lines: [linkLine(2), linkLine(2)] }] },
+  ];
+
+  it('finds the pages pointing at this one', () => {
+    expect(backlinksTo(pages, 2).map((b) => b.label)).toEqual(['บทนำ', 'อีกหน้า']);
+  });
+
+  it('counts a page once however many links it holds', () => {
+    expect(backlinksTo(pages, 2).filter((b) => b.index === 3)).toHaveLength(1);
+  });
+
+  it('returns nothing for a page nobody links to', () => {
+    expect(backlinksTo(pages, 1)).toEqual([]);
+  });
+
+  it('never lists the page itself', () => {
+    const selfLink = [{ texts: [{ lines: [linkLine(0)] }] }];
+    expect(backlinksTo(selfLink, 0)).toEqual([]);
+  });
+
+  it('survives pages with no texts and a missing notebook', () => {
+    expect(backlinksTo([{}, {}], 0)).toEqual([]);
+    expect(backlinksTo(null, 0)).toEqual([]);
   });
 });

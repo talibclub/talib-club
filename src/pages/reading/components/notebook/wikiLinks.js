@@ -44,3 +44,26 @@ export function filterPages(pages, query, currentIndex) {
     .filter((row) => row.index !== currentIndex)
     .filter((row) => !q || row.label.toLowerCase().includes(q));
 }
+
+// Which pages link to this one.
+//
+// A link that only goes one way is half a link: standing on a page, the useful
+// question is usually "what points here?" — the thing that turns a pile of pages
+// into something you can move around in. Deduplicated, because one page linking
+// here three times is still one page worth showing.
+export function backlinksTo(pages, target) {
+  if (!Array.isArray(pages)) return [];
+  const seen = new Set();
+  const out = [];
+  pages.forEach((page, index) => {
+    if (index === target) return;
+    const links = (page?.texts || []).some((t) =>
+      (t?.lines || []).some((l) => l?.link && l.link.page === target)
+    );
+    if (links && !seen.has(index)) {
+      seen.add(index);
+      out.push({ index, label: pageLabel(page, index) });
+    }
+  });
+  return out;
+}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Path, Group, Circle, Text, Rect, Transformer, RegularPolygon, Line, Star as KonvaStar, Arrow as KonvaArrow } from 'react-konva';
-import { Bookmark, BookOpen, Camera, ChevronLeft, ChevronRight, Cloud, FileText, Image as ImageIcon, Lasso, Link2, Mic, MonitorPlay, PenTool, Ruler, Search, SquareSquare, Star, Trash2, X } from 'lucide-react';
+import { Bookmark, BookOpen, Camera, ChevronLeft, ChevronRight, Cloud, FileText, Image as ImageIcon, Lasso, Link as LinkIcon, Link2, Mic, MonitorPlay, PenTool, Ruler, Search, SquareSquare, Star, Trash2, X } from 'lucide-react';
 import CropModal from './CropModal';
 import ColorPickerPanel from './ColorPickerPanel';
 import BookSnipModal from './BookSnipModal';
@@ -25,6 +25,7 @@ import ObjectContextMenu from './notebook/ObjectContextMenu.jsx';
 import SelectionToolbar from './notebook/SelectionToolbar.jsx';
 import LassoToolbar from './notebook/LassoToolbar.jsx';
 import { konvaFontStyle, stickerTextStyle } from './notebook/stickerText.js';
+import { backlinksTo } from './notebook/wikiLinks.js';
 import TextEditor from './notebook/TextEditor.jsx';
 import PaperTemplateModal from './notebook/PaperTemplateModal.jsx';
 import ExportModal from './notebook/ExportModal.jsx';
@@ -1971,6 +1972,31 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       >
 
       {/* iPad-style drop hint */}
+      {/* Which pages link here. A link that only goes one way is half a link:
+          standing on a page, the useful question is usually "what points here?".
+          Shown only when there is something to show, so a notebook with no links
+          in it never grows a strip explaining that it has none. */}
+      {!fullView && (() => {
+         const back = backlinksTo(pages, currentPageIndex);
+         if (!back.length) return null;
+         return (
+           <div style={{ position: 'absolute', left: 12, bottom: 92, zIndex: 25, display: 'flex', alignItems: 'center', gap: 6, maxWidth: 'calc(100% - 24px)', padding: '5px 9px', borderRadius: 12, background: 'rgba(252,250,246,0.72)', backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, border: `1px solid ${HW.hairline}`, overflowX: 'auto' }} className="hide-scroll">
+             <LinkIcon size={12} color={HW.textDim} style={{ flexShrink: 0 }} />
+             <span style={{ fontSize: 11.5, color: HW.textDim, whiteSpace: 'nowrap', flexShrink: 0 }}>ลิงก์มาจาก</span>
+             {back.map((b) => (
+               <button
+                 key={b.index}
+                 onClick={() => { selectShape(null); setCurrentPageIndex(b.index); }}
+                 title={`ไปหน้า ${b.index + 1}`}
+                 style={{ flexShrink: 0, border: 'none', background: HW.accentSoft, color: HW.accent, fontSize: 11.5, fontWeight: 600, fontFamily: 'Kanit, sans-serif', padding: '3px 9px', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}
+               >
+                 {b.label}
+               </button>
+             ))}
+           </div>
+         );
+      })()}
+
       {isDragOver && !readonly && (
         <div style={{ position: 'absolute', inset: 12, zIndex: 70, pointerEvents: 'none', border: `2.5px dashed ${HW.accent}`, borderRadius: 18, background: 'rgba(16,185,129,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'white', padding: '12px 22px', borderRadius: 999, boxShadow: '0 8px 28px rgba(0,0,0,0.14)', fontWeight: 700, color: HW.text, fontSize: 15 }}>
