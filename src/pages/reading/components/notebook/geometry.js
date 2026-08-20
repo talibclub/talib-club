@@ -67,6 +67,9 @@ export const makeLine = (text = '', fmt = {}) => ({
   // null means "inherit the object's size", which is what every line saved
   // before this carried — so nothing that already exists changes appearance.
   size: Number.isFinite(fmt.size) && fmt.size > 0 ? fmt.size : null,
+  // A "[[" link to another page of the notebook. null for every line that is not
+  // one, which is every line written before links existed.
+  link: Number.isInteger(fmt.link?.page) && fmt.link.page >= 0 ? { page: fmt.link.page } : null,
 });
 
 // Return a copy of the text object guaranteed to have a well-formed `lines[]`.
@@ -90,7 +93,12 @@ export const textOf = (t) => (Array.isArray(t?.lines) ? t.lines.map((l) => l.tex
 // byte-identical to the pre-rich-text behaviour. Always true for legacy boxes.
 export const isUniformText = (t) => {
   const lines = t?.lines;
-  if (!Array.isArray(lines) || lines.length <= 1) return true;
+  if (!Array.isArray(lines)) return true;
+  // A linked line is drawn in the accent colour and listens for a tap, neither
+  // of which the single-<Text> path can express — so one link anywhere makes the
+  // box non-uniform, including a box that is only one line long.
+  if (lines.some((l) => l?.link)) return false;
+  if (lines.length <= 1) return true;
   const first = lines[0];
   return lines.every((l) => l.list === first.list && l.align === first.align
     && (l.size || null) === (first.size || null)

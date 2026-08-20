@@ -4,6 +4,7 @@ import { FONT_OPTIONS, LINE_HEIGHT, TEXT_COLORS, HW } from './theme.js';
 import { migrateText, makeLine, listPrefixes } from './geometry.js';
 import { matchAutoformat, matchLineTrigger, matchInlineWrap } from './textAutoformat.js';
 import { filterSlashCommands, matchSlashCommand } from './slashCommands.js';
+import { filterPages, matchWikiLink } from './wikiLinks.js';
 import SlashMenu from './SlashMenu.jsx';
 
 // WYSIWYG in-place editor for a text object with PER-LINE formatting.
@@ -23,7 +24,7 @@ import SlashMenu from './SlashMenu.jsx';
 // carries the format with the line the browser clones — no index bookkeeping to
 // drift out of sync.
 
-const DEF = { bold: false, italic: false, underline: false, strikethrough: false, list: 'none', align: 'left', size: null };
+const DEF = { bold: false, italic: false, underline: false, strikethrough: false, list: 'none', align: 'left', size: null, link: null };
 const FLAGS = ['bold', 'italic', 'underline', 'strikethrough'];
 
 const readFmt = (el) => {
@@ -33,7 +34,11 @@ const readFmt = (el) => {
 const styleLine = (el, f) => {
   el.style.fontWeight = f.bold ? '700' : '400';
   el.style.fontStyle = f.italic ? 'italic' : 'normal';
-  el.style.textDecoration = [f.underline ? 'underline' : '', f.strikethrough ? 'line-through' : ''].filter(Boolean).join(' ') || 'none';
+  // A link is underlined and in the accent colour, so it reads as one while
+  // being written and not only once the canvas takes over.
+  const decoration = [f.underline || f.link ? 'underline' : '', f.strikethrough ? 'line-through' : ''].filter(Boolean).join(' ');
+  el.style.textDecoration = decoration || 'none';
+  el.style.color = f.link ? HW.accent : '';
   el.style.textAlign = f.align || 'left';
   el.style.paddingLeft = f.list && f.list !== 'none' ? '1.6em' : '0';
 };
@@ -95,7 +100,7 @@ const FormatBtn = ({ icon, active, onClick }) => (
   </button>
 );
 
-export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLinesChange, onFont, onSize, onColor, onCommit, boxWidth }) {
+export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLinesChange, onFont, onSize, onColor, onCommit, boxWidth, pages, currentPageIndex }) {
   // The format bar is anchored to the text box's left edge with
   // `width: max-content` and `maxWidth: calc(100vw - 32px)`. Two problems: a box
   // near the right of the notebook pushed the bar off the edge, and the clamp
@@ -136,7 +141,12 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
   // nothing else.
   const [slash, setSlash] = useState(null);   // { node, start, query, x, y, above }
   const [slashIndex, setSlashIndex] = useState(0);
-  const slashItems = slash ? filterSlashCommands(slash.query) : [];
+  // "[[" uses the same picker, listing the notebook's other pages.
+  const [wiki, setWiki] = useState(null);       // { node, start, query, x, y, above }
+  const menuItems = slash
+    ? filterSlashCommands(slash.query)
+    : (wiki ? filterPages(pages, wiki.query, currentPageIndex) : []);
+  const slashItems = menuItems;
 
   const size = t.size || 24;
   const fontFamily = t.fontFamily || 'Kanit';
@@ -334,35 +344,69 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
   // Track the "/" token under the caret and place the menu against it. Skipped
   // while an IME is composing: mid-composition the text node holds provisional
   // characters, and opening a menu on those would fight the input method.
-  const syncSlash = () => {
-    if (composing.current) { setSlash(null); return; }
-    const sel = window.getSelection();
-    const node = sel?.anchorNode;
-    if (!sel?.isCollapsed || !node || node.nodeType !== 3 || !edRef.current?.contains(node)) {
-      setSlash(null);
-      return;
-    }
-    const hit = matchSlashCommand(node.textContent.slice(0, sel.anchorOffset));
-    if (!hit || !filterSlashCommands(hit.query).length) { setSlash(null); return; }
-
-    // Anchor to the slash itself rather than the caret, so the menu stops
-    // sliding sideways as the query is typed.
+  // Anchor a picker to the token that opened it rather than to the caret, so it
+  // stops sliding sideways as the query is typed, and flip it above the line
+  // when there is no room below.
+  const placeAt = (node, start) => {
     const r = document.createRange();
-    r.setStart(node, hit.start);
-    r.setEnd(node, hit.start);
+    r.setStart(node, start);
+    r.setEnd(node, start);
     const box = r.getBoundingClientRect();
-    const roomBelow = window.innerHeight - box.bottom;
-    const above = roomBelow < 280;
-    setSlash({
-      node, start: hit.start, query: hit.query,
+    const above = window.innerHeight - box.bottom < 280;
+    return {
       x: Math.min(Math.max(8, box.left), window.innerWidth - 234),
       y: above ? window.innerHeight - box.top + 6 : box.bottom + 6,
       above,
-    });
+    };
+  };
+
+  const syncSlash = () => {
+    // Mid-composition the text node holds provisional characters; opening a
+    // picker on those fights the input method.
+    if (composing.current) { setSlash(null); setWiki(null); return; }
+    const sel = window.getSelection();
+    const node = sel?.anchorNode;
+    if (!sel?.isCollapsed || !node || node.nodeType !== 3 || !edRef.current?.contains(node)) {
+      setSlash(null); setWiki(null);
+      return;
+    }
+    const before = node.textContent.slice(0, sel.anchorOffset);
+
+    const link = matchWikiLink(before);
+    if (link && filterPages(pages, link.query, currentPageIndex).length) {
+      setSlash(null);
+      setWiki({ node, start: link.start, query: link.query, ...placeAt(node, link.start) });
+      setSlashIndex(0);
+      return;
+    }
+    setWiki(null);
+
+    const hit = matchSlashCommand(before);
+    if (!hit || !filterSlashCommands(hit.query).length) { setSlash(null); return; }
+    setSlash({ node, start: hit.start, query: hit.query, ...placeAt(node, hit.start) });
     setSlashIndex(0);
   };
 
-  const closeSlash = () => setSlash(null);
+  const closeSlash = () => { setSlash(null); setWiki(null); };
+
+  // Replace the typed "[[query" with the page's name and mark the line as a link
+  // to it. The label is the text; the destination rides on the line.
+  const runWiki = (row) => {
+    const { node, start, query } = wiki;
+    if (node?.nodeType === 3) {
+      const text = node.textContent;
+      node.textContent = text.slice(0, start) + row.label + text.slice(start + 2 + query.length);
+      const r = document.createRange();
+      r.setStart(node, Math.min(start + row.label.length, node.textContent.length));
+      r.collapse(true);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+      rememberSelection();
+    }
+    setWiki(null);
+    applyToLines((f) => ({ ...f, link: { page: row.index } }));
+  };
 
   // Delete the typed "/query" and run the command it named.
   const runSlash = (cmd) => {
@@ -457,10 +501,15 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
     // While the "/" menu is open it owns the arrows, Enter and Escape. Anything
     // else falls through, so typing keeps filtering and the editor behaves
     // normally the moment the menu closes.
-    if (slash && slashItems.length) {
+    if ((slash || wiki) && slashItems.length) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setSlashIndex((i) => (i + 1) % slashItems.length); return; }
       if (e.key === 'ArrowUp') { e.preventDefault(); setSlashIndex((i) => (i - 1 + slashItems.length) % slashItems.length); return; }
-      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); runSlash(slashItems[slashIndex] || slashItems[0]); return; }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        const pick = slashItems[slashIndex] || slashItems[0];
+        if (wiki) runWiki(pick); else runSlash(pick);
+        return;
+      }
       if (e.key === 'Escape') { e.preventDefault(); closeSlash(); return; }
     }
     if (e.key === 'Escape') { e.preventDefault(); edRef.current?.blur(); return; }
@@ -705,15 +754,15 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
           zIndex: 1,
         }}
       />
-    {slash && (
+    {(slash || wiki) && (
         <SlashMenu
           items={slashItems}
           active={slashIndex}
-          onPick={runSlash}
+          onPick={wiki ? runWiki : runSlash}
           onHover={setSlashIndex}
-          x={slash.x}
-          y={slash.y}
-          above={slash.above}
+          x={(slash || wiki).x}
+          y={(slash || wiki).y}
+          above={(slash || wiki).above}
         />
       )}
     </div>

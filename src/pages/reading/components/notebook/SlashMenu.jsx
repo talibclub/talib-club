@@ -1,17 +1,19 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  AlignCenter, AlignLeft, AlignRight, Bold, Heading1, Heading2, Italic,
+  AlignCenter, AlignLeft, AlignRight, Bold, FileText, Heading1, Heading2, Italic,
   List, ListOrdered, RemoveFormatting, Strikethrough, Underline,
 } from 'lucide-react';
 import { HW } from './theme.js';
 
 const ICONS = {
-  AlignCenter, AlignLeft, AlignRight, Bold, Heading1, Heading2, Italic,
+  AlignCenter, AlignLeft, AlignRight, Bold, FileText, Heading1, Heading2, Italic,
   List, ListOrdered, RemoveFormatting, Strikethrough, Underline,
 };
 
-// The "/" menu. Presentational: the editor owns the query, the highlighted row
-// and what happens on pick.
+// The menu behind both "/" and "[[". Presentational: the editor owns the query,
+// the highlighted row and what happens on pick. One component for both so the
+// two feel like the same thing, which they are — type a couple of characters,
+// recognise a row, press Enter.
 //
 // Deliberately plain — one icon and one label per row, no grouping and no
 // descriptions. Someone typing wants to recognise a word and press Enter, and

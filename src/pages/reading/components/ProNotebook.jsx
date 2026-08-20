@@ -1401,6 +1401,17 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     });
     toast.success('วางแล้ว');
   };
+  // Following a "[[" link. Clamped, because a linked page can be deleted after
+  // the link was written and a stale index would otherwise blank the notebook.
+  const goToLinkedPage = (index) => {
+     const last = pagesRef.current.length - 1;
+     if (last < 0) return;
+     const target = Math.min(Math.max(0, index), last);
+     selectShape(null);
+     setCurrentPageIndex(target);
+     if (target !== index) toast('หน้าที่ลิงก์ไว้ถูกลบไปแล้ว — พาไปหน้าที่ใกล้ที่สุด');
+  };
+
   // OCR on an image, and handwriting to editable text.
   const { runOcrOnImage, rasterizeStrokes, convertLassoToText } = useTextRecognition({
      updatePage, currentPageIndex, pushHistory, selectShape,
@@ -2591,19 +2602,40 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                     return top;
                   });
                   return tt.lines.map((l, i) => (
-                    <Text
-                      key={i}
-                      x={4}
-                      y={tops[i]}
-                      text={(prefixes[i] || '') + l.text}
-                      fontSize={l.size || t.size}
-                      fill={t.color}
-                      fontFamily={t.fontFamily || 'Kanit'}
-                      fontStyle={[l.bold ? 'bold' : '', l.italic ? 'italic' : ''].filter(Boolean).join(' ') || 'normal'}
-                      textDecoration={textDecorationOf(l)}
-                      align={l.align || 'left'}
-                      width={l.align && l.align !== 'left' ? (t.width || TEXT_BOX_WIDTH) : undefined}
-                    />
+                    <React.Fragment key={i}>
+                      <Text
+                        x={4}
+                        y={tops[i]}
+                        text={(prefixes[i] || '') + l.text}
+                        fontSize={l.size || t.size}
+                        // A "[[" link is drawn in the accent colour, underlined.
+                        fill={l.link ? HW.accent : t.color}
+                        fontFamily={t.fontFamily || 'Kanit'}
+                        fontStyle={[l.bold ? 'bold' : '', l.italic ? 'italic' : ''].filter(Boolean).join(' ') || 'normal'}
+                        textDecoration={l.link ? 'underline' : textDecorationOf(l)}
+                        align={l.align || 'left'}
+                        width={l.align && l.align !== 'left' ? (t.width || TEXT_BOX_WIDTH) : undefined}
+                        listening={false}
+                      />
+                      {/* A link gets its own transparent hit area rather than
+                          relying on the glyphs. Konva hit-tests text by its drawn
+                          pixels, which makes a line of type a fiddly target — and
+                          on a tablet an even worse one. A band the height of the
+                          line is what a finger is actually aiming at. */}
+                      {l.link && (
+                        <Rect
+                          x={4}
+                          y={tops[i]}
+                          width={t.width || TEXT_BOX_WIDTH}
+                          height={(l.size || t.size) * LINE_HEIGHT}
+                          fill="transparent"
+                          onClick={(e) => { e.cancelBubble = true; goToLinkedPage(l.link.page); }}
+                          onTap={(e) => { e.cancelBubble = true; goToLinkedPage(l.link.page); }}
+                          onMouseEnter={(e) => { const st = e.target.getStage(); if (st) st.container().style.cursor = 'pointer'; }}
+                          onMouseLeave={(e) => { const st = e.target.getStage(); if (st) st.container().style.cursor = ''; }}
+                        />
+                      )}
+                    </React.Fragment>
                   ));
                 })()}
               </Group>
@@ -2954,6 +2986,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              y={(t.y + pageY) * scale + position.y}
              scale={scale}
              t={t}
+             pages={pages}
+             currentPageIndex={currentPageIndex}
              textareaRef={textareaRef}
              onChange={(val) => setEditingTextValue(val)}
              onLinesChange={(lines) => upd(txt => { txt.lines = lines; txt.text = lines.map(l => l.text).join('\n'); })}
@@ -3016,6 +3050,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                scale={z}
                t={{ ...sk, size: ts.size, color: ts.color, fontFamily: 'Kanit', width: 126 }}
                boxWidth={126}
+               pages={pages}
+               currentPageIndex={currentPageIndex}
                onLinesChange={(lines) => updSticker((x) => { x.lines = lines; x.text = lines.map(l => l.text).join('\n'); })}
                onFont={() => {}}
                onSize={(n) => updSticker((x) => { x.textSize = n; })}
