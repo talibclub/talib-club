@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "../firebase.js"
 import { SITE_DOC, TAXONOMY_DOC } from "./constants.js"
@@ -16,14 +16,16 @@ export function useSiteSettings(fallbackSite) {
   })
   const [error, setError] = useState(null)
 
-  // M8: Avoid JSON.stringify dependency array
-  const fallbackRef = useRef(fallbackSite)
-  if (fallbackRef.current !== fallbackSite) {
-    if (JSON.stringify(fallbackRef.current) !== JSON.stringify(fallbackSite)) {
-      fallbackRef.current = fallbackSite
-    }
-  }
-  const stableFallbackSite = fallbackRef.current
+  // Callers pass this fallback as an object literal, so it is a new identity on
+  // every render and cannot be used in a dependency array directly. It used to
+  // be held in a ref that was compared and rewritten mid-render, which is a
+  // pattern React cannot guarantee under concurrent rendering — a render that
+  // gets thrown away still leaves its write behind. Memoising on the serialised
+  // value does the same job with none of that, and stringifies once per render
+  // instead of twice.
+  const fallbackSiteKey = JSON.stringify(fallbackSite)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stableFallbackSite = useMemo(() => fallbackSite, [fallbackSiteKey])
 
   useEffect(() => {
     const cached = readCachedDocument(SITE_DOC.collection, SITE_DOC.id)
@@ -78,14 +80,16 @@ export function useTaxonomySettings(fallbackTaxonomy) {
   })
   const [error, setError] = useState(null)
 
-  // M8: Avoid JSON.stringify dependency array
-  const fallbackRef = useRef(fallbackTaxonomy)
-  if (fallbackRef.current !== fallbackTaxonomy) {
-    if (JSON.stringify(fallbackRef.current) !== JSON.stringify(fallbackTaxonomy)) {
-      fallbackRef.current = fallbackTaxonomy
-    }
-  }
-  const stableFallbackTaxonomy = fallbackRef.current
+  // Callers pass this fallback as an object literal, so it is a new identity on
+  // every render and cannot be used in a dependency array directly. It used to
+  // be held in a ref that was compared and rewritten mid-render, which is a
+  // pattern React cannot guarantee under concurrent rendering — a render that
+  // gets thrown away still leaves its write behind. Memoising on the serialised
+  // value does the same job with none of that, and stringifies once per render
+  // instead of twice.
+  const fallbackTaxonomyKey = JSON.stringify(fallbackTaxonomy)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stableFallbackTaxonomy = useMemo(() => fallbackTaxonomy, [fallbackTaxonomyKey])
 
   useEffect(() => {
     const cached = readCachedDocument(TAXONOMY_DOC.collection, TAXONOMY_DOC.id)

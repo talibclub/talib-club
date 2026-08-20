@@ -70,12 +70,20 @@ export default function ColorPickerPanel({ color, onChange, onCommit, onClose, r
     el.addEventListener('pointercancel', up);
   };
 
-  const onSvDrag = startDrag(svRef, (x, y) => apply({ ...hsvRef.current, s: x, v: 1 - y }));
-  const onHueDrag = startDrag(hueRef, (x) => apply({ ...hsvRef.current, h: x * 360 }));
-
   // The drag closures outlive a render, so they read the live hsv through a ref.
+  // Declared before the handlers that close over it: it used to sit below them,
+  // which reads as using a value before it exists even though the closures only
+  // run on pointerdown.
   const hsvRef = useRef(hsv);
   useEffect(() => { hsvRef.current = hsv; }, [hsv]);
+
+  // startDrag is called from inside the pointerdown handler rather than during
+  // render. It used to be called during render, which made the ref read inside
+  // its callback look like a ref read during render — it is not, that callback
+  // only runs once a drag is under way, and it has to go through the ref because
+  // the listeners attached at pointerdown outlive the render that made them.
+  const onSvDrag = (e) => startDrag(svRef, (x, y) => apply({ ...hsvRef.current, s: x, v: 1 - y }))(e);
+  const onHueDrag = (e) => startDrag(hueRef, (x) => apply({ ...hsvRef.current, h: x * 360 }))(e);
 
   const commitHexInput = () => {
     const parsed = hexToHsv(hexInput.startsWith('#') ? hexInput : `#${hexInput}`);

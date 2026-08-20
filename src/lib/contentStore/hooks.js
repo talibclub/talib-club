@@ -297,14 +297,15 @@ export function useContentCollection(name, fallbackItems = [], uid = null, optio
     }
   }, [collectionName, name, uid, isUserSpecific, limitCount, orderByField, orderDirection, live, refetchTrigger])
 
-  // H4: Avoid running JSON.stringify on every render by checking object identity/deep equality only when needed
-  const fallbackRef = useRef(fallbackItems)
-  if (fallbackRef.current !== fallbackItems) {
-    if (JSON.stringify(fallbackRef.current) !== JSON.stringify(fallbackItems)) {
-      fallbackRef.current = fallbackItems
-    }
-  }
-  const stableFallbackItems = fallbackRef.current
+  // Callers pass this fallback as an array literal, so it is a new identity every
+  // render and cannot go into a dependency array as-is. It used to live in a ref
+  // that was compared and rewritten mid-render, which React cannot guarantee
+  // under concurrent rendering: a render that gets discarded still leaves its
+  // write behind. Memoising on the serialised value is the same idea without
+  // that, and stringifies once per render rather than twice.
+  const fallbackItemsKey = JSON.stringify(fallbackItems)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stableFallbackItems = useMemo(() => fallbackItems, [fallbackItemsKey])
 
   const items = useMemo(() => {
     if (loading && remoteItems === null) {
