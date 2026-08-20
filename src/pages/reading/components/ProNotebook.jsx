@@ -40,6 +40,8 @@ import { useNotebookGestures } from './notebook/useNotebookGestures.js';
 import { makeLassoOps } from './notebook/lassoOps.js';
 import { makePdfImport } from './notebook/pdfImport.js';
 import { useImageDrop } from './notebook/imageDrop.js';
+import { makeWriterStrip } from './notebook/writerStrip.js';
+import { makeConnectors } from './notebook/connectors.js';
 import NotebookStyles from './notebook/NotebookStyles.jsx';
 import NotebookTopBar from './notebook/NotebookTopBar.jsx';
 import NotebookToolCapsule from './notebook/NotebookToolCapsule.jsx';
@@ -1235,70 +1237,16 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // The strip is a second stage showing a magnified window onto the same page, so
   // it reuses the stroke pipeline wholesale; only the coordinate mapping differs.
 
-  const writerBoxW = dimensions.width / WRITER_ZOOM;
-  const writerBoxH = WRITER_H / WRITER_ZOOM;
-
-  const writerPointerPos = () => {
-    const st = writerStageRef.current;
-    const p = st?.getPointerPosition();
-    if (!p) return null;
-    // getPointerPosition is container-relative and ignores the stage transform.
-    return { x: writerFocus.x + p.x / WRITER_ZOOM, y: writerFocus.y + p.y / WRITER_ZOOM };
-  };
-
-  const moveWriterFocus = (dx, dy) => {
-    setWriterFocus((f) => ({
-      x: Math.max(0, Math.min(currentPage.width - writerBoxW, f.x + dx)),
-      y: Math.max(0, Math.min(currentPage.height - writerBoxH, f.y + dy)),
-    }));
-  };
-
-  // Slide the window along as the writing approaches its right edge, then drop to
-  // the next line when there is no more room.
-  const advanceWriterIfNeeded = (pos) => {
-    const edge = writerFocus.x + writerBoxW * 0.76;
-    if (pos.x < edge) return;
-    const atEnd = writerFocus.x + writerBoxW >= currentPage.width - 1;
-    if (atEnd) moveWriterFocus(-writerFocus.x, writerBoxH * 0.62);
-    else moveWriterFocus(writerBoxW * 0.45, 0);
-  };
-
-  const handleWriterDown = (e) => {
-    if (readonly) return;
-    if (!PEN_STYLES[tool] && tool !== 'eraser') return;   // strip is for ink only
-    if (!shouldDrawWith(e)) return;
-    const pos = writerPointerPos();
-    if (!pos) return;
-    drawingPointerId.current = e.evt?.pointerId;
-    const relativeTime = isRecording && recordingStartTimeRef.current ? Date.now() - recordingStartTimeRef.current : null;
-
-    if (tool === 'eraser') {
-      isDrawing.current = true;
-      gestureErasedRef.current = false;
-      if (eraserSettings.mode === 'area') beginLiveStroke(pos, 1, relativeTime, 'eraser');
-      else eraseAt(pos);
-      return;
-    }
-    beginLiveStroke(pos, getPressure(e), relativeTime, tool);
-  };
-
-  const handleWriterMove = (e) => {
-    if (!isDrawing.current) return;
-    const evt = e?.evt;
-    if (evt && drawingPointerId.current !== undefined && evt.pointerId !== drawingPointerId.current) return;
-    const pos = writerPointerPos();
-    if (!pos) return;
-    if (tool === 'eraser' && eraserSettings.mode !== 'area') { eraseAt(pos); return; }
-    extendLiveStroke(pos, getPressure(e));
-    advanceWriterIfNeeded(pos);
-  };
-
-  const handleWriterUp = () => {
-    if (liveStrokeRef.current) commitLiveStroke();
-    isDrawing.current = false;
-    drawingPointerId.current = null;
-    gestureErasedRef.current = false;
-  };
+  const {
+     writerBoxW, writerBoxH, writerPointerPos, moveWriterFocus,
+     advanceWriterIfNeeded, handleWriterDown, handleWriterMove, handleWriterUp,
+  } = makeWriterStrip({
+     dimensions, WRITER_ZOOM, WRITER_H, writerStageRef, writerFocus, setWriterFocus,
+     currentPage, readonly, tool, penColor, penSize, penOpacity,
+     isDrawing, liveStrokeRef, drawingPointerId, gestureErasedRef,
+     beginLiveStroke, extendLiveStroke, commitLiveStroke, getPressure, eraseAt,
+     shouldDrawWith, eraserSettings, isRecording, recordingStartTimeRef,
+  });
 
   // Bounding box of the live selection, in page coordinates (before the group's
   // drag offset is applied). Drives both the outline and the floating menu.
@@ -1306,75 +1254,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // Defined above the memos that read them (selectedInfo) so their bindings exist
   // when those memos run during render.
   const connectorDrawIdRef = useRef(null);
-  const objectBoundsById = (id) => {
-    const page = pagesRef.current[currentPageIndex];
-    if (!page || !id) return null;
-    for (const kind of ['images', 'shapes', 'texts', 'stickers']) {
-      const o = (page[kind] || []).find((x) => x.id === id);
-      if (!o) continue;
-      if (kind === 'shapes' && o.type === 'connector') return null;
-      if (kind === 'shapes' && o.type === 'polygon') return polygonBounds(o.points);
-      if (kind === 'shapes') return { minX: Math.min(o.x1, o.x2), minY: Math.min(o.y1, o.y2), maxX: Math.max(o.x1, o.x2), maxY: Math.max(o.y1, o.y2) };
-      if (kind === 'images') return { minX: o.x, minY: o.y, maxX: o.x + (o.width || 0) * (o.scaleX || 1), maxY: o.y + (o.height || 0) * (o.scaleY || 1) };
-      if (kind === 'stickers') { const w = o.audioUrl ? 130 : 150, h = o.audioUrl ? 44 : 150; return { minX: o.x, minY: o.y, maxX: o.x + w * (o.scaleX || 1), maxY: o.y + h * (o.scaleY || 1) }; }
-      // Text objects: `o.text` only exists on the legacy flat shape. Anything
-      // edited through TextEditor stores `lines`, so this measured a
-      // one-character box for it — and for a flat multi-line string it laid the
-      // whole character count out on a single line and gave it one line of
-      // height. Measure the longest line for width and count the lines for
-      // height.
-      {
-        const body = textOf(o);
-        const rows = body ? body.split(/\r?\n/) : [''];
-        const longest = rows.reduce((n, r) => Math.max(n, r.length), 1);
-        const size = o.size || 16;
-        const width = o.width || Math.max(60, longest * size * 0.6);
-        const height = Math.max(1, rows.length) * size * LINE_HEIGHT;
-        return { minX: o.x, minY: o.y, maxX: o.x + width, maxY: o.y + height };
-      }
-    }
-    return null;
-  };
-
-  // Topmost non-connector object under a page-space point (for endpoint snapping).
-  const objectIdAt = (pos, excludeId) => {
-    const page = pagesRef.current[currentPageIndex];
-    if (!page) return null;
-    for (const kind of ['stickers', 'images', 'texts', 'shapes']) {
-      const arr = page[kind] || [];
-      for (let i = arr.length - 1; i >= 0; i--) {
-        const o = arr[i];
-        if (o.id === excludeId || o.type === 'connector') continue;
-        const b = objectBoundsById(o.id);
-        if (b && pos.x >= b.minX && pos.x <= b.maxX && pos.y >= b.minY && pos.y <= b.maxY) return o.id;
-      }
-    }
-    return null;
-  };
-
-
-  // Resolve an endpoint to a page point. A bound end sits on its object's edge
-  // facing `toward`, so the line meets the border instead of the centre.
-  const resolveConnectorEnd = (anchor, toward) => {
-    if (!anchor) return { x: 0, y: 0 };
-    if (!anchor.id) return { x: anchor.x, y: anchor.y };
-    const b = objectBoundsById(anchor.id);
-    if (!b) return { x: anchor.x, y: anchor.y };
-    const c = boundsCenter(b);
-    const dx = (toward ? toward.x : c.x) - c.x, dy = (toward ? toward.y : c.y) - c.y;
-    if (dx === 0 && dy === 0) return c;
-    const hw = (b.maxX - b.minX) / 2 || 1, hh = (b.maxY - b.minY) / 2 || 1;
-    const f = 1 / Math.max(Math.abs(dx) / hw, Math.abs(dy) / hh);
-    return { x: c.x + dx * f, y: c.y + dy * f };
-  };
-
-  // Both endpoints of a connector as page points (each aimed at the other).
-  const connectorPoints = (s) => {
-    const rawA = s.from?.id ? (objectBoundsById(s.from.id) ? boundsCenter(objectBoundsById(s.from.id)) : s.from) : s.from;
-    const rawB = s.to?.id ? (objectBoundsById(s.to.id) ? boundsCenter(objectBoundsById(s.to.id)) : s.to) : s.to;
-    return { a: resolveConnectorEnd(s.from, rawB), b: resolveConnectorEnd(s.to, rawA) };
-  };
-
+  const {
+     objectBoundsById, objectIdAt, resolveConnectorEnd, connectorPoints,
+  } = makeConnectors({ pagesRef, currentPageIndex });
   const lassoBounds = React.useMemo(() => {
     if (selectedLassoLines.length === 0 && selectedObjects.length === 0) return null;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
