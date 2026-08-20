@@ -3,6 +3,8 @@ import { AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Minus, Plus, Mor
 import { FONT_OPTIONS, LINE_HEIGHT, TEXT_COLORS, HW } from './theme.js';
 import { migrateText, makeLine, listPrefixes } from './geometry.js';
 import { matchAutoformat, matchLineTrigger, matchInlineWrap } from './textAutoformat.js';
+import { filterSlashCommands, matchSlashCommand } from './slashCommands.js';
+import SlashMenu from './SlashMenu.jsx';
 
 // WYSIWYG in-place editor for a text object with PER-LINE formatting.
 //
@@ -128,6 +130,13 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
   const composing = useRef(false);
   const savedRange = useRef(null);
   const [active, setActive] = useState(DEF);
+
+  // The "/" menu. `slash` holds the text node the token lives in and where it
+  // starts, so applying a command can delete exactly the typed "/query" and
+  // nothing else.
+  const [slash, setSlash] = useState(null);   // { node, start, query, x, y, above }
+  const [slashIndex, setSlashIndex] = useState(0);
+  const slashItems = slash ? filterSlashCommands(slash.query) : [];
 
   const size = t.size || 24;
   const fontFamily = t.fontFamily || 'Kanit';
@@ -322,9 +331,76 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
     return false;
   };
 
+  // Track the "/" token under the caret and place the menu against it. Skipped
+  // while an IME is composing: mid-composition the text node holds provisional
+  // characters, and opening a menu on those would fight the input method.
+  const syncSlash = () => {
+    if (composing.current) { setSlash(null); return; }
+    const sel = window.getSelection();
+    const node = sel?.anchorNode;
+    if (!sel?.isCollapsed || !node || node.nodeType !== 3 || !edRef.current?.contains(node)) {
+      setSlash(null);
+      return;
+    }
+    const hit = matchSlashCommand(node.textContent.slice(0, sel.anchorOffset));
+    if (!hit || !filterSlashCommands(hit.query).length) { setSlash(null); return; }
+
+    // Anchor to the slash itself rather than the caret, so the menu stops
+    // sliding sideways as the query is typed.
+    const r = document.createRange();
+    r.setStart(node, hit.start);
+    r.setEnd(node, hit.start);
+    const box = r.getBoundingClientRect();
+    const roomBelow = window.innerHeight - box.bottom;
+    const above = roomBelow < 280;
+    setSlash({
+      node, start: hit.start, query: hit.query,
+      x: Math.min(Math.max(8, box.left), window.innerWidth - 234),
+      y: above ? window.innerHeight - box.top + 6 : box.bottom + 6,
+      above,
+    });
+    setSlashIndex(0);
+  };
+
+  const closeSlash = () => setSlash(null);
+
+  // Delete the typed "/query" and run the command it named.
+  const runSlash = (cmd) => {
+    const { node, start, query } = slash;
+    if (node?.nodeType === 3) {
+      const text = node.textContent;
+      node.textContent = text.slice(0, start) + text.slice(start + 1 + query.length);
+      const r = document.createRange();
+      r.setStart(node, Math.min(start, node.textContent.length));
+      r.collapse(true);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+      rememberSelection();
+    }
+    setSlash(null);
+
+    switch (cmd.id) {
+      case 'h1': setHeading(1); break;
+      case 'h2': setHeading(2); break;
+      case 'bullet': toggleList('bullet'); break;
+      case 'number': toggleList('number'); break;
+      case 'bold': case 'italic': case 'underline': toggleFlag(cmd.id); break;
+      case 'strike': toggleFlag('strikethrough'); break;
+      case 'left': case 'center': case 'right': setAlign(cmd.id); break;
+      // "Back to ordinary text": drop the heading and every mark, keep the words.
+      case 'normal': applyToLines((f) => ({ ...f, ...DEF, align: f.align })); break;
+      default: break;
+    }
+    reflow();
+    emit();
+    edRef.current?.focus();
+  };
+
   const handleInput = () => {
     if (!applyMarkdown()) applyAutoformat();
     if (!composing.current) reflow();
+    syncSlash();
     emit();
   };
 
@@ -378,6 +454,15 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
   };
 
   const handleKeyDown = (e) => {
+    // While the "/" menu is open it owns the arrows, Enter and Escape. Anything
+    // else falls through, so typing keeps filtering and the editor behaves
+    // normally the moment the menu closes.
+    if (slash && slashItems.length) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSlashIndex((i) => (i + 1) % slashItems.length); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setSlashIndex((i) => (i - 1 + slashItems.length) % slashItems.length); return; }
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); runSlash(slashItems[slashIndex] || slashItems[0]); return; }
+      if (e.key === 'Escape') { e.preventDefault(); closeSlash(); return; }
+    }
     if (e.key === 'Escape') { e.preventDefault(); edRef.current?.blur(); return; }
 
     // Enter at the end of a heading starts an ordinary line. The browser clones
@@ -620,6 +705,17 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
           zIndex: 1,
         }}
       />
+    {slash && (
+        <SlashMenu
+          items={slashItems}
+          active={slashIndex}
+          onPick={runSlash}
+          onHover={setSlashIndex}
+          x={slash.x}
+          y={slash.y}
+          above={slash.above}
+        />
+      )}
     </div>
   );
 }
