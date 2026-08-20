@@ -2053,7 +2053,30 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                     {!p.src && p.paperType !== 'blank' && <SquareSquare size={24} color="#9CA3AF" opacity={0.3} />}
                     {p.lines.length > 0 && <PenTool size={16} color="#10B981" style={{ position: 'absolute', bottom: 4, right: 4 }} />}
                   </div>
-                  <span style={{ marginTop: 8, fontSize: 13, fontWeight: 600, color: 'var(--t2)' }}>หน้า {i + 1}</span>
+                  {/* The label is the rename field. Pages could not be named at
+                      all, which left the "[[" picker offering "หน้า 1, หน้า 2,
+                      หน้า 3" — a list that tells you nothing about the pages it
+                      is listing. No new button and no dialog: the caption simply
+                      accepts typing, and emptying it goes back to the number. */}
+                  <input
+                    value={p.name || ''}
+                    placeholder={`หน้า ${i + 1}`}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      updatePage(i, (page) => { page.name = name.trim() ? name : undefined; });
+                    }}
+                    title="ตั้งชื่อหน้านี้ เพื่อให้หาเจอตอนพิมพ์ [["
+                    style={{
+                      marginTop: 8, width: '100%', textAlign: 'center',
+                      fontSize: 13, fontWeight: 600, color: 'var(--t2)',
+                      fontFamily: 'Kanit, sans-serif',
+                      border: 'none', background: 'transparent', outline: 'none',
+                      padding: '2px 4px', borderRadius: 6, maxWidth: 'none',
+                    }}
+                    onFocus={(e) => { e.target.style.background = 'var(--gray-light)'; }}
+                    onBlur={(e) => { e.target.style.background = 'transparent'; }}
+                  />
                 </div>
              ))}
            </div>
