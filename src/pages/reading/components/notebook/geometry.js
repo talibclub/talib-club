@@ -131,3 +131,35 @@ export const migrateSticker = (st) => {
   const parts = raw.length ? raw.split('\n') : [''];
   return { ...st, lines: parts.map((line) => makeLine(line, box)) };
 };
+
+// --- Hit testing and ruler projection ---------------------------------------
+// Pulled out of ProNotebook, which had grown to hold every one of these inline.
+// They depend on nothing but their arguments, so they belong with the rest of
+// the geometry rather than inside a component.
+
+export const boundsCenter = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
+
+// True when a stroke passes within `radius` of a point. Measures against each
+// segment rather than each recorded point, so the eraser reacts to the line
+// *between* two samples — a fast stroke leaves its points far apart.
+export const strokeHitsPoint = (line, pos, radius, distToSegment) => {
+  const pts = line.points;
+  const hitRadius = radius + (line.size || 4) / 2;
+  if (pts.length < 4) {
+    return Math.hypot(pos.x - pts[0], pos.y - pts[1]) <= hitRadius;
+  }
+  for (let i = 0; i + 3 < pts.length; i += 2) {
+    if (distToSegment(pos.x, pos.y, pts[i], pts[i + 1], pts[i + 2], pts[i + 3]) <= hitRadius) return true;
+  }
+  return false;
+};
+
+// Nearest point on the ruler's line, plus how far the pointer is from it.
+export const projectOntoRuler = (pos, ruler) => {
+  const rad = (ruler.angle * Math.PI) / 180;
+  const dx = Math.cos(rad), dy = Math.sin(rad);
+  const t = (pos.x - ruler.x) * dx + (pos.y - ruler.y) * dy;
+  const px = ruler.x + dx * t;
+  const py = ruler.y + dy * t;
+  return { x: px, y: py, dist: Math.hypot(pos.x - px, pos.y - py) };
+};

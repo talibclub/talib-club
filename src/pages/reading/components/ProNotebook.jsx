@@ -17,7 +17,7 @@ import { auth, db, storage } from '../../../lib/firebase.js';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { PDFPageImage, PaperPattern, getSvgPathFromStroke, PEN_STYLES, StrokeShape, CommittedStrokes, StickyStyleThumb } from './notebook/canvasElements.jsx';
-import { polygonBounds, polygonCentroid, polygonInteriorAngle, applyListPrefix, textDecorationOf, migrateText, migrateSticker, textOf, isUniformText, uniformFormatOf, listPrefixes } from './notebook/geometry.js';
+import { polygonBounds, polygonCentroid, polygonInteriorAngle, applyListPrefix, textDecorationOf, migrateText, migrateSticker, textOf, isUniformText, uniformFormatOf, listPrefixes, boundsCenter, strokeHitsPoint, projectOntoRuler } from './notebook/geometry.js';
 import { HW, ZERO_OFFSET, TEXT_BOX_WIDTH, LINE_HEIGHT, STICKY_COLORS, DRAW_CURSOR } from './notebook/theme.js';
 import { useDragScroll } from './notebook/useDragScroll.js';
 import ImageSearchPanel from './notebook/ImageSearchPanel.jsx';
@@ -29,9 +29,10 @@ import TextEditor from './notebook/TextEditor.jsx';
 import PaperTemplateModal from './notebook/PaperTemplateModal.jsx';
 import ExportModal from './notebook/ExportModal.jsx';
 import AiAssistantPanel from './notebook/AiAssistantPanel.jsx';
-import { pickCoverColor, nextStrokeId, nextImageId, compressImageFile } from './notebook/notebookAssets.js';
+import { compressImageFile, downloadDataUrl, nextImageId, nextStrokeId, pickCoverColor, preloadImage } from './notebook/notebookAssets.js';
 import { DEFAULT_LASSO_FILTER } from './notebook/notebookConstants.js';
 import { useNotebookHistory } from './notebook/useNotebookHistory.js';
+import { formatTime, useNotebookAudio } from './notebook/useNotebookAudio.js';
 import NotebookStyles from './notebook/NotebookStyles.jsx';
 import NotebookTopBar from './notebook/NotebookTopBar.jsx';
 import NotebookToolCapsule from './notebook/NotebookToolCapsule.jsx';
@@ -679,75 +680,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const [contextMenu, setContextMenu] = useState(null);
   const longPressRef = useRef(null); // { timer, startX, startY, id }
 
-  // --- Audio recordings (Huawei Notes style) ---
-  // A single <audio> element drives the whole notebook; recordings live inside the
-  // pages (as stickers with an audioUrl) so they save and sync with everything else,
-  // but they are surfaced through a list panel + transport bar instead of chips.
-  const [showRecordings, setShowRecordings] = useState(false);
-  const [nowPlaying, setNowPlaying] = useState(null);   // { id, pageIndex, name }
-  const [audioPlaying, setAudioPlaying] = useState(false);
-  const [audioProgress, setAudioProgress] = useState({ current: 0, duration: 0 });
-  const [audioSpeed, setAudioSpeed] = useState(1);
-  const audioElRef = useRef(null);
-
-  const getAudioEl = () => {
-    if (!audioElRef.current) {
-      const a = new Audio();
-      a.addEventListener('play', () => setAudioPlaying(true));
-      a.addEventListener('pause', () => setAudioPlaying(false));
-      a.addEventListener('timeupdate', () => setAudioProgress({ current: a.currentTime, duration: a.duration || 0 }));
-      a.addEventListener('loadedmetadata', () => setAudioProgress({ current: a.currentTime, duration: a.duration || 0 }));
-      a.addEventListener('ended', () => { setAudioPlaying(false); setAudioProgress((p) => ({ ...p, current: 0 })); });
-      audioElRef.current = a;
-    }
-    return audioElRef.current;
-  };
-
-  // Every audio note across every page, in page order, for the list panel.
-  const recordings = React.useMemo(() => {
-    const out = [];
-    pages.forEach((pg, pi) => (pg.stickers || []).forEach((s) => {
-      if (s.audioUrl) out.push({ pageIndex: pi, id: s.id, name: s.name, createdAt: s.createdAt, audioUrl: s.audioUrl, isUploading: s.isUploading });
-    }));
-    return out;
-  }, [pages]);
-
-  const playRecording = (rec) => {
-    if (rec.isUploading) return;
-    const a = getAudioEl();
-    if (nowPlaying?.id === rec.id) {
-      if (a.paused) a.play(); else a.pause();
-      return;
-    }
-    a.src = rec.audioUrl;
-    a.currentTime = 0;
-    a.playbackRate = audioSpeed;
-    a.play();
-    const idx = recordings.findIndex((r) => r.id === rec.id);
-    setNowPlaying({ id: rec.id, pageIndex: rec.pageIndex, name: rec.name || `บันทึก (${idx + 1})` });
-  };
-
-  const toggleAudioPlay = () => { const a = getAudioEl(); if (a.paused) a.play(); else a.pause(); };
-  const skipAudio = (delta) => { const a = getAudioEl(); a.currentTime = Math.max(0, Math.min(a.duration || 0, a.currentTime + delta)); };
-  const seekAudio = (t) => { const a = getAudioEl(); a.currentTime = t; setAudioProgress((p) => ({ ...p, current: t })); };
-  const cycleSpeed = () => {
-    const speeds = [1, 1.5, 2, 0.75];
-    const next = speeds[(speeds.indexOf(audioSpeed) + 1) % speeds.length];
-    setAudioSpeed(next);
-    if (audioElRef.current) audioElRef.current.playbackRate = next;
-  };
-  const closePlayback = () => { const a = audioElRef.current; if (a) { a.pause(); a.currentTime = 0; } setNowPlaying(null); };
-
-  const deleteRecording = (rec) => {
-    if (nowPlaying?.id === rec.id) closePlayback();
-    pushHistory();
-    updatePage(rec.pageIndex, (page) => { page.stickers = (page.stickers || []).filter((s) => s.id !== rec.id); });
-    toast.success('ลบบันทึกเสียงแล้ว');
-  };
-  const renameRecording = (rec, name) => {
-    updatePage(rec.pageIndex, (page) => { page.stickers = (page.stickers || []).map((s) => (s.id === rec.id ? { ...s, name } : s)); });
-    if (nowPlaying?.id === rec.id) setNowPlaying((np) => ({ ...np, name }));
-  };
 
   // "Zoom-in writing": a magnified strip at the bottom of the screen. You write
   // large in the strip and the ink lands small on the page, which is how Huawei
@@ -794,6 +726,27 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      return () => window.removeEventListener('resize', handleToolsScroll);
   }, []);
   const { pushHistory, undo, redo, canUndo, canRedo } = useNotebookHistory(pagesRef, setPages, setCurrentPageIndex);
+
+  const updatePage = (index, updater) => {
+    setPages((prev) => {
+      const newPages = [...prev];
+      const page = { ...newPages[index] };
+      updater(page);
+      newPages[index] = page;
+      return newPages;
+    });
+  };
+
+  // Audio notes live in their own hook now. It is called here rather than where
+  // the code used to sit, because it writes through updatePage and pushHistory
+  // and so has to come after both exist.
+  const {
+     showRecordings, setShowRecordings, nowPlaying, setNowPlaying,
+     audioPlaying, audioProgress, audioSpeed, recordings,
+     playRecording, toggleAudioPlay, skipAudio, seekAudio, cycleSpeed,
+     closePlayback, deleteRecording, renameRecording,
+  } = useNotebookAudio({ pages, updatePage, pushHistory });
+
   
   useEffect(() => {
     pagesRef.current = pages;
@@ -830,7 +783,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       if (readonly || !uid || !notebookId) return;
       if (loadStateRef.current !== 'ready') return; // load failed/pending → don't clobber the cloud copy
       if (pagesRef.current && pagesRef.current.length > 0) {
-        uploadNotebookData(uid, notebookId, pagesRef.current).catch(console.error);
+        if (uid) uploadNotebookData(uid, notebookId, pagesRef.current).catch(console.error);
         writeNotebookMeta().catch(console.error);
         try { localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pagesRef.current)); } catch { /* ignore */ }
       }
@@ -952,16 +905,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   }, [dimensions.width, currentPageIndex, readonly]);
 
   // Update a specific page's data safely
-  const updatePage = (index, updater) => {
-    setPages((prev) => {
-      const newPages = [...prev];
-      const page = { ...newPages[index] };
-      updater(page);
-      newPages[index] = page;
-      return newPages;
-    });
-  };
-
   const startLoadingPDF = async (pdfUrl = null) => {
     // Importing a PDF REPLACES every page in the notebook. That used to happen
     // with no warning and no undo entry, so one tap on "นำเข้า PDF" could wipe a
@@ -1261,6 +1204,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const saveInFlightRef = useRef(false);
   const saveNotebook = async (isAuto = false) => {
      if (readonly) return;
+     // Without a signed-in user the upload path becomes .../null/<id>.json.gz and
+     // Storage rejects it, so every autosave tick turned into a failed request.
+     // Local pages are kept either way; there is simply nowhere to put them.
+     if (!uid) return;
      if (loadStateRef.current !== 'ready') {
         if (!isAuto) toast.error("ยังโหลดสมุดโน้ตไม่สำเร็จ — บันทึกไม่ได้เพื่อป้องกันข้อมูลเดิมหาย");
         return;
@@ -1312,21 +1259,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   };
 
 
-  const downloadDataUrl = (dataUrl, filename) => {
-     const link = document.createElement('a');
-     link.download = filename;
-     link.href = dataUrl;
-     document.body.appendChild(link);
-     link.click();
-     document.body.removeChild(link);
-  };
 
-  const preloadImage = (src) => new Promise((resolve) => {
-     if (!src) return resolve();
-     const img = new window.Image();
-     img.onload = resolve; img.onerror = resolve;
-     img.src = src;
-  });
 
   // Render one page cleanly (scale 1, no pan) and crop to the paper rectangle, so
   // the export never carries the grey canvas backdrop or the current zoom.
@@ -1678,17 +1611,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
   // distToSegmentXY keeps the stroke eraser reacting to the line *between* two
   // sampled points, not only to the sampled points themselves.
-  const strokeHitsPoint = (line, pos, radius) => {
-    const pts = line.points;
-    const hitRadius = radius + (line.size || 4) / 2;
-    if (pts.length < 4) {
-      return Math.hypot(pos.x - pts[0], pos.y - pts[1]) <= hitRadius;
-    }
-    for (let i = 0; i + 3 < pts.length; i += 2) {
-      if (distToSegmentXY(pos.x, pos.y, pts[i], pts[i + 1], pts[i + 2], pts[i + 3]) <= hitRadius) return true;
-    }
-    return false;
-  };
 
   // Whole-stroke eraser: removes any stroke (and optionally any object) it touches.
   const eraseAt = (pos) => {
@@ -1699,7 +1621,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     // Shared hit predicates, reused for the "did we hit anything?" check and for
     // the actual filtering inside updatePage (which must run against the latest
     // draft, not this snapshot, so fast strokes never resurrect erased items).
-    const lineKeep = (l) => !strokeHitsPoint(l, pos, radius);
+    const lineKeep = (l) => !strokeHitsPoint(l, pos, radius, distToSegmentXY);
     const shapeKeep = (s) => {
       const b = s.type === 'polygon' ? polygonBounds(s.points)
         : s.type === 'connector' ? (() => { const { a, b: bb } = connectorPoints(s); return { minX: Math.min(a.x, bb.x), maxX: Math.max(a.x, bb.x), minY: Math.min(a.y, bb.y), maxY: Math.max(a.y, bb.y) }; })()
@@ -1742,14 +1664,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
   // Foot of the perpendicular from pos onto the ruler's edge, plus how far away
   // pos was — the distance decides whether the stroke grabs the edge at all.
-  const projectOntoRuler = (pos) => {
-    const rad = (ruler.angle * Math.PI) / 180;
-    const dx = Math.cos(rad), dy = Math.sin(rad);
-    const t = (pos.x - ruler.x) * dx + (pos.y - ruler.y) * dy;
-    const px = ruler.x + dx * t;
-    const py = ruler.y + dy * t;
-    return { x: px, y: py, dist: Math.hypot(pos.x - px, pos.y - py) };
-  };
 
   const beginLiveStroke = (pos, pressure, relativeTime, strokeTool) => {
     isDrawing.current = true;
@@ -1759,7 +1673,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     let start = pos;
     let ruled = false;
     if (rulerOn && strokeTool !== 'eraser') {
-      const p = projectOntoRuler(pos);
+      const p = projectOntoRuler(pos, ruler);
       if (p.dist <= RULER_SNAP) { start = { x: p.x, y: p.y }; ruled = true; }
     }
 
@@ -1785,7 +1699,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const extendLiveStroke = (pos, pressure) => {
     const stroke = liveStrokeRef.current;
     if (!stroke) return;
-    const p = ruledStrokeRef.current ? projectOntoRuler(pos) : pos;
+    const p = ruledStrokeRef.current ? projectOntoRuler(pos, ruler) : pos;
     const n = stroke.points.length;
     // Drop samples that land on the previous point; they add cost and pinch the taper.
     if (n >= 2 && Math.hypot(p.x - stroke.points[n - 2], p.y - stroke.points[n - 1]) < 0.6) return;
@@ -1945,7 +1859,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     return null;
   };
 
-  const boundsCenter = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
 
   // Resolve an endpoint to a page point. A bound end sits on its object's edge
   // facing `toward`, so the line meets the border instead of the centre.
@@ -3118,12 +3031,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [readonly, selectedId, editingTextId, editingStickerId, pages.length, currentPageIndex, lassoGroupPos, undo, redo, deleteSelected]);
-
-  const formatTime = (secs) => {
-     const m = Math.floor(secs / 60);
-     const s = secs % 60;
-     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
 
   // One bag of state and callbacks for the extracted UI files. The notebook
   // holds all of its state in this component, so the split-out toolbars take a

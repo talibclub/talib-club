@@ -66,3 +66,24 @@ export async function compressImageFile(file) {
     return original;
   }
 }
+
+// Hand a data URL to the browser as a download. Lived in ProNotebook, but it
+// touches nothing in the component.
+export const downloadDataUrl = (dataUrl, filename) => {
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = dataUrl;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+// Resolves once the image is decoded, or once it fails — an export should not
+// hang on one broken picture.
+export const preloadImage = (src) => new Promise((resolve) => {
+  if (!src) return resolve();
+  const img = new window.Image();
+  img.onload = resolve;
+  img.onerror = resolve;
+  img.src = src;
+});

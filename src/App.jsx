@@ -415,6 +415,17 @@ export default function App() {
                   )}
                 />
               )}
+              {/* Dev-only: the entire notebook, running, without a login or a
+                  book — so a change to it can be exercised before a user is the
+                  one to find out. Dropped from production the same way. */}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/notebook-live"
+                  element={createElement(
+                    lazyWithRetry(() => import("./pages/reading/components/notebook/__live.jsx"))
+                  )}
+                />
+              )}
               <Route path="*" element={<NotFound go={go} />} />
             </Routes>
           </Suspense>
