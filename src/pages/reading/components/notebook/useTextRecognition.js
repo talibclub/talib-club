@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import toast from 'react-hot-toast';
+import { nextObjectId } from './notebookAssets.js';
 import { TEXT_BOX_WIDTH } from './theme.js';
 
 // Reading text off the page: OCR on an image, and turning a lassoed piece of
@@ -37,7 +38,7 @@ export function useTextRecognition({
       updatePage(currentPageIndex, (page) => {
         if (!page.texts) page.texts = [];
         page.texts.push({
-          id: `text-${Date.now()}`, text,
+          id: nextObjectId('text'), text,
           x: img.x, y: img.y + (img.height || 0) * (img.scaleY || 1) + 12,
           color: penColor, size: 20, fontFamily: 'Sarabun', bold: false, italic: false,
         });
@@ -124,7 +125,7 @@ export function useTextRecognition({
       }
 
       const { x: dx, y: dy } = lassoGroupPos;
-      const id = `text-${Date.now()}`;
+      const id = nextObjectId('text');
       pushHistory();
       updatePage(currentPageIndex, (page) => {
         if (!page.texts) page.texts = [];

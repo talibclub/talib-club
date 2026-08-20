@@ -87,3 +87,13 @@ export const preloadImage = (src) => new Promise((resolve) => {
   img.onerror = resolve;
   img.src = src;
 });
+
+// Ids for the things on a page — text boxes, notes, shapes, connectors, pages.
+//
+// These were `${kind}-${Date.now()}`, which collides whenever two are made
+// inside the same millisecond. That is not hypothetical: one stray double event
+// while placing a text box produced two objects sharing an id, and from then on
+// selecting, editing or deleting either of them hit both. The counter makes each
+// one distinct however fast they arrive.
+let objectIdSeq = 0;
+export const nextObjectId = (kind = 'obj') => `${kind}-${Date.now().toString(36)}-${++objectIdSeq}`;

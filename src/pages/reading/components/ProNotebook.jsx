@@ -26,11 +26,12 @@ import SelectionToolbar from './notebook/SelectionToolbar.jsx';
 import LassoToolbar from './notebook/LassoToolbar.jsx';
 import { konvaFontStyle, stickerTextStyle } from './notebook/stickerText.js';
 import { backlinksTo } from './notebook/wikiLinks.js';
+import { childIdsOf, childPlacement, makeBranchConnector, parentIdOf, siblingPlacement } from './notebook/mindmap.js';
 import TextEditor from './notebook/TextEditor.jsx';
 import PaperTemplateModal from './notebook/PaperTemplateModal.jsx';
 import ExportModal from './notebook/ExportModal.jsx';
 import AiAssistantPanel from './notebook/AiAssistantPanel.jsx';
-import { compressImageFile, downloadDataUrl, nextImageId, nextStrokeId, pickCoverColor, preloadImage } from './notebook/notebookAssets.js';
+import { compressImageFile, downloadDataUrl, nextImageId, nextObjectId, nextStrokeId, pickCoverColor, preloadImage } from './notebook/notebookAssets.js';
 import { DEFAULT_LASSO_FILTER } from './notebook/notebookConstants.js';
 import { useNotebookHistory } from './notebook/useNotebookHistory.js';
 import { formatTime, useNotebookAudio } from './notebook/useNotebookAudio.js';
@@ -383,7 +384,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     updatePage(currentPageIndex, (p) => {
       if (!p.texts) p.texts = [];
       p.texts.push({
-        id: `text-${Date.now()}`, text: emoji, isEmoji: true,
+        id: nextObjectId('text'), text: emoji, isEmoji: true,
         x: cx - 32 + jitter(), y: cy - 32 + jitter(),
         color: '#111827', size: 60, fontFamily: 'Kanit', bold: false, italic: false,
         underline: false, strikethrough: false, align: 'left', list: 'none',
@@ -479,10 +480,24 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   }, []);
   const { pushHistory, undo, redo, canUndo, canRedo } = useNotebookHistory(pagesRef, setPages, setCurrentPageIndex);
 
+  // Every writer in the notebook goes through here, and nearly all of them do it
+  // by pushing into one of the page's arrays. The spread below copies the page
+  // object but not those arrays, so `page.texts.push(...)` was writing into the
+  // very array the previous state still holds — and a state updater is not
+  // allowed to do that. React may call an updater more than once for the same
+  // input (StrictMode does it on every update, which is how this surfaced:
+  // placing one text box produced two identical objects, and every later
+  // selection, edit and delete hit both).
+  //
+  // Copying the content arrays first makes the updater pure: run it twice on the
+  // same `prev` and you get the same single push, because each run starts from
+  // its own copy.
+  const PAGE_CONTENT = ['lines', 'stickers', 'images', 'texts', 'shapes'];
   const updatePage = (index, updater) => {
     setPages((prev) => {
       const newPages = [...prev];
       const page = { ...newPages[index] };
+      PAGE_CONTENT.forEach((key) => { if (Array.isArray(page[key])) page[key] = [...page[key]]; });
       updater(page);
       newPages[index] = page;
       return newPages;
@@ -681,7 +696,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         
         // Capture the index when recording starts so sticker goes to the right page
         const targetPageIndex = currentPageIndex;
-        const currentRecordingId = `audio-${Date.now()}`;
+        const currentRecordingId = nextObjectId('audio');
         recordingIdRef.current = currentRecordingId;
         recordingStartTimeRef.current = Date.now();
         
@@ -799,7 +814,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
   const handleAddPage = () => {
     const currentPage = pages[currentPageIndex] || {};
-    const newPage = { id: `blank-${Date.now()}`, src: null, width: dimensions.width > 0 ? dimensions.width - 40 : 800, height: 1130, lines: [], stickers: [], images: [], texts: [], shapes: [], paperType: currentPage.paperType || 'blank', paperColor: currentPage.paperColor || '#ffffff', isBookmarked: false };
+    const newPage = { id: nextObjectId('blank'), src: null, width: dimensions.width > 0 ? dimensions.width - 40 : 800, height: 1130, lines: [], stickers: [], images: [], texts: [], shapes: [], paperType: currentPage.paperType || 'blank', paperColor: currentPage.paperColor || '#ffffff', isBookmarked: false };
     pushHistory();
     setPages((prev) => {
       const p = [...prev];
@@ -993,7 +1008,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
        // object's own tap handler — just don't also drop a new box underneath.
        if (hitExistingObject) return;
        const newText = {
-          id: `text-${Date.now()}`, text: '', x: pos.x, y: pos.y, color: penColor,
+          id: nextObjectId('text'), text: '', x: pos.x, y: pos.y, color: penColor,
           size: textStyle.fontSize,
           fontFamily: textStyle.fontFamily,
           bold: textStyle.bold,
@@ -1018,7 +1033,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     if (tool === 'sticker') {
        if (hitExistingObject || editingStickerId) return;
        const stickerColor = STICKY_COLORS.includes(penColor) ? penColor : '#FEF08A';
-       const newSticker = { id: `sticker-${Date.now()}`, x: pos.x, y: pos.y, color: stickerColor, text: '', style: stickerStyle };
+       const newSticker = { id: nextObjectId('sticker'), x: pos.x, y: pos.y, color: stickerColor, text: '', style: stickerStyle };
        pushHistory();
        updatePage(currentPageIndex, (page) => {
           if (!page.stickers) page.stickers = [];
@@ -1047,7 +1062,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     
     if (tool === 'shape' && shapeType === 'polygon') {
        if (hitExistingObject) return;
-       const id = `shape-${Date.now()}`;
+       const id = nextObjectId('shape');
        pushHistory();
        updatePage(currentPageIndex, (page) => {
           if (!page.shapes) page.shapes = [];
@@ -1064,7 +1079,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     if (tool === 'shape' && shapeType === 'connector') {
        // Drag from one object/point to another; endpoints snap to whatever they land on.
        isDrawing.current = true;
-       const id = `shape-${Date.now()}`;
+       const id = nextObjectId('shape');
        const startId = objectIdAt(pos);
        connectorDrawIdRef.current = id;
        pushHistory();
@@ -1085,7 +1100,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
        pushHistory();
        updatePage(currentPageIndex, (page) => {
           if (!page.shapes) page.shapes = [];
-          page.shapes.push({ id: `shape-${Date.now()}`, type: shapeType, x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y, color: penColor, size: penSize, opacity: penOpacity });
+          page.shapes.push({ id: nextObjectId('shape'), type: shapeType, x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y, color: penColor, size: penSize, opacity: penOpacity });
        });
        return;
     }
@@ -1402,6 +1417,67 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     });
     toast.success('วางแล้ว');
   };
+  // --- Mindmap branching ---------------------------------------------------
+  // Tab adds a child, Enter adds a sibling: the new node is placed, connected
+  // and opened for typing in one keystroke. Drawing each connector by hand is
+  // what made building a map out of the existing pieces not worth doing.
+  const branchFrom = (nodeId, kind) => {
+     const page = pagesRef.current[currentPageIndex];
+     const anchorId = kind === 'sibling' ? (parentIdOf(page, nodeId) || nodeId) : nodeId;
+     const from = objectBoundsById(nodeId);
+     if (!from) return;
+
+     const spot = kind === 'sibling'
+        ? siblingPlacement(from)
+        : childPlacement(from, childIdsOf(page, nodeId).map(objectBoundsById));
+
+     const nodeIdNew = nextObjectId('text');
+     const newNode = {
+        id: nodeIdNew, text: '', lines: [],
+        x: spot.x, y: spot.y,
+        color: textStyle.color || '#111827', size: textStyle.fontSize || 22,
+        fontFamily: textStyle.fontFamily || 'Kanit',
+        bold: false, italic: false, underline: false, strikethrough: false,
+        align: 'left', list: 'none', width: TEXT_BOX_WIDTH,
+     };
+     pushHistory();
+     updatePage(currentPageIndex, (page2) => {
+        if (!page2.texts) page2.texts = [];
+        if (!page2.shapes) page2.shapes = [];
+        page2.texts.push(newNode);
+        page2.shapes.push(makeBranchConnector({
+           id: nextObjectId('shape'), fromId: anchorId, toId: nodeIdNew,
+           color: penColor, size: Math.max(2, penSize),
+        }));
+     });
+     selectShape(nodeIdNew);
+     setEditingTextId(nodeIdNew);
+     setEditingTextValue('');
+     isEditingText.current = true;
+  };
+
+  useEffect(() => {
+     if (readonly) return;
+     const onKey = (e) => {
+        if (e.key !== 'Tab' && e.key !== 'Enter') return;
+        // Only when a node is selected and nothing is being typed into — Tab and
+        // Enter belong to the editor whenever one is open, and to the page
+        // otherwise.
+        if (editingTextId || editingStickerId || isEditingText.current) return;
+        const ae = document.activeElement;
+        if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+        if (!selectedId) return;
+        const page = pagesRef.current[currentPageIndex];
+        const isNode = (page?.texts || []).some((t) => t.id === selectedId)
+           || (page?.stickers || []).some((st) => st.id === selectedId);
+        if (!isNode) return;
+        e.preventDefault();
+        branchFrom(selectedId, e.key === 'Tab' ? 'child' : 'sibling');
+     };
+     window.addEventListener('keydown', onKey);
+     return () => window.removeEventListener('keydown', onKey);
+  });
+
   // Following a "[[" link. Clamped, because a linked page can be deleted after
   // the link was written and a stale index would otherwise blank the notebook.
   const goToLinkedPage = (index) => {
@@ -2165,7 +2241,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
             pushHistory();
             updatePage(currentPageIndex, (page) => {
               if (!page.texts) page.texts = [];
-              page.texts.push({ id: `text-${Date.now()}`, text, x: 80, y: 80, color: '#111827', size: 22, fontFamily: 'Sarabun', bold: false, italic: false, underline: false, strikethrough: false, align: 'left', list: 'none', width: TEXT_BOX_WIDTH });
+              page.texts.push({ id: nextObjectId('text'), text, x: 80, y: 80, color: '#111827', size: 22, fontFamily: 'Sarabun', bold: false, italic: false, underline: false, strikethrough: false, align: 'left', list: 'none', width: TEXT_BOX_WIDTH });
             });
             toast.success('แทรกคำตอบลงสมุดแล้ว');
             setShowAi(false);
