@@ -74,7 +74,13 @@ export default function NotebookTopBar({ ui }) {
              if (!drag.current) return;
              e.currentTarget.scrollLeft = drag.current.left - (e.pageX - drag.current.x);
            }}
-           style={{ height: 52, width: '100%', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, display: 'flex', alignItems: 'center', justifyContent: readonly ? 'center' : 'flex-start', gap: 8, padding: '0 12px', borderBottom: `1px solid ${HW.hairline}`, overflowX: 'auto', overflowY: 'hidden', touchAction: 'pan-x', scrollBehavior: 'auto' }}
+           // `safe center` rather than plain `center`: the bar scrolls when the
+           // tools do not fit, and a plain `center` on an overflowing flex row
+           // pushes the first items off the left edge where nothing can scroll
+           // back to them. `safe` centres while there is room and falls back to
+           // the start once there is not. It was flex-start, which never lost an
+           // icon but left the whole bar hugging the left of a wide screen.
+           style={{ height: 52, width: '100%', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, display: 'flex', alignItems: 'center', justifyContent: readonly ? 'center' : 'safe center', gap: 8, padding: '0 12px', borderBottom: `1px solid ${HW.hairline}`, overflowX: 'auto', overflowY: 'hidden', touchAction: 'pan-x', scrollBehavior: 'auto' }}
          >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                {/* No in-notebook back button: it called window.history.back(), which

@@ -3353,6 +3353,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                }
                selectShape(null);
              }}
+             // Same thing Tab does. Only for the kinds that can be a node.
+             onBranch={(kind === 'texts' || kind === 'stickers')
+               ? () => branchFrom(obj.id, 'child')
+               : undefined}
              onRecolor={recolorSelectedObject}
              onFront={() => reorderSelectedObject(true)}
              onBack={() => reorderSelectedObject(false)}
