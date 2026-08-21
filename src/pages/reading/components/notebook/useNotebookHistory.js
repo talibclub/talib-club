@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // Undo/redo for the notebook pages.
 //
@@ -11,8 +11,8 @@ const HISTORY_LIMIT = 30;
 export function snapshotPages(pgs) {
   return pgs.map((p) => ({
     ...p,
-    lines: (p.lines || []).map((l) => ({ ...l, points: l.points.slice(), pressures: l.pressures ? l.pressures.slice() : undefined })),
-    shapes: (p.shapes || []).map((s) => ({ ...s, points: s.points ? s.points.slice() : undefined, from: s.from ? { ...s.from } : undefined, to: s.to ? { ...s.to } : undefined })),
+    lines: (p.lines || []).map((l) => ({ ...l, points: Array.isArray(l.points) ? l.points.slice() : [], pressures: Array.isArray(l.pressures) ? l.pressures.slice() : undefined })),
+    shapes: (p.shapes || []).map((s) => ({ ...s, points: Array.isArray(s.points) ? s.points.slice() : undefined, from: s.from ? { ...s.from } : undefined, to: s.to ? { ...s.to } : undefined })),
     texts: (p.texts || []).map((t) => ({ ...t })),
     stickers: (p.stickers || []).map((s) => ({ ...s })),
     images: (p.images || []).map((i) => ({ ...i })),
@@ -24,11 +24,21 @@ export function snapshotPages(pgs) {
  * @param setPages      state setter for the pages array
  * @param setCurrentPageIndex  clamped after an undo/redo shortens the book
  */
-export function useNotebookHistory(pagesRef, setPages, setCurrentPageIndex) {
+export function useNotebookHistory(pagesRef, setPages, setCurrentPageIndex, historyKey) {
   const undoStack = useRef([]);
   const redoStack = useRef([]);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+
+  // A notebook is its own editing session. Keeping the previous book's stack
+  // meant that pressing Undo after changing books could replace the newly
+  // loaded pages with a snapshot from the book just left.
+  useEffect(() => {
+    undoStack.current = [];
+    redoStack.current = [];
+    setCanUndo(false);
+    setCanRedo(false);
+  }, [historyKey]);
 
   const pushHistory = () => {
     undoStack.current.push(snapshotPages(pagesRef.current));
@@ -43,7 +53,7 @@ export function useNotebookHistory(pagesRef, setPages, setCurrentPageIndex) {
     const previousState = undoStack.current.pop();
     redoStack.current.push(snapshotPages(pagesRef.current));
     setPages(previousState);
-    setCurrentPageIndex((i) => Math.min(i, previousState.length - 1));
+    setCurrentPageIndex((i) => Math.max(0, Math.min(i, previousState.length - 1)));
     setCanUndo(undoStack.current.length > 0);
     setCanRedo(true);
   };
@@ -53,7 +63,7 @@ export function useNotebookHistory(pagesRef, setPages, setCurrentPageIndex) {
     const nextState = redoStack.current.pop();
     undoStack.current.push(snapshotPages(pagesRef.current));
     setPages(nextState);
-    setCurrentPageIndex((i) => Math.min(i, nextState.length - 1));
+    setCurrentPageIndex((i) => Math.max(0, Math.min(i, nextState.length - 1)));
     setCanUndo(true);
     setCanRedo(redoStack.current.length > 0);
   };

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dedupePage, dedupePages } from '../pages/reading/components/notebook/dedupePage.js';
+import { snapshotPages } from '../pages/reading/components/notebook/useNotebookHistory.js';
 
 describe('dedupePage', () => {
   it('drops a later object sharing an id', () => {
@@ -66,5 +67,13 @@ describe('dedupePages', () => {
 
   it('survives a missing notebook', () => {
     expect(dedupePages(null).removed).toBe(0);
+  });
+});
+
+describe('snapshotPages', () => {
+  it('tolerates legacy strokes that have no point array', () => {
+    const snapshot = snapshotPages([{ lines: [{ id: 'old' }], shapes: [{ id: 'shape' }] }]);
+    expect(snapshot[0].lines[0].points).toEqual([]);
+    expect(snapshot[0].shapes[0].points).toBeUndefined();
   });
 });

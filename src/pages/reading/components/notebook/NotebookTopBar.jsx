@@ -23,6 +23,8 @@ export default function NotebookTopBar({ ui }) {
     showBookSnip, showMoreMenu, showPageManager, showRecordings, showSearch,
     startLoadingPDF, stylusMode, toggleBookmark, togglePanel, zoomWriter,
   } = ui;
+  const pageTitle = pages[currentPageIndex]?.name || `หน้า ${currentPageIndex + 1}`;
+  const notebookTitle = activeBook?.book?.title || 'สมุดโน้ตของฉัน';
 
   // The header overflows on a narrow pane — the notebook is normally half a
   // split view — and there was no way to reach what fell off the right edge. It
@@ -80,7 +82,7 @@ export default function NotebookTopBar({ ui }) {
            // back to them. `safe` centres while there is room and falls back to
            // the start once there is not. It was flex-start, which never lost an
            // icon but left the whole bar hugging the left of a wide screen.
-           style={{ height: 52, width: '100%', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, display: 'flex', alignItems: 'center', justifyContent: readonly ? 'center' : 'safe center', gap: 8, padding: '0 12px', borderBottom: `1px solid ${HW.hairline}`, overflowX: 'auto', overflowY: 'hidden', touchAction: 'pan-x', scrollBehavior: 'auto' }}
+           style={{ height: 58, width: '100%', background: 'linear-gradient(115deg, rgba(255,255,255,0.82), rgba(247,245,241,0.72))', backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, display: 'flex', alignItems: 'center', justifyContent: readonly ? 'center' : 'safe center', gap: 10, padding: '0 14px', borderBottom: `1px solid ${HW.hairline}`, overflowX: 'auto', overflowY: 'hidden', touchAction: 'pan-x', scrollBehavior: 'auto' }}
          >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                {/* No in-notebook back button: it called window.history.back(), which
@@ -104,6 +106,15 @@ export default function NotebookTopBar({ ui }) {
                      style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'transparent', cursor: currentPageIndex === pages.length - 1 ? 'default' : 'pointer', opacity: currentPageIndex === pages.length - 1 ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
                      <ChevronRight size={17} strokeWidth={2} />
                    </button>
+                 </div>
+               )}
+               {!isMobile && (
+                 <div title={`${notebookTitle} · ${pageTitle}`} style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, maxWidth: 220, padding: '5px 10px', borderRadius: 14, background: 'rgba(255,255,255,0.68)', border: `1px solid ${HW.hairline}`, boxShadow: '0 2px 8px rgba(35,31,27,0.04)' }}>
+                   <span style={{ width: 25, height: 25, borderRadius: 9, background: HW.accentSoft, color: HW.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><BookOpen size={14} strokeWidth={2} /></span>
+                   <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
+                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, fontWeight: 700, color: HW.text }}>{notebookTitle}</span>
+                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10.5, color: HW.textDim }}>{pageTitle}</span>
+                   </span>
                  </div>
                )}
                {/* Zoom cluster — the quick way back when the page has drifted off screen */}
@@ -174,7 +185,7 @@ export default function NotebookTopBar({ ui }) {
                        key={b.id}
                        onClick={b.onClick}
                        title={b.title}
-                       style={{ position: 'relative', width: 36, height: 36, borderRadius: 10, border: 'none', background: b.active ? HW.accentSoft : 'transparent', color: b.active ? HW.accent : HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.18s' }}
+                       style={{ position: 'relative', width: 36, height: 36, borderRadius: 12, border: `1px solid ${b.active ? HW.accentRing : 'transparent'}`, background: b.active ? HW.accentSoft : 'rgba(255,255,255,0.38)', color: b.active ? HW.accent : HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.18s' }}
                      >
                        <b.icon size={20} strokeWidth={1.6} />
                        {b.badge > 0 && (

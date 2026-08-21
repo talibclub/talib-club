@@ -34,12 +34,22 @@ export function useNotebookPersistence({
   const saveInFlightRef = useRef(false);
   const saveNotebook = async (isAuto = false) => {
      if (readonly) return;
-     // Without a signed-in user the upload path becomes .../null/<id>.json.gz and
-     // Storage rejects it, so every autosave tick turned into a failed request.
-     // Local pages are kept either way; there is simply nowhere to put them.
-     if (!uid) return;
      if (loadStateRef.current !== 'ready') {
         if (!isAuto) toast.error("ยังโหลดสมุดโน้ตไม่สำเร็จ — บันทึกไม่ได้เพื่อป้องกันข้อมูลเดิมหาย");
+        return;
+     }
+     // Without a signed-in user the upload path becomes .../null/<id>.json.gz and
+     // Storage rejects it. We still need the normal autosave path to protect a
+     // guest's work locally; previously it returned here and only saved when the
+     // tab happened to close.
+     if (!uid) {
+        try {
+          localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pages));
+          if (!isAuto) toast.success('บันทึกไว้ในอุปกรณ์นี้แล้ว', { id: 'local-save', icon: '💾' });
+        } catch (e) {
+          console.warn('Local storage quota exceeded on guest save', e);
+          if (!isAuto) toast.error('พื้นที่ในอุปกรณ์เต็ม — ยังบันทึกไม่ได้', { id: 'local-save' });
+        }
         return;
      }
      // Manual save and autosave can fire together; the 2nd would clear the 1st's

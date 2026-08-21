@@ -92,6 +92,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
   useEffect(() => {
      loadStateRef.current = 'loading';
+     // A different book can have fewer pages. Reset before its data arrives so
+     // the canvas never tries to render a stale out-of-range page index.
+     setCurrentPageIndex(0);
      const loadData = async () => {
         setIsSyncing(true);
         setSyncProgress(null);
@@ -505,7 +508,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      window.addEventListener('resize', handleToolsScroll);
      return () => window.removeEventListener('resize', handleToolsScroll);
   }, []);
-  const { pushHistory, undo, redo, canUndo, canRedo } = useNotebookHistory(pagesRef, setPages, setCurrentPageIndex);
+  const { pushHistory, undo, redo, canUndo, canRedo } = useNotebookHistory(pagesRef, setPages, setCurrentPageIndex, notebookId);
 
   // Every writer in the notebook goes through here, and nearly all of them do it
   // by pushing into one of the page's arrays. The spread below copies the page
@@ -522,6 +525,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const PAGE_CONTENT = ['lines', 'stickers', 'images', 'texts', 'shapes'];
   const updatePage = (index, updater) => {
     setPages((prev) => {
+      // Imports and uploads can finish after a page was deleted or after a
+      // notebook switched. Ignore that stale completion instead of spreading
+      // `undefined` and taking down the entire canvas.
+      if (!Number.isInteger(index) || index < 0 || index >= prev.length) return prev;
       const newPages = [...prev];
       const page = { ...newPages[index] };
       PAGE_CONTENT.forEach((key) => { if (Array.isArray(page[key])) page[key] = [...page[key]]; });
@@ -710,6 +717,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       if (mediaRecorderRef.current) mediaRecorderRef.current.stop();
       setIsRecording(false);
     } else {
+      // Audio is stored in Firebase Storage. A blob URL would appear to work
+      // during this visit but becomes unusable after reload, so do not create a
+      // misleading permanent-looking recording for a guest.
+      if (!uid) {
+        toast.error('กรุณาเข้าสู่ระบบก่อนอัดเสียง เพื่อให้บันทึกและเปิดฟังภายหลังได้');
+        return;
+      }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const mediaRecorder = new MediaRecorder(stream);
@@ -739,6 +753,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           const stickerId = currentRecordingId;
           const totalAudio = pagesRef.current.reduce((n, pg) => n + (pg.stickers || []).filter((s) => s.audioUrl).length, 0);
 
+          pushHistory();
           updatePage(targetPageIndex, (page) => {
              if (!page.stickers) page.stickers = [];
              // Audio notes are no longer drawn on the page — they live in the
@@ -845,7 +860,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
   const handleAddPage = () => {
     const currentPage = pages[currentPageIndex] || {};
-    const newPage = { id: nextObjectId('blank'), src: null, width: dimensions.width > 0 ? dimensions.width - 40 : 800, height: 1130, lines: [], stickers: [], images: [], texts: [], shapes: [], paperType: currentPage.paperType || 'blank', paperColor: currentPage.paperColor || '#ffffff', isBookmarked: false };
+    // A new page should keep the paper proportions of the page the reader is
+    // working on, not inherit the current split-pane width (which made pages
+    // visibly change shape when the browser was resized).
+    const newPage = { id: nextObjectId('blank'), src: null, width: currentPage.width || 800, height: currentPage.height || 1130, lines: [], stickers: [], images: [], texts: [], shapes: [], paperType: currentPage.paperType || 'blank', paperColor: currentPage.paperColor || '#ffffff', isBookmarked: false };
     pushHistory();
     setPages((prev) => {
       const p = [...prev];
@@ -2083,7 +2101,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   return (
     <>
     <NotebookStyles />
-    <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: '#F3F4F6', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: 'radial-gradient(circle at 12% 8%, rgba(15,110,86,0.09), transparent 28%), radial-gradient(circle at 92% 92%, rgba(217,119,6,0.07), transparent 30%), #f3f0ea', display: 'flex', flexDirection: 'column' }}>
       
       <NotebookTopBar ui={ui} />
 
@@ -2200,7 +2218,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
          <div style={{ position: 'absolute', inset: 0, zIndex: 30, background: 'rgba(243,244,246,0.95)', backdropFilter: 'blur(10px)', overflowY: 'auto', padding: 24 }}>
            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, background: 'white', padding: '12px 24px', borderRadius: 16, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
              <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-               <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: 'var(--text)' }}>แม่แบบกระดาษ</h3>
+               <div>
+                 <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: 'var(--text)' }}>หน้าทั้งหมดในสมุด</h3>
+                 <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--t2)' }}>แตะเพื่อไปหน้านั้น หรือตั้งชื่อเพื่อค้นหาได้ง่ายขึ้น</p>
+               </div>
                <div style={{ display: 'flex', gap: 8, background: '#F3F4F6', padding: 4, borderRadius: 10 }}>
                  <button onClick={() => setPageManagerTab('all')} style={{ padding: '6px 16px', borderRadius: 8, border: 'none', background: pageManagerTab === 'all' ? 'white' : 'transparent', color: pageManagerTab === 'all' ? '#111827' : '#6B7280', fontWeight: 600, fontSize: 14, cursor: 'pointer', boxShadow: pageManagerTab === 'all' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>ทั้งหมด ({pages.length})</button>
                  <button onClick={() => setPageManagerTab('bookmarks')} style={{ padding: '6px 16px', borderRadius: 8, border: 'none', background: pageManagerTab === 'bookmarks' ? 'white' : 'transparent', color: pageManagerTab === 'bookmarks' ? '#111827' : '#6B7280', fontWeight: 600, fontSize: 14, cursor: 'pointer', boxShadow: pageManagerTab === 'bookmarks' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -2233,7 +2254,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                         full-size background at once when this grid opens. */}
                     {p.src && <img src={p.src} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="pdf page" />}
                     {!p.src && p.paperType !== 'blank' && <SquareSquare size={24} color="#9CA3AF" opacity={0.3} />}
-                    {p.lines.length > 0 && <PenTool size={16} color="#10B981" style={{ position: 'absolute', bottom: 4, right: 4 }} />}
+                    {(p.lines?.length || 0) > 0 && <PenTool size={16} color="#10B981" style={{ position: 'absolute', bottom: 4, right: 4 }} />}
                   </div>
                   {/* The label is the rename field. Pages could not be named at
                       all, which left the "[[" picker offering "หน้า 1, หน้า 2,
@@ -2335,7 +2356,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
       {loadingPdf && (
          <div style={{ position: 'absolute', inset: 0, zIndex: 10, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-           <span style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>Loading PDF...</span>
+           <span style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>กำลังเตรียมหน้า PDF...</span>
          </div>
       )}
 
