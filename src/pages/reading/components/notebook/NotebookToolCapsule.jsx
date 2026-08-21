@@ -17,7 +17,7 @@ export default function NotebookToolCapsule({ ui }) {
     deleteSelected, editingTextId, eraserSettings, handleToolsScroll,
     insertEmoji, isCoarse, isRecording, laserColor, lassoFilter,
     leftToolbarScroll, penColor, penOpacity, penSize, protractorOn, readonly, rememberCustomColor, rightToolbarScroll, rulerOn, scale, selectedId, setAutoShape, setCroppingImageId,
-    setEraserSettings, setLaserColor, setLassoFilter, setPenColor,
+    connectorHasArrow, setConnectorHasArrow, setEraserSettings, setLaserColor, setLassoFilter, setPenColor,
     setPenOpacity, setPenSize, setProtractorOn, setRulerOn, setShapeType,
     setShowColorPicker, setShowEmojiPicker, setShowToolOptions,
     setStickerStyle, setTextStyle, setTool, shapeType, showColorPicker,
@@ -328,6 +328,13 @@ export default function NotebookToolCapsule({ ui }) {
                                   </button>
                                 ))}
                              </div>
+                             {shapeType === 'connector' && (
+                               <button
+                                 onClick={() => setConnectorHasArrow((v) => !v)}
+                                 title={connectorHasArrow ? 'เส้นเชื่อมมีหัวลูกศร — กดเพื่อเป็นเส้นธรรมดา' : 'เส้นเชื่อมธรรมดา — กดเพื่อใส่หัวลูกศร'}
+                                 style={{ height: 32, padding: '0 10px', borderRadius: 10, border: 'none', background: connectorHasArrow ? HW.accentSoft : 'rgba(0,0,0,0.04)', color: connectorHasArrow ? HW.accent : HW.textDim, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                               >{connectorHasArrow ? 'มีหัวลูกศร' : 'เส้นธรรมดา'}</button>
+                             )}
                              <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
                            </>
                         )}

@@ -165,6 +165,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   
   const [tool, setTool] = useState('pen'); // 'pen', 'pencil', 'highlighter', 'eraser', 'pan', 'text', 'laser', 'shape', 'lasso'
   const [shapeType, setShapeType] = useState('rect'); // 'rect', 'circle', 'line'
+  const [connectorHasArrow, setConnectorHasArrow] = useState(true);
   const [isSpaceDown, setIsSpaceDown] = useState(false);
 
   // Item 7 (group C): the first time the lasso is picked, point out that two
@@ -997,7 +998,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     }
     // A polygon vertex / connector endpoint handle drags itself; the stage must
     // not pan or deselect.
-    if (targetName === 'poly-handle' || targetName === 'conn-handle') {
+    if (targetName === 'poly-handle' || targetName === 'conn-handle' || targetName === 'connect-handle') {
        return;
     }
     // The protractor guide moves/rotates itself and must not lay down ink.
@@ -1136,6 +1137,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
        const startBox = startId ? objectBoundsById(startId) : null;
        const start = startBox ? boundsCenter(startBox) : pos;
        connectorSourceIdRef.current = null;
+       setConnectorSourceId(null);
        connectorDrawIdRef.current = id;
        pushHistory();
        updatePage(currentPageIndex, (page) => {
@@ -1144,7 +1146,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              id, type: 'connector',
              from: startId ? { id: startId, x: start.x, y: start.y } : { x: pos.x, y: pos.y },
              to: { x: pos.x, y: pos.y },
-             color: penColor, size: Math.max(2, penSize), hasArrow: true,
+             color: penColor, size: Math.max(2, penSize), hasArrow: connectorHasArrow,
           });
        });
        return;
@@ -1331,9 +1333,29 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // Set by the selected-object toolbar. It lets one tap on a destination create
   // a bound connector from the selected source.
   const connectorSourceIdRef = useRef(null);
+  const [connectorSourceId, setConnectorSourceId] = useState(null);
   const {
-     objectBoundsById, objectIdAt, resolveConnectorEnd, connectorPoints,
+     objectBoundsById, objectIdAt, resolveConnectorEnd, connectorPoints, connectableObjects,
   } = makeConnectors({ pagesRef, currentPageIndex, getPage: () => currentPage });
+  const beginConnector = (sourceId) => {
+    connectorSourceIdRef.current = sourceId || null;
+    setConnectorSourceId(sourceId || null);
+    setTool('shape');
+    setShapeType('connector');
+    setShowToolOptions(true);
+    selectShape(null);
+  };
+  const cancelConnector = () => {
+    connectorSourceIdRef.current = null;
+    setConnectorSourceId(null);
+    setTool('pan');
+    setShowToolOptions(false);
+  };
+  useEffect(() => {
+    if (tool === 'shape' && shapeType === 'connector') return;
+    connectorSourceIdRef.current = null;
+    setConnectorSourceId(null);
+  }, [tool, shapeType]);
   const lassoBounds = React.useMemo(() => {
     if (selectedLassoLines.length === 0 && selectedObjects.length === 0) return null;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -2053,6 +2075,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         return;
       }
       if (e.key === 'Escape') {
+        if (tool === 'shape' && shapeType === 'connector') {
+          cancelConnector();
+          return;
+        }
         selectShape(null);
         closeOverlays(null);
         return;
@@ -2085,7 +2111,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     undo,
     TOOL_BTN, WRITER_H, activeBook, applyColorToActiveText, audioPlaying,
     autoShape, clearPage, clearStrokes, closeOverlays, colors, currentPage,
-    currentPageIndex, customColors, deletePage, deleteRecording,
+    connectorHasArrow, currentPageIndex, customColors, deletePage, deleteRecording,
     deleteSelected, editingTextId, eraserSettings, exportNotebookPDF,
     fitToScreen, fullView, handleAddPage, handleToolsScroll, insertEmoji,
     isCoarse, isMobile, isRecording, isSaving, laserColor, lassoFilter,
@@ -2094,7 +2120,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     protractor, protractorOn, readonly, recordings, rememberCustomColor,
     renameRecording, rightToolbarScroll, ruler, rulerOn, runExport,
     saveNotebook, scale, selectedId, setAutoShape, setBookSnipInitialPage,
-    setCroppingImageId, setCurrentPageIndex, setEraserSettings,
+    setConnectorHasArrow, setCroppingImageId, setCurrentPageIndex, setEraserSettings,
     setLaserColor, setLassoFilter, setPenColor, setPenOpacity, setPenSize,
     setPressureEnabled, setProtractorOn, setRulerOn, setScale, setShapeType,
     setShowAi, setShowBookSnip, setShowColorPicker, setShowEmojiPicker,
@@ -2388,6 +2414,19 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
            </div>
            <span style={{ fontSize: 12.5, color: HW.textDim, fontFamily: 'Kanit, sans-serif' }}>กรุณารอสักครู่ กำลังโหลดสมุดโน้ตของคุณ</span>
          </div>
+      )}
+
+      {/* Connector mode is intentionally loud: drawing tools normally need no
+          explanation, but a two-step connection should never leave the reader
+          wondering why the next tap did not place a shape. */}
+      {!readonly && tool === 'shape' && shapeType === 'connector' && (
+        <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 55, maxWidth: 'calc(100% - 24px)', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px 7px 12px', borderRadius: 999, background: 'rgba(15,110,86,0.94)', color: 'white', boxShadow: '0 8px 22px rgba(15,110,86,0.25)', fontFamily: 'Kanit, sans-serif' }}>
+          <Link2 size={16} strokeWidth={2.2} />
+          <span style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {connectorSourceId ? 'เลือกวัตถุปลายทางเพื่อเชื่อม' : 'ลากจากวัตถุหนึ่งไปยังอีกวัตถุ'}
+          </span>
+          <button onClick={cancelConnector} title="ยกเลิกโหมดเชื่อม (Esc)" style={{ display: 'flex', alignItems: 'center', gap: 3, border: 'none', borderRadius: 999, padding: '4px 7px', background: 'rgba(255,255,255,0.18)', color: 'white', cursor: 'pointer', fontFamily: 'Kanit, sans-serif', fontSize: 11.5, fontWeight: 600 }}><X size={14} /> ยกเลิก</button>
+        </div>
       )}
 
       
@@ -3135,6 +3174,24 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         
         {/* Transformer Layer */}
         <Layer>
+           {/* While connecting, quietly outline every valid destination. The
+               canvas remains fully interactive; this layer is visual only. */}
+           {tool === 'shape' && shapeType === 'connector' && (
+             <Group x={pageX} y={pageY} listening={false}>
+               {connectableObjects().map(({ id, bounds }) => (
+                 <Rect
+                   key={`connect-target-${id}`}
+                   x={bounds.minX - 5} y={bounds.minY - 5}
+                   width={Math.max(10, bounds.maxX - bounds.minX + 10)}
+                   height={Math.max(10, bounds.maxY - bounds.minY + 10)}
+                   cornerRadius={8}
+                   stroke={id === connectorSourceId ? HW.accent : 'rgba(15,110,86,0.45)'}
+                   strokeWidth={id === connectorSourceId ? 2.5 / scale : 1 / scale}
+                   dash={id === connectorSourceId ? [] : [5 / scale, 4 / scale]}
+                 />
+               ))}
+             </Group>
+           )}
            {selectedId && (
               <Transformer
                 ref={transformerRef}
@@ -3159,6 +3216,35 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                 }}
               />
            )}
+
+           {/* Four explicit connection ports make the feature discoverable. Tap
+               one, then tap a target; no pixel-perfect drag from the object is
+               required on a tablet. */}
+           {!readonly && selectedInfo && !(selectedInfo.kind === 'shapes' && selectedInfo.obj.type === 'connector') && (() => {
+             const b = selectedInfo.box;
+             const r = 6.5 / scale;
+             const ports = [
+               { x: (b.minX + b.maxX) / 2, y: b.minY, label: 'บน' },
+               { x: b.maxX, y: (b.minY + b.maxY) / 2, label: 'ขวา' },
+               { x: (b.minX + b.maxX) / 2, y: b.maxY, label: 'ล่าง' },
+               { x: b.minX, y: (b.minY + b.maxY) / 2, label: 'ซ้าย' },
+             ];
+             return (
+               <Group x={pageX} y={pageY}>
+                 {ports.map((port) => (
+                   <Circle
+                     key={`connect-port-${port.label}`}
+                     name="connect-handle"
+                     x={port.x} y={port.y} radius={r}
+                     fill="#FFFFFF" stroke={HW.accent} strokeWidth={2 / scale}
+                     shadowColor="rgba(15,110,86,0.25)" shadowBlur={4 / scale}
+                     onClick={() => { beginConnector(selectedInfo.obj.id); toast('เลือกปลายทางที่ต้องการเชื่อมได้เลย', { icon: '🔗' }); }}
+                     onTap={() => { beginConnector(selectedInfo.obj.id); toast('เลือกปลายทางที่ต้องการเชื่อมได้เลย', { icon: '🔗' }); }}
+                   />
+                 ))}
+               </Group>
+             );
+           })()}
 
            {!readonly && (() => {
               const poly = currentPage.shapes?.find(sh => sh.id === selectedId && sh.type === 'polygon');
@@ -3313,6 +3399,17 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
          const noteW = st.width || 150;
          const noteH = st.height || 150;
          const editorWidth = Math.max(48, noteW - 24);
+         // A note grows down only when its writing needs it. Width is the
+         // reader's layout decision (drag the side handles), while height should
+         // not hide a paragraph just because the original card was short.
+         const stickerHeightForLines = (lines) => {
+           const visualRows = (lines || []).reduce((sum, line) => {
+             const size = line.size || ts.size;
+             const estimate = Math.max(1, Math.ceil(((line.text || '').length * size * 0.58) / editorWidth));
+             return sum + estimate * size * LINE_HEIGHT;
+           }, 0);
+           return Math.ceil(visualRows + (polaroid ? 44 : 38));
+         };
          const noteZ = scale * (st.scaleX || 1);
          // Editing scale, not drawing scale. A note zoomed out renders its text
          // at a handful of pixels — legible as a shape on the page, not as
@@ -3346,7 +3443,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                pages={pages}
                currentPageIndex={currentPageIndex}
                onCreateLinkedPage={createLinkedPage}
-               onLinesChange={(lines) => updSticker((x) => { x.lines = lines; x.text = lines.map(l => l.text).join('\n'); })}
+               onLinesChange={(lines) => {
+                 const needed = stickerHeightForLines(lines);
+                 updSticker((x) => {
+                   x.lines = lines;
+                   x.text = lines.map(l => l.text).join('\n');
+                   if (needed > (x.height || 150)) x.height = needed;
+                 });
+               }}
                onFont={() => {}}
                onSize={(n) => updSticker((x) => { x.textSize = n; })}
                onColor={(c) => updSticker((x) => { x.textColor = c; })}
@@ -3473,11 +3577,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              // Keep the selected object as the source, then let the reader tap
              // (or drag to) any destination to make a bound connector.
              onConnect={!(kind === 'shapes' && obj.type === 'connector') ? () => {
-               connectorSourceIdRef.current = obj.id;
-               setTool('shape');
-               setShapeType('connector');
-               setShowToolOptions(true);
-               selectShape(null);
+               beginConnector(obj.id);
                toast('แตะหรือ ลาก ไปยังวัตถุปลายทางเพื่อเชื่อม เส้นจะเกาะทั้งสองฝั่ง', { icon: '🔗' });
              } : undefined}
              onRecolor={recolorSelectedObject}

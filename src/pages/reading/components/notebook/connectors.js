@@ -99,7 +99,24 @@ export function makeConnectors({ pagesRef, currentPageIndex, getPage }) {
     return { a: resolveConnectorEnd(s.from, rawB), b: resolveConnectorEnd(s.to, rawA) };
   };
 
-  return { objectBoundsById, objectIdAt, resolveConnectorEnd, connectorPoints };
+  // Used by the canvas to softly outline every valid destination while the
+  // connector tool is active. A visible affordance beats asking someone to
+  // remember which things on a busy page are actually linkable.
+  const connectableObjects = () => {
+    const page = readPage();
+    if (!page) return [];
+    const out = [];
+    for (const kind of ['lines', 'texts', 'stickers', 'images', 'shapes']) {
+      for (const o of page[kind] || []) {
+        if (!o?.id || (kind === 'shapes' && o.type === 'connector')) continue;
+        const bounds = objectBoundsById(o.id);
+        if (bounds) out.push({ id: o.id, bounds });
+      }
+    }
+    return out;
+  };
+
+  return { objectBoundsById, objectIdAt, resolveConnectorEnd, connectorPoints, connectableObjects };
 }
 
 // Connectors whose far end no longer exists.
