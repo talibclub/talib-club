@@ -587,7 +587,7 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
           /* "พิมพ์ข้อความที่นี่..." was instructions for a form. The caret is
              already at the spot and already blinking, so the only thing worth
              saying is what this editor can do that a plain box cannot. */
-          content: "เขียนได้เลย — / คำสั่ง · [[ ลิงก์หน้า";
+          content: "เขียน…";
           color: #B6B1A9;
           font-size: 0.82em;
           pointer-events: none;
@@ -715,7 +715,7 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
         suppressContentEditableWarning
         role="textbox"
         aria-multiline="true"
-        data-placeholder="เขียนได้เลย — / คำสั่ง · [[ ลิงก์หน้า"
+        data-placeholder="เขียน…"
         spellCheck={false}
         onInput={handleInput}
         onKeyDown={handleKeyDown}
@@ -732,7 +732,7 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
         }}
         style={{
           margin: 0,
-          padding: '2px 0 2px 8px',
+          padding: '2px 0',
           // No border, no ring, no fill.
           //
           // This surface has been complained about three times, and each attempt
@@ -746,8 +746,10 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
           // What marks the editor is the caret, which is what marks every text
           // cursor anywhere. A thin bar at the left edge says which block has it
           // without enclosing anything.
+          // The left bar went the same way as the box before it: on a node it
+          // sat outside the card looking like a stray mark, and it was one more
+          // thing on screen that is not the writing. The caret is the marker.
           border: 'none',
-          borderLeft: `2px solid ${HW.accent}`,
           borderRadius: 0,
           background: 'transparent',
           boxShadow: 'none',

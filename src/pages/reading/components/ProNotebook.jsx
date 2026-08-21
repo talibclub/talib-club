@@ -334,7 +334,12 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     // Polygons and connectors are edited by their own handles, so they must not
     // also get the scale/rotate transformer box.
     const selCustom = pagesRef.current[currentPageIndex]?.shapes?.some((s) => s.id === selectedId && (s.type === 'polygon' || s.type === 'connector'));
-    if (selectedId && !selCustom && transformerRef.current) {
+    // Nothing gets resize handles while it is being written in. Branching leaves
+    // the new node selected so the next Tab continues from it, which meant a
+    // freshly branched node came up with eight handles around a box the size of
+    // a caret while you were trying to type in it.
+    const busyWriting = !!editingTextId || !!editingStickerId;
+    if (selectedId && !selCustom && !busyWriting && transformerRef.current) {
        const node = stageRef.current.findOne(`#${selectedId}`);
        if (node) {
           transformerRef.current.nodes([node]);
@@ -343,7 +348,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     } else if (transformerRef.current) {
        transformerRef.current.nodes([]);
     }
-  }, [selectedId, currentPageIndex]);
+  }, [selectedId, currentPageIndex, editingTextId, editingStickerId]);
 
   const checkDeselect = (e) => {
     const clickedOnEmpty = e.target === e.target.getStage() || e.target.name() === 'background';
@@ -2784,7 +2789,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                    const rows = tt.lines.length || 1;
                    // The same measurement the connector uses, so the card and the
                    // branch that meets it agree on where the node ends.
-                   const w = textVisualWidth(t, textOf(tt)) + 26;
+                   // A node being written in is empty, and an empty node measured
+                   // by its words is a stub barely wider than the caret. Hold a
+                   // sensible minimum so the card does not pop into existence
+                   // around the words after the fact.
+                   const w = Math.max(editingTextId === t.id ? 150 : 84, textVisualWidth(t, textOf(tt)) + 26);
                    const h = rows * (t.size || 22) * LINE_HEIGHT + 16;
                    return (
                      <Rect
