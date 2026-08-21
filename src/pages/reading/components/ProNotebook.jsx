@@ -43,7 +43,7 @@ import { makeLassoOps } from './notebook/lassoOps.js';
 import { makePdfImport } from './notebook/pdfImport.js';
 import { useImageDrop } from './notebook/imageDrop.js';
 import { makeWriterStrip } from './notebook/writerStrip.js';
-import { makeConnectors } from './notebook/connectors.js';
+import { makeConnectors, pruneDanglingConnectors } from './notebook/connectors.js';
 import { useTextRecognition } from './notebook/useTextRecognition.js';
 import NotebookStyles from './notebook/NotebookStyles.jsx';
 import NotebookTopBar from './notebook/NotebookTopBar.jsx';
@@ -796,6 +796,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
        if (page.stickers) page.stickers = page.stickers.filter(st => st.id !== selectedId);
        if (page.images) page.images = page.images.filter(img => img.id !== selectedId);
        if (page.shapes) page.shapes = page.shapes.filter(sh => sh.id !== selectedId);
+       // A connector bound to what just went would otherwise stay, and fall back
+       // to the coordinates on its endpoint — which a branch made by Tab or
+       // Enter does not have, so its line jumped to the corner of the page.
+       page.shapes = pruneDanglingConnectors(page);
     });
     selectShape(null);
   };

@@ -78,3 +78,25 @@ export function makeConnectors({ pagesRef, currentPageIndex }) {
 
   return { objectBoundsById, objectIdAt, resolveConnectorEnd, connectorPoints };
 }
+
+// Connectors whose far end no longer exists.
+//
+// Deleting an object left every connector bound to it behind. Such a connector
+// falls back to the coordinates stored on its endpoint, and a branch made by Tab
+// or Enter stores none — so deleting one node of a mindmap flung its line to the
+// page's top-left corner. A connector to nothing is not meaningful in either
+// case, so it goes when its object goes.
+export function pruneDanglingConnectors(page) {
+  const shapes = page?.shapes || [];
+  const alive = new Set(
+    [...(page?.texts || []), ...(page?.stickers || []), ...(page?.images || []), ...shapes]
+      .map((o) => o?.id)
+      .filter(Boolean)
+  );
+  return shapes.filter((s) => {
+    if (s?.type !== 'connector') return true;
+    if (s.from?.id && !alive.has(s.from.id)) return false;
+    if (s.to?.id && !alive.has(s.to.id)) return false;
+    return true;
+  });
+}

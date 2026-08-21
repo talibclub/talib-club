@@ -1,4 +1,5 @@
 import toast from 'react-hot-toast';
+import { pruneDanglingConnectors } from './connectors.js';
 import { ZERO_OFFSET } from './theme.js';
 
 // Lasso selection: what is selected, moving it, and the operations offered on it
@@ -100,6 +101,8 @@ export function makeLassoOps({
           if (!page[kind]) return;
           page[kind] = page[kind].filter((o) => !objects.some((s) => s.kind === kind && s.id === o.id));
         });
+        // Same as the single delete: a connector to something that is gone goes.
+        page.shapes = pruneDanglingConnectors(page);
       });
     }
     clearLassoSelection();
