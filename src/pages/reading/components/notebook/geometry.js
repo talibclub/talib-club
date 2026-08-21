@@ -67,9 +67,12 @@ export const makeLine = (text = '', fmt = {}) => ({
   // null means "inherit the object's size", which is what every line saved
   // before this carried — so nothing that already exists changes appearance.
   size: Number.isFinite(fmt.size) && fmt.size > 0 ? fmt.size : null,
-  // A "[[" link to another page of the notebook. null for every line that is not
-  // one, which is every line written before links existed.
-  link: Number.isInteger(fmt.link?.page) && fmt.link.page >= 0 ? { page: fmt.link.page } : null,
+  // A "[[" link to another page of the notebook. Held as the page's id, so it
+  // survives pages being inserted or reordered; a plain index is still read, for
+  // links written before that was true. null for every line that is not a link.
+  link: fmt.link?.pageId
+    ? { pageId: fmt.link.pageId }
+    : (Number.isInteger(fmt.link?.page) && fmt.link.page >= 0 ? { page: fmt.link.page } : null),
 });
 
 // Return a copy of the text object guaranteed to have a well-formed `lines[]`.

@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  AlignCenter, AlignLeft, AlignRight, Bold, FileText, Heading1, Heading2, Italic,
+  AlignCenter, AlignLeft, AlignRight, Bold, FilePlus, FileText, Heading1, Heading2, Italic,
   List, ListOrdered, RemoveFormatting, Strikethrough, Underline,
 } from 'lucide-react';
 import { HW } from './theme.js';
 
 const ICONS = {
-  AlignCenter, AlignLeft, AlignRight, Bold, FileText, Heading1, Heading2, Italic,
+  AlignCenter, AlignLeft, AlignRight, Bold, FilePlus, FileText, Heading1, Heading2, Italic,
   List, ListOrdered, RemoveFormatting, Strikethrough, Underline,
 };
 

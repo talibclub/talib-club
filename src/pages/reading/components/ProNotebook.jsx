@@ -25,7 +25,7 @@ import ObjectContextMenu from './notebook/ObjectContextMenu.jsx';
 import SelectionToolbar from './notebook/SelectionToolbar.jsx';
 import LassoToolbar from './notebook/LassoToolbar.jsx';
 import { konvaFontStyle, stickerTextStyle } from './notebook/stickerText.js';
-import { backlinksTo } from './notebook/wikiLinks.js';
+import { backlinksTo, resolveLinkIndex } from './notebook/wikiLinks.js';
 import { childIdsOf, childPlacement, makeBranchConnector, parentIdOf, siblingPlacement } from './notebook/mindmap.js';
 import TextEditor from './notebook/TextEditor.jsx';
 import PaperTemplateModal from './notebook/PaperTemplateModal.jsx';
@@ -1484,13 +1484,29 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
   // Following a "[[" link. Clamped, because a linked page can be deleted after
   // the link was written and a stale index would otherwise blank the notebook.
-  const goToLinkedPage = (index) => {
-     const last = pagesRef.current.length - 1;
-     if (last < 0) return;
-     const target = Math.min(Math.max(0, index), last);
+  const goToLinkedPage = (link) => {
+     const target = resolveLinkIndex(pagesRef.current, link);
+     if (target === -1) { toast('หน้าที่ลิงก์ไว้ถูกลบไปแล้ว'); return; }
      selectShape(null);
      setCurrentPageIndex(target);
-     if (target !== index) toast('หน้าที่ลิงก์ไว้ถูกลบไปแล้ว — พาไปหน้าที่ใกล้ที่สุด');
+  };
+
+  // "[[" on a name that is not a page yet makes one. Appended at the end rather
+  // than after the current page, so nothing shifts under the reader's feet while
+  // they are mid-sentence. Returns what the editor needs to write the link.
+  const createLinkedPage = (name) => {
+     const base = pages[currentPageIndex] || {};
+     const page = {
+        id: nextObjectId('page'), src: null,
+        width: dimensions.width > 0 ? dimensions.width - 40 : 800, height: 1130,
+        lines: [], stickers: [], images: [], texts: [], shapes: [],
+        paperType: base.paperType || 'blank', paperColor: base.paperColor || '#ffffff',
+        isBookmarked: false, name: name || undefined,
+     };
+     pushHistory();
+     setPages((prev) => [...prev, page]);
+     toast.success(name ? `สร้างหน้า "${name}" แล้ว` : 'สร้างหน้าใหม่แล้ว');
+     return { pageId: page.id, label: name || `หน้า ${pages.length + 1}` };
   };
 
   // OCR on an image, and handwriting to editable text.
@@ -2758,8 +2774,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                           width={t.width || TEXT_BOX_WIDTH}
                           height={(l.size || t.size) * LINE_HEIGHT}
                           fill="transparent"
-                          onClick={(e) => { e.cancelBubble = true; goToLinkedPage(l.link.page); }}
-                          onTap={(e) => { e.cancelBubble = true; goToLinkedPage(l.link.page); }}
+                          onClick={(e) => { e.cancelBubble = true; goToLinkedPage(l.link); }}
+                          onTap={(e) => { e.cancelBubble = true; goToLinkedPage(l.link); }}
                           onMouseEnter={(e) => { const st = e.target.getStage(); if (st) st.container().style.cursor = 'pointer'; }}
                           onMouseLeave={(e) => { const st = e.target.getStage(); if (st) st.container().style.cursor = ''; }}
                         />
@@ -3117,6 +3133,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              t={t}
              pages={pages}
              currentPageIndex={currentPageIndex}
+             onCreateLinkedPage={createLinkedPage}
              textareaRef={textareaRef}
              onChange={(val) => setEditingTextValue(val)}
              onLinesChange={(lines) => upd(txt => { txt.lines = lines; txt.text = lines.map(l => l.text).join('\n'); })}
@@ -3181,6 +3198,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                boxWidth={126}
                pages={pages}
                currentPageIndex={currentPageIndex}
+               onCreateLinkedPage={createLinkedPage}
                onLinesChange={(lines) => updSticker((x) => { x.lines = lines; x.text = lines.map(l => l.text).join('\n'); })}
                onFont={() => {}}
                onSize={(n) => updSticker((x) => { x.textSize = n; })}

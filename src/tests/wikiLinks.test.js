@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { backlinksTo, filterPages, matchWikiLink, pageLabel } from '../pages/reading/components/notebook/wikiLinks.js';
+import { backlinksTo, filterPages, matchWikiLink, pageLabel, resolveLinkIndex } from '../pages/reading/components/notebook/wikiLinks.js';
 
 describe('matchWikiLink', () => {
   it('opens on "[["', () => {
@@ -76,10 +76,10 @@ describe('filterPages', () => {
 describe('backlinksTo', () => {
   const linkLine = (page) => ({ text: 'ไป', link: { page } });
   const pages = [
-    { name: 'บทนำ', texts: [{ lines: [linkLine(2)] }] },
-    { name: 'กลาง', texts: [{ lines: [{ text: 'ธรรมดา' }] }] },
-    { name: 'ปลายทาง', texts: [] },
-    { name: 'อีกหน้า', texts: [{ lines: [linkLine(2), linkLine(2)] }] },
+    { id: 'p0', name: 'บทนำ', texts: [{ lines: [linkLine(2)] }] },
+    { id: 'p1', name: 'กลาง', texts: [{ lines: [{ text: 'ธรรมดา' }] }] },
+    { id: 'p2', name: 'ปลายทาง', texts: [] },
+    { id: 'p3', name: 'อีกหน้า', texts: [{ lines: [linkLine(2), linkLine(2)] }] },
   ];
 
   it('finds the pages pointing at this one', () => {
@@ -95,12 +95,39 @@ describe('backlinksTo', () => {
   });
 
   it('never lists the page itself', () => {
-    const selfLink = [{ texts: [{ lines: [linkLine(0)] }] }];
+    const selfLink = [{ id: 'only', texts: [{ lines: [linkLine(0)] }] }];
     expect(backlinksTo(selfLink, 0)).toEqual([]);
   });
 
   it('survives pages with no texts and a missing notebook', () => {
     expect(backlinksTo([{}, {}], 0)).toEqual([]);
     expect(backlinksTo(null, 0)).toEqual([]);
+  });
+});
+
+describe('resolveLinkIndex', () => {
+  const pages = [{ id: 'p-a' }, { id: 'p-b' }, { id: 'p-c' }];
+
+  it('finds the page by its id', () => {
+    expect(resolveLinkIndex(pages, { pageId: 'p-c' })).toBe(2);
+  });
+
+  it('still points at the same page after one is inserted before it', () => {
+    const grown = [{ id: 'p-a' }, { id: 'p-new' }, { id: 'p-b' }, { id: 'p-c' }];
+    expect(resolveLinkIndex(grown, { pageId: 'p-c' })).toBe(3);
+  });
+
+  it('reads a plain index, for links written before ids were used', () => {
+    expect(resolveLinkIndex(pages, { page: 1 })).toBe(1);
+  });
+
+  it('clamps a legacy index that now runs past the end', () => {
+    expect(resolveLinkIndex(pages, { page: 99 })).toBe(2);
+  });
+
+  it('reports a target that no longer exists', () => {
+    expect(resolveLinkIndex(pages, { pageId: 'gone' })).toBe(-1);
+    expect(resolveLinkIndex(pages, null)).toBe(-1);
+    expect(resolveLinkIndex(null, { pageId: 'p-a' })).toBe(-1);
   });
 });

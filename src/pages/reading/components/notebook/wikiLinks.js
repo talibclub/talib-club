@@ -40,9 +40,26 @@ export function pageLabel(page, index) {
 export function filterPages(pages, query, currentIndex) {
   const q = (query || '').trim().toLowerCase();
   return (pages || [])
-    .map((page, index) => ({ id: `page-${index}`, index, label: pageLabel(page, index), icon: 'FileText' }))
+    .map((page, index) => ({ id: `page-${index}`, index, pageId: page?.id, label: pageLabel(page, index), icon: 'FileText' }))
     .filter((row) => row.index !== currentIndex)
     .filter((row) => !q || row.label.toLowerCase().includes(q));
+}
+
+// Which page a link points at, right now.
+//
+// Links used to store a page index, which is only true until someone inserts or
+// reorders a page — after that every link past the insertion point quietly points
+// one page short. They store the page's id now. A number is still understood, so
+// links written before this keep working; they carry the old risk and nothing
+// can be done about that retrospectively.
+export function resolveLinkIndex(pages, link) {
+  if (!link || !Array.isArray(pages)) return -1;
+  if (link.pageId) {
+    const byId = pages.findIndex((p) => p?.id === link.pageId);
+    if (byId !== -1) return byId;
+  }
+  if (Number.isInteger(link.page)) return Math.min(Math.max(0, link.page), pages.length - 1);
+  return -1;
 }
 
 // Which pages link to this one.
@@ -58,7 +75,7 @@ export function backlinksTo(pages, target) {
   pages.forEach((page, index) => {
     if (index === target) return;
     const links = (page?.texts || []).some((t) =>
-      (t?.lines || []).some((l) => l?.link && l.link.page === target)
+      (t?.lines || []).some((l) => l?.link && resolveLinkIndex(pages, l.link) === target)
     );
     if (links && !seen.has(index)) {
       seen.add(index);

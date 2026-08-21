@@ -100,7 +100,7 @@ const FormatBtn = ({ icon, active, onClick }) => (
   </button>
 );
 
-export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLinesChange, onFont, onSize, onColor, onCommit, boxWidth, pages, currentPageIndex }) {
+export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLinesChange, onFont, onSize, onColor, onCommit, boxWidth, pages, currentPageIndex, onCreateLinkedPage }) {
   // The format bar is anchored to the text box's left edge with
   // `width: max-content` and `maxWidth: calc(100vw - 32px)`. Two problems: a box
   // near the right of the notebook pushed the bar off the edge, and the clamp
@@ -143,9 +143,22 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
   const [slashIndex, setSlashIndex] = useState(0);
   // "[[" uses the same picker, listing the notebook's other pages.
   const [wiki, setWiki] = useState(null);       // { node, start, query, x, y, above }
+  // "[[" used to open only when another page already existed, so in a one-page
+  // notebook it did nothing at all and said nothing about why. It always opens
+  // now, and when nothing matches it offers to make the page — which is also how
+  // an outline gets written: the links come first, the pages after.
+  const wikiRows = wiki ? filterPages(pages, wiki.query, currentPageIndex) : [];
+  const wikiQuery = (wiki?.query || '').trim();
+  const canCreate = !!wiki && !!onCreateLinkedPage
+    && !wikiRows.some((r) => r.label === wikiQuery);
   const menuItems = slash
     ? filterSlashCommands(slash.query)
-    : (wiki ? filterPages(pages, wiki.query, currentPageIndex) : []);
+    : (wiki
+        ? [...wikiRows, ...(canCreate ? [{
+            id: '__create', icon: 'FilePlus', create: true,
+            label: wikiQuery ? `สร้างหน้าใหม่ "${wikiQuery}"` : 'สร้างหน้าใหม่แล้วลิงก์',
+          }] : [])]
+        : []);
   const slashItems = menuItems;
 
   const size = t.size || 24;
@@ -373,7 +386,7 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
     const before = node.textContent.slice(0, sel.anchorOffset);
 
     const link = matchWikiLink(before);
-    if (link && filterPages(pages, link.query, currentPageIndex).length) {
+    if (link) {
       setSlash(null);
       setWiki({ node, start: link.start, query: link.query, ...placeAt(node, link.start) });
       setSlashIndex(0);
@@ -393,11 +406,16 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
   // to it. The label is the text; the destination rides on the line.
   const runWiki = (row) => {
     const { node, start, query } = wiki;
+    // Making the page first, so the label written into the line is its real name
+    // and the link binds to the page that now exists.
+    const made = row.create ? onCreateLinkedPage(query.trim()) : null;
+    if (row.create && !made) { setWiki(null); return; }
+    const label = made ? made.label : row.label;
     if (node?.nodeType === 3) {
       const text = node.textContent;
-      node.textContent = text.slice(0, start) + row.label + text.slice(start + 2 + query.length);
+      node.textContent = text.slice(0, start) + label + text.slice(start + 2 + query.length);
       const r = document.createRange();
-      r.setStart(node, Math.min(start + row.label.length, node.textContent.length));
+      r.setStart(node, Math.min(start + label.length, node.textContent.length));
       r.collapse(true);
       const sel = window.getSelection();
       sel.removeAllRanges();
@@ -405,7 +423,7 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
       rememberSelection();
     }
     setWiki(null);
-    applyToLines((f) => ({ ...f, link: { page: row.index } }));
+    applyToLines((f) => ({ ...f, link: { pageId: made ? made.pageId : row.pageId } }));
   };
 
   // Delete the typed "/query" and run the command it named.
