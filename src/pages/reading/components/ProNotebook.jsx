@@ -1299,7 +1299,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const connectorDrawIdRef = useRef(null);
   const {
      objectBoundsById, objectIdAt, resolveConnectorEnd, connectorPoints,
-  } = makeConnectors({ pagesRef, currentPageIndex });
+  } = makeConnectors({ pagesRef, currentPageIndex, getPage: () => currentPage });
   const lassoBounds = React.useMemo(() => {
     if (selectedLassoLines.length === 0 && selectedObjects.length === 0) return null;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -1471,9 +1471,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         if (!page2.texts) page2.texts = [];
         if (!page2.shapes) page2.shapes = [];
         page2.texts.push(newNode);
+        const anchorBox = objectBoundsById(anchorId) || from;
         page2.shapes.push(makeBranchConnector({
            id: nextObjectId('shape'), fromId: anchorId, toId: nodeIdNew,
            color: penColor, size: Math.max(2, penSize),
+           // Real coordinates, so a connector that ever loses an end stays put
+           // instead of snapping to the corner of the page.
+           from: { x: (anchorBox.minX + anchorBox.maxX) / 2, y: (anchorBox.minY + anchorBox.maxY) / 2 },
+           to: { x: spot.x + 60, y: spot.y + 12 },
         }));
      });
      selectShape(nodeIdNew);

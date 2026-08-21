@@ -45,11 +45,15 @@ export function parentIdOf(page, childId) {
   return link ? link.from.id : null;
 }
 
-export function makeBranchConnector({ id, fromId, toId, color, size }) {
+// The coordinates matter even though both ends are bound by id: they are what a
+// connector falls back to if it cannot find its object, and (0, 0) meant the
+// line shot off to the corner of the page rather than staying near where it
+// belongs.
+export function makeBranchConnector({ id, fromId, toId, color, size, from, to }) {
   return {
     id, type: 'connector',
-    from: { id: fromId, x: 0, y: 0 },
-    to: { id: toId, x: 0, y: 0 },
+    from: { id: fromId, x: from?.x || 0, y: from?.y || 0 },
+    to: { id: toId, x: to?.x || 0, y: to?.y || 0 },
     color, size, hasArrow: true,
   };
 }

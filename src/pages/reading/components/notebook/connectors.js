@@ -6,9 +6,15 @@ import { LINE_HEIGHT, TEXT_BOX_WIDTH } from './theme.js';
 //
 // A bound end sits on its object's edge facing the other end, so the line meets
 // the border rather than burying itself in the middle of the box.
-export function makeConnectors({ pagesRef, currentPageIndex }) {
+export function makeConnectors({ pagesRef, currentPageIndex, getPage }) {
+  // pagesRef is written by an effect, so it lags a render behind. A connector
+  // drawn to a node created in this very render found nothing, fell back to the
+  // coordinates on its endpoint, and drew itself to the corner of the page —
+  // which is exactly what a freshly branched mindmap looked like. Prefer the
+  // live page when the caller can give one.
+  const readPage = () => (getPage ? getPage() : null) || pagesRef.current[currentPageIndex];
   const objectBoundsById = (id) => {
-    const page = pagesRef.current[currentPageIndex];
+    const page = readPage();
     if (!page || !id) return null;
     for (const kind of ['images', 'shapes', 'texts', 'stickers']) {
       const o = (page[kind] || []).find((x) => x.id === id);
@@ -39,7 +45,7 @@ export function makeConnectors({ pagesRef, currentPageIndex }) {
 
   // Topmost non-connector object under a page-space point (for endpoint snapping).
   const objectIdAt = (pos, excludeId) => {
-    const page = pagesRef.current[currentPageIndex];
+    const page = readPage();
     if (!page) return null;
     for (const kind of ['stickers', 'images', 'texts', 'shapes']) {
       const arr = page[kind] || [];

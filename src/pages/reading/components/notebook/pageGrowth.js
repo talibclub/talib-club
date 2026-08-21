@@ -76,3 +76,46 @@ export function grownPageSize(page) {
   if (width === page.width && height === page.height) return null;
   return { width, height };
 }
+
+// The paper texture, as CSS, for the board behind the page.
+//
+// The page rect only ever covered its own area, so panning past its edge showed
+// grey and the notebook felt walled in — which it is not: objects already live
+// outside it and the page grows to include them. Painting the same paper across
+// the whole board makes what you see match what you can do.
+//
+// The pattern is aligned to the page's own, by stepping at the same 40 units and
+// offsetting by wherever the page's origin currently sits on screen, so there is
+// no seam at the boundary.
+export const PAPER_GAP = 40;
+
+export function boardPaperStyle(page, scale, position, pageX, pageY) {
+  const dark = page?.paperColor === 'dark';
+  const base = dark ? '#1F2937' : page?.paperColor === 'yellow' ? '#FEF3C7' : '#FFFFFF';
+  // A PDF page is a real sheet with edges; leave the board around it alone.
+  if (!page || page.src) return { background: '#F3F4F6' };
+
+  const type = page.paperType || 'lines';
+  if (type === 'blank') return { background: base };
+
+  const ink = dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
+  const step = Math.max(4, PAPER_GAP * scale);
+  const ox = (position?.x || 0) + (pageX || 0) * scale;
+  const oy = (position?.y || 0) + (pageY || 0) * scale;
+
+  if (type === 'dots') {
+    return {
+      background: base,
+      backgroundImage: `radial-gradient(${ink} 1px, transparent 1px)`,
+      backgroundSize: `${step}px ${step}px`,
+      backgroundPosition: `${ox}px ${oy}px`,
+    };
+  }
+  const horizontal = `repeating-linear-gradient(to bottom, ${ink} 0 1px, transparent 1px ${step}px)`;
+  const vertical = `repeating-linear-gradient(to right, ${ink} 0 1px, transparent 1px ${step}px)`;
+  return {
+    background: base,
+    backgroundImage: type === 'grid' ? `${horizontal}, ${vertical}` : horizontal,
+    backgroundPosition: `${ox}px ${oy}px`,
+  };
+}
