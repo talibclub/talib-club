@@ -584,8 +584,12 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
           text-decoration: none;
         }
         .pn-ed[data-empty="1"] .pn-ln::after {
-          content: "พิมพ์ข้อความที่นี่...";
-          color: #9CA3AF;
+          /* "พิมพ์ข้อความที่นี่..." was instructions for a form. The caret is
+             already at the spot and already blinking, so the only thing worth
+             saying is what this editor can do that a plain box cannot. */
+          content: "เขียนได้เลย — / คำสั่ง · [[ ลิงก์หน้า";
+          color: #B6B1A9;
+          font-size: 0.82em;
           pointer-events: none;
         }
       `}</style>
@@ -711,7 +715,7 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
         suppressContentEditableWarning
         role="textbox"
         aria-multiline="true"
-        data-placeholder="พิมพ์ข้อความที่นี่..."
+        data-placeholder="เขียนได้เลย — / คำสั่ง · [[ ลิงก์หน้า"
         spellCheck={false}
         onInput={handleInput}
         onKeyDown={handleKeyDown}
@@ -728,18 +732,25 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
         }}
         style={{
           margin: 0,
-          padding: 8,
-          border: `1.5px solid ${HW.accentRing}`,
-          borderRadius: 14,
-          // Fully transparent. Two earlier attempts left it looking like a white
-          // card anyway: first a 90% white fill, then a 10% one plus a 1.5px
-          // backdrop blur — and the blur was the real problem, because blurring
-          // the ruled paper behind the box flattened those lines into a milky
-          // wash, so the inside read as lighter than the outside even though the
-          // fill was nearly nothing. No fill and no blur: the page shows through
-          // untouched, and the ring alone says "you are editing".
+          padding: '2px 0 2px 8px',
+          // No border, no ring, no fill.
+          //
+          // This surface has been complained about three times, and each attempt
+          // kept the box and softened it: a white card, then a 10% fill, then a
+          // transparent fill inside a 1.5px border and a 4px halo. The box was
+          // always the problem. An empty text box is 340 wide because that is
+          // where its lines wrap, so outlining it draws a large empty rectangle
+          // around three words — louder than the writing it contains, and
+          // reading as a form field rather than a place to write.
+          //
+          // What marks the editor is the caret, which is what marks every text
+          // cursor anywhere. A thin bar at the left edge says which block has it
+          // without enclosing anything.
+          border: 'none',
+          borderLeft: `2px solid ${HW.accent}`,
+          borderRadius: 0,
           background: 'transparent',
-          boxShadow: `0 0 0 4px ${HW.accentSoft}`,
+          boxShadow: 'none',
           color: t.color,
           fontSize: `${size * scale}px`,
           fontFamily,
