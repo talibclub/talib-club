@@ -1,5 +1,5 @@
 import React from 'react';
-import { Undo2, Redo2, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Underline, Strikethrough, Scissors, ChevronRight, PenTool, Square, Circle as CircleIcon, Minus, Triangle, Star, Hexagon, ArrowRight, Spline, Trash2 } from 'lucide-react';
+import { Undo2, Redo2, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Underline, Strikethrough, Scissors, ChevronRight, PenTool, Square, Circle as CircleIcon, Minus, Triangle, Star, Hexagon, ArrowRight, Spline, Trash2, Hand } from 'lucide-react';
 import { HW, STICKY_COLORS, STICKY_STYLES, FONT_OPTIONS } from './theme.js';
 import { StickyStyleThumb } from './canvasElements.jsx';
 import ColorPickerPanel from '../ColorPickerPanel';
@@ -154,6 +154,19 @@ export default function NotebookToolCapsule({ ui }) {
                       <Redo2 size={20} strokeWidth={1.5} />
                     </button>
                  </div>
+
+                 {/* Always keep a way back to navigation visible. It should not
+                     disappear into the scrolling list after someone finishes a mark. */}
+                 <button
+                   onClick={() => { setTool('pan'); closeOverlays(null); }}
+                   title="เลื่อนกระดาน"
+                   aria-label="เลื่อนกระดาน"
+                   aria-pressed={tool === 'pan'}
+                   style={{ flexShrink: 0, minWidth: showLabels ? 52 : 36, height: 36, padding: showLabels ? '0 8px' : 0, borderRadius: 10, border: 'none', background: tool === 'pan' ? HW.accentSoft : 'transparent', color: tool === 'pan' ? HW.accent : HW.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontFamily: 'Kanit, sans-serif', fontSize: 11, fontWeight: 600, boxShadow: tool === 'pan' ? `inset 0 0 0 1px ${HW.accentRing}` : 'none' }}
+                 >
+                   <Hand size={18} strokeWidth={tool === 'pan' ? 2 : 1.6} />
+                   {showLabels && <span>เลื่อน</span>}
+                 </button>
                  
                  <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0, margin: '0 5px', borderRadius: 1 }}></div>
                  

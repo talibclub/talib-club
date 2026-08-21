@@ -27,7 +27,7 @@ import LassoToolbar from './notebook/LassoToolbar.jsx';
 import { konvaFontStyle, stickerTextStyle } from './notebook/stickerText.js';
 import { backlinksTo, resolveLinkIndex } from './notebook/wikiLinks.js';
 import { dedupePages } from './notebook/dedupePage.js';
-import { boardPaperStyle, grownPageSize } from './notebook/pageGrowth.js';
+import { boardPaperStyle, grownPageSize, pageContentBounds } from './notebook/pageGrowth.js';
 import { branchColorFor, branchCurvePoints, childIdsOf, childPlacement, makeBranchConnector, parentIdOf, revealOffset, siblingPlacement } from './notebook/mindmap.js';
 import TextEditor from './notebook/TextEditor.jsx';
 import PaperTemplateModal from './notebook/PaperTemplateModal.jsx';
@@ -1159,6 +1159,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              color: penColor, size: Math.max(2, penSize), hasArrow: connectorHasArrow,
           });
        });
+       setConnectorPreviewId(id);
        return;
     }
 
@@ -1344,9 +1345,66 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // a bound connector from the selected source.
   const connectorSourceIdRef = useRef(null);
   const [connectorSourceId, setConnectorSourceId] = useState(null);
+  // Preview state belongs to the current pointer gesture, never to the saved
+  // connector. A reload halfway through a drag must not leave a dead dashed line.
+  const [connectorPreviewId, setConnectorPreviewId] = useState(null);
   const {
      objectBoundsById, objectIdAt, resolveConnectorEnd, connectorPoints, connectableObjects,
   } = makeConnectors({ pagesRef, currentPageIndex, getPage: () => currentPage });
+
+  // The board is deliberately unbounded, so a small positional overview is much
+  // more useful than a fixed "page" thumbnail. It includes the viewport even
+  // before any content exists, which keeps the map useful on a fresh notebook.
+  const minimap = React.useMemo(() => {
+    if (!isInfiniteCanvas || dimensions.width < 1 || dimensions.height < 1) return null;
+    const view = {
+      minX: -position.x / scale - pageX,
+      minY: -position.y / scale - pageY,
+      maxX: (dimensions.width - position.x) / scale - pageX,
+      maxY: (dimensions.height - position.y) / scale - pageY,
+    };
+    const centerX = (view.minX + view.maxX) / 2;
+    const centerY = (view.minY + view.maxY) / 2;
+    const content = pageContentBounds(currentPage);
+    // An empty board still gets a stable area around the reader instead of a
+    // viewport-sized map with no sense of where its center is.
+    const base = content || { minX: centerX - 800, minY: centerY - 560, maxX: centerX + 800, maxY: centerY + 560 };
+    const padding = Math.max(100, Math.min(320, Math.max(base.maxX - base.minX, base.maxY - base.minY) * 0.12));
+    const bounds = {
+      minX: Math.min(base.minX, view.minX) - padding,
+      minY: Math.min(base.minY, view.minY) - padding,
+      maxX: Math.max(base.maxX, view.maxX) + padding,
+      maxY: Math.max(base.maxY, view.maxY) + padding,
+    };
+    const width = 156;
+    const height = 108;
+    const rangeX = Math.max(1, bounds.maxX - bounds.minX);
+    const rangeY = Math.max(1, bounds.maxY - bounds.minY);
+    const project = (x, y) => ({ left: ((x - bounds.minX) / rangeX) * width, top: ((y - bounds.minY) / rangeY) * height });
+    const points = [
+      ...(currentPage.texts || []).map((o) => ({ id: o.id, x: o.x, y: o.y, color: '#2563EB' })),
+      ...(currentPage.stickers || []).map((o) => ({ id: o.id, x: o.x, y: o.y, color: '#D97706' })),
+      ...(currentPage.images || []).map((o) => ({ id: o.id, x: o.x, y: o.y, color: '#7C3AED' })),
+      ...(currentPage.lines || []).filter((o) => o.points?.length >= 2).map((o) => ({ id: o.id, x: o.points[0], y: o.points[1], color: '#0F766E' })),
+      ...(currentPage.shapes || []).filter((o) => o.type !== 'connector').map((o) => ({ id: o.id, x: Number.isFinite(o.x1) ? o.x1 : o.x, y: Number.isFinite(o.y1) ? o.y1 : o.y, color: '#DB2777' })),
+    ].filter((o) => Number.isFinite(o.x) && Number.isFinite(o.y)).map((o) => ({ ...o, ...project(o.x, o.y) }));
+    const topLeft = project(view.minX, view.minY);
+    const bottomRight = project(view.maxX, view.maxY);
+    return {
+      width, height, bounds, points,
+      viewport: { left: topLeft.left, top: topLeft.top, width: Math.max(3, bottomRight.left - topLeft.left), height: Math.max(3, bottomRight.top - topLeft.top) },
+    };
+  }, [currentPage, dimensions.height, dimensions.width, isInfiniteCanvas, pageX, pageY, position.x, position.y, scale]);
+
+  const panFromMinimap = (event) => {
+    if (!minimap) return;
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = minimap.bounds.minX + Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * (minimap.bounds.maxX - minimap.bounds.minX);
+    const y = minimap.bounds.minY + Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)) * (minimap.bounds.maxY - minimap.bounds.minY);
+    setPosition({ x: dimensions.width / 2 - (pageX + x) * scale, y: dimensions.height / 2 - (pageY + y) * scale });
+  };
+
   const beginConnector = (sourceId) => {
     connectorSourceIdRef.current = sourceId || null;
     setConnectorSourceId(sourceId || null);
@@ -1358,6 +1416,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const cancelConnector = () => {
     connectorSourceIdRef.current = null;
     setConnectorSourceId(null);
+    setConnectorPreviewId(null);
     setTool('pan');
     setShowToolOptions(false);
   };
@@ -1380,6 +1439,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     if (tool === 'shape' && shapeType === 'connector') return;
     connectorSourceIdRef.current = null;
     setConnectorSourceId(null);
+    setConnectorPreviewId(null);
   }, [tool, shapeType]);
   const lassoBounds = React.useMemo(() => {
     if (selectedLassoLines.length === 0 && selectedObjects.length === 0) return null;
@@ -1785,9 +1845,12 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     if (evt && drawingPointerId.current !== undefined && evt.pointerId !== drawingPointerId.current) return;
     const pos = getPointerPosRelativeToPage();
     if (!pos) return;
-    // Ink stops at the page edge; dragging past it pins the stroke to the border.
-    pos.x = Math.max(0, Math.min(currentPage.width, pos.x));
-    pos.y = Math.max(0, Math.min(currentPage.height, pos.y));
+    // PDFs are physical sheets, but blank notes are an infinite board. Clamping
+    // every move here used to snap an otherwise valid stroke back at the old edge.
+    if (!isInfiniteCanvas) {
+      pos.x = Math.max(0, Math.min(currentPage.width, pos.x));
+      pos.y = Math.max(0, Math.min(currentPage.height, pos.y));
+    }
 
     if (tool === 'eraser') {
        if (eraserSettings.mode === 'area') extendLiveStroke(pos, 1);
@@ -1820,8 +1883,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     }
     
     if (tool === 'shape' && connectorDrawIdRef.current) {
+       const connector = pagesRef.current[currentPageIndex]?.shapes?.find((sh) => sh.id === connectorDrawIdRef.current);
+       // Snap while dragging, not just on release, so the temporary line previews
+       // its exact attachment point before a connector is committed.
+       const targetId = objectIdAt(pos, connector?.from?.id);
        updatePage(currentPageIndex, (page) => {
-          page.shapes = (page.shapes || []).map((sh) => sh.id === connectorDrawIdRef.current ? { ...sh, to: { x: pos.x, y: pos.y } } : sh);
+          page.shapes = (page.shapes || []).map((sh) => sh.id === connectorDrawIdRef.current
+            ? { ...sh, to: targetId ? { id: targetId, x: pos.x, y: pos.y } : { x: pos.x, y: pos.y } }
+            : sh);
        });
        return;
     }
@@ -1875,6 +1944,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     if (connectorDrawIdRef.current) {
        const id = connectorDrawIdRef.current;
        connectorDrawIdRef.current = null;
+       setConnectorPreviewId(null);
        isDrawing.current = false;
        const page = pagesRef.current[currentPageIndex];
        const conn = page?.shapes?.find((s) => s.id === id);
@@ -1886,7 +1956,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              updatePage(currentPageIndex, (p) => { p.shapes = (p.shapes || []).filter((s) => s.id !== id); });
           } else {
              const endId = objectIdAt({ x: end.x, y: end.y }, conn.from.id);
-             if (endId) updatePage(currentPageIndex, (p) => { p.shapes = (p.shapes || []).map((s) => s.id === id ? { ...s, to: { id: endId, x: end.x, y: end.y } } : s); });
+             updatePage(currentPageIndex, (p) => {
+               p.shapes = (p.shapes || []).map((s) => s.id === id
+                 ? { ...s, to: endId ? { id: endId, x: end.x, y: end.y } : s.to }
+                 : s);
+             });
              selectShape(id);
           }
        }
@@ -2206,6 +2280,25 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         onDragLeave={readonly ? undefined : (e) => { if (e.currentTarget === e.target) setIsDragOver(false); }}
         onDrop={readonly ? undefined : handleCanvasDrop}
       >
+
+      {/* A compact map for blank (infinite) boards. Click or drag in it to jump
+          around; it stays out of the way of the bottom tool capsule. */}
+      {!readonly && minimap && (
+        <div
+          title="แผนที่ย่อ — คลิกหรือลากเพื่อย้ายมุมมอง"
+          onPointerDown={panFromMinimap}
+          onPointerMove={(event) => { if (event.buttons === 1) panFromMinimap(event); }}
+          style={{ position: 'absolute', right: 14, bottom: 18, zIndex: 42, width: minimap.width, height: minimap.height, overflow: 'hidden', borderRadius: 12, background: 'rgba(255,255,255,0.82)', border: `1px solid ${HW.hairline}`, boxShadow: '0 7px 20px rgba(35,31,27,0.14)', backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, cursor: 'crosshair', touchAction: 'none' }}
+          aria-label="แผนที่ย่อของกระดาน"
+        >
+          <div style={{ position: 'absolute', inset: 0, opacity: 0.42, backgroundImage: 'radial-gradient(rgba(31,41,55,0.42) 0.65px, transparent 0.75px)', backgroundSize: '8px 8px' }} />
+          {minimap.points.map((point) => (
+            <span key={point.id} style={{ position: 'absolute', left: point.left - 2, top: point.top - 2, width: 4, height: 4, borderRadius: 99, background: point.color, boxShadow: '0 0 0 1px rgba(255,255,255,0.7)', pointerEvents: 'none' }} />
+          ))}
+          <div style={{ position: 'absolute', left: minimap.viewport.left, top: minimap.viewport.top, width: minimap.viewport.width, height: minimap.viewport.height, minWidth: 3, minHeight: 3, border: `1.5px solid ${HW.accent}`, borderRadius: 3, background: 'rgba(15,110,86,0.10)', boxSizing: 'border-box', pointerEvents: 'none' }} />
+          <span style={{ position: 'absolute', left: 7, bottom: 5, color: HW.textDim, fontFamily: 'Kanit, sans-serif', fontSize: 9.5, fontWeight: 600, letterSpacing: 0.15, pointerEvents: 'none' }}>แผนที่</span>
+        </div>
+      )}
 
       {/* iPad-style drop hint */}
       {/* Which pages link here. A link that only goes one way is half a link:
@@ -2608,6 +2701,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                      pointerWidth={s.hasArrow === false || curved ? 0 : 11}
                      hitStrokeWidth={16}
                      lineCap="round"
+                     dash={s.id === connectorPreviewId ? [8, 6] : undefined}
+                     opacity={s.id === connectorPreviewId ? 0.72 : 1}
+                     listening={s.id !== connectorPreviewId}
                      onClick={() => { if (tool === 'pan' || tool === 'lasso' || tool === 'shape') selectShape(s.id); }}
                      onTap={() => { if (tool === 'pan' || tool === 'lasso' || tool === 'shape') selectShape(s.id); }}
                    />
