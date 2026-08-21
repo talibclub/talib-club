@@ -9,6 +9,10 @@ const ERA_LABELS = {
   revival: "ยุคฟื้นฟู ค.ศ. 1500–1800",
   modern: "ยุคปัจจุบัน ค.ศ. 1800–ปัจจุบัน"
 }
+// Twelve at a time, and twelve more on each press: it divides by two, three,
+// four and six, so the grid ends on a full row at every width it lays out.
+const SCHOLARS_PER_STEP = 12
+
 const ERA_COLORS = {
   salaf: "var(--teal)",
   classical: "#c9a84c",
@@ -39,10 +43,17 @@ export default function Scholars() {
   const [mhFilter, setMhFilter] = useState("")
   const [mzFilter, setMzFilter] = useState("")
 
-  const [visibleCounts, setVisibleCounts] = useState({ salaf: 6, classical: 6, revival: 6, modern: 6 })
+  // Keyed by whatever era ids the taxonomy actually has. It used to be seeded
+  // with salaf/classical/revival/modern, which are the colour keys and not the
+  // ids this list iterates — so `prev[eraNum]` was undefined, adding six made it
+  // NaN, and NaN falls back through `|| SCHOLARS_PER_STEP` to the same number
+  // forever. The button could not work, and the count beside it gave it away:
+  // it said 25 left, which is only true if 12 were showing rather than the 6 the
+  // seed asked for.
+  const [visibleCounts, setVisibleCounts] = useState({})
 
   const resetVisible = () => {
-    setVisibleCounts({ salaf: 6, classical: 6, revival: 6, modern: 6 })
+    setVisibleCounts({})
   }
 
   const fields = ["all", ...new Set([...(taxonomy.scholarFields || []).map(f => typeof f === 'string' ? f : f.label), ...scholars.map(s => s.field).filter(Boolean)])]
@@ -250,7 +261,8 @@ export default function Scholars() {
           const eraScholars = filtered.filter(s => mapEraValue(s.era) === mapEraValue(eraNum))
           if (eraScholars.length === 0) return null
           const color = ERA_COLORS[eraNum] || "var(--teal)"
-          const visibleScholars = eraScholars.slice(0, visibleCounts[eraNum] || 12)
+          const shown = visibleCounts[eraNum] ?? SCHOLARS_PER_STEP
+          const visibleScholars = eraScholars.slice(0, shown)
 
           return (
             <div key={eraNum} style={{ marginBottom: 36 }}>
@@ -283,7 +295,7 @@ export default function Scholars() {
               {eraScholars.length > visibleScholars.length && (
                 <div style={{ textAlign: "center", marginTop: 20 }}>
                   <button
-                    onClick={() => setVisibleCounts(prev => ({ ...prev, [eraNum]: prev[eraNum] + 6 }))}
+                    onClick={() => setVisibleCounts(prev => ({ ...prev, [eraNum]: (prev[eraNum] ?? SCHOLARS_PER_STEP) + SCHOLARS_PER_STEP }))}
                     style={{
                       fontFamily: "'Prompt', sans-serif", fontSize: 11, fontWeight: 300,
                       padding: "5px 16px", borderRadius: 20, border: ".5px solid var(--br)",
