@@ -3269,7 +3269,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                 anchorFill="#FFFFFF"
                 borderStroke={HW.accent}
                 borderStrokeWidth={1.5}
-                rotateEnabled={true}
+                // Text is edited in place and does not need a ring of resize
+                // handles. Removing them leaves the selected line readable and
+                // keeps the object toolbar as the single place to start a link.
+                rotateEnabled={selectedInfo?.kind !== 'texts'}
+                resizeEnabled={selectedInfo?.kind !== 'texts'}
                 rotateAnchorOffset={isCoarse ? 34 : 24}
                 keepRatio={selectedInfo?.kind !== 'shapes' && selectedInfo?.kind !== 'stickers'}
                 enabledAnchors={selectedInfo?.kind === 'shapes' || selectedInfo?.kind === 'stickers'
@@ -3281,35 +3285,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                 }}
               />
            )}
-
-           {/* Four explicit connection ports make the feature discoverable. Tap
-               one, then tap a target; no pixel-perfect drag from the object is
-               required on a tablet. */}
-           {!readonly && selectedInfo && !(selectedInfo.kind === 'shapes' && selectedInfo.obj.type === 'connector') && (() => {
-             const b = selectedInfo.box;
-             const r = 6.5 / scale;
-             const ports = [
-               { x: (b.minX + b.maxX) / 2, y: b.minY, label: 'บน' },
-               { x: b.maxX, y: (b.minY + b.maxY) / 2, label: 'ขวา' },
-               { x: (b.minX + b.maxX) / 2, y: b.maxY, label: 'ล่าง' },
-               { x: b.minX, y: (b.minY + b.maxY) / 2, label: 'ซ้าย' },
-             ];
-             return (
-               <Group x={pageX} y={pageY}>
-                 {ports.map((port) => (
-                   <Circle
-                     key={`connect-port-${port.label}`}
-                     name="connect-handle"
-                     x={port.x} y={port.y} radius={r}
-                     fill="#FFFFFF" stroke={HW.accent} strokeWidth={2 / scale}
-                     shadowColor="rgba(15,110,86,0.25)" shadowBlur={4 / scale}
-                     onClick={() => { beginConnector(selectedInfo.obj.id); toast('เลือกปลายทางที่ต้องการเชื่อมได้เลย', { icon: '🔗' }); }}
-                     onTap={() => { beginConnector(selectedInfo.obj.id); toast('เลือกปลายทางที่ต้องการเชื่อมได้เลย', { icon: '🔗' }); }}
-                   />
-                 ))}
-               </Group>
-             );
-           })()}
 
            {!readonly && (() => {
               const poly = currentPage.shapes?.find(sh => sh.id === selectedId && sh.type === 'polygon');
