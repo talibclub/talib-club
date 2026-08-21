@@ -1,5 +1,6 @@
-import { useState, useMemo, useEffect, useRef } from "react"
+import { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react"
 import { ARTICLES, DEFAULT_TAXONOMY } from "../data/index.js"
+import { columnsAt, completeRows } from "./articles/gridFill.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 import { clampPage } from "../utils/pagination.js"
 import PaginationBar from "../components/PaginationBar.jsx"
@@ -183,7 +184,19 @@ export default function Articles({ go, authState, ctx }) {
   }, [taxonomy.articleSeries, sortedFiltered, articles]);
 
   const isDefaultView = !search && cat === "all" && type === "all" && !showAllBrowse
-  const recentArticles = sortedFiltered.slice(0, 6)
+
+  // Six cards in a grid four wide ends on a row of two beside a stretch of
+  // nothing, which reads as "we ran out" rather than "here is the selection".
+  // Measure the grid and show whole rows of it.
+  const gridRef = useRef(null)
+  const [gridWidth, setGridWidth] = useState(0)
+  useLayoutEffect(() => {
+    const measure = () => setGridWidth(gridRef.current?.clientWidth || 0)
+    measure()
+    window.addEventListener("resize", measure)
+    return () => window.removeEventListener("resize", measure)
+  }, [isDefaultView])
+  const recentArticles = sortedFiltered.slice(0, completeRows(sortedFiltered.length, columnsAt(gridWidth)))
 
   return (
     <div>
@@ -357,12 +370,12 @@ export default function Articles({ go, authState, ctx }) {
 
               <div>
                 <div className="sec-hd"><span className="sec-title">บทความมาใหม่ล่าสุด</span></div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>
+                <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>
                   {recentArticles.map(a => (
                     <ArticleCard key={a.id} article={a} onClick={viewArticle} />
                   ))}
                 </div>
-                {sortedFiltered.length > 6 && (
+                {sortedFiltered.length > recentArticles.length && (
                   <button className="btn btn-outline" onClick={() => updateFilters({ showAllBrowse: true })} style={{ margin: "28px auto 0", display: "block", fontSize: 12 }}>
                     ดูบทความทั้งหมด ({sortedFiltered.length} บทความ)
                   </button>
