@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Path, Group, Circle, Text, Rect, Transformer, RegularPolygon, Line, Star as KonvaStar, Arrow as KonvaArrow } from 'react-konva';
-import { Bookmark, BookOpen, Camera, ChevronLeft, ChevronRight, Cloud, FileText, Image as ImageIcon, Lasso, Link as LinkIcon, Link2, Mic, MonitorPlay, PenTool, Plus, Ruler, Search, SquareSquare, Star, Trash2, X } from 'lucide-react';
+import { Bookmark, BookOpen, Camera, ChevronLeft, ChevronRight, Cloud, FileText, Image as ImageIcon, Lasso, Link as LinkIcon, Link2, Map as MapIcon, Mic, MonitorPlay, PenTool, Ruler, Search, SquareSquare, Star, Trash2, X } from 'lucide-react';
 import CropModal from './CropModal';
 import ColorPickerPanel from './ColorPickerPanel';
 import BookSnipModal from './BookSnipModal';
@@ -200,7 +200,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   }, []);
   
   const [showToolSettings, setShowToolSettings] = useState(false);
-  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [showMinimap, setShowMinimap] = useState(false);
   const [showGettingStarted, setShowGettingStarted] = useState(() => {
     try { return localStorage.getItem('talib_notebook_getting_started') !== 'seen'; } catch { return true; }
   });
@@ -1390,8 +1390,12 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     ].filter((o) => Number.isFinite(o.x) && Number.isFinite(o.y)).map((o) => ({ ...o, ...project(o.x, o.y) }));
     const topLeft = project(view.minX, view.minY);
     const bottomRight = project(view.maxX, view.maxY);
+    const hasOffscreenContent = !!content && (
+      content.minX < view.minX || content.minY < view.minY
+      || content.maxX > view.maxX || content.maxY > view.maxY
+    );
     return {
-      width, height, bounds, points,
+      width, height, bounds, points, hasOffscreenContent,
       viewport: { left: topLeft.left, top: topLeft.top, width: Math.max(3, bottomRight.left - topLeft.left), height: Math.max(3, bottomRight.top - topLeft.top) },
     };
   }, [currentPage, dimensions.height, dimensions.width, isInfiniteCanvas, pageX, pageY, position.x, position.y, scale]);
@@ -1421,7 +1425,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     setShowToolOptions(false);
   };
   const startQuickAdd = (kind) => {
-    setShowQuickAdd(false);
     if (kind === 'image') { document.getElementById('image-upload')?.click(); return; }
     if (kind === 'connector') {
       beginConnector(null);
@@ -2281,22 +2284,32 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         onDrop={readonly ? undefined : handleCanvasDrop}
       >
 
-      {/* Keep the map in the quiet top-right corner. The lower-right corner is
-          occupied by the expanding tool capsule on a compact reader pane. */}
-      {!readonly && minimap && (
-        <div
-          title="แผนที่ย่อ — คลิกหรือลากเพื่อย้ายมุมมอง"
-          onPointerDown={panFromMinimap}
-          onPointerMove={(event) => { if (event.buttons === 1) panFromMinimap(event); }}
-          style={{ position: 'absolute', right: 14, top: 14, zIndex: 42, width: minimap.width, height: minimap.height, overflow: 'hidden', borderRadius: 12, background: 'rgba(255,255,255,0.82)', border: `1px solid ${HW.hairline}`, boxShadow: '0 7px 20px rgba(35,31,27,0.14)', backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, cursor: 'crosshair', touchAction: 'none' }}
-          aria-label="แผนที่ย่อของกระดาน"
-        >
-          <div style={{ position: 'absolute', inset: 0, opacity: 0.42, backgroundImage: 'radial-gradient(rgba(31,41,55,0.42) 0.65px, transparent 0.75px)', backgroundSize: '8px 8px' }} />
-          {minimap.points.map((point) => (
-            <span key={point.id} style={{ position: 'absolute', left: point.left - 2, top: point.top - 2, width: 4, height: 4, borderRadius: 99, background: point.color, boxShadow: '0 0 0 1px rgba(255,255,255,0.7)', pointerEvents: 'none' }} />
-          ))}
-          <div style={{ position: 'absolute', left: minimap.viewport.left, top: minimap.viewport.top, width: minimap.viewport.width, height: minimap.viewport.height, minWidth: 3, minHeight: 3, border: `1.5px solid ${HW.accent}`, borderRadius: 3, background: 'rgba(15,110,86,0.10)', boxSizing: 'border-box', pointerEvents: 'none' }} />
-          <span style={{ position: 'absolute', left: 7, bottom: 5, color: HW.textDim, fontFamily: 'Kanit, sans-serif', fontSize: 9.5, fontWeight: 600, letterSpacing: 0.15, pointerEvents: 'none' }}>แผนที่</span>
+      {/* The map is navigation, not decoration: it appears only when work sits
+          outside the viewport, and opens from a small button instead of leaving
+          a large empty card on every board. */}
+      {!readonly && minimap?.hasOffscreenContent && (
+        <div style={{ position: 'absolute', right: 14, top: 14, zIndex: 42 }}>
+          {!showMinimap ? (
+            <button onClick={() => setShowMinimap(true)} title="เปิดแผนที่ย่อ" aria-label="เปิดแผนที่ย่อ" style={{ width: 38, height: 38, borderRadius: 12, border: `1px solid ${HW.hairline}`, background: HW.surface, color: HW.accent, cursor: 'pointer', boxShadow: '0 5px 14px rgba(35,31,27,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <MapIcon size={19} strokeWidth={1.9} />
+            </button>
+          ) : (
+            <div
+              title="แผนที่ย่อ — คลิกหรือลากเพื่อย้ายมุมมอง"
+              onPointerDown={panFromMinimap}
+              onPointerMove={(event) => { if (event.buttons === 1) panFromMinimap(event); }}
+              style={{ position: 'relative', width: minimap.width, height: minimap.height, overflow: 'hidden', borderRadius: 12, background: 'rgba(255,255,255,0.90)', border: `1px solid ${HW.hairline}`, boxShadow: '0 7px 20px rgba(35,31,27,0.14)', backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, cursor: 'crosshair', touchAction: 'none' }}
+              aria-label="แผนที่ย่อของกระดาน"
+            >
+              <div style={{ position: 'absolute', inset: 0, opacity: 0.42, backgroundImage: 'radial-gradient(rgba(31,41,55,0.42) 0.65px, transparent 0.75px)', backgroundSize: '8px 8px' }} />
+              {minimap.points.map((point) => (
+                <span key={point.id} style={{ position: 'absolute', left: point.left - 2, top: point.top - 2, width: 4, height: 4, borderRadius: 99, background: point.color, boxShadow: '0 0 0 1px rgba(255,255,255,0.7)', pointerEvents: 'none' }} />
+              ))}
+              <div style={{ position: 'absolute', left: minimap.viewport.left, top: minimap.viewport.top, width: minimap.viewport.width, height: minimap.viewport.height, minWidth: 3, minHeight: 3, border: `1.5px solid ${HW.accent}`, borderRadius: 3, background: 'rgba(15,110,86,0.10)', boxSizing: 'border-box', pointerEvents: 'none' }} />
+              <button onPointerDown={(event) => event.stopPropagation()} onClick={() => setShowMinimap(false)} title="ซ่อนแผนที่ย่อ" aria-label="ซ่อนแผนที่ย่อ" style={{ position: 'absolute', right: 5, top: 5, width: 22, height: 22, padding: 0, border: 'none', borderRadius: 7, background: 'rgba(255,255,255,0.85)', color: HW.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
+              <span style={{ position: 'absolute', left: 7, bottom: 5, color: HW.textDim, fontFamily: 'Kanit, sans-serif', fontSize: 9.5, fontWeight: 600, letterSpacing: 0.15, pointerEvents: 'none' }}>แผนที่</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -2331,31 +2344,6 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'white', padding: '12px 22px', borderRadius: 999, boxShadow: '0 8px 28px rgba(0,0,0,0.14)', fontWeight: 700, color: HW.text, fontSize: 15 }}>
             <ImageIcon size={20} color={HW.accent} /> วางรูปที่นี่เพื่อแทรกลงสมุด
           </div>
-        </div>
-      )}
-
-      {/* A small starting point for the common actions. It used to share the
-          lower-right corner with the expanding tool capsule, so the + could cover
-          its last tool on narrow panes. Keep it in the right-side utility area. */}
-      {!readonly && !isMobile && (
-        <div style={{ position: 'absolute', right: 18, top: minimap ? 132 : 18, zIndex: 48, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-          {showQuickAdd && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(112px, 1fr))', gap: 6, padding: 8, borderRadius: 16, background: HW.surfaceStrong, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}` }}>
-              {[
-                { id: 'text', icon: 'T', label: 'ข้อความ' },
-                { id: 'sticker', icon: '▣', label: 'Note card' },
-                { id: 'image', icon: '▧', label: 'รูปภาพ' },
-                { id: 'connector', icon: '⌁', label: 'เส้นเชื่อม' },
-              ].map((item) => (
-                <button key={item.id} onClick={() => startQuickAdd(item.id)} style={{ height: 38, padding: '0 10px', border: 'none', borderRadius: 10, background: 'rgba(255,255,255,0.72)', color: HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left', fontFamily: 'Kanit, sans-serif', fontSize: 12.5, fontWeight: 600 }}>
-                  <span style={{ width: 20, color: HW.accent, fontSize: 17, textAlign: 'center' }}>{item.icon}</span>{item.label}
-                </button>
-              ))}
-            </div>
-          )}
-          <button onClick={() => setShowQuickAdd((v) => !v)} title="เพิ่มอย่างรวดเร็ว" aria-expanded={showQuickAdd} style={{ width: 46, height: 46, borderRadius: 15, border: 'none', background: HW.accent, color: 'white', cursor: 'pointer', boxShadow: '0 8px 20px rgba(15,110,86,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', transform: showQuickAdd ? 'rotate(45deg)' : 'none', transition: 'transform 0.18s' }}>
-            <Plus size={24} strokeWidth={2.2} />
-          </button>
         </div>
       )}
 
