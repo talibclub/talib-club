@@ -30,20 +30,21 @@ export default function SelectionToolbar({ left, top, kind, canEdit, onCrop, onO
       {canEdit && (
         <>
           <button style={btn} onClick={onEdit} title="แก้ไขข้อความ"><Type size={17} strokeWidth={1.7} /></button>
-          {/* Branching had no affordance at all: it was Tab and Enter on a
-              selected node and nothing anywhere said so, which makes it a
-              feature nobody has. Offered at the one moment it applies, and
-              naming the key so it only has to be found once. */}
+          {divider}
+        </>
+      )}
+
+      {/* Any visible object can now be the start of a connection — not just the
+          text cards created by the mind-map shortcut. */}
+      {(onBranch || onConnect) && (
+        <>
           {onBranch && (
-            <button style={btn} onClick={onBranch} title="เพิ่มกิ่ง — ทำมายด์แมป (กด Tab ก็ได้)">
+            <button style={btn} onClick={onBranch} title="เพิ่มกล่องโน้ตที่เชื่อมกับอันนี้">
               <GitBranch size={17} strokeWidth={1.7} />
             </button>
           )}
-          {/* Drawing a connector by hand was always possible and was three levels
-              down, under the shape tool. Offered here it is one tap from the
-              thing you want to connect. */}
           {onConnect && (
-            <button style={btn} onClick={onConnect} title="โยงเส้นเอง — ลากจากอันนี้ไปยังอีกอัน">
+            <button style={btn} onClick={onConnect} title="เชื่อมกับอันนี้ แล้วแตะวัตถุปลายทาง">
               <Spline size={17} strokeWidth={1.7} />
             </button>
           )}

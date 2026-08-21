@@ -39,6 +39,11 @@ describe('pruneDanglingConnectors', () => {
     expect(pruneDanglingConnectors(page).map((s) => s.id)).toEqual(['c1']);
   });
 
+  it('counts ink strokes as valid anchors', () => {
+    const page = { lines: [{ id: 'ink-1', points: [10, 10, 30, 30] }], shapes: [conn('c1', { id: 'ink-1' }, { x: 90, y: 90 })] };
+    expect(pruneDanglingConnectors(page).map((s) => s.id)).toEqual(['c1']);
+  });
+
   it('survives an empty or missing page', () => {
     expect(pruneDanglingConnectors({})).toEqual([]);
     expect(pruneDanglingConnectors(null)).toEqual([]);

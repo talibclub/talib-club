@@ -41,10 +41,10 @@ const spanOf = (obj, kind) => {
     }
   }
   if (!Number.isFinite(obj.x) || !Number.isFinite(obj.y)) return null;
-  // Sticky notes are a fixed 150 square; everything else states its size, and a
-  // text box that has not been measured yet gets a sensible guess.
-  const w = kind === 'stickers' ? 150 : (obj.width || (kind === 'texts' ? 340 : 120));
-  const h = kind === 'stickers' ? 150 : (obj.height || (kind === 'texts' ? (obj.size || 22) * 2 : 120));
+  // Sticky notes retain the original 150px default, but can now grow sideways
+  // (and vertically) for longer writing.
+  const w = kind === 'stickers' ? (obj.width || 150) : (obj.width || (kind === 'texts' ? 340 : 120));
+  const h = kind === 'stickers' ? (obj.height || 150) : (obj.height || (kind === 'texts' ? (obj.size || 22) * 2 : 120));
   return { minX: obj.x, minY: obj.y, maxX: obj.x + w * (obj.scaleX || 1), maxY: obj.y + h * (obj.scaleY || 1) };
 };
 

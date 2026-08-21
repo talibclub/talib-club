@@ -826,6 +826,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     pushHistory();
     updatePage(currentPageIndex, (page) => {
        page.lines = [];
+       page.shapes = pruneDanglingConnectors(page);
     });
     toast.success('ล้างเส้นทั้งหมดแล้ว');
   };
@@ -1126,17 +1127,22 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     }
 
     if (tool === 'shape' && shapeType === 'connector') {
-       // Drag from one object/point to another; endpoints snap to whatever they land on.
+       // Drag from one object/point to another, or use the selected object's
+       // toolbar and simply tap the destination. Endpoints snap to any object
+       // (including ink) they land on.
        isDrawing.current = true;
        const id = nextObjectId('shape');
-       const startId = objectIdAt(pos);
+       const startId = connectorSourceIdRef.current || objectIdAt(pos);
+       const startBox = startId ? objectBoundsById(startId) : null;
+       const start = startBox ? boundsCenter(startBox) : pos;
+       connectorSourceIdRef.current = null;
        connectorDrawIdRef.current = id;
        pushHistory();
        updatePage(currentPageIndex, (page) => {
           if (!page.shapes) page.shapes = [];
           page.shapes.push({
              id, type: 'connector',
-             from: startId ? { id: startId, x: pos.x, y: pos.y } : { x: pos.x, y: pos.y },
+             from: startId ? { id: startId, x: start.x, y: start.y } : { x: pos.x, y: pos.y },
              to: { x: pos.x, y: pos.y },
              color: penColor, size: Math.max(2, penSize), hasArrow: true,
           });
@@ -1194,8 +1200,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       return !(pos.x >= t.x - radius && pos.x <= t.x + w + radius && pos.y >= t.y - radius && pos.y <= t.y + (t.size || 16) * 1.4 + radius);
     };
     const stickerKeep = (st) => {
-      const w = st.audioUrl ? 130 : 150;
-      const h = st.audioUrl ? 44 : 150;
+      const w = st.audioUrl ? 130 : (st.width || 150);
+      const h = st.audioUrl ? 44 : (st.height || 150);
       return !(pos.x >= st.x - radius && pos.x <= st.x + w + radius && pos.y >= st.y - radius && pos.y <= st.y + h + radius);
     };
 
@@ -1220,6 +1226,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         p.texts = (p.texts || []).filter(textKeep);
         p.stickers = (p.stickers || []).filter(stickerKeep);
       }
+      // Do not leave a bound connector pointing to a stroke/object erased above.
+      p.shapes = pruneDanglingConnectors(p);
     });
   };
 
@@ -1320,6 +1328,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // Defined above the memos that read them (selectedInfo) so their bindings exist
   // when those memos run during render.
   const connectorDrawIdRef = useRef(null);
+  // Set by the selected-object toolbar. It lets one tap on a destination create
+  // a bound connector from the selected source.
+  const connectorSourceIdRef = useRef(null);
   const {
      objectBoundsById, objectIdAt, resolveConnectorEnd, connectorPoints,
   } = makeConnectors({ pagesRef, currentPageIndex, getPage: () => currentPage });
@@ -1343,7 +1354,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       if (kind === 'shapes' && o.type === 'polygon') { for (let i = 0; i < o.points.length; i += 2) grow(o.points[i], o.points[i + 1]); }
       else if (kind === 'shapes') { grow(o.x1, o.y1); grow(o.x2, o.y2); }
       else if (kind === 'images') { grow(o.x, o.y); grow(o.x + (o.width || 0), o.y + (o.height || 0)); }
-      else if (kind === 'stickers') { grow(o.x, o.y); grow(o.x + (o.audioUrl ? 130 : 150), o.y + (o.audioUrl ? 44 : 150)); }
+      else if (kind === 'stickers') { grow(o.x, o.y); grow(o.x + (o.audioUrl ? 130 : (o.width || 150)), o.y + (o.audioUrl ? 44 : (o.height || 150))); }
       else { grow(o.x, o.y); grow(o.x + Math.max(60, (o.text?.length || 1) * (o.size || 16) * 0.6), o.y + (o.size || 16) * 1.4); }
     });
 
@@ -1374,8 +1385,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       } else if (kind === 'images') {
         box = { minX: obj.x, minY: obj.y, maxX: obj.x + (obj.width || 0) * (obj.scaleX || 1), maxY: obj.y + (obj.height || 0) * (obj.scaleY || 1) };
       } else if (kind === 'stickers') {
-        const w = obj.audioUrl ? 130 : 150;
-        const h = obj.audioUrl ? 44 : 150;
+        const w = obj.audioUrl ? 130 : (obj.width || 150);
+        const h = obj.audioUrl ? 44 : (obj.height || 150);
         box = { minX: obj.x, minY: obj.y, maxX: obj.x + w * (obj.scaleX || 1), maxY: obj.y + h * (obj.scaleY || 1) };
       } else {
         box = { minX: obj.x, minY: obj.y, maxX: obj.x + Math.max(60, (obj.text?.length || 1) * (obj.size || 16) * 0.6), maxY: obj.y + (obj.size || 16) * 1.4 };
@@ -2597,6 +2608,12 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
             {currentPage.stickers && currentPage.stickers.map(st => {
               // Audio notes are surfaced in the recordings panel, not on the canvas.
               if (st.audioUrl) return null;
+              // Older notes remain the familiar 150px square. Resized notes keep
+              // their own dimensions so a card can grow sideways for longer text.
+              const noteW = st.width || 150;
+              const noteH = st.height || 150;
+              const textLeft = 12;
+              const textWidth = Math.max(48, noteW - textLeft * 2);
 
               // Sticky Note
               return (
@@ -2624,11 +2641,17 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   }}
                   onTransformEnd={(e) => {
                     const node = e.target;
+                    pushHistory();
                     updatePage(currentPageIndex, (page) => {
                        const sticker = page.stickers.find(s => s.id === st.id);
                        if (sticker) {
                           sticker.x = node.x(); sticker.y = node.y();
-                          sticker.scaleX = node.scaleX(); sticker.scaleY = node.scaleY(); sticker.rotation = node.rotation();
+                          // Store a real card size instead of a permanently
+                          // stretched 150px square. This keeps the font natural
+                          // when the reader drags a side handle to make room.
+                          sticker.width = Math.max(90, (sticker.width || 150) * node.scaleX());
+                          sticker.height = Math.max(72, (sticker.height || 150) * node.scaleY());
+                          sticker.scaleX = 1; sticker.scaleY = 1; sticker.rotation = node.rotation();
                        }
                     });
                   }}
@@ -2649,41 +2672,41 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   {st.style === 'polaroid' ? (
                      <>
                         {/* White photo frame with a thick caption strip at the bottom */}
-                        <Rect width={150} height={150} fill="#FFFFFF" shadowColor="rgba(0,0,0,0.18)" shadowBlur={10} shadowOffsetY={4} cornerRadius={3} />
-                        <Rect x={10} y={10} width={130} height={104} fill={st.color} cornerRadius={2} />
+                        <Rect width={noteW} height={noteH} fill="#FFFFFF" shadowColor="rgba(0,0,0,0.18)" shadowBlur={10} shadowOffsetY={4} cornerRadius={3} />
+                        <Rect x={10} y={10} width={Math.max(24, noteW - 20)} height={Math.max(28, noteH - 46)} fill={st.color} cornerRadius={2} />
                      </>
                   ) : st.style === 'bubble' ? (
                      <>
                         {/* Speech bubble: rounded body + a little tail bottom-left */}
-                        <Rect width={150} height={132} fill={st.color} shadowColor="rgba(0,0,0,0.15)" shadowBlur={10} shadowOffsetY={4} cornerRadius={24} />
-                        <Path data="M 28 128 L 20 150 L 52 130 Z" fill={st.color} />
+                        <Rect width={noteW} height={Math.max(36, noteH - 18)} fill={st.color} shadowColor="rgba(0,0,0,0.15)" shadowBlur={10} shadowOffsetY={4} cornerRadius={24} />
+                        <Path data={`M 28 ${noteH - 22} L 20 ${noteH} L 52 ${noteH - 20} Z`} fill={st.color} />
                      </>
                   ) : (
-                     <Rect width={150} height={150} fill={st.color} shadowColor="rgba(0,0,0,0.15)" shadowBlur={10} shadowOffsetY={4} cornerRadius={st.style === 'round' ? 16 : 2} />
+                     <Rect width={noteW} height={noteH} fill={st.color} shadowColor="rgba(0,0,0,0.15)" shadowBlur={10} shadowOffsetY={4} cornerRadius={st.style === 'round' ? 16 : 2} />
                   )}
 
                   {(!st.style || st.style === 'classic') && (
                      <>
-                        <Rect width={150} height={20} fill="rgba(0,0,0,0.05)" cornerRadius={[2, 2, 0, 0]} />
-                        <Path data="M 150 150 L 130 150 L 150 130 Z" fill="rgba(0,0,0,0.08)" />
+                        <Rect width={noteW} height={20} fill="rgba(0,0,0,0.05)" cornerRadius={[2, 2, 0, 0]} />
+                        <Path data={`M ${noteW} ${noteH} L ${noteW - 20} ${noteH} L ${noteW} ${noteH - 20} Z`} fill="rgba(0,0,0,0.08)" />
                      </>
                   )}
                   {st.style === 'pin' && (
                      <>
-                        <Circle x={75} y={12} radius={5} fill="#EF4444" shadowColor="rgba(0,0,0,0.3)" shadowBlur={3} shadowOffsetY={1} />
-                        <Circle x={74} y={11} radius={2} fill="#FCA5A5" />
+                        <Circle x={noteW / 2} y={12} radius={5} fill="#EF4444" shadowColor="rgba(0,0,0,0.3)" shadowBlur={3} shadowOffsetY={1} />
+                        <Circle x={noteW / 2 - 1} y={11} radius={2} fill="#FCA5A5" />
                      </>
                   )}
                   {st.style === 'tape' && (
-                     <Rect x={45} y={-8} width={60} height={20} fill="rgba(255,255,255,0.5)" rotation={-2} shadowColor="rgba(0,0,0,0.05)" shadowBlur={2} shadowOffsetY={1} />
+                        <Rect x={noteW / 2 - 30} y={-8} width={60} height={20} fill="rgba(255,255,255,0.5)" rotation={-2} shadowColor="rgba(0,0,0,0.05)" shadowBlur={2} shadowOffsetY={1} />
                   )}
                   {st.style === 'torn' && (
                      // Jagged white strip along the bottom edge, like a torn-off note.
                      <Path data="M 0 132 L 15 142 L 30 133 L 45 143 L 60 134 L 75 144 L 90 133 L 105 143 L 120 134 L 135 143 L 150 133 L 150 150 L 0 150 Z" fill="rgba(255,255,255,0.85)" />
                   )}
                   {st.style === 'lined' && (
-                     [48, 72, 96, 120].map((ly) => (
-                        <Path key={`line-${ly}`} data={`M 12 ${ly} L 138 ${ly}`} stroke="rgba(0,0,0,0.12)" strokeWidth={1} />
+                     [48, 72, 96, 120].filter((ly) => ly < noteH - 10).map((ly) => (
+                        <Path key={`line-${ly}`} data={`M 12 ${ly} L ${noteW - 12} ${ly}`} stroke="rgba(0,0,0,0.12)" strokeWidth={1} />
                      ))
                   )}
 
@@ -2699,8 +2722,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                      const sk = migrateSticker(st);
                      if (!sk.lines.some((l) => l.text)) return null;
                      const prefixes = listPrefixes(sk.lines);
-                     const top = st.style === 'polaroid' ? 118 : 24;
-                     const boxH = st.style === 'polaroid' ? 28 : 116;
+                     const top = st.style === 'polaroid' ? Math.max(24, noteH - 32) : 24;
+                     const boxH = st.style === 'polaroid' ? 28 : Math.max(24, noteH - 34);
                      let cursorY = top;
                      return (
                         // Clipped to the note's text area. Dropping whole lines
@@ -2709,7 +2732,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                         // page below the note. Konva clips at the group, so the
                         // note can hold as much text as it likes and never paint
                         // outside itself.
-                        <Group key="sticker-text" clipX={12} clipY={top} clipWidth={126} clipHeight={boxH}>
+                        <Group key="sticker-text" clipX={textLeft} clipY={top} clipWidth={textWidth} clipHeight={boxH}>
                            {sk.lines.map((l, i) => {
                               const lineSize = l.size || ts.size;
                               const y = cursorY;
@@ -2718,8 +2741,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                                  <Text
                                     key={i}
                                     text={(prefixes[i] || '') + l.text}
-                                    x={12} y={y}
-                                    width={126}
+                                    x={textLeft} y={y}
+                                    width={textWidth}
                                     fontSize={lineSize}
                                     fill={ts.color}
                                     fontStyle={konvaFontStyle(l)}
@@ -3116,8 +3139,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               <Transformer
                 ref={transformerRef}
                 // Fat, teal, rounded handles — easy to grab with a fingertip. Emoji,
-                // images and text scale uniformly (corner anchors only); shapes may
-                // stretch freely.
+                // Images and text scale uniformly (corner anchors only); shapes
+                // and note cards can stretch freely.
                 anchorSize={isCoarse ? 18 : 11}
                 anchorCornerRadius={isCoarse ? 9 : 5}
                 anchorStroke={HW.accent}
@@ -3126,8 +3149,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                 borderStrokeWidth={1.5}
                 rotateEnabled={true}
                 rotateAnchorOffset={isCoarse ? 34 : 24}
-                keepRatio={selectedInfo?.kind !== 'shapes'}
-                enabledAnchors={selectedInfo?.kind === 'shapes'
+                keepRatio={selectedInfo?.kind !== 'shapes' && selectedInfo?.kind !== 'stickers'}
+                enabledAnchors={selectedInfo?.kind === 'shapes' || selectedInfo?.kind === 'stickers'
                   ? ['top-left', 'top-center', 'top-right', 'middle-left', 'middle-right', 'bottom-left', 'bottom-center', 'bottom-right']
                   : ['top-left', 'top-right', 'bottom-left', 'bottom-right']}
                 boundBoxFunc={(oldBox, newBox) => {
@@ -3287,6 +3310,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
          const ts = stickerTextStyle(st);
          const sk = migrateSticker(st);
          const polaroid = st.style === 'polaroid';
+         const noteW = st.width || 150;
+         const noteH = st.height || 150;
+         const editorWidth = Math.max(48, noteW - 24);
          const noteZ = scale * (st.scaleX || 1);
          // Editing scale, not drawing scale. A note zoomed out renders its text
          // at a handful of pixels — legible as a shape on the page, not as
@@ -3313,10 +3339,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                // Anchored to the note's text area, not the note's corner, so the
                // words sit where the canvas will draw them.
                x={(st.x + pageX) * scale + position.x + 12 * noteZ}
-               y={(st.y + pageY) * scale + position.y + (polaroid ? 118 : 24) * noteZ}
+               y={(st.y + pageY) * scale + position.y + (polaroid ? Math.max(24, noteH - 32) : 24) * noteZ}
                scale={z}
-               t={{ ...sk, size: ts.size, color: ts.color, fontFamily: 'Kanit', width: 126 }}
-               boxWidth={126}
+               t={{ ...sk, size: ts.size, color: ts.color, fontFamily: 'Kanit', width: editorWidth }}
+               boxWidth={editorWidth}
                pages={pages}
                currentPageIndex={currentPageIndex}
                onCreateLinkedPage={createLinkedPage}
@@ -3343,7 +3369,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                title="ลบโพสต์อิท"
                style={{ position: 'absolute', zIndex: 3001,
                         left: (st.x + pageX) * scale + position.x,
-                        top: (st.y + pageY) * scale + position.y + 150 * scale * (st.scaleY || 1) + 8,
+                        top: (st.y + pageY) * scale + position.y + noteH * scale * (st.scaleY || 1) + 8,
                         width: 32, height: 32, borderRadius: 10, cursor: 'pointer',
                         border: `1px solid ${HW.hairline}`, background: HW.surface,
                         backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur,
@@ -3439,21 +3465,21 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                }
                selectShape(null);
              }}
-             // Same thing Tab does. Only for the kinds that can be a node.
-             onBranch={(kind === 'texts' || kind === 'stickers')
+             // A linked note can grow from any ordinary object, not only a
+             // mind-map card. A connector itself is deliberately excluded.
+             onBranch={!(kind === 'shapes' && obj.type === 'connector')
                ? () => branchFrom(obj.id, 'child')
                : undefined}
-             // Hands over the connector tool with the shape picker already on it,
-             // so the next drag joins two objects.
-             onConnect={() => {
+             // Keep the selected object as the source, then let the reader tap
+             // (or drag to) any destination to make a bound connector.
+             onConnect={!(kind === 'shapes' && obj.type === 'connector') ? () => {
+               connectorSourceIdRef.current = obj.id;
                setTool('shape');
                setShapeType('connector');
-               // Open the options row as well, so the connector is visibly the
-               // chosen tool rather than a silent mode change.
                setShowToolOptions(true);
                selectShape(null);
-               toast('ลากจากวัตถุหนึ่งไปยังอีกวัตถุ เส้นจะเกาะให้เอง', { icon: '🔗' });
-             }}
+               toast('แตะหรือ ลาก ไปยังวัตถุปลายทางเพื่อเชื่อม เส้นจะเกาะทั้งสองฝั่ง', { icon: '🔗' });
+             } : undefined}
              onRecolor={recolorSelectedObject}
              onFront={() => reorderSelectedObject(true)}
              onBack={() => reorderSelectedObject(false)}

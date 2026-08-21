@@ -19,6 +19,11 @@ describe('pageContentBounds', () => {
       .toEqual({ minX: 10, minY: 10, maxX: 160, maxY: 160 });
   });
 
+  it('uses a resized sticky note’s actual dimensions', () => {
+    expect(pageContentBounds(blank({ stickers: [{ x: 10, y: 10, width: 280, height: 100 }] })))
+      .toEqual({ minX: 10, minY: 10, maxX: 290, maxY: 110 });
+  });
+
   it('respects an object\u2019s own scale', () => {
     expect(pageContentBounds(blank({ stickers: [{ x: 0, y: 0, scaleX: 2, scaleY: 3 }] })))
       .toEqual({ minX: 0, minY: 0, maxX: 300, maxY: 450 });

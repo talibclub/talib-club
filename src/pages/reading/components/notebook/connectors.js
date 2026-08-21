@@ -16,14 +16,32 @@ export function makeConnectors({ pagesRef, currentPageIndex, getPage }) {
   const objectBoundsById = (id) => {
     const page = readPage();
     if (!page || !id) return null;
-    for (const kind of ['images', 'shapes', 'texts', 'stickers']) {
+    for (const kind of ['images', 'shapes', 'texts', 'stickers', 'lines']) {
       const o = (page[kind] || []).find((x) => x.id === id);
       if (!o) continue;
       if (kind === 'shapes' && o.type === 'connector') return null;
+      // Ink is a first-class thing on the page too. It has no rectangle of its
+      // own, so use the tight bounds of its points (including pen width) as the
+      // place a connector can attach to.
+      if (kind === 'lines') {
+        const pts = o.points || [];
+        if (pts.length < 2) return null;
+        let minX = pts[0], maxX = pts[0], minY = pts[1], maxY = pts[1];
+        for (let i = 2; i + 1 < pts.length; i += 2) {
+          minX = Math.min(minX, pts[i]); maxX = Math.max(maxX, pts[i]);
+          minY = Math.min(minY, pts[i + 1]); maxY = Math.max(maxY, pts[i + 1]);
+        }
+        const pad = (o.size || 4) / 2;
+        return { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad };
+      }
       if (kind === 'shapes' && o.type === 'polygon') return polygonBounds(o.points);
       if (kind === 'shapes') return { minX: Math.min(o.x1, o.x2), minY: Math.min(o.y1, o.y2), maxX: Math.max(o.x1, o.x2), maxY: Math.max(o.y1, o.y2) };
       if (kind === 'images') return { minX: o.x, minY: o.y, maxX: o.x + (o.width || 0) * (o.scaleX || 1), maxY: o.y + (o.height || 0) * (o.scaleY || 1) };
-      if (kind === 'stickers') { const w = o.audioUrl ? 130 : 150, h = o.audioUrl ? 44 : 150; return { minX: o.x, minY: o.y, maxX: o.x + w * (o.scaleX || 1), maxY: o.y + h * (o.scaleY || 1) }; }
+      if (kind === 'stickers') {
+        const w = o.audioUrl ? 130 : (o.width || 150);
+        const h = o.audioUrl ? 44 : (o.height || 150);
+        return { minX: o.x, minY: o.y, maxX: o.x + w * (o.scaleX || 1), maxY: o.y + h * (o.scaleY || 1) };
+      }
       // Text objects: `o.text` only exists on the legacy flat shape. Anything
       // edited through TextEditor stores `lines`, so this measured a
       // one-character box for it — and for a flat multi-line string it laid the
@@ -46,7 +64,7 @@ export function makeConnectors({ pagesRef, currentPageIndex, getPage }) {
   const objectIdAt = (pos, excludeId) => {
     const page = readPage();
     if (!page) return null;
-    for (const kind of ['stickers', 'images', 'texts', 'shapes']) {
+    for (const kind of ['stickers', 'images', 'texts', 'shapes', 'lines']) {
       const arr = page[kind] || [];
       for (let i = arr.length - 1; i >= 0; i--) {
         const o = arr[i];
@@ -94,7 +112,7 @@ export function makeConnectors({ pagesRef, currentPageIndex, getPage }) {
 export function pruneDanglingConnectors(page) {
   const shapes = page?.shapes || [];
   const alive = new Set(
-    [...(page?.texts || []), ...(page?.stickers || []), ...(page?.images || []), ...shapes]
+    [...(page?.lines || []), ...(page?.texts || []), ...(page?.stickers || []), ...(page?.images || []), ...shapes]
       .map((o) => o?.id)
       .filter(Boolean)
   );
