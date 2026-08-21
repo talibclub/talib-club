@@ -26,6 +26,7 @@ import SelectionToolbar from './notebook/SelectionToolbar.jsx';
 import LassoToolbar from './notebook/LassoToolbar.jsx';
 import { konvaFontStyle, stickerTextStyle } from './notebook/stickerText.js';
 import { backlinksTo, resolveLinkIndex } from './notebook/wikiLinks.js';
+import { dedupePages } from './notebook/dedupePage.js';
 import { childIdsOf, childPlacement, makeBranchConnector, parentIdOf, siblingPlacement } from './notebook/mindmap.js';
 import TextEditor from './notebook/TextEditor.jsx';
 import PaperTemplateModal from './notebook/PaperTemplateModal.jsx';
@@ -96,8 +97,16 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         try {
            const cloudData = await downloadNotebookData(uid, notebookId, (p) => setSyncProgress(p));
            if (cloudData && cloudData.length > 0) {
-              setPages(cloudData);
+              // Notebooks saved while updatePage was impure hold objects stacked
+              // exactly on top of each other. They are close to invisible — you
+              // delete one and the other is still there — so they are cleared on
+              // the way in, and said out loud rather than done quietly.
+              const cleaned = dedupePages(cloudData);
+              setPages(cleaned.pages);
               toast.success("ซิงก์ข้อมูลสำเร็จ!", { id: "cloud-sync" });
+              if (cleaned.removed) {
+                 toast(`เก็บกวาดวัตถุที่ซ้อนกันอยู่ ${cleaned.removed} ชิ้น`, { icon: '🧹', duration: 5000 });
+              }
            }
            // null = notebook doesn't exist yet → a fresh blank book is correct.
            loadStateRef.current = 'ready';
@@ -106,9 +115,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
            const saved = localStorage.getItem(`talib_notebook_${notebookId}`);
            if (saved) {
               try {
-                 setPages(JSON.parse(saved));
+                 const cleaned = dedupePages(JSON.parse(saved));
+                 setPages(cleaned.pages);
                  loadStateRef.current = 'ready';
                  toast.error("ออฟไลน์: โหลดจากเครื่องแทน", { id: "cloud-sync" });
+                 if (cleaned.removed) {
+                    toast(`เก็บกวาดวัตถุที่ซ้อนกันอยู่ ${cleaned.removed} ชิ้น`, { icon: '🧹', duration: 5000 });
+                 }
               } catch (parseErr) {
                  console.error("Local backup unreadable", parseErr);
                  loadStateRef.current = 'failed';
@@ -130,7 +143,15 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      } else {
         const saved = localStorage.getItem(`talib_notebook_${notebookId}`);
         if (saved) {
-           try { setPages(JSON.parse(saved)); } catch { /* ignore */ }
+           // The signed-out path reads the same possibly-damaged data, so it
+           // gets the same clean-up. Three load paths, one rule.
+           try {
+              const cleaned = dedupePages(JSON.parse(saved));
+              setPages(cleaned.pages);
+              if (cleaned.removed) {
+                 toast(`เก็บกวาดวัตถุที่ซ้อนกันอยู่ ${cleaned.removed} ชิ้น`, { icon: '🧹', duration: 5000 });
+              }
+           } catch { /* ignore */ }
         }
         loadStateRef.current = 'ready';
      }
