@@ -175,6 +175,35 @@ export const projectOntoRuler = (pos, ruler) => {
   return { x: px, y: py, dist: Math.hypot(pos.x - px, pos.y - py) };
 };
 
+// Measuring a string the way the canvas will draw it.
+//
+// Width was estimated as characters x size x 0.6, a Latin rule of thumb that is
+// wrong for Thai in both directions: a vowel or tone mark is its own character
+// but takes no width, while the consonants are wider than 0.6em. Node cards came
+// out too narrow and the text ran out of them.
+//
+// One offscreen canvas and a cache, because this runs during render for every
+// node on the page.
+let measureCtx = null;
+const measureCache = new Map();
+
+export function measureTextWidth(text, fontSize, fontFamily = 'Kanit') {
+  if (!text) return 0;
+  const key = fontSize + '|' + fontFamily + '|' + text;
+  const hit = measureCache.get(key);
+  if (hit !== undefined) return hit;
+  if (!measureCtx) {
+    if (typeof document === 'undefined') return null;   // tests, SSR
+    measureCtx = document.createElement('canvas').getContext('2d');
+  }
+  if (!measureCtx) return null;
+  measureCtx.font = fontSize + 'px ' + fontFamily + ', sans-serif';
+  const w = measureCtx.measureText(text).width;
+  if (measureCache.size > 2000) measureCache.clear();
+  measureCache.set(key, w);
+  return w;
+}
+
 // How wide a text object's words actually are.
 //
 // A text box stores `width` as the point at which lines wrap — 340 by default —
@@ -185,8 +214,16 @@ export const projectOntoRuler = (pos, ruler) => {
 // is genuinely that wide.
 export const textVisualWidth = (obj, body) => {
   const rows = body ? body.split(/\r?\n/) : [''];
+  const size = obj?.size || 16;
+  let measured = 0;
+  for (const row of rows) {
+    const w = measureTextWidth(row, size, obj?.fontFamily || 'Kanit');
+    if (w === null) { measured = null; break; }
+    if (w > measured) measured = w;
+  }
+  // Falls back to the old estimate wherever there is no canvas to measure with.
   const longest = rows.reduce((n, r) => Math.max(n, r.length), 1);
-  const estimate = longest * (obj?.size || 16) * 0.6;
+  const width = measured === null ? longest * size * 0.6 : measured;
   const wrap = obj?.width;
-  return Math.max(24, wrap ? Math.min(estimate, wrap) : estimate);
+  return Math.max(24, wrap ? Math.min(width, wrap) : width);
 };

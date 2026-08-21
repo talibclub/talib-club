@@ -2793,11 +2793,18 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                    // by its words is a stub barely wider than the caret. Hold a
                    // sensible minimum so the card does not pop into existence
                    // around the words after the fact.
-                   const w = Math.max(editingTextId === t.id ? 150 : 84, textVisualWidth(t, textOf(tt)) + 26);
-                   const h = rows * (t.size || 22) * LINE_HEIGHT + 16;
+                   // Padding, not a hairline: the words were sitting against the
+                   // border on every side. Measured rather than estimated, so a
+                   // Thai node no longer overflows its own card — tone marks and
+                   // vowels are separate characters that take no width, which a
+                   // character count gets badly wrong.
+                   const padX = 18;
+                   const padY = 12;
+                   const w = Math.max(editingTextId === t.id ? 150 : 84, textVisualWidth(t, textOf(tt)) + padX * 2);
+                   const h = rows * (t.size || 22) * LINE_HEIGHT + padY * 2;
                    return (
                      <Rect
-                       x={-13} y={-8} width={w} height={h}
+                       x={-padX} y={-padY} width={w} height={h}
                        cornerRadius={12}
                        fill={t.nodeFill || '#FFFFFF'}
                        stroke={t.nodeColor || HW.accent}
