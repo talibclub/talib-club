@@ -3406,6 +3406,17 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              onBranch={(kind === 'texts' || kind === 'stickers')
                ? () => branchFrom(obj.id, 'child')
                : undefined}
+             // Hands over the connector tool with the shape picker already on it,
+             // so the next drag joins two objects.
+             onConnect={() => {
+               setTool('shape');
+               setShapeType('connector');
+               // Open the options row as well, so the connector is visibly the
+               // chosen tool rather than a silent mode change.
+               setShowToolOptions(true);
+               selectShape(null);
+               toast('ลากจากวัตถุหนึ่งไปยังอีกวัตถุ เส้นจะเกาะให้เอง', { icon: '🔗' });
+             }}
              onRecolor={recolorSelectedObject}
              onFront={() => reorderSelectedObject(true)}
              onBack={() => reorderSelectedObject(false)}
