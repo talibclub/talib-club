@@ -2334,11 +2334,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         </div>
       )}
 
-      {/* A small starting point for the common actions. It stays out of the way
-          while writing but removes the need to decode a long tool strip before
-          someone can make their first note. */}
+      {/* A small starting point for the common actions. It used to share the
+          lower-right corner with the expanding tool capsule, so the + could cover
+          its last tool on narrow panes. Keep it in the right-side utility area. */}
       {!readonly && !isMobile && (
-        <div style={{ position: 'absolute', right: 18, bottom: 18, zIndex: 48, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+        <div style={{ position: 'absolute', right: 18, top: minimap ? 132 : 18, zIndex: 48, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
           {showQuickAdd && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(112px, 1fr))', gap: 6, padding: 8, borderRadius: 16, background: HW.surfaceStrong, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}` }}>
               {[
