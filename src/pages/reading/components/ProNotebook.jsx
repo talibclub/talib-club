@@ -27,6 +27,7 @@ import LassoToolbar from './notebook/LassoToolbar.jsx';
 import { konvaFontStyle, stickerTextStyle } from './notebook/stickerText.js';
 import { backlinksTo, resolveLinkIndex } from './notebook/wikiLinks.js';
 import { dedupePages } from './notebook/dedupePage.js';
+import { grownPageSize } from './notebook/pageGrowth.js';
 import { childIdsOf, childPlacement, makeBranchConnector, parentIdOf, siblingPlacement } from './notebook/mindmap.js';
 import TextEditor from './notebook/TextEditor.jsx';
 import PaperTemplateModal from './notebook/PaperTemplateModal.jsx';
@@ -1502,6 +1503,19 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      window.addEventListener('keydown', onKey);
      return () => window.removeEventListener('keydown', onKey);
   });
+
+  // A blank page grows to hold what is on it, so a mindmap can keep branching
+  // instead of running off the edge of fixed paper. Pages backed by a PDF keep
+  // their size — they have to match the sheet they came from. Growth is one-way:
+  // a page that resized itself smaller would pull the paper out from under work
+  // that is still there.
+  useEffect(() => {
+     if (readonly) return;
+     const next = grownPageSize(currentPage);
+     if (!next) return;
+     const index = currentPageIndex;
+     updatePage(index, (page) => { page.width = next.width; page.height = next.height; });
+  }, [currentPage, currentPageIndex, readonly]);
 
   // Following a "[[" link. Clamped, because a linked page can be deleted after
   // the link was written and a stale index would otherwise blank the notebook.
