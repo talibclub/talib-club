@@ -2281,14 +2281,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         onDrop={readonly ? undefined : handleCanvasDrop}
       >
 
-      {/* A compact map for blank (infinite) boards. Click or drag in it to jump
-          around; it stays out of the way of the bottom tool capsule. */}
+      {/* Keep the map in the quiet top-right corner. The lower-right corner is
+          occupied by the expanding tool capsule on a compact reader pane. */}
       {!readonly && minimap && (
         <div
           title="แผนที่ย่อ — คลิกหรือลากเพื่อย้ายมุมมอง"
           onPointerDown={panFromMinimap}
           onPointerMove={(event) => { if (event.buttons === 1) panFromMinimap(event); }}
-          style={{ position: 'absolute', right: 14, bottom: 18, zIndex: 42, width: minimap.width, height: minimap.height, overflow: 'hidden', borderRadius: 12, background: 'rgba(255,255,255,0.82)', border: `1px solid ${HW.hairline}`, boxShadow: '0 7px 20px rgba(35,31,27,0.14)', backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, cursor: 'crosshair', touchAction: 'none' }}
+          style={{ position: 'absolute', right: 14, top: 14, zIndex: 42, width: minimap.width, height: minimap.height, overflow: 'hidden', borderRadius: 12, background: 'rgba(255,255,255,0.82)', border: `1px solid ${HW.hairline}`, boxShadow: '0 7px 20px rgba(35,31,27,0.14)', backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, cursor: 'crosshair', touchAction: 'none' }}
           aria-label="แผนที่ย่อของกระดาน"
         >
           <div style={{ position: 'absolute', inset: 0, opacity: 0.42, backgroundImage: 'radial-gradient(rgba(31,41,55,0.42) 0.65px, transparent 0.75px)', backgroundSize: '8px 8px' }} />
