@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Path, Group, Circle, Text, Rect, Transformer, RegularPolygon, Line, Star as KonvaStar, Arrow as KonvaArrow } from 'react-konva';
-import { Bookmark, BookOpen, Camera, ChevronLeft, ChevronRight, Cloud, FileText, Image as ImageIcon, Lasso, Link as LinkIcon, Link2, Mic, MonitorPlay, PenTool, Ruler, Search, SquareSquare, Star, Trash2, X } from 'lucide-react';
+import { Bookmark, BookOpen, Camera, ChevronLeft, ChevronRight, Cloud, FileText, Image as ImageIcon, Lasso, Link as LinkIcon, Link2, Mic, MonitorPlay, PenTool, Plus, Ruler, Search, SquareSquare, Star, Trash2, X } from 'lucide-react';
 import CropModal from './CropModal';
 import ColorPickerPanel from './ColorPickerPanel';
 import BookSnipModal from './BookSnipModal';
@@ -27,7 +27,7 @@ import LassoToolbar from './notebook/LassoToolbar.jsx';
 import { konvaFontStyle, stickerTextStyle } from './notebook/stickerText.js';
 import { backlinksTo, resolveLinkIndex } from './notebook/wikiLinks.js';
 import { dedupePages } from './notebook/dedupePage.js';
-import { grownPageSize } from './notebook/pageGrowth.js';
+import { boardPaperStyle, grownPageSize } from './notebook/pageGrowth.js';
 import { branchColorFor, branchCurvePoints, childIdsOf, childPlacement, makeBranchConnector, parentIdOf, revealOffset, siblingPlacement } from './notebook/mindmap.js';
 import TextEditor from './notebook/TextEditor.jsx';
 import PaperTemplateModal from './notebook/PaperTemplateModal.jsx';
@@ -200,6 +200,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   }, []);
   
   const [showToolSettings, setShowToolSettings] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [showGettingStarted, setShowGettingStarted] = useState(() => {
+    try { return localStorage.getItem('talib_notebook_getting_started') !== 'seen'; } catch { return true; }
+  });
   // Huawei-style: tapping the already-active tool opens its options popover
   const [showToolOptions, setShowToolOptions] = useState(false);
 
@@ -586,6 +590,12 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // than two thousand lines further down, because the gesture hook below needs
   // the page's width while a pinch is in flight.
   const currentPage = pages[currentPageIndex] || { width: 800, height: 1130, lines: [], stickers: [], images: [], texts: [], shapes: [] };
+  // Blank notes are boards, not sheets: their coordinate space is deliberately
+  // unbounded. Imported PDF pages stay finite so annotations retain exact page
+  // geometry for viewing and export.
+  const isInfiniteCanvas = !currentPage.src && currentPage.infinite !== false;
+  const isCurrentPageEmpty = !currentPage.src
+    && !(currentPage.lines?.length || currentPage.stickers?.length || currentPage.images?.length || currentPage.texts?.length || currentPage.shapes?.length);
   const pageX = Math.max(0, (dimensions.width - currentPage.width * scale) / 2 / scale);
   const pageY = 20;
 
@@ -1033,7 +1043,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     if (!pos) return;
     // Off the paper there is nothing to write on (for ink): drag the board instead.
     // However, users might want to add text notes or stickers in the margins.
-    if (!tapToPlace && (pos.x < 0 || pos.y < 0 || pos.x > currentPage.width || pos.y > currentPage.height)) {
+    if (!tapToPlace && !isInfiniteCanvas && (pos.x < 0 || pos.y < 0 || pos.x > currentPage.width || pos.y > currentPage.height)) {
       if (evt) panningRef.current = { x: evt.clientX, y: evt.clientY };
       return;
     }
@@ -1350,6 +1360,21 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     setConnectorSourceId(null);
     setTool('pan');
     setShowToolOptions(false);
+  };
+  const startQuickAdd = (kind) => {
+    setShowQuickAdd(false);
+    if (kind === 'image') { document.getElementById('image-upload')?.click(); return; }
+    if (kind === 'connector') {
+      beginConnector(null);
+      toast('ลากจากวัตถุหนึ่งไปยังอีกวัตถุเพื่อเชื่อม', { icon: '🔗' });
+      return;
+    }
+    setTool(kind);
+    setShowToolOptions(kind === 'sticker');
+  };
+  const dismissGettingStarted = () => {
+    setShowGettingStarted(false);
+    try { localStorage.setItem('talib_notebook_getting_started', 'seen'); } catch { /* ignore */ }
   };
   useEffect(() => {
     if (tool === 'shape' && shapeType === 'connector') return;
@@ -2176,7 +2201,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
       <div
         ref={containerRef}
-        style={{ flex: 1, position: 'relative', display: 'flex', overflow: 'hidden' }}
+        style={{ flex: 1, position: 'relative', display: 'flex', overflow: 'hidden', ...(isInfiniteCanvas ? boardPaperStyle(currentPage, scale, position, pageX, pageY) : {}) }}
         onDragOver={readonly ? undefined : (e) => { if (Array.from(e.dataTransfer?.types || []).some(t => ['Files', 'text/uri-list', 'text/html'].includes(t))) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; if (!isDragOver) setIsDragOver(true); } }}
         onDragLeave={readonly ? undefined : (e) => { if (e.currentTarget === e.target) setIsDragOver(false); }}
         onDrop={readonly ? undefined : handleCanvasDrop}
@@ -2212,6 +2237,46 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         <div style={{ position: 'absolute', inset: 12, zIndex: 70, pointerEvents: 'none', border: `2.5px dashed ${HW.accent}`, borderRadius: 18, background: 'rgba(16,185,129,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'white', padding: '12px 22px', borderRadius: 999, boxShadow: '0 8px 28px rgba(0,0,0,0.14)', fontWeight: 700, color: HW.text, fontSize: 15 }}>
             <ImageIcon size={20} color={HW.accent} /> วางรูปที่นี่เพื่อแทรกลงสมุด
+          </div>
+        </div>
+      )}
+
+      {/* A small starting point for the common actions. It stays out of the way
+          while writing but removes the need to decode a long tool strip before
+          someone can make their first note. */}
+      {!readonly && !isMobile && (
+        <div style={{ position: 'absolute', right: 18, bottom: 18, zIndex: 48, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+          {showQuickAdd && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(112px, 1fr))', gap: 6, padding: 8, borderRadius: 16, background: HW.surfaceStrong, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}` }}>
+              {[
+                { id: 'text', icon: 'T', label: 'ข้อความ' },
+                { id: 'sticker', icon: '▣', label: 'Note card' },
+                { id: 'image', icon: '▧', label: 'รูปภาพ' },
+                { id: 'connector', icon: '⌁', label: 'เส้นเชื่อม' },
+              ].map((item) => (
+                <button key={item.id} onClick={() => startQuickAdd(item.id)} style={{ height: 38, padding: '0 10px', border: 'none', borderRadius: 10, background: 'rgba(255,255,255,0.72)', color: HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left', fontFamily: 'Kanit, sans-serif', fontSize: 12.5, fontWeight: 600 }}>
+                  <span style={{ width: 20, color: HW.accent, fontSize: 17, textAlign: 'center' }}>{item.icon}</span>{item.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <button onClick={() => setShowQuickAdd((v) => !v)} title="เพิ่มอย่างรวดเร็ว" aria-expanded={showQuickAdd} style={{ width: 46, height: 46, borderRadius: 15, border: 'none', background: HW.accent, color: 'white', cursor: 'pointer', boxShadow: '0 8px 20px rgba(15,110,86,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', transform: showQuickAdd ? 'rotate(45deg)' : 'none', transition: 'transform 0.18s' }}>
+            <Plus size={24} strokeWidth={2.2} />
+          </button>
+        </div>
+      )}
+
+      {/* A one-time, actionable empty-board welcome. It never blocks an
+          existing notebook and its actions go straight to the same tools. */}
+      {!readonly && !isMobile && isCurrentPageEmpty && showGettingStarted && (
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 24, width: 'min(390px, calc(100% - 40px))', padding: 22, borderRadius: 22, background: 'rgba(255,255,255,0.87)', backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, boxShadow: '0 18px 50px rgba(35,31,27,0.14)', border: `1px solid ${HW.hairline}`, textAlign: 'center', fontFamily: 'Kanit, sans-serif' }}>
+          <button onClick={dismissGettingStarted} title="ปิดคำแนะนำ" style={{ position: 'absolute', top: 10, right: 10, border: 'none', background: 'transparent', color: HW.textDim, cursor: 'pointer', display: 'flex', padding: 4 }}><X size={16} /></button>
+          <div style={{ width: 42, height: 42, borderRadius: 14, margin: '0 auto 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: HW.accentSoft, color: HW.accent }}><PenTool size={22} /></div>
+          <h3 style={{ margin: 0, color: HW.text, fontSize: 18 }}>เริ่มจดบนกระดานได้เลย</h3>
+          <p style={{ margin: '4px 0 14px', color: HW.textDim, fontSize: 13, lineHeight: 1.5 }}>หน้านี้เป็นกระดานไร้ขอบ เลื่อนและขยายพื้นที่ทำงานได้ตามต้องการ</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 7 }}>
+            <button onClick={() => { dismissGettingStarted(); startQuickAdd('text'); }} style={{ padding: '9px 8px', border: 'none', borderRadius: 11, background: HW.accent, color: 'white', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>พิมพ์ข้อความ</button>
+            <button onClick={() => { dismissGettingStarted(); startQuickAdd('sticker'); }} style={{ padding: '9px 8px', border: 'none', borderRadius: 11, background: HW.accentSoft, color: HW.accent, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>เพิ่ม Note card</button>
           </div>
         </div>
       )}
@@ -2456,20 +2521,20 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       >
         {/* Background Layer (Paper + PDF + Images) */}
         <Layer>
-          <Group x={pageX} y={pageY} clipX={0} clipY={0} clipWidth={currentPage.width} clipHeight={currentPage.height}>
+          <Group x={pageX} y={pageY} clipX={isInfiniteCanvas ? undefined : 0} clipY={isInfiniteCanvas ? undefined : 0} clipWidth={isInfiniteCanvas ? undefined : currentPage.width} clipHeight={isInfiniteCanvas ? undefined : currentPage.height}>
             {/* Page Paper Background */}
             <Rect 
                name="background"
                width={currentPage.width} 
                height={currentPage.height} 
-               fill={currentPage.paperColor === 'yellow' ? '#FEF3C7' : currentPage.paperColor === 'dark' ? '#1F2937' : 'white'} 
-               shadowColor="rgba(0,0,0,0.15)" shadowBlur={20} shadowOffsetY={10} 
+               fill={isInfiniteCanvas ? 'transparent' : (currentPage.paperColor === 'yellow' ? '#FEF3C7' : currentPage.paperColor === 'dark' ? '#1F2937' : 'white')}
+               shadowColor={isInfiniteCanvas ? 'transparent' : 'rgba(0,0,0,0.15)'} shadowBlur={isInfiniteCanvas ? 0 : 20} shadowOffsetY={10}
                onClick={checkDeselect}
                onTap={checkDeselect}
             />
             
             {/* Paper Pattern */}
-            {!currentPage.src && currentPage.paperType !== 'blank' && (
+            {!currentPage.src && !isInfiniteCanvas && currentPage.paperType !== 'blank' && (
                <PaperPattern width={currentPage.width} height={currentPage.height} type={currentPage.paperType || 'lines'} color={currentPage.paperColor || 'white'} />
             )}
             

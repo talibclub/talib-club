@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { grownPageSize, MIN_HEIGHT, MIN_WIDTH, PAGE_PAD, pageContentBounds } from '../pages/reading/components/notebook/pageGrowth.js';
+import { boardPaperStyle, grownPageSize, MIN_HEIGHT, MIN_WIDTH, PAGE_PAD, pageContentBounds } from '../pages/reading/components/notebook/pageGrowth.js';
 
 const blank = (extra = {}) => ({ width: MIN_WIDTH, height: MIN_HEIGHT, src: null, ...extra });
 
@@ -85,5 +85,16 @@ describe('grownPageSize', () => {
 
   it('survives a missing page', () => {
     expect(grownPageSize(null)).toBeNull();
+  });
+});
+
+describe('boardPaperStyle', () => {
+  it('extends a dotted blank board across the viewport', () => {
+    const style = boardPaperStyle(blank({ paperType: 'dots' }), 1, { x: 0, y: 0 }, 0, 0);
+    expect(style.backgroundImage).toContain('radial-gradient');
+  });
+
+  it('keeps a PDF page on the neutral board background', () => {
+    expect(boardPaperStyle(blank({ src: 'page.png' }), 1, { x: 0, y: 0 }, 0, 0)).toEqual({ background: '#F3F4F6' });
   });
 });
