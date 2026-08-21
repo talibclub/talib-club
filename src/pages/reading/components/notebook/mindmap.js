@@ -93,3 +93,23 @@ export function branchCurvePoints(a, b) {
   const dir = b.x >= a.x ? 1 : -1;
   return [a.x, a.y, a.x + reach * dir, a.y, b.x - reach * dir, b.y, b.x, b.y];
 }
+
+// Where the board has to move so a point is on screen.
+//
+// Branching placed the new node to the parent's right and left the view where it
+// was, so on anything but a wide, zoomed-out board the node — and its branch —
+// appeared somewhere off-screen with no clue as to where. The smallest nudge
+// that brings it inside the margin, and nothing at all when it is already in
+// view: a board that recentres itself on every keystroke is its own annoyance.
+export function revealOffset({ x, y, pageX, pageY, scale, position, width, height, margin = 90 }) {
+  const sx = position.x + (pageX + x) * scale;
+  const sy = position.y + (pageY + y) * scale;
+  let dx = 0;
+  let dy = 0;
+  if (sx < margin) dx = margin - sx;
+  else if (sx > width - margin) dx = (width - margin) - sx;
+  if (sy < margin) dy = margin - sy;
+  else if (sy > height - margin) dy = (height - margin) - sy;
+  if (dx === 0 && dy === 0) return null;
+  return { x: position.x + dx, y: position.y + dy };
+}

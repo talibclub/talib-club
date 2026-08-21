@@ -1,4 +1,4 @@
-import { boundsCenter, polygonBounds, textOf } from './geometry.js';
+import { boundsCenter, polygonBounds, textOf, textVisualWidth } from './geometry.js';
 import { LINE_HEIGHT, TEXT_BOX_WIDTH } from './theme.js';
 
 // Smart connectors, for mindmaps: where each object sits, what is under a point,
@@ -33,9 +33,8 @@ export function makeConnectors({ pagesRef, currentPageIndex, getPage }) {
       {
         const body = textOf(o);
         const rows = body ? body.split(/\r?\n/) : [''];
-        const longest = rows.reduce((n, r) => Math.max(n, r.length), 1);
         const size = o.size || 16;
-        const width = o.width || Math.max(60, longest * size * 0.6);
+        const width = textVisualWidth(o, body);
         const height = Math.max(1, rows.length) * size * LINE_HEIGHT;
         return { minX: o.x, minY: o.y, maxX: o.x + width, maxY: o.y + height };
       }

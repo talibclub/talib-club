@@ -174,3 +174,19 @@ export const projectOntoRuler = (pos, ruler) => {
   const py = ruler.y + dy * t;
   return { x: px, y: py, dist: Math.hypot(pos.x - px, pos.y - py) };
 };
+
+// How wide a text object's words actually are.
+//
+// A text box stores `width` as the point at which lines wrap — 340 by default —
+// not the width the text occupies. Measuring by that made a two-character node
+// 340 wide, so connectors aimed at the edge of an invisible box and branches
+// appeared to start in mid-air, ninety pixels clear of the node they came from.
+// The estimate wins for short text; the wrap width caps it for long text, which
+// is genuinely that wide.
+export const textVisualWidth = (obj, body) => {
+  const rows = body ? body.split(/\r?\n/) : [''];
+  const longest = rows.reduce((n, r) => Math.max(n, r.length), 1);
+  const estimate = longest * (obj?.size || 16) * 0.6;
+  const wrap = obj?.width;
+  return Math.max(24, wrap ? Math.min(estimate, wrap) : estimate);
+};

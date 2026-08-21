@@ -17,7 +17,7 @@ import { auth, db, storage } from '../../../lib/firebase.js';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { PDFPageImage, PaperPattern, getSvgPathFromStroke, PEN_STYLES, StrokeShape, CommittedStrokes, StickyStyleThumb } from './notebook/canvasElements.jsx';
-import { polygonBounds, polygonCentroid, polygonInteriorAngle, applyListPrefix, textDecorationOf, migrateText, migrateSticker, textOf, isUniformText, uniformFormatOf, listPrefixes, boundsCenter, strokeHitsPoint, projectOntoRuler } from './notebook/geometry.js';
+import { polygonBounds, polygonCentroid, polygonInteriorAngle, applyListPrefix, textDecorationOf, migrateText, migrateSticker, textOf, isUniformText, uniformFormatOf, listPrefixes, boundsCenter, strokeHitsPoint, projectOntoRuler, textVisualWidth } from './notebook/geometry.js';
 import { HW, ZERO_OFFSET, TEXT_BOX_WIDTH, LINE_HEIGHT, STICKY_COLORS, DRAW_CURSOR } from './notebook/theme.js';
 import { useDragScroll } from './notebook/useDragScroll.js';
 import ImageSearchPanel from './notebook/ImageSearchPanel.jsx';
@@ -28,7 +28,7 @@ import { konvaFontStyle, stickerTextStyle } from './notebook/stickerText.js';
 import { backlinksTo, resolveLinkIndex } from './notebook/wikiLinks.js';
 import { dedupePages } from './notebook/dedupePage.js';
 import { grownPageSize } from './notebook/pageGrowth.js';
-import { branchColorFor, branchCurvePoints, childIdsOf, childPlacement, makeBranchConnector, parentIdOf, siblingPlacement } from './notebook/mindmap.js';
+import { branchColorFor, branchCurvePoints, childIdsOf, childPlacement, makeBranchConnector, parentIdOf, revealOffset, siblingPlacement } from './notebook/mindmap.js';
 import TextEditor from './notebook/TextEditor.jsx';
 import PaperTemplateModal from './notebook/PaperTemplateModal.jsx';
 import ExportModal from './notebook/ExportModal.jsx';
@@ -1488,6 +1488,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         // Marked so it draws as a curve; connectors drawn by hand stay straight.
         page2.shapes[page2.shapes.length - 1].isBranch = true;
      });
+     // Bring it into view. Placing a node to the parent's right and leaving the
+     // board where it was is how "I pressed Tab and the branch went somewhere I
+     // cannot see" happens.
+     const reveal = revealOffset({
+        x: spot.x + 120, y: spot.y + 20, pageX, pageY, scale, position,
+        width: dimensions.width, height: dimensions.height,
+     });
+     if (reveal) setPosition(reveal);
      selectShape(nodeIdNew);
      setEditingTextId(nodeIdNew);
      setEditingTextValue('');
@@ -2774,8 +2782,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                 {t.isNode && (() => {
                    const tt = migrateText(t);
                    const rows = tt.lines.length || 1;
-                   const longest = tt.lines.reduce((n, l) => Math.max(n, (l.text || '').length), 1);
-                   const w = Math.max(96, Math.min(longest * (t.size || 22) * 0.62 + 26, (t.width || TEXT_BOX_WIDTH)));
+                   // The same measurement the connector uses, so the card and the
+                   // branch that meets it agree on where the node ends.
+                   const w = textVisualWidth(t, textOf(tt)) + 26;
                    const h = rows * (t.size || 22) * LINE_HEIGHT + 16;
                    return (
                      <Rect

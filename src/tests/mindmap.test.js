@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BRANCH_GAP_X, BRANCH_GAP_Y, childIdsOf, childPlacement,
-  makeBranchConnector, parentIdOf, siblingPlacement,
+  makeBranchConnector, parentIdOf, revealOffset, siblingPlacement,
 } from '../pages/reading/components/notebook/mindmap.js';
 
 const box = (minX, minY, maxX, maxY) => ({ minX, minY, maxX, maxY });
@@ -78,5 +78,45 @@ describe('makeBranchConnector', () => {
   it('binds both ends by id and points at the child', () => {
     const c = makeBranchConnector({ id: 's1', fromId: 'a', toId: 'b', color: '#000', size: 2 });
     expect(c).toMatchObject({ id: 's1', type: 'connector', from: { id: 'a' }, to: { id: 'b' }, hasArrow: true });
+  });
+});
+
+describe('revealOffset', () => {
+  const view = { pageX: 0, pageY: 0, scale: 1, position: { x: 0, y: 0 }, width: 1000, height: 600 };
+
+  it('does nothing when the point is already comfortably on screen', () => {
+    expect(revealOffset({ ...view, x: 500, y: 300 })).toBeNull();
+  });
+
+  it('pulls the board left when the point is off the right edge', () => {
+    const next = revealOffset({ ...view, x: 1400, y: 300 });
+    expect(next.x).toBe(1000 - 90 - 1400);
+    expect(next.y).toBe(0);
+  });
+
+  it('pushes the board right when the point is off the left edge', () => {
+    const next = revealOffset({ ...view, x: -300, y: 300 });
+    expect(next.x).toBe(90 + 300);
+  });
+
+  it('moves on both axes at once when needed', () => {
+    const next = revealOffset({ ...view, x: 2000, y: 900 });
+    expect(next.x).toBeLessThan(0);
+    expect(next.y).toBeLessThan(0);
+  });
+
+  it('accounts for zoom and the current pan', () => {
+    const next = revealOffset({ ...view, x: 2000, y: 10, scale: 0.5, position: { x: 100, y: 0 } });
+    // on screen at 100 + 1000 = 1100, which is past 1000 - 90
+    expect(next.x).toBe(100 + (1000 - 90 - 1100));
+  });
+
+  it('respects the page offset', () => {
+    expect(revealOffset({ ...view, x: 500, y: 300, pageX: 600 })).not.toBeNull();
+  });
+
+  it('nudges only as far as the margin, not to the centre', () => {
+    const next = revealOffset({ ...view, x: 1010, y: 300 });
+    expect(next.x).toBe(-100);
   });
 });
