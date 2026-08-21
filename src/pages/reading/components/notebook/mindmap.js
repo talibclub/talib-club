@@ -57,3 +57,39 @@ export function makeBranchConnector({ id, fromId, toId, color, size, from, to })
     color, size, hasArrow: true,
   };
 }
+
+// --- Looking like a mindmap -------------------------------------------------
+
+// One colour per top-level branch, inherited by everything under it, so a map
+// reads as a few limbs rather than one undifferentiated tangle. Taken from the
+// Talib palette rather than the rainbow, so a map still looks like this notebook.
+export const BRANCH_COLORS = [
+  '#0f6e56', // green
+  '#c0392b', // red
+  '#1d4ed8', // blue
+  '#b45309', // amber
+  '#6b21a8', // purple
+  '#0e7490', // teal
+];
+
+// The colour a new child should take: the same as its parent's branch once one
+// exists, otherwise the next unused colour, so siblings of the root differ and
+// their descendants match.
+export function branchColorFor(page, parentId, rootId) {
+  const shapes = (page?.shapes || []).filter((s) => s?.type === 'connector');
+  const incoming = shapes.find((s) => s.to?.id === parentId);
+  if (incoming?.color) return incoming.color;
+  const used = shapes.filter((s) => s.from?.id === (rootId ?? parentId)).map((s) => s.color);
+  const free = BRANCH_COLORS.find((c) => !used.includes(c));
+  return free || BRANCH_COLORS[used.length % BRANCH_COLORS.length];
+}
+
+// A cubic curve leaving the parent horizontally and arriving at the child the
+// same way — the shape every mindmap tool draws, and the reason a hand-drawn
+// straight diagonal reads as a mistake rather than a branch.
+export function branchCurvePoints(a, b) {
+  const dx = Math.abs(b.x - a.x);
+  const reach = Math.max(28, Math.min(dx * 0.55, 160));
+  const dir = b.x >= a.x ? 1 : -1;
+  return [a.x, a.y, a.x + reach * dir, a.y, b.x - reach * dir, b.y, b.x, b.y];
+}

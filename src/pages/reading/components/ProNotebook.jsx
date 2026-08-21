@@ -28,7 +28,7 @@ import { konvaFontStyle, stickerTextStyle } from './notebook/stickerText.js';
 import { backlinksTo, resolveLinkIndex } from './notebook/wikiLinks.js';
 import { dedupePages } from './notebook/dedupePage.js';
 import { grownPageSize } from './notebook/pageGrowth.js';
-import { childIdsOf, childPlacement, makeBranchConnector, parentIdOf, siblingPlacement } from './notebook/mindmap.js';
+import { branchColorFor, branchCurvePoints, childIdsOf, childPlacement, makeBranchConnector, parentIdOf, siblingPlacement } from './notebook/mindmap.js';
 import TextEditor from './notebook/TextEditor.jsx';
 import PaperTemplateModal from './notebook/PaperTemplateModal.jsx';
 import ExportModal from './notebook/ExportModal.jsx';
@@ -1458,6 +1458,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         : childPlacement(from, childIdsOf(page, nodeId).map(objectBoundsById));
 
      const nodeIdNew = nextObjectId('text');
+     // The branch's colour: inherited from the parent's limb, or the next unused
+     // one when this is a new limb off the root — so a map reads as a few
+     // coloured branches rather than one tangle.
+     const branchColor = branchColorFor(page, anchorId, anchorId);
      const newNode = {
         id: nodeIdNew, text: '', lines: [],
         x: spot.x, y: spot.y,
@@ -1465,6 +1469,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         fontFamily: textStyle.fontFamily || 'Kanit',
         bold: false, italic: false, underline: false, strikethrough: false,
         align: 'left', list: 'none', width: TEXT_BOX_WIDTH,
+        isNode: true, nodeColor: branchColor, nodeFill: '#FFFFFF',
      };
      pushHistory();
      updatePage(currentPageIndex, (page2) => {
@@ -1474,12 +1479,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         const anchorBox = objectBoundsById(anchorId) || from;
         page2.shapes.push(makeBranchConnector({
            id: nextObjectId('shape'), fromId: anchorId, toId: nodeIdNew,
-           color: penColor, size: Math.max(2, penSize),
+           color: branchColor, size: Math.max(2.5, penSize),
            // Real coordinates, so a connector that ever loses an end stays put
            // instead of snapping to the corner of the page.
            from: { x: (anchorBox.minX + anchorBox.maxX) / 2, y: (anchorBox.minY + anchorBox.maxY) / 2 },
            to: { x: spot.x + 60, y: spot.y + 12 },
         }));
+        // Marked so it draws as a curve; connectors drawn by hand stay straight.
+        page2.shapes[page2.shapes.length - 1].isBranch = true;
      });
      selectShape(nodeIdNew);
      setEditingTextId(nodeIdNew);
@@ -2433,17 +2440,23 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               // Connector: an arrow/line whose ends follow the objects they snap to.
               if (s.type === 'connector') {
                  const { a, b } = connectorPoints(s);
+                 // A branch curves; a connector drawn by hand stays the straight
+                 // line it was drawn as. A mindmap limb rendered as a straight
+                 // diagonal reads as a mistake rather than a branch, which is
+                 // exactly how it looked.
+                 const curved = !!s.isBranch;
                  return (
                    <KonvaArrow
                      key={s.id}
                      id={s.id}
                      name="object"
-                     points={[a.x, a.y, b.x, b.y]}
+                     points={curved ? branchCurvePoints(a, b) : [a.x, a.y, b.x, b.y]}
+                     bezier={curved}
                      stroke={s.color}
                      fill={s.color}
                      strokeWidth={s.size || 3}
-                     pointerLength={s.hasArrow === false ? 0 : 11}
-                     pointerWidth={s.hasArrow === false ? 0 : 11}
+                     pointerLength={s.hasArrow === false || curved ? 0 : 11}
+                     pointerWidth={s.hasArrow === false || curved ? 0 : 11}
                      hitStrokeWidth={16}
                      lineCap="round"
                      onClick={() => { if (tool === 'pan' || tool === 'lasso' || tool === 'shape') selectShape(s.id); }}
@@ -2754,6 +2767,28 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                    isEditingText.current = true;
                 }}
               >
+                {/* A node made by branching is drawn as a rounded card behind
+                    its words, in its branch's colour. Bare text floating on the
+                    page does not read as a mindmap node — the boxes are what
+                    make a map look like a map rather than scattered labels. */}
+                {t.isNode && (() => {
+                   const tt = migrateText(t);
+                   const rows = tt.lines.length || 1;
+                   const longest = tt.lines.reduce((n, l) => Math.max(n, (l.text || '').length), 1);
+                   const w = Math.max(96, Math.min(longest * (t.size || 22) * 0.62 + 26, (t.width || TEXT_BOX_WIDTH)));
+                   const h = rows * (t.size || 22) * LINE_HEIGHT + 16;
+                   return (
+                     <Rect
+                       x={-13} y={-8} width={w} height={h}
+                       cornerRadius={12}
+                       fill={t.nodeFill || '#FFFFFF'}
+                       stroke={t.nodeColor || HW.accent}
+                       strokeWidth={1.6}
+                       shadowColor="rgba(35,31,27,0.16)" shadowBlur={10} shadowOffsetY={3}
+                       listening={false}
+                     />
+                   );
+                })()}
                 {editingTextId !== t.id && (() => {
                   // Rich text (item 9, phase 1): a uniform box renders as one
                   // <Text> exactly as before; a box with per-line formatting
