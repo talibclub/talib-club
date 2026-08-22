@@ -13,7 +13,6 @@ import { PenTool, Highlighter, Eraser, Type, Square, Lasso, Pencil, Pointer, Sti
 export const TOOL_GROUPS = {
   // Always visible, whichever mode you are in.
   core: [
-    { id: 'pan', icon: Pointer, title: 'เลื่อนกระดาน', label: 'เลื่อน' },
     { id: 'text', icon: Type, title: 'พิมพ์ข้อความ', label: 'ข้อความ' },
     { id: 'sticker', icon: StickyNote, title: 'โน้ตติดกระดาษ', label: 'โน้ต' },
     { id: 'image', icon: ImageIcon, title: 'แทรกรูปภาพ', label: 'รูป' },

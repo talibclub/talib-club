@@ -6,7 +6,7 @@ import { LINE_HEIGHT, TEXT_BOX_WIDTH } from './theme.js';
 //
 // A bound end sits on its object's edge facing the other end, so the line meets
 // the border rather than burying itself in the middle of the box.
-export function makeConnectors({ pagesRef, currentPageIndex, getPage }) {
+export function makeConnectors({ pagesRef, currentPageIndex, getPage, stageRef }) {
   // pagesRef is written by an effect, so it lags a render behind. A connector
   // drawn to a node created in this very render found nothing, fell back to the
   // coordinates on its endpoint, and drew itself to the corner of the page —
@@ -36,11 +36,25 @@ export function makeConnectors({ pagesRef, currentPageIndex, getPage }) {
       }
       if (kind === 'shapes' && o.type === 'polygon') return polygonBounds(o.points);
       if (kind === 'shapes') return { minX: Math.min(o.x1, o.x2), minY: Math.min(o.y1, o.y2), maxX: Math.max(o.x1, o.x2), maxY: Math.max(o.y1, o.y2) };
-      if (kind === 'images') return { minX: o.x, minY: o.y, maxX: o.x + (o.width || 0) * (o.scaleX || 1), maxY: o.y + (o.height || 0) * (o.scaleY || 1) };
+
+      let liveX = o.x;
+      let liveY = o.y;
+      let liveScaleX = o.scaleX || 1;
+      let liveScaleY = o.scaleY || 1;
+      if (stageRef && stageRef.current) {
+         const node = stageRef.current.findOne('#' + id);
+         if (node) {
+            liveX = node.x();
+            liveY = node.y();
+            liveScaleX = node.scaleX();
+            liveScaleY = node.scaleY();
+         }
+      }
+      if (kind === 'images') return { minX: liveX, minY: liveY, maxX: liveX + (o.width || 0) * liveScaleX, maxY: liveY + (o.height || 0) * liveScaleY };
       if (kind === 'stickers') {
         const w = o.audioUrl ? 130 : (o.width || 150);
         const h = o.audioUrl ? 44 : (o.height || 150);
-        return { minX: o.x, minY: o.y, maxX: o.x + w * (o.scaleX || 1), maxY: o.y + h * (o.scaleY || 1) };
+        return { minX: liveX, minY: liveY, maxX: liveX + w * liveScaleX, maxY: liveY + h * liveScaleY };
       }
       // Text objects: `o.text` only exists on the legacy flat shape. Anything
       // edited through TextEditor stores `lines`, so this measured a
@@ -54,7 +68,7 @@ export function makeConnectors({ pagesRef, currentPageIndex, getPage }) {
         const size = o.size || 16;
         const width = textVisualWidth(o, body);
         const height = Math.max(1, rows.length) * size * LINE_HEIGHT;
-        return { minX: o.x, minY: o.y, maxX: o.x + width, maxY: o.y + height };
+        return { minX: liveX, minY: liveY, maxX: liveX + width, maxY: liveY + height };
       }
     }
     return null;
