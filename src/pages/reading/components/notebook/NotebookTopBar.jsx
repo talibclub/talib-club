@@ -82,9 +82,9 @@ export default function NotebookTopBar({ ui }) {
            // back to them. `safe` centres while there is room and falls back to
            // the start once there is not. It was flex-start, which never lost an
            // icon but left the whole bar hugging the left of a wide screen.
-           style={{ height: 58, width: '100%', background: 'linear-gradient(115deg, rgba(255,255,255,0.82), rgba(247,245,241,0.72))', backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, display: 'flex', alignItems: 'center', justifyContent: readonly ? 'center' : 'safe center', gap: 10, padding: '0 14px', borderBottom: `1px solid ${HW.hairline}`, overflowX: 'auto', overflowY: 'hidden', touchAction: 'pan-x', scrollBehavior: 'auto' }}
+           style={{ height: 52, width: '100%', background: 'linear-gradient(115deg, rgba(255,255,255,0.85), rgba(247,245,241,0.78))', backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, display: 'flex', alignItems: 'center', justifyContent: readonly ? 'center' : 'safe center', gap: 8, padding: '0 12px', borderBottom: `1px solid ${HW.hairline}`, overflowX: 'auto', overflowY: 'hidden', touchAction: 'pan-x', scrollBehavior: 'auto' }}
          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                {/* No in-notebook back button: it called window.history.back(), which
                    would kick the user out of the reading room entirely. The reader
                    (and the gallery viewer) already provide their own exit. */}
@@ -94,56 +94,56 @@ export default function NotebookTopBar({ ui }) {
                    <button
                      onClick={() => setCurrentPageIndex(Math.max(0, currentPageIndex - 1))}
                      disabled={currentPageIndex === 0}
-                     style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'transparent', cursor: currentPageIndex === 0 ? 'default' : 'pointer', opacity: currentPageIndex === 0 ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
-                     <ChevronLeft size={17} strokeWidth={2} />
+                     style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent', cursor: currentPageIndex === 0 ? 'default' : 'pointer', opacity: currentPageIndex === 0 ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
+                     <ChevronLeft size={16} strokeWidth={2} />
                    </button>
-                   <span style={{ fontSize: 12.5, fontWeight: 600, color: HW.text, minWidth: 42, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+                   <span style={{ fontSize: 12, fontWeight: 600, color: HW.text, minWidth: 38, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
                      {currentPageIndex + 1} / {pages.length}
                    </span>
                    <button
                      onClick={() => setCurrentPageIndex(Math.min(pages.length - 1, currentPageIndex + 1))}
                      disabled={currentPageIndex === pages.length - 1}
-                     style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'transparent', cursor: currentPageIndex === pages.length - 1 ? 'default' : 'pointer', opacity: currentPageIndex === pages.length - 1 ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
-                     <ChevronRight size={17} strokeWidth={2} />
+                     style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent', cursor: currentPageIndex === pages.length - 1 ? 'default' : 'pointer', opacity: currentPageIndex === pages.length - 1 ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
+                     <ChevronRight size={16} strokeWidth={2} />
                    </button>
                  </div>
                )}
                {!isMobile && (
-                 <div title={`${notebookTitle} · ${pageTitle}`} style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, maxWidth: 220, padding: '5px 10px', borderRadius: 14, background: 'rgba(255,255,255,0.68)', border: `1px solid ${HW.hairline}`, boxShadow: '0 2px 8px rgba(35,31,27,0.04)' }}>
-                   <span style={{ width: 25, height: 25, borderRadius: 9, background: HW.accentSoft, color: HW.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><BookOpen size={14} strokeWidth={2} /></span>
+                 <div title={`${notebookTitle} · ${pageTitle}`} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: fullView ? 240 : 140, padding: '4px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.72)', border: `1px solid ${HW.hairline}`, boxShadow: '0 1px 4px rgba(35,31,27,0.03)' }}>
+                   <span style={{ width: 22, height: 22, borderRadius: 7, background: HW.accentSoft, color: HW.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><BookOpen size={13} strokeWidth={2} /></span>
                    <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
-                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, fontWeight: 700, color: HW.text }}>{notebookTitle}</span>
-                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10.5, color: HW.textDim }}>{pageTitle}</span>
+                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11.5, fontWeight: 700, color: HW.text }}>{notebookTitle}</span>
+                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, color: HW.textDim }}>{pageTitle}</span>
                    </span>
                  </div>
                )}
                {/* Zoom cluster — the quick way back when the page has drifted off screen */}
                {!isMobile && (
-                 <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.04)', borderRadius: 100, padding: '2px 4px' }}>
-                   <button title="ย่อ" onClick={() => setScale(s => Math.max(0.1, s / 1.2))} style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
-                     <Minus size={15} strokeWidth={2} />
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 1, background: 'rgba(0,0,0,0.04)', borderRadius: 100, padding: '2px 4px' }}>
+                   <button title="ย่อ" onClick={() => setScale(s => Math.max(0.1, s / 1.2))} style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
+                     <Minus size={14} strokeWidth={2} />
                    </button>
-                   <button title="พอดีหน้าจอ" onClick={fitToScreen} style={{ minWidth: 46, height: 26, borderRadius: 100, border: 'none', background: 'transparent', cursor: 'pointer', color: HW.text, fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                   <button title="พอดีหน้าจอ" onClick={fitToScreen} style={{ minWidth: 42, height: 24, borderRadius: 100, border: 'none', background: 'transparent', cursor: 'pointer', color: HW.text, fontSize: 11.5, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
                      {Math.round(scale * 100)}%
                    </button>
-                   <button title="ขยาย" onClick={() => setScale(s => Math.min(5, s * 1.2))} style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
-                     <Plus size={15} strokeWidth={2} />
+                   <button title="ขยาย" onClick={() => setScale(s => Math.min(5, s * 1.2))} style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
+                     <Plus size={14} strokeWidth={2} />
                    </button>
                  </div>
                )}
                {isSaving && (
                   <span title="กำลังบันทึก" style={{ color: '#10B981', display: 'flex', alignItems: 'center' }}>
-                     <Cloud size={17} />
+                     <Cloud size={16} />
                   </span>
                )}
                {!isSaving && !readonly && (
                   <button title="บันทึกแล้ว (คลิกเพื่อบังคับบันทึก)" onClick={() => saveNotebook()} style={{ background: 'transparent', border: 'none', color: '#9CA3AF', display: 'flex', alignItems: 'center', cursor: 'pointer', padding: 0 }}>
-                     <CheckCircle size={17} />
+                     <CheckCircle size={16} />
                   </button>
                )}
             </div>
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, position: 'relative' }}>
                {!readonly && (
                  <>
                    {/* Full-view: give the whole browser width to the notebook and
@@ -154,9 +154,9 @@ export default function NotebookTopBar({ ui }) {
                      <button
                        onClick={onToggleFullView}
                        title={fullView ? 'กลับมุมมองคู่กับ PDF' : 'ขยายสมุดโน้ตเต็มจอ ซ่อน PDF ด้านข้าง'}
-                       style={{ height: 34, padding: '0 12px', borderRadius: 10, border: 'none', background: fullView ? HW.accentSoft : 'rgba(0,0,0,0.05)', color: fullView ? HW.accent : HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'Kanit, sans-serif', transition: 'all 0.18s' }}
+                       style={{ height: 32, padding: '0 10px', borderRadius: 9, border: 'none', background: fullView ? HW.accentSoft : 'rgba(0,0,0,0.05)', color: fullView ? HW.accent : HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'Kanit, sans-serif', transition: 'all 0.18s' }}
                      >
-                       {fullView ? <PanelLeftOpen size={17} strokeWidth={1.8} /> : <PanelLeftClose size={17} strokeWidth={1.8} />}
+                       {fullView ? <PanelLeftOpen size={15} strokeWidth={1.8} /> : <PanelLeftClose size={15} strokeWidth={1.8} />}
                        {fullView ? 'แสดง PDF' : 'โน้ตเต็มจอ'}
                      </button>
                    )}
@@ -185,11 +185,11 @@ export default function NotebookTopBar({ ui }) {
                        key={b.id}
                        onClick={b.onClick}
                        title={b.title}
-                       style={{ position: 'relative', width: 36, height: 36, borderRadius: 12, border: `1px solid ${b.active ? HW.accentRing : 'transparent'}`, background: b.active ? HW.accentSoft : 'rgba(255,255,255,0.38)', color: b.active ? HW.accent : HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.18s' }}
+                       style={{ position: 'relative', width: 33, height: 33, borderRadius: 10, border: `1px solid ${b.active ? HW.accentRing : 'transparent'}`, background: b.active ? HW.accentSoft : 'rgba(255,255,255,0.45)', color: b.active ? HW.accent : HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.18s' }}
                      >
-                       <b.icon size={20} strokeWidth={1.6} />
+                       <b.icon size={18} strokeWidth={1.6} />
                        {b.badge > 0 && (
-                         <span style={{ position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: '#EF4444', color: 'white', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{b.badge}</span>
+                         <span style={{ position: 'absolute', top: -2, right: -2, minWidth: 15, height: 15, padding: '0 3px', borderRadius: 8, background: '#EF4444', color: 'white', fontSize: 9.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{b.badge}</span>
                        )}
                      </button>
                    ))}

@@ -2535,35 +2535,43 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           <p style={{ margin: '4px 0 14px', color: HW.textDim, fontSize: 13, lineHeight: 1.5 }}>หน้านี้เป็นกระดานไร้ขอบ เลื่อนและขยายพื้นที่ทำงานได้ตามต้องการ</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 7 }}>
             <button onClick={() => { dismissGettingStarted(); startQuickAdd('text'); }} style={{ padding: '9px 8px', border: 'none', borderRadius: 11, background: HW.accent, color: 'white', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>พิมพ์ข้อความ</button>
-            <button onClick={() => { dismissGettingStarted(); startQuickAdd('sticker'); }} style={{ padding: '9px 8px', border: 'none', borderRadius: 11, background: HW.accentSoft, color: HW.accent, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>พิมพ์ข้อความ</button>
+            <button onClick={() => { dismissGettingStarted(); startQuickAdd('sticker'); }} style={{ padding: '9px 8px', border: 'none', borderRadius: 11, background: HW.accentSoft, color: HW.accent, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>แปะสติกเกอร์ / โน้ต</button>
           </div>
         </div>
       )}
 
       {/* Hint: the book's PDF page is read-only; capture/import it to write on it */}
       {showPdfHint && !readonly && activeBook?.book?.fileUrl && !isMobile && (
-        <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 44, maxWidth: 'calc(100% - 24px)', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 12, background: 'rgba(255,251,235,0.97)', border: '1px solid #FDE68A', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', backdropFilter: 'blur(8px)' }}>
-          <FileText size={18} color="#B45309" style={{ flexShrink: 0 }} />
-          <span style={{ fontSize: 12.5, color: '#92400E', lineHeight: 1.4 }}>หน้า PDF ของหนังสือ <b>เขียนทับตรงๆ ไม่ได้</b> — ต้องดึงเข้ามาในโน้ตก่อน</span>
-          {/* The primary action said "ดึงหน้าจากหนังสือ" and opened the snip
-              tool, which captures a region of one page. That is not what the
-              words promise, and it is not what someone reading this hint wants:
-              they want the book in the notebook. Full import is the main button
-              now, and snipping is offered as what it actually is. */}
-          <button
-            onClick={() => { startLoadingPDF(); dismissPdfHint(); }}
-            style={{ flexShrink: 0, border: 'none', background: HW.accent, color: 'white', fontWeight: 600, fontSize: 12, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
-          >
-            <BookOpen size={14} /> ดึง PDF ทุกหน้าเข้าโน้ต
-          </button>
-          <button
-            onClick={() => { setBookSnipInitialPage(1); setShowBookSnip(true); dismissPdfHint(); }}
-                    title="เลือกกรอบเฉพาะส่วนที่ต้องการจากหน้าใดหน้าหนึ่ง"
-            style={{ flexShrink: 0, border: '1px solid #FDE68A', background: 'transparent', color: '#92400E', fontWeight: 600, fontSize: 12, padding: '6px 10px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
-          >
-                    <Camera size={14} /> แคปเฉพาะบางส่วน
-          </button>
-          <button onClick={dismissPdfHint} title="เข้าใจแล้ว" style={{ flexShrink: 0, border: 'none', background: 'transparent', color: '#92400E', cursor: 'pointer', display: 'flex', padding: 2 }}><X size={16} /></button>
+        <div style={{ position: 'absolute', top: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 44, width: 'min(420px, calc(100% - 28px))', padding: '12px 14px', borderRadius: 16, background: 'rgba(255, 251, 235, 0.98)', border: '1px solid #FCD34D', boxShadow: '0 8px 24px rgba(180, 83, 9, 0.12)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', display: 'flex', flexDirection: 'column', gap: 8, fontFamily: 'Kanit, sans-serif' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <FileText size={17} color="#B45309" style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#92400E', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                หน้า PDF หนังสือ เขียนทับตรงๆ ไม่ได้
+              </span>
+            </div>
+            <button onClick={dismissPdfHint} title="ปิดคำแนะนำ" style={{ flexShrink: 0, border: 'none', background: 'transparent', color: '#92400E', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4, borderRadius: 6, opacity: 0.8 }}>
+              <X size={15} />
+            </button>
+          </div>
+          <p style={{ margin: 0, fontSize: 12, color: '#B45309', lineHeight: 1.45 }}>
+            ดึงหน้าหนังสือเข้ามาในสมุดโน้ตก่อน จึงจะสามารถขีดเขียน ไฮไลต์ และใส่โน้ตประกอบได้
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginTop: 2 }}>
+            <button
+              onClick={() => { startLoadingPDF(); dismissPdfHint(); }}
+              style={{ border: 'none', background: HW.accent, color: 'white', fontWeight: 600, fontSize: 12, padding: '7px 10px', borderRadius: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.15s' }}
+            >
+              <BookOpen size={14} /> ดึง PDF ทุกหน้า
+            </button>
+            <button
+              onClick={() => { setBookSnipInitialPage(1); setShowBookSnip(true); dismissPdfHint(); }}
+              title="เลือกกรอบเฉพาะส่วนที่ต้องการจากหน้าใดหน้าหนึ่ง"
+              style={{ border: '1px solid #FCD34D', background: 'rgba(254, 243, 199, 0.6)', color: '#92400E', fontWeight: 600, fontSize: 12, padding: '7px 8px', borderRadius: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.15s' }}
+            >
+              <Camera size={14} /> แคปเฉพาะบางส่วน
+            </button>
+          </div>
         </div>
       )}
 
