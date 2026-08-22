@@ -3,6 +3,13 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "allowScripts": {
+    "@firebase/util@1.15.1": false,
+    "core-js@3.49.0": false,
+    "esbuild@0.21.5": true,
+    "protobufjs@7.6.5": false,
+    "tesseract.js@7.0.0": false
+  },
   "scripts": {
     "dev": "node ./scripts/vite-runner.mjs dev",
     "dev:lan": "node ./scripts/vite-runner.mjs dev --lan",
