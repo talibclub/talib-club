@@ -19,16 +19,17 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { PDFPageImage, PaperPattern, getSvgPathFromStroke, PEN_STYLES, StrokeShape, CommittedStrokes, StickyStyleThumb } from './notebook/canvasElements.jsx';
 import { polygonBounds, polygonCentroid, polygonInteriorAngle, applyListPrefix, textDecorationOf, migrateText, migrateSticker, textOf, isUniformText, uniformFormatOf, listPrefixes, boundsCenter, strokeHitsPoint, projectOntoRuler, textVisualWidth } from './notebook/geometry.js';
 import { HW, ZERO_OFFSET, TEXT_BOX_WIDTH, LINE_HEIGHT, STICKY_COLORS, DRAW_CURSOR } from './notebook/theme.js';
+import SelectionToolbar from './notebook/SelectionToolbar.jsx';
+import LassoToolbar from './notebook/LassoToolbar.jsx';
 import { useDragScroll } from './notebook/useDragScroll.js';
 import ImageSearchPanel from './notebook/ImageSearchPanel.jsx';
 import ObjectContextMenu from './notebook/ObjectContextMenu.jsx';
-import SelectionToolbar from './notebook/SelectionToolbar.jsx';
-import LassoToolbar from './notebook/LassoToolbar.jsx';
 import { konvaFontStyle, stickerTextStyle } from './notebook/stickerText.js';
 import { backlinksTo, resolveLinkIndex } from './notebook/wikiLinks.js';
 import { dedupePages } from './notebook/dedupePage.js';
 import { boardPaperStyle, grownPageSize, pageContentBounds } from './notebook/pageGrowth.js';
-import { branchColorFor, branchCurvePoints, childIdsOf, childPlacement, makeBranchConnector, parentIdOf, revealOffset, siblingPlacement } from './notebook/mindmap.js';
+import { branchColorFor, branchCurvePoints, branchAngledPoints, branchStraightPoints, childIdsOf, childPlacement, makeBranchConnector, parentIdOf, revealOffset, siblingPlacement, MINDMAP_STYLES, DEFAULT_MINDMAP_STYLE } from './notebook/mindmap.js';
+import KonvaIcon from './notebook/KonvaIcon.jsx';
 import TextEditor from './notebook/TextEditor.jsx';
 import PaperTemplateModal from './notebook/PaperTemplateModal.jsx';
 import ExportModal from './notebook/ExportModal.jsx';
@@ -85,8 +86,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const [syncProgress, setSyncProgress] = useState(null); // null = indeterminate
 
   // Data-loss guard: every write path (autosave, manual save, unmount flush)
-  // checks this ref. Until the initial load has finished — or if it FAILED and we
-  // don't know what the cloud copy holds — saving is forbidden, so a blank
+  // checks this ref. Until the initial load has finished โ€” or if it FAILED and we
+  // don't know what the cloud copy holds โ€” saving is forbidden, so a blank
   // default page can never overwrite a real notebook.
   const loadStateRef = useRef('loading'); // 'loading' | 'ready' | 'failed'
 
@@ -102,17 +103,17 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
            const cloudData = await downloadNotebookData(uid, notebookId, (p) => setSyncProgress(p));
            if (cloudData && cloudData.length > 0) {
               // Notebooks saved while updatePage was impure hold objects stacked
-              // exactly on top of each other. They are close to invisible — you
-              // delete one and the other is still there — so they are cleared on
+              // exactly on top of each other. They are close to invisible โ€” you
+              // delete one and the other is still there โ€” so they are cleared on
               // the way in, and said out loud rather than done quietly.
               const cleaned = dedupePages(cloudData);
               setPages(cleaned.pages);
-              toast.success("ซิงก์ข้อมูลสำเร็จ!", { id: "cloud-sync" });
+              toast.success("เธเธดเธเธเนเธเนเธญเธกเธนเธฅเธชเธณเน€เธฃเนเธ!", { id: "cloud-sync" });
               if (cleaned.removed) {
-                 toast(`เก็บกวาดวัตถุที่ซ้อนกันอยู่ ${cleaned.removed} ชิ้น`, { icon: '🧹', duration: 5000 });
+                 toast(`เน€เธเนเธเธเธงเธฒเธ”เธงเธฑเธ•เธ–เธธเธ—เธตเนเธเนเธญเธเธเธฑเธเธญเธขเธนเน ${cleaned.removed} เธเธดเนเธ`, { icon: '๐งน', duration: 5000 });
               }
            }
-           // null = notebook doesn't exist yet → a fresh blank book is correct.
+           // null = notebook doesn't exist yet โ’ a fresh blank book is correct.
            loadStateRef.current = 'ready';
         } catch (e) {
            console.error("Cloud load failed", e);
@@ -122,9 +123,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                  const cleaned = dedupePages(JSON.parse(saved));
                  setPages(cleaned.pages);
                  loadStateRef.current = 'ready';
-                 toast.error("ออฟไลน์: โหลดจากเครื่องแทน", { id: "cloud-sync" });
+                 toast.error("เธญเธญเธเนเธฅเธเน: เนเธซเธฅเธ”เธเธฒเธเน€เธเธฃเธทเนเธญเธเนเธ—เธ", { id: "cloud-sync" });
                  if (cleaned.removed) {
-                    toast(`เก็บกวาดวัตถุที่ซ้อนกันอยู่ ${cleaned.removed} ชิ้น`, { icon: '🧹', duration: 5000 });
+                    toast(`เน€เธเนเธเธเธงเธฒเธ”เธงเธฑเธ•เธ–เธธเธ—เธตเนเธเนเธญเธเธเธฑเธเธญเธขเธนเน ${cleaned.removed} เธเธดเนเธ`, { icon: '๐งน', duration: 5000 });
                  }
               } catch (parseErr) {
                  console.error("Local backup unreadable", parseErr);
@@ -134,7 +135,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               loadStateRef.current = 'failed';
            }
            if (loadStateRef.current === 'failed') {
-              toast.error("โหลดสมุดโน้ตไม่สำเร็จ — ปิดการบันทึกไว้ชั่วคราวเพื่อป้องกันข้อมูลเดิมหาย ลองรีเฟรชอีกครั้ง", { id: "cloud-sync", duration: 10000 });
+              toast.error("เนเธซเธฅเธ”เธชเธกเธธเธ”เนเธเนเธ•เนเธกเนเธชเธณเน€เธฃเนเธ โ€” เธเธดเธ”เธเธฒเธฃเธเธฑเธเธ—เธถเธเนเธงเนเธเธฑเนเธงเธเธฃเธฒเธงเน€เธเธทเนเธญเธเนเธญเธเธเธฑเธเธเนเธญเธกเธนเธฅเน€เธ”เธดเธกเธซเธฒเธข เธฅเธญเธเธฃเธตเน€เธเธฃเธเธญเธตเธเธเธฃเธฑเนเธ", { id: "cloud-sync", duration: 10000 });
            }
         } finally {
            setIsSyncing(false);
@@ -153,7 +154,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               const cleaned = dedupePages(JSON.parse(saved));
               setPages(cleaned.pages);
               if (cleaned.removed) {
-                 toast(`เก็บกวาดวัตถุที่ซ้อนกันอยู่ ${cleaned.removed} ชิ้น`, { icon: '🧹', duration: 5000 });
+                 toast(`เน€เธเนเธเธเธงเธฒเธ”เธงเธฑเธ•เธ–เธธเธ—เธตเนเธเนเธญเธเธเธฑเธเธญเธขเธนเน ${cleaned.removed} เธเธดเนเธ`, { icon: '๐งน', duration: 5000 });
               }
            } catch { /* ignore */ }
         }
@@ -169,7 +170,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const [isSpaceDown, setIsSpaceDown] = useState(false);
 
   // Item 7 (group C): the first time the lasso is picked, point out that two
-  // fingers still pan/zoom — so users don't feel forced to switch tools to move
+  // fingers still pan/zoom โ€” so users don't feel forced to switch tools to move
   // around. The gesture already works in every tool (handlePinch is tool-agnostic);
   // this is pure discovery, no behaviour change and nothing to tune on-device.
   useEffect(() => {
@@ -177,7 +178,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     if (typeof localStorage === 'undefined') return;
     if (localStorage.getItem('talib_lasso_pan_hint') === 'seen') return;
     localStorage.setItem('talib_lasso_pan_hint', 'seen');
-    toast('โหมดบ่วง: ใช้สองนิ้วเลื่อน/ซูมหน้าได้เลย ไม่ต้องสลับเครื่องมือ', { icon: '🤏', duration: 4500 });
+    toast('เนเธซเธกเธ”เธเนเธงเธ: เนเธเนเธชเธญเธเธเธดเนเธงเน€เธฅเธทเนเธญเธ/เธเธนเธกเธซเธเนเธฒเนเธ”เนเน€เธฅเธข เนเธกเนเธ•เนเธญเธเธชเธฅเธฑเธเน€เธเธฃเธทเนเธญเธเธกเธทเธญ', { icon: '๐ค', duration: 4500 });
   }, [tool]);
 
   useEffect(() => {
@@ -225,11 +226,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   }, [editingTextId]);
 
   // When the user switches AWAY from the text tool, close any open editor.
-  // Guarded by prevTool so it only fires on an actual tool change — otherwise it
+  // Guarded by prevTool so it only fires on an actual tool change โ€” otherwise it
   // would also slam shut an editor opened by double-tapping a note while on the
   // pan/lasso tool (double-tap edits from any tool), making text uneditable.
   // Declared here (not at the top of the component) so `tool`/`editingTextId`/
-  // `textareaRef` already exist — referencing them earlier throws a TDZ
+  // `textareaRef` already exist โ€” referencing them earlier throws a TDZ
   // ("Cannot access 'tool' before initialization") that crashes the reader.
   const prevToolRef = useRef(tool);
   useEffect(() => {
@@ -243,9 +244,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // Size the edit box to its content whenever it opens or its text changes, so an
   // existing multi-line note (bullets/numbered lists) is fully visible right away.
   // The WYSIWYG editor is a contentEditable box that already grows with its own
-  // content — forcing a pixel height on it would clip long notes — so this only
+  // content โ€” forcing a pixel height on it would clip long notes โ€” so this only
   // applies to the plain textareas.
-  // NB: `scale` is intentionally not a dependency — it is declared far below this
+  // NB: `scale` is intentionally not a dependency โ€” it is declared far below this
   // effect, and referencing it here evaluates during render, before its useState
   // runs, which throws "Cannot access 'scale' before initialization".
   useEffect(() => {
@@ -260,13 +261,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const [editingStickerId, setEditingStickerId] = useState(null);
   // The note's text lives on the note itself, written there line by line as it
   // is typed. There used to be a second copy of it in state here, kept only so
-  // the old textarea could commit it on close — nothing read it any more, and
+  // the old textarea could commit it on close โ€” nothing read it any more, and
   // setting it on every keystroke re-rendered this entire component for nothing.
   // The focus timer that went with it is gone too: the shared editor focuses
   // itself on mount and places the caret at the end, which a later blind
   // focus() call would have undone.
   
-  // Which kinds of thing the lasso picks up. Remembered between sessions — a
+  // Which kinds of thing the lasso picks up. Remembered between sessions โ€” a
   // "handwriting only" habit shouldn't have to be re-set every time.
   const [lassoFilter, setLassoFilter] = useState(() => {
     try { return { ...DEFAULT_LASSO_FILTER, ...JSON.parse(localStorage.getItem('talib_lasso_filter') || '{}') }; }
@@ -299,7 +300,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
 
   const [showAi, setShowAi] = useState(false);
-  // One-time hint (per book) that the book's PDF page can't be drawn on directly —
+  // One-time hint (per book) that the book's PDF page can't be drawn on directly โ€”
   // it has to be captured/imported into the notebook first.
   const [showPdfHint, setShowPdfHint] = useState(() => {
     try { return !localStorage.getItem(`talib_pdf_hint_${bookId}`); } catch { return true; }
@@ -317,7 +318,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         // Text objects edited through TextEditor store their content as a
         // `lines` array; only the legacy shape has a flat `text`. Reading
         // `t.text` alone meant search never found anything that had been edited
-        // — and threw outright on any object that had. textOf() handles both.
+        // โ€” and threw outright on any object that had. textOf() handles both.
         p.texts?.forEach(t => {
            const body = textOf(t);
            if (body && body.toLowerCase().includes(needle)) {
@@ -425,8 +426,33 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         underline: false, strikethrough: false, align: 'left', list: 'none',
       });
     });
-    toast.success('เพิ่มอิโมจิแล้ว ใช้เครื่องมือเลื่อน (มือ) เพื่อย้าย/ปรับขนาด', { id: 'emoji-add' });
+    toast.success('เน€เธเธดเนเธกเธญเธดเนเธกเธเธดเนเธฅเนเธง เนเธเนเน€เธเธฃเธทเนเธญเธเธกเธทเธญเน€เธฅเธทเนเธญเธ (เธกเธทเธญ) เน€เธเธทเนเธญเธขเนเธฒเธข/เธเธฃเธฑเธเธเธเธฒเธ”', { id: 'emoji-add' });
   };
+  
+  const insertIcon = (iconName) => {
+    const page = pagesRef.current[currentPageIndex] || { width: 800, height: 1130 };
+    const jitter = () => (Math.random() - 0.5) * 40;
+    let cx = page.width / 2, cy = page.height / 2;
+    const stage = stageRef.current;
+    if (stage) {
+      const rect = stage.container().getBoundingClientRect();
+      const s = stage.scaleX() || scale || 1;
+      cx = (rect.width / 2 - stage.x()) / s - pageX;
+      cy = (rect.height / 2 - stage.y()) / s - pageY;
+    }
+    pushHistory();
+    updatePage(currentPageIndex, (p) => {
+      if (!p.shapes) p.shapes = [];
+      p.shapes.push({
+        id: nextObjectId('shape'), type: 'icon', iconName: iconName,
+        x: cx - 24 + jitter(), y: cy - 24 + jitter(),
+        width: 48, height: 48,
+        color: penColor || '#111827',
+      });
+    });
+    toast.success('เน€เธเธดเนเธกเนเธญเธเธญเธเนเธฅเนเธง', { id: 'icon-add' });
+  };
+  
   const [showBookSnip, setShowBookSnip] = useState(false);
   // Page a "jump back to source" link should open the book snipper on. 1 for a
   // fresh snip; the image's stored sourcePage when jumping back from a snip.
@@ -518,7 +544,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // Every writer in the notebook goes through here, and nearly all of them do it
   // by pushing into one of the page's arrays. The spread below copies the page
   // object but not those arrays, so `page.texts.push(...)` was writing into the
-  // very array the previous state still holds — and a state updater is not
+  // very array the previous state still holds โ€” and a state updater is not
   // allowed to do that. React may call an updater more than once for the same
   // input (StrictMode does it on every update, which is how this surfaced:
   // placing one text box produced two identical objects, and every later
@@ -624,7 +650,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // Audio Recording State
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
-  // Held so the microphone can be released even when onstop never runs — the
+  // Held so the microphone can be released even when onstop never runs โ€” the
   // user navigating away mid-recording used to leave the mic light on until the
   // tab was closed.
   const mediaStreamRef = useRef(null);
@@ -702,7 +728,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   //
   // This used to depend on `dimensions` as a whole, which includes the height.
   // On a phone the address bar collapsing as you scroll changes only the height
-  // — so the zoom and pan reset themselves in the middle of writing. Refit on
+  // โ€” so the zoom and pan reset themselves in the middle of writing. Refit on
   // width (rotation, window resize) and on page change only.
   const lastFitRef = useRef({ w: 0, page: -1 });
   useEffect(() => {
@@ -732,7 +758,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       // during this visit but becomes unusable after reload, so do not create a
       // misleading permanent-looking recording for a guest.
       if (!uid) {
-        toast.error('กรุณาเข้าสู่ระบบก่อนอัดเสียง เพื่อให้บันทึกและเปิดฟังภายหลังได้');
+        toast.error('เธเธฃเธธเธ“เธฒเน€เธเนเธฒเธชเธนเนเธฃเธฐเธเธเธเนเธญเธเธญเธฑเธ”เน€เธชเธตเธขเธ เน€เธเธทเนเธญเนเธซเนเธเธฑเธเธ—เธถเธเนเธฅเธฐเน€เธเธดเธ”เธเธฑเธเธ เธฒเธขเธซเธฅเธฑเธเนเธ”เน');
         return;
       }
       try {
@@ -754,7 +780,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         
         mediaRecorder.onstop = async () => {
           // Release the mic first. It used to be released only after the upload
-          // finished, so a slow or failed upload held the microphone open — and
+          // finished, so a slow or failed upload held the microphone open โ€” and
           // anything that threw in between never released it at all.
           stream.getTracks().forEach(track => track.stop());
           mediaStreamRef.current = null;
@@ -767,15 +793,15 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           pushHistory();
           updatePage(targetPageIndex, (page) => {
              if (!page.stickers) page.stickers = [];
-             // Audio notes are no longer drawn on the page — they live in the
-             // recordings panel — but they still ride inside the page data so they
+             // Audio notes are no longer drawn on the page โ€” they live in the
+             // recordings panel โ€” but they still ride inside the page data so they
              // save and sync with everything else.
              page.stickers.push({
                id: stickerId,
                x: 16,
                y: 16,
                audioUrl: localUrl,
-               name: `บันทึก (${totalAudio + 1})`,
+               name: `เธเธฑเธเธ—เธถเธ (${totalAudio + 1})`,
                createdAt: Date.now(),
                isPlaying: false,
                isUploading: true
@@ -783,7 +809,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           });
           setShowRecordings(true);
 
-          toast.loading('กำลังอัปโหลดเสียงลงคลาวด์...', { id: `upload-${stickerId}` });
+          toast.loading('เธเธณเธฅเธฑเธเธญเธฑเธเนเธซเธฅเธ”เน€เธชเธตเธขเธเธฅเธเธเธฅเธฒเธงเธ”เน...', { id: `upload-${stickerId}` });
           
           try {
              const storageRef = ref(storage, `user_audio/${uid}/${Date.now()}.webm`);
@@ -797,10 +823,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                    s.isUploading = false;
                 }
              });
-             toast.success('อัปโหลดเสียงเสร็จสิ้น!', { id: `upload-${stickerId}`, icon: '🎤' });
+             toast.success('เธญเธฑเธเนเธซเธฅเธ”เน€เธชเธตเธขเธเน€เธชเธฃเนเธเธชเธดเนเธ!', { id: `upload-${stickerId}`, icon: '๐ค' });
           } catch (err) {
              console.error(err);
-             toast.error('อัปโหลดเสียงล้มเหลว', { id: `upload-${stickerId}` });
+             toast.error('เธญเธฑเธเนเธซเธฅเธ”เน€เธชเธตเธขเธเธฅเนเธกเน€เธซเธฅเธง', { id: `upload-${stickerId}` });
              updatePage(targetPageIndex, (page) => {
                 const s = page.stickers.find(st => st.id === stickerId);
                 if (s) s.isUploading = false;
@@ -810,15 +836,15 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         
         mediaRecorder.start();
         setIsRecording(true);
-        toast('กำลังอัดเสียง... (กดอีกครั้งเพื่อหยุด)', { icon: '🔴', duration: 4000 });
+        toast('เธเธณเธฅเธฑเธเธญเธฑเธ”เน€เธชเธตเธขเธ... (เธเธ”เธญเธตเธเธเธฃเธฑเนเธเน€เธเธทเนเธญเธซเธขเธธเธ”)', { icon: '๐”ด', duration: 4000 });
       } catch (err) {
         console.error("Mic access denied", err);
-        toast.error('ไม่สามารถเข้าถึงไมโครโฟนได้');
+        toast.error('เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เน€เธเนเธฒเธ–เธถเธเนเธกเนเธเธฃเนเธเธเนเธ”เน');
       }
     }
   };
 
-  // Snapshot for undo/redo. Only the annotation arrays are copied — `src` (a base64
+  // Snapshot for undo/redo. Only the annotation arrays are copied โ€” `src` (a base64
   // PDF/image data URL, often megabytes) is carried over by reference, so a snapshot
   // costs roughly the size of the strokes on the page rather than the whole document.
   const clearPage = () => {
@@ -830,7 +856,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
        page.texts = [];
        page.shapes = [];
     });
-    toast.success('ล้างหน้ากระดาษเรียบร้อย');
+    toast.success('เธฅเนเธฒเธเธซเธเนเธฒเธเธฃเธฐเธ”เธฒเธฉเน€เธฃเธตเธขเธเธฃเนเธญเธข');
   };
 
   const clearStrokes = () => {
@@ -839,7 +865,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
        page.lines = [];
        page.shapes = pruneDanglingConnectors(page);
     });
-    toast.success('ล้างเส้นทั้งหมดแล้ว');
+    toast.success('เธฅเนเธฒเธเน€เธชเนเธเธ—เธฑเนเธเธซเธกเธ”เนเธฅเนเธง');
   };
 
   const deleteSelected = () => {
@@ -851,7 +877,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
        if (page.images) page.images = page.images.filter(img => img.id !== selectedId);
        if (page.shapes) page.shapes = page.shapes.filter(sh => sh.id !== selectedId);
        // A connector bound to what just went would otherwise stay, and fall back
-       // to the coordinates on its endpoint — which a branch made by Tab or
+       // to the coordinates on its endpoint โ€” which a branch made by Tab or
        // Enter does not have, so its line jumped to the corner of the page.
        page.shapes = pruneDanglingConnectors(page);
     });
@@ -859,7 +885,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   };
 
   const deletePage = () => {
-    if (pages.length <= 1) return toast.error("ไม่สามารถลบหน้าสุดท้ายได้");
+    if (pages.length <= 1) return toast.error("เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธฅเธเธซเธเนเธฒเธชเธธเธ”เธ—เนเธฒเธขเนเธ”เน");
     pushHistory();
     setPages(prev => {
        const newPages = [...prev];
@@ -867,7 +893,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
        return newPages;
     });
     setCurrentPageIndex(Math.max(0, currentPageIndex - 1));
-    toast.success('ลบหน้ากระดาษแล้ว');
+    toast.success('เธฅเธเธซเธเนเธฒเธเธฃเธฐเธ”เธฒเธฉเนเธฅเนเธง');
   };
 
   const handleAddPage = () => {
@@ -890,7 +916,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     updatePage(currentPageIndex, (page) => {
        page.isBookmarked = !page.isBookmarked;
     });
-    toast.success(pages[currentPageIndex]?.isBookmarked ? "ลบบุ๊คมาร์กแล้ว" : "เพิ่มบุ๊คมาร์กแล้ว");
+    toast.success(pages[currentPageIndex]?.isBookmarked ? "เธฅเธเธเธธเนเธเธกเธฒเธฃเนเธเนเธฅเนเธง" : "เน€เธเธดเนเธกเธเธธเนเธเธกเธฒเธฃเนเธเนเธฅเนเธง");
   };
 
 
@@ -972,11 +998,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       penAutoSwitchDone.current = true;
       if (stylusMode !== 'pen') {
         setStylusMode('pen');
-        toast('ตรวจพบปากกาสไตลัส: ปิดการเขียนด้วยนิ้วแล้ว ใช้นิ้วเลื่อน/ซูมหน้าได้เลย', { icon: '✍️', duration: 5000 });
+        toast('เธ•เธฃเธงเธเธเธเธเธฒเธเธเธฒเธชเนเธ•เธฅเธฑเธช: เธเธดเธ”เธเธฒเธฃเน€เธเธตเธขเธเธ”เนเธงเธขเธเธดเนเธงเนเธฅเนเธง เนเธเนเธเธดเนเธงเน€เธฅเธทเนเธญเธ/เธเธนเธกเธซเธเนเธฒเนเธ”เนเน€เธฅเธข', { icon: 'โ๏ธ', duration: 5000 });
       }
     }
 
-    // Touching the canvas puts the tool to work — tuck its options away.
+    // Touching the canvas puts the tool to work โ€” tuck its options away.
     if (showToolOptions) setShowToolOptions(false);
     if (showColorPicker) setShowColorPicker(false);
     if (showEmojiPicker) setShowEmojiPicker(false);
@@ -1031,7 +1057,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     }
     // Palm-rejection (stylus-only mode) is meant to stop a resting hand from
     // INKING while you write. Tap-to-place tools are deliberate single taps, not
-    // scribbles, so a finger must always be allowed to drop a text box / sticker —
+    // scribbles, so a finger must always be allowed to drop a text box / sticker โ€”
     // otherwise, once the Huawei pen auto-enables pen-only mode, tapping to add
     // text just pans the board and nothing ever appears.
     const tapToPlace = tool === 'text' || tool === 'sticker';
@@ -1066,7 +1092,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
            return; // Prevent spawning a new text box when just clicking outside to finish typing
        }
        // Landing on an existing object means "edit that one", handled by the
-       // object's own tap handler — just don't also drop a new box underneath.
+       // object's own tap handler โ€” just don't also drop a new box underneath.
        if (hitExistingObject) return;
        const newText = {
           id: nextObjectId('text'), text: '', x: pos.x, y: pos.y, color: penColor,
@@ -1245,7 +1271,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   };
 
   // Foot of the perpendicular from pos onto the ruler's edge, plus how far away
-  // pos was — the distance decides whether the stroke grabs the edge at all.
+  // pos was โ€” the distance decides whether the stroke grabs the edge at all.
 
   const beginLiveStroke = (pos, pressure, relativeTime, strokeTool) => {
     isDrawing.current = true;
@@ -1428,7 +1454,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     if (kind === 'image') { document.getElementById('image-upload')?.click(); return; }
     if (kind === 'connector') {
       beginConnector(null);
-      toast('ลากจากวัตถุหนึ่งไปยังอีกวัตถุเพื่อเชื่อม', { icon: '🔗' });
+      toast('เธฅเธฒเธเธเธฒเธเธงเธฑเธ•เธ–เธธเธซเธเธถเนเธเนเธเธขเธฑเธเธญเธตเธเธงเธฑเธ•เธ–เธธเน€เธเธทเนเธญเน€เธเธทเนเธญเธก', { icon: '๐”—' });
       return;
     }
     setTool(kind);
@@ -1473,7 +1499,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   }, [selectedLassoLines, selectedObjects, pages, currentPageIndex]);
 
   // The selected object, its kind, and its box in page coordinates. Drives the
-  // floating context menu — actions belong next to the thing they act on, not in a
+  // floating context menu โ€” actions belong next to the thing they act on, not in a
   // toolbar at the far edge of the screen where nobody finds them.
   const selectedInfo = React.useMemo(() => {
     if (!selectedId) return null;
@@ -1534,7 +1560,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const removePolygonVertex = (id, k) => {
     const shp = pagesRef.current[currentPageIndex]?.shapes?.find(x => x.id === id);
     if (!shp || shp.type !== 'polygon') return;
-    if (shp.points.length / 2 <= 3) { toast('รูปหลายเหลี่ยมต้องมีอย่างน้อย 3 จุด'); return; }
+    if (shp.points.length / 2 <= 3) { toast('เธฃเธนเธเธซเธฅเธฒเธขเน€เธซเธฅเธตเนเธขเธกเธ•เนเธญเธเธกเธตเธญเธขเนเธฒเธเธเนเธญเธข 3 เธเธธเธ”'); return; }
     pushHistory();
     updatePage(currentPageIndex, (page) => {
       const sh = page.shapes.find(x => x.id === id);
@@ -1559,12 +1585,12 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           return { kind, obj: clone };
        }).filter(Boolean);
        clipboardRef.current = { lines, objects };
-       toast.success('คัดลอกแล้ว');
+       toast.success('เธเธฑเธ”เธฅเธญเธเนเธฅเนเธง');
        return;
     }
     if (selectedInfo) {
        clipboardRef.current = { lines: [], objects: [{ kind: selectedInfo.kind, obj: JSON.parse(JSON.stringify(selectedInfo.obj)) }] };
-       toast.success('คัดลอกแล้ว');
+       toast.success('เธเธฑเธ”เธฅเธญเธเนเธฅเนเธง');
     }
   };
 
@@ -1585,7 +1611,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           page[kind] = [...(page[kind] || []), clone];
        });
     });
-    toast.success('วางแล้ว');
+    toast.success('เธงเธฒเธเนเธฅเนเธง');
   };
   // --- Mindmap branching ---------------------------------------------------
   // Tab adds a child, Enter adds a sibling: the new node is placed, connected
@@ -1603,7 +1629,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
      const nodeIdNew = nextObjectId('text');
      // The branch's colour: inherited from the parent's limb, or the next unused
-     // one when this is a new limb off the root — so a map reads as a few
+     // one when this is a new limb off the root โ€” so a map reads as a few
      // coloured branches rather than one tangle.
      const branchColor = branchColorFor(page, anchorId, anchorId);
      const newNode = {
@@ -1650,7 +1676,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      if (readonly) return;
      const onKey = (e) => {
         if (e.key !== 'Tab' && e.key !== 'Enter') return;
-        // Only when a node is selected and nothing is being typed into — Tab and
+        // Only when a node is selected and nothing is being typed into โ€” Tab and
         // Enter belong to the editor whenever one is open, and to the page
         // otherwise.
         if (editingTextId || editingStickerId || isEditingText.current) return;
@@ -1670,7 +1696,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
   // A blank page grows to hold what is on it, so a mindmap can keep branching
   // instead of running off the edge of fixed paper. Pages backed by a PDF keep
-  // their size — they have to match the sheet they came from. Growth is one-way:
+  // their size โ€” they have to match the sheet they came from. Growth is one-way:
   // a page that resized itself smaller would pull the paper out from under work
   // that is still there.
   useEffect(() => {
@@ -1685,7 +1711,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // the link was written and a stale index would otherwise blank the notebook.
   const goToLinkedPage = (link) => {
      const target = resolveLinkIndex(pagesRef.current, link);
-     if (target === -1) { toast('หน้าที่ลิงก์ไว้ถูกลบไปแล้ว'); return; }
+     if (target === -1) { toast('เธซเธเนเธฒเธ—เธตเนเธฅเธดเธเธเนเนเธงเนเธ–เธนเธเธฅเธเนเธเนเธฅเนเธง'); return; }
      selectShape(null);
      setCurrentPageIndex(target);
   };
@@ -1704,8 +1730,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      };
      pushHistory();
      setPages((prev) => [...prev, page]);
-     toast.success(name ? `สร้างหน้า "${name}" แล้ว` : 'สร้างหน้าใหม่แล้ว');
-     return { pageId: page.id, label: name || `หน้า ${pages.length + 1}` };
+     toast.success(name ? `เธชเธฃเนเธฒเธเธซเธเนเธฒ "${name}" เนเธฅเนเธง` : 'เธชเธฃเนเธฒเธเธซเธเนเธฒเนเธซเธกเนเนเธฅเนเธง');
+     return { pageId: page.id, label: name || `เธซเธเนเธฒ ${pages.length + 1}` };
   };
 
   // OCR on an image, and handwriting to editable text.
@@ -1727,13 +1753,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     pushHistory();
     updatePage(currentPageIndex, (page) => { page[kind] = [...(page[kind] || []), clone]; });
     selectShape(clone.id);
-    toast.success('ทำซ้ำแล้ว');
+    toast.success('เธ—เธณเธเนเธณเนเธฅเนเธง');
   };
 
   const recolorSelectedObject = (color) => {
     if (!selectedInfo) return;
     const { kind, obj } = selectedInfo;
-    // Was `kind === 'stickers' ? { color } : { color }` — both branches the
+    // Was `kind === 'stickers' ? { color } : { color }` โ€” both branches the
     // same, so the condition never meant anything.
     const patch = { color };
     pushHistory();
@@ -1773,7 +1799,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      updatePage, currentPageIndex, pushHistory, selectShape, setTool, pageX, pageY,
   });
 
-  // Bringing a PDF in — the book's own file, or one picked from disk.
+  // Bringing a PDF in โ€” the book's own file, or one picked from disk.
   const { startLoadingPDF, handleFileUpload } = makePdfImport({
      activeBook, dimensions, pages, setPages, setCurrentPageIndex,
      pushHistory, setLoadingPdf, onPdfPageCount, pagesRef,
@@ -1784,7 +1810,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      e.target.value = null;
      if (!file || file.type !== 'application/pdf') return;
      
-     toast.loading('กำลังอัปโหลดและประมวลผล PDF...', { id: 'pdf-widget' });
+     toast.loading('เธเธณเธฅเธฑเธเธญเธฑเธเนเธซเธฅเธ”เนเธฅเธฐเธเธฃเธฐเธกเธงเธฅเธเธฅ PDF...', { id: 'pdf-widget' });
      try {
         const storageRef = ref(storage, `notebooks/${uid || 'guest'}/${Date.now()}_${file.name}`);
         await uploadBytes(storageRef, file);
@@ -1821,10 +1847,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              currentDataUrl
            });
         });
-        toast.success('แทรก PDF เป็น Widget แล้ว', { id: 'pdf-widget' });
+        toast.success('เนเธ—เธฃเธ PDF เน€เธเนเธ Widget เนเธฅเนเธง', { id: 'pdf-widget' });
      } catch (err) {
         console.error(err);
-        toast.error('ไม่สามารถอัปโหลด PDF ได้', { id: 'pdf-widget' });
+        toast.error('เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธญเธฑเธเนเธซเธฅเธ” PDF เนเธ”เน', { id: 'pdf-widget' });
      }
   };
 
@@ -1833,7 +1859,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      if (!pdfObj) return;
      if (newPage < 1 || newPage > pdfObj.numPages) return;
      
-     toast.loading(`กำลังโหลดหน้า ${newPage}...`, { id: 'pdf-page' });
+     toast.loading(`เธเธณเธฅเธฑเธเนเธซเธฅเธ”เธซเธเนเธฒ ${newPage}...`, { id: 'pdf-page' });
      try {
         const pdf = await pdfjsLib.getDocument({ url: pdfObj.fileUrl }).promise;
         const page = await pdf.getPage(newPage);
@@ -1853,10 +1879,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               obj.currentDataUrl = currentDataUrl;
            }
         });
-        toast.success(`เปลี่ยนเป็นหน้า ${newPage} แล้ว`, { id: 'pdf-page' });
+        toast.success(`เน€เธเธฅเธตเนเธขเธเน€เธเนเธเธซเธเนเธฒ ${newPage} เนเธฅเนเธง`, { id: 'pdf-page' });
      } catch (err) {
         console.error(err);
-        toast.error('โหลดหน้าไม่สำเร็จ', { id: 'pdf-page' });
+        toast.error('เนเธซเธฅเธ”เธซเธเนเธฒเนเธกเนเธชเธณเน€เธฃเนเธ', { id: 'pdf-page' });
      }
   };
 
@@ -1875,7 +1901,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      updatePage, currentPageIndex, pushHistory, setTool,
   });
 
-  // A drifting pointer is a drag, not a long-press — drop the pending menu timer.
+  // A drifting pointer is a drag, not a long-press โ€” drop the pending menu timer.
   const cancelLongPress = (evt) => {
     const lp = longPressRef.current;
     if (!lp) return;
@@ -1925,7 +1951,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     }
 
     if (!isDrawing.current || tool === 'pan' || isSpaceDown) return;
-    // Ignore stray pointers (a palm landing mid-stroke) — only the pointer that
+    // Ignore stray pointers (a palm landing mid-stroke) โ€” only the pointer that
     // started the stroke may extend it.
     if (evt && drawingPointerId.current !== undefined && evt.pointerId !== drawingPointerId.current) return;
     const pos = getPointerPosRelativeToPage();
@@ -2151,7 +2177,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         const text = cd.getData('text/plain');
         if (text && /^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg|avif)(\?|#|$)/i.test(text.trim())) {
            e.preventDefault();
-           toast.loading('กำลังแทรกรูป...', { id: 'drop-img' });
+           toast.loading('เธเธณเธฅเธฑเธเนเธ—เธฃเธเธฃเธนเธ...', { id: 'drop-img' });
            const src = await fetchAsDataUrlOrRemote(text.trim());
            insertImageSrcAt(src, null, null);
            return;
@@ -2248,7 +2274,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       if (mod && e.key.toLowerCase() === 'c') { e.preventDefault(); copySelection(); return; }
       // Ctrl/Cmd+V is deliberately NOT handled here. Calling preventDefault on
       // the keydown cancels the browser's `paste` event outright, which killed
-      // the document-level paste listener below — the one whose whole job is to
+      // the document-level paste listener below โ€” the one whose whole job is to
       // drop a copied image onto the page. The listener now handles both: it
       // takes an image off the system clipboard when there is one, and falls
       // back to the notebook's own copy buffer when there isn't.
@@ -2270,7 +2296,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       if (e.key === 'PageDown') { e.preventDefault(); setCurrentPageIndex(i => Math.min(pages.length - 1, i + 1)); return; }
       if (e.key === 'PageUp') { e.preventDefault(); setCurrentPageIndex(i => Math.max(0, i - 1)); return; }
 
-      // Number keys 1–9 pick the first nine palette colours for the pen.
+      // Number keys 1โ€“9 pick the first nine palette colours for the pen.
       if (/^[1-9]$/.test(e.key)) {
         const c = colors[Number(e.key) - 1];
         if (c) { setPenColor(c); return; }
@@ -2297,7 +2323,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     autoShape, clearPage, clearStrokes, closeOverlays, colors, currentPage,
     connectorHasArrow, currentPageIndex, customColors, deletePage, deleteRecording,
     deleteSelected, editingTextId, eraserSettings, exportNotebookPDF,
-    fitToScreen, fullView, handleAddPage, handleToolsScroll, insertEmoji,
+    fitToScreen, fullView, handleAddPage, handleToolsScroll, insertEmoji, insertIcon,
     isCoarse, isMobile, isRecording, isSaving, laserColor, lassoFilter,
     leftToolbarScroll, nowPlaying, onToggleFullView, pages, penColor,
     penOpacity, penSize, playRecording, position, pressureEnabled,
@@ -2332,12 +2358,12 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
             <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#EF4444', animation: 'pulse 1.5s infinite' }}></div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#111827', fontFamily: 'Kanit, sans-serif' }}>{formatTime(recordingTimer)}</span>
             <button onClick={toggleRecording} style={{ marginLeft: 8, padding: '4px 12px', borderRadius: 16, border: 'none', background: '#FEE2E2', color: '#EF4444', fontWeight: 600, cursor: 'pointer' }}>
-               หยุด
+               เธซเธขเธธเธ”
             </button>
          </div>
       )}
 
-      {/* Audio playback transport bar — floats above the tool capsule while a
+      {/* Audio playback transport bar โ€” floats above the tool capsule while a
           recording is playing, Huawei style. */}
       {nowPlaying && (
          <div style={{ position: 'absolute', bottom: (zoomWriter ? WRITER_H + 44 + 14 : 20) + TOOL_BTN + 26, left: '50%', transform: 'translateX(-50%)', zIndex: 47, maxWidth: 'calc(100% - 24px)' }}>
@@ -2372,24 +2398,24 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       {!readonly && minimap?.hasOffscreenContent && (
         <div style={{ position: 'absolute', right: 14, top: 14, zIndex: 42 }}>
           {!showMinimap ? (
-            <button onClick={() => setShowMinimap(true)} title="เปิดแผนที่ย่อ" aria-label="เปิดแผนที่ย่อ" style={{ width: 38, height: 38, borderRadius: 12, border: `1px solid ${HW.hairline}`, background: HW.surface, color: HW.accent, cursor: 'pointer', boxShadow: '0 5px 14px rgba(35,31,27,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={() => setShowMinimap(true)} title="เน€เธเธดเธ”เนเธเธเธ—เธตเนเธขเนเธญ" aria-label="เน€เธเธดเธ”เนเธเธเธ—เธตเนเธขเนเธญ" style={{ width: 38, height: 38, borderRadius: 12, border: `1px solid ${HW.hairline}`, background: HW.surface, color: HW.accent, cursor: 'pointer', boxShadow: '0 5px 14px rgba(35,31,27,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <MapIcon size={19} strokeWidth={1.9} />
             </button>
           ) : (
             <div
-              title="แผนที่ย่อ — คลิกหรือลากเพื่อย้ายมุมมอง"
+              title="เนเธเธเธ—เธตเนเธขเนเธญ โ€” เธเธฅเธดเธเธซเธฃเธทเธญเธฅเธฒเธเน€เธเธทเนเธญเธขเนเธฒเธขเธกเธธเธกเธกเธญเธ"
               onPointerDown={panFromMinimap}
               onPointerMove={(event) => { if (event.buttons === 1) panFromMinimap(event); }}
               style={{ position: 'relative', width: minimap.width, height: minimap.height, overflow: 'hidden', borderRadius: 12, background: 'rgba(255,255,255,0.90)', border: `1px solid ${HW.hairline}`, boxShadow: '0 7px 20px rgba(35,31,27,0.14)', backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, cursor: 'crosshair', touchAction: 'none' }}
-              aria-label="แผนที่ย่อของกระดาน"
+              aria-label="เนเธเธเธ—เธตเนเธขเนเธญเธเธญเธเธเธฃเธฐเธ”เธฒเธ"
             >
               <div style={{ position: 'absolute', inset: 0, opacity: 0.42, backgroundImage: 'radial-gradient(rgba(31,41,55,0.42) 0.65px, transparent 0.75px)', backgroundSize: '8px 8px' }} />
               {minimap.points.map((point) => (
                 <span key={point.id} style={{ position: 'absolute', left: point.left - 2, top: point.top - 2, width: 4, height: 4, borderRadius: 99, background: point.color, boxShadow: '0 0 0 1px rgba(255,255,255,0.7)', pointerEvents: 'none' }} />
               ))}
               <div style={{ position: 'absolute', left: minimap.viewport.left, top: minimap.viewport.top, width: minimap.viewport.width, height: minimap.viewport.height, minWidth: 3, minHeight: 3, border: `1.5px solid ${HW.accent}`, borderRadius: 3, background: 'rgba(15,110,86,0.10)', boxSizing: 'border-box', pointerEvents: 'none' }} />
-              <button onPointerDown={(event) => event.stopPropagation()} onClick={() => setShowMinimap(false)} title="ซ่อนแผนที่ย่อ" aria-label="ซ่อนแผนที่ย่อ" style={{ position: 'absolute', right: 5, top: 5, width: 22, height: 22, padding: 0, border: 'none', borderRadius: 7, background: 'rgba(255,255,255,0.85)', color: HW.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
-              <span style={{ position: 'absolute', left: 7, bottom: 5, color: HW.textDim, fontFamily: 'Kanit, sans-serif', fontSize: 9.5, fontWeight: 600, letterSpacing: 0.15, pointerEvents: 'none' }}>แผนที่</span>
+              <button onPointerDown={(event) => event.stopPropagation()} onClick={() => setShowMinimap(false)} title="เธเนเธญเธเนเธเธเธ—เธตเนเธขเนเธญ" aria-label="เธเนเธญเธเนเธเธเธ—เธตเนเธขเนเธญ" style={{ position: 'absolute', right: 5, top: 5, width: 22, height: 22, padding: 0, border: 'none', borderRadius: 7, background: 'rgba(255,255,255,0.85)', color: HW.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
+              <span style={{ position: 'absolute', left: 7, bottom: 5, color: HW.textDim, fontFamily: 'Kanit, sans-serif', fontSize: 9.5, fontWeight: 600, letterSpacing: 0.15, pointerEvents: 'none' }}>เนเธเธเธ—เธตเน</span>
             </div>
           )}
         </div>
@@ -2406,12 +2432,12 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
          return (
            <div style={{ position: 'absolute', left: 12, bottom: 92, zIndex: 25, display: 'flex', alignItems: 'center', gap: 6, maxWidth: 'calc(100% - 24px)', padding: '5px 9px', borderRadius: 12, background: 'rgba(252,250,246,0.72)', backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, border: `1px solid ${HW.hairline}`, overflowX: 'auto' }} className="hide-scroll">
              <LinkIcon size={12} color={HW.textDim} style={{ flexShrink: 0 }} />
-             <span style={{ fontSize: 11.5, color: HW.textDim, whiteSpace: 'nowrap', flexShrink: 0 }}>ลิงก์มาจาก</span>
+             <span style={{ fontSize: 11.5, color: HW.textDim, whiteSpace: 'nowrap', flexShrink: 0 }}>เธฅเธดเธเธเนเธกเธฒเธเธฒเธ</span>
              {back.map((b) => (
                <button
                  key={b.index}
                  onClick={() => { selectShape(null); setCurrentPageIndex(b.index); }}
-                 title={`ไปหน้า ${b.index + 1}`}
+                 title={`เนเธเธซเธเนเธฒ ${b.index + 1}`}
                  style={{ flexShrink: 0, border: 'none', background: HW.accentSoft, color: HW.accent, fontSize: 11.5, fontWeight: 600, fontFamily: 'Kanit, sans-serif', padding: '3px 9px', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}
                >
                  {b.label}
@@ -2424,7 +2450,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       {isDragOver && !readonly && (
         <div style={{ position: 'absolute', inset: 12, zIndex: 70, pointerEvents: 'none', border: `2.5px dashed ${HW.accent}`, borderRadius: 18, background: 'rgba(16,185,129,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'white', padding: '12px 22px', borderRadius: 999, boxShadow: '0 8px 28px rgba(0,0,0,0.14)', fontWeight: 700, color: HW.text, fontSize: 15 }}>
-            <ImageIcon size={20} color={HW.accent} /> วางรูปที่นี่เพื่อแทรกลงสมุด
+            <ImageIcon size={20} color={HW.accent} /> เธงเธฒเธเธฃเธนเธเธ—เธตเนเธเธตเนเน€เธเธทเนเธญเนเธ—เธฃเธเธฅเธเธชเธกเธธเธ”
           </div>
         </div>
       )}
@@ -2433,13 +2459,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           existing notebook and its actions go straight to the same tools. */}
       {!readonly && !isMobile && isCurrentPageEmpty && showGettingStarted && (
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 24, width: 'min(390px, calc(100% - 40px))', padding: 22, borderRadius: 22, background: 'rgba(255,255,255,0.87)', backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, boxShadow: '0 18px 50px rgba(35,31,27,0.14)', border: `1px solid ${HW.hairline}`, textAlign: 'center', fontFamily: 'Kanit, sans-serif' }}>
-          <button onClick={dismissGettingStarted} title="ปิดคำแนะนำ" style={{ position: 'absolute', top: 10, right: 10, border: 'none', background: 'transparent', color: HW.textDim, cursor: 'pointer', display: 'flex', padding: 4 }}><X size={16} /></button>
+          <button onClick={dismissGettingStarted} title="เธเธดเธ”เธเธณเนเธเธฐเธเธณ" style={{ position: 'absolute', top: 10, right: 10, border: 'none', background: 'transparent', color: HW.textDim, cursor: 'pointer', display: 'flex', padding: 4 }}><X size={16} /></button>
           <div style={{ width: 42, height: 42, borderRadius: 14, margin: '0 auto 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: HW.accentSoft, color: HW.accent }}><PenTool size={22} /></div>
-          <h3 style={{ margin: 0, color: HW.text, fontSize: 18 }}>เริ่มจดบนกระดานได้เลย</h3>
-          <p style={{ margin: '4px 0 14px', color: HW.textDim, fontSize: 13, lineHeight: 1.5 }}>หน้านี้เป็นกระดานไร้ขอบ เลื่อนและขยายพื้นที่ทำงานได้ตามต้องการ</p>
+          <h3 style={{ margin: 0, color: HW.text, fontSize: 18 }}>เน€เธฃเธดเนเธกเธเธ”เธเธเธเธฃเธฐเธ”เธฒเธเนเธ”เนเน€เธฅเธข</h3>
+          <p style={{ margin: '4px 0 14px', color: HW.textDim, fontSize: 13, lineHeight: 1.5 }}>เธซเธเนเธฒเธเธตเนเน€เธเนเธเธเธฃเธฐเธ”เธฒเธเนเธฃเนเธเธญเธ เน€เธฅเธทเนเธญเธเนเธฅเธฐเธเธขเธฒเธขเธเธทเนเธเธ—เธตเนเธ—เธณเธเธฒเธเนเธ”เนเธ•เธฒเธกเธ•เนเธญเธเธเธฒเธฃ</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 7 }}>
-            <button onClick={() => { dismissGettingStarted(); startQuickAdd('text'); }} style={{ padding: '9px 8px', border: 'none', borderRadius: 11, background: HW.accent, color: 'white', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>พิมพ์ข้อความ</button>
-            <button onClick={() => { dismissGettingStarted(); startQuickAdd('sticker'); }} style={{ padding: '9px 8px', border: 'none', borderRadius: 11, background: HW.accentSoft, color: HW.accent, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>เพิ่ม Note card</button>
+            <button onClick={() => { dismissGettingStarted(); startQuickAdd('text'); }} style={{ padding: '9px 8px', border: 'none', borderRadius: 11, background: HW.accent, color: 'white', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>เธเธดเธกเธเนเธเนเธญเธเธงเธฒเธก</button>
+            <button onClick={() => { dismissGettingStarted(); startQuickAdd('sticker'); }} style={{ padding: '9px 8px', border: 'none', borderRadius: 11, background: HW.accentSoft, color: HW.accent, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>เน€เธเธดเนเธก Note card</button>
           </div>
         </div>
       )}
@@ -2448,8 +2474,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       {showPdfHint && !readonly && activeBook?.book?.fileUrl && !isMobile && (
         <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 44, maxWidth: 'calc(100% - 24px)', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 12, background: 'rgba(255,251,235,0.97)', border: '1px solid #FDE68A', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', backdropFilter: 'blur(8px)' }}>
           <FileText size={18} color="#B45309" style={{ flexShrink: 0 }} />
-          <span style={{ fontSize: 12.5, color: '#92400E', lineHeight: 1.4 }}>หน้า PDF ของหนังสือ <b>เขียนทับตรงๆ ไม่ได้</b> — ต้องดึงเข้ามาในโน้ตก่อน</span>
-          {/* The primary action said "ดึงหน้าจากหนังสือ" and opened the snip
+          <span style={{ fontSize: 12.5, color: '#92400E', lineHeight: 1.4 }}>เธซเธเนเธฒ PDF เธเธญเธเธซเธเธฑเธเธชเธทเธญ <b>เน€เธเธตเธขเธเธ—เธฑเธเธ•เธฃเธเน เนเธกเนเนเธ”เน</b> โ€” เธ•เนเธญเธเธ”เธถเธเน€เธเนเธฒเธกเธฒเนเธเนเธเนเธ•เธเนเธญเธ</span>
+          {/* The primary action said "เธ”เธถเธเธซเธเนเธฒเธเธฒเธเธซเธเธฑเธเธชเธทเธญ" and opened the snip
               tool, which captures a region of one page. That is not what the
               words promise, and it is not what someone reading this hint wants:
               they want the book in the notebook. Full import is the main button
@@ -2458,24 +2484,24 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
             onClick={() => { startLoadingPDF(); dismissPdfHint(); }}
             style={{ flexShrink: 0, border: 'none', background: HW.accent, color: 'white', fontWeight: 600, fontSize: 12, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
           >
-            <BookOpen size={14} /> ดึง PDF ทุกหน้าเข้าโน้ต
+            <BookOpen size={14} /> เธ”เธถเธ PDF เธ—เธธเธเธซเธเนเธฒเน€เธเนเธฒเนเธเนเธ•
           </button>
           <button
             onClick={() => { setBookSnipInitialPage(1); setShowBookSnip(true); dismissPdfHint(); }}
-            title="เลือกกรอบเฉพาะส่วนที่ต้องการจากหน้าใดหน้าหนึ่ง"
+            title="เน€เธฅเธทเธญเธเธเธฃเธญเธเน€เธเธเธฒเธฐเธชเนเธงเธเธ—เธตเนเธ•เนเธญเธเธเธฒเธฃเธเธฒเธเธซเธเนเธฒเนเธ”เธซเธเนเธฒเธซเธเธถเนเธ"
             style={{ flexShrink: 0, border: '1px solid #FDE68A', background: 'transparent', color: '#92400E', fontWeight: 600, fontSize: 12, padding: '6px 10px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
           >
-            <Camera size={14} /> แคปเฉพาะบางส่วน
+            <Camera size={14} /> เนเธเธเน€เธเธเธฒเธฐเธเธฒเธเธชเนเธงเธ
           </button>
-          <button onClick={dismissPdfHint} title="เข้าใจแล้ว" style={{ flexShrink: 0, border: 'none', background: 'transparent', color: '#92400E', cursor: 'pointer', display: 'flex', padding: 2 }}><X size={16} /></button>
+          <button onClick={dismissPdfHint} title="เน€เธเนเธฒเนเธเนเธฅเนเธง" style={{ flexShrink: 0, border: 'none', background: 'transparent', color: '#92400E', cursor: 'pointer', display: 'flex', padding: 2 }}><X size={16} /></button>
         </div>
       )}
 
       {isMobile && (
          <div style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
            <MonitorPlay size={48} color="#10B981" style={{ marginBottom: 16 }} />
-           <h3 style={{ fontSize: 20, fontWeight: 700, color: '#111827', marginBottom: 8 }}>หน้าจอเล็กเกินไป</h3>
-           <p style={{ fontSize: 15, color: '#4B5563' }}>กรุณาเปิดแอปนี้บน Tablet หรือ Computer (Desktop) เพื่อใช้งานระบบจดโน้ตแบบสมบูรณ์</p>
+           <h3 style={{ fontSize: 20, fontWeight: 700, color: '#111827', marginBottom: 8 }}>เธซเธเนเธฒเธเธญเน€เธฅเนเธเน€เธเธดเธเนเธ</h3>
+           <p style={{ fontSize: 15, color: '#4B5563' }}>เธเธฃเธธเธ“เธฒเน€เธเธดเธ”เนเธญเธเธเธตเนเธเธ Tablet เธซเธฃเธทเธญ Computer (Desktop) เน€เธเธทเนเธญเนเธเนเธเธฒเธเธฃเธฐเธเธเธเธ”เนเธเนเธ•เนเธเธเธชเธกเธเธนเธฃเธ“เน</p>
          </div>
       )}
 
@@ -2484,23 +2510,23 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, background: 'white', padding: '12px 24px', borderRadius: 16, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
              <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
                <div>
-                 <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: 'var(--text)' }}>หน้าทั้งหมดในสมุด</h3>
-                 <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--t2)' }}>แตะเพื่อไปหน้านั้น หรือตั้งชื่อเพื่อค้นหาได้ง่ายขึ้น</p>
+                 <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: 'var(--text)' }}>เธซเธเนเธฒเธ—เธฑเนเธเธซเธกเธ”เนเธเธชเธกเธธเธ”</h3>
+                 <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--t2)' }}>เนเธ•เธฐเน€เธเธทเนเธญเนเธเธซเธเนเธฒเธเธฑเนเธ เธซเธฃเธทเธญเธ•เธฑเนเธเธเธทเนเธญเน€เธเธทเนเธญเธเนเธเธซเธฒเนเธ”เนเธเนเธฒเธขเธเธถเนเธ</p>
                </div>
                <div style={{ display: 'flex', gap: 8, background: '#F3F4F6', padding: 4, borderRadius: 10 }}>
-                 <button onClick={() => setPageManagerTab('all')} style={{ padding: '6px 16px', borderRadius: 8, border: 'none', background: pageManagerTab === 'all' ? 'white' : 'transparent', color: pageManagerTab === 'all' ? '#111827' : '#6B7280', fontWeight: 600, fontSize: 14, cursor: 'pointer', boxShadow: pageManagerTab === 'all' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>ทั้งหมด ({pages.length})</button>
+                 <button onClick={() => setPageManagerTab('all')} style={{ padding: '6px 16px', borderRadius: 8, border: 'none', background: pageManagerTab === 'all' ? 'white' : 'transparent', color: pageManagerTab === 'all' ? '#111827' : '#6B7280', fontWeight: 600, fontSize: 14, cursor: 'pointer', boxShadow: pageManagerTab === 'all' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>เธ—เธฑเนเธเธซเธกเธ” ({pages.length})</button>
                  <button onClick={() => setPageManagerTab('bookmarks')} style={{ padding: '6px 16px', borderRadius: 8, border: 'none', background: pageManagerTab === 'bookmarks' ? 'white' : 'transparent', color: pageManagerTab === 'bookmarks' ? '#111827' : '#6B7280', fontWeight: 600, fontSize: 14, cursor: 'pointer', boxShadow: pageManagerTab === 'bookmarks' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
-                   <Bookmark size={16} fill={pageManagerTab === 'bookmarks' ? '#F59E0B' : 'none'} color={pageManagerTab === 'bookmarks' ? '#F59E0B' : 'currentColor'} /> คั่นหน้าไว้ ({pages.filter(p => p.isBookmarked).length})
+                   <Bookmark size={16} fill={pageManagerTab === 'bookmarks' ? '#F59E0B' : 'none'} color={pageManagerTab === 'bookmarks' ? '#F59E0B' : 'currentColor'} /> เธเธฑเนเธเธซเธเนเธฒเนเธงเน ({pages.filter(p => p.isBookmarked).length})
                  </button>
                </div>
              </div>
-             <button onClick={() => setShowPageManager(false)} style={{ border: 'none', background: 'var(--gray-light)', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, color: 'var(--text)' }}>ปิด</button>
+             <button onClick={() => setShowPageManager(false)} style={{ border: 'none', background: 'var(--gray-light)', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, color: 'var(--text)' }}>เธเธดเธ”</button>
            </div>
            
            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 24 }}>
              {pages.map((p, i) => ({ p, i })).filter(({ p }) => pageManagerTab === 'all' || p.isBookmarked).length === 0 && (
                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px 0', color: '#6B7280' }}>
-                 ไม่มีหน้ากระดาษที่ค้นหา
+                 เนเธกเนเธกเธตเธซเธเนเธฒเธเธฃเธฐเธ”เธฒเธฉเธ—เธตเนเธเนเธเธซเธฒ
                </div>
              )}
              {pages.map((p, i) => ({ p, i })).filter(({ p }) => pageManagerTab === 'all' || p.isBookmarked).map(({ p, i }) => (
@@ -2522,19 +2548,19 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                     {(p.lines?.length || 0) > 0 && <PenTool size={16} color="#10B981" style={{ position: 'absolute', bottom: 4, right: 4 }} />}
                   </div>
                   {/* The label is the rename field. Pages could not be named at
-                      all, which left the "[[" picker offering "หน้า 1, หน้า 2,
-                      หน้า 3" — a list that tells you nothing about the pages it
+                      all, which left the "[[" picker offering "เธซเธเนเธฒ 1, เธซเธเนเธฒ 2,
+                      เธซเธเนเธฒ 3" โ€” a list that tells you nothing about the pages it
                       is listing. No new button and no dialog: the caption simply
                       accepts typing, and emptying it goes back to the number. */}
                   <input
                     value={p.name || ''}
-                    placeholder={`หน้า ${i + 1}`}
+                    placeholder={`เธซเธเนเธฒ ${i + 1}`}
                     onClick={(e) => e.stopPropagation()}
                     onChange={(e) => {
                       const name = e.target.value;
                       updatePage(i, (page) => { page.name = name.trim() ? name : undefined; });
                     }}
-                    title="ตั้งชื่อหน้านี้ เพื่อให้หาเจอตอนพิมพ์ [["
+                    title="เธ•เธฑเนเธเธเธทเนเธญเธซเธเนเธฒเธเธตเน เน€เธเธทเนเธญเนเธซเนเธซเธฒเน€เธเธญเธ•เธญเธเธเธดเธกเธเน [["
                     style={{
                       marginTop: 8, width: '100%', textAlign: 'center',
                       fontSize: 13, fontWeight: 600, color: 'var(--t2)',
@@ -2554,20 +2580,20 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
        {showSearch && (
          <div style={{ position: 'absolute', top: 80, right: 24, zIndex: 40, background: 'white', padding: 16, borderRadius: 16, boxShadow: '0 10px 40px rgba(0,0,0,0.15)', border: '1px solid var(--br2)', width: 300, display: 'flex', flexDirection: 'column' }}>
            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-             <h4 style={{ margin: 0, fontSize: 16, color: 'var(--text)' }}>ค้นหาในสมุดโน้ต</h4>
+             <h4 style={{ margin: 0, fontSize: 16, color: 'var(--text)' }}>เธเนเธเธซเธฒเนเธเธชเธกเธธเธ”เนเธเนเธ•</h4>
              <button onClick={() => setShowSearch(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--t2)' }}><i className="ti ti-x"></i></button>
            </div>
            <input 
              type="text" 
              autoFocus
-             placeholder="พิมพ์ข้อความที่ต้องการค้นหา..." 
+             placeholder="เธเธดเธกเธเนเธเนเธญเธเธงเธฒเธกเธ—เธตเนเธ•เนเธญเธเธเธฒเธฃเธเนเธเธซเธฒ..." 
              value={searchQuery} 
              onChange={e => setSearchQuery(e.target.value)}
              style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid var(--br2)', fontSize: 14, outline: 'none', marginBottom: 12 }} 
            />
            <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
              {searchResults.length === 0 && searchQuery.trim() !== "" && (
-                <div style={{ padding: 12, textAlign: 'center', color: 'var(--t2)', fontSize: 13 }}>ไม่พบผลลัพธ์</div>
+                <div style={{ padding: 12, textAlign: 'center', color: 'var(--t2)', fontSize: 13 }}>เนเธกเนเธเธเธเธฅเธฅเธฑเธเธเน</div>
              )}
              {searchResults.map((res, i) => (
                 <div 
@@ -2575,7 +2601,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   onClick={() => { setCurrentPageIndex(res.pageIndex); setShowSearch(false); }}
                   style={{ padding: 12, background: 'var(--gray-light)', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text)' }}
                 >
-                  <div style={{ fontWeight: 600, color: 'var(--teal)', marginBottom: 4 }}>หน้า {res.pageIndex + 1}</div>
+                  <div style={{ fontWeight: 600, color: 'var(--teal)', marginBottom: 4 }}>เธซเธเนเธฒ {res.pageIndex + 1}</div>
                   <div>{res.text}</div>
                 </div>
              ))}
@@ -2595,11 +2621,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           onSearch={searchWebImages}
           onInsert={insertWebImage}
           onClose={() => setShowImgSearch(false)}
-          onPopupBlocked={() => toast.error('เบราว์เซอร์บล็อกหน้าต่างใหม่ — อนุญาต pop-up ให้เว็บนี้ก่อน แล้วลองอีกครั้ง')}
+          onPopupBlocked={() => toast.error('เน€เธเธฃเธฒเธงเนเน€เธเธญเธฃเนเธเธฅเนเธญเธเธซเธเนเธฒเธ•เนเธฒเธเนเธซเธกเน โ€” เธญเธเธธเธเธฒเธ• pop-up เนเธซเนเน€เธงเนเธเธเธตเนเธเนเธญเธ เนเธฅเนเธงเธฅเธญเธเธญเธตเธเธเธฃเธฑเนเธ')}
         />
       )}
 
-      {/* AI assistant — ask about an attached PDF, drop the answer in as a note */}
+      {/* AI assistant โ€” ask about an attached PDF, drop the answer in as a note */}
       {showAi && (
         <AiAssistantPanel
           onClose={() => setShowAi(false)}
@@ -2609,7 +2635,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               if (!page.texts) page.texts = [];
               page.texts.push({ id: nextObjectId('text'), text, x: 80, y: 80, color: '#111827', size: 22, fontFamily: 'Sarabun', bold: false, italic: false, underline: false, strikethrough: false, align: 'left', list: 'none', width: TEXT_BOX_WIDTH });
             });
-            toast.success('แทรกคำตอบลงสมุดแล้ว');
+            toast.success('เนเธ—เธฃเธเธเธณเธ•เธญเธเธฅเธเธชเธกเธธเธ”เนเธฅเนเธง');
             setShowAi(false);
           }}
         />
@@ -2622,7 +2648,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
       {loadingPdf && (
          <div style={{ position: 'absolute', inset: 0, zIndex: 10, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-           <span style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>กำลังเตรียมหน้า PDF...</span>
+           <span style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>เธเธณเธฅเธฑเธเน€เธ•เธฃเธตเธขเธกเธซเธเนเธฒ PDF...</span>
          </div>
       )}
 
@@ -2631,7 +2657,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
          <div style={{ position: 'absolute', inset: 0, zIndex: 90, background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18 }}>
            <div style={{ width: 44, height: 44, borderRadius: '50%', border: `4px solid ${HW.accentSoft}`, borderTopColor: HW.accent, animation: 'spinSync 0.9s linear infinite' }}></div>
            <span style={{ fontSize: 16, fontWeight: 600, color: HW.text, fontFamily: 'Kanit, sans-serif' }}>
-             กำลังซิงก์ข้อมูลคลาวด์...{syncProgress != null ? ` ${Math.round(syncProgress * 100)}%` : ''}
+             เธเธณเธฅเธฑเธเธเธดเธเธเนเธเนเธญเธกเธนเธฅเธเธฅเธฒเธงเธ”เน...{syncProgress != null ? ` ${Math.round(syncProgress * 100)}%` : ''}
            </span>
            <div style={{ width: 220, height: 6, borderRadius: 100, background: 'rgba(0,0,0,0.07)', overflow: 'hidden' }}>
              <div style={{
@@ -2641,7 +2667,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                ...(syncProgress == null ? { animation: 'pulse 1.2s infinite' } : {})
              }}></div>
            </div>
-           <span style={{ fontSize: 12.5, color: HW.textDim, fontFamily: 'Kanit, sans-serif' }}>กรุณารอสักครู่ กำลังโหลดสมุดโน้ตของคุณ</span>
+           <span style={{ fontSize: 12.5, color: HW.textDim, fontFamily: 'Kanit, sans-serif' }}>เธเธฃเธธเธ“เธฒเธฃเธญเธชเธฑเธเธเธฃเธนเน เธเธณเธฅเธฑเธเนเธซเธฅเธ”เธชเธกเธธเธ”เนเธเนเธ•เธเธญเธเธเธธเธ“</span>
          </div>
       )}
 
@@ -2652,9 +2678,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 55, maxWidth: 'calc(100% - 24px)', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px 7px 12px', borderRadius: 999, background: 'rgba(15,110,86,0.94)', color: 'white', boxShadow: '0 8px 22px rgba(15,110,86,0.25)', fontFamily: 'Kanit, sans-serif' }}>
           <Link2 size={16} strokeWidth={2.2} />
           <span style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {connectorSourceId ? 'เลือกวัตถุปลายทางเพื่อเชื่อม' : 'ลากจากวัตถุหนึ่งไปยังอีกวัตถุ'}
+            {connectorSourceId ? 'เน€เธฅเธทเธญเธเธงเธฑเธ•เธ–เธธเธเธฅเธฒเธขเธ—เธฒเธเน€เธเธทเนเธญเน€เธเธทเนเธญเธก' : 'เธฅเธฒเธเธเธฒเธเธงเธฑเธ•เธ–เธธเธซเธเธถเนเธเนเธเธขเธฑเธเธญเธตเธเธงเธฑเธ•เธ–เธธ'}
           </span>
-          <button onClick={cancelConnector} title="ยกเลิกโหมดเชื่อม (Esc)" style={{ display: 'flex', alignItems: 'center', gap: 3, border: 'none', borderRadius: 999, padding: '4px 7px', background: 'rgba(255,255,255,0.18)', color: 'white', cursor: 'pointer', fontFamily: 'Kanit, sans-serif', fontSize: 11.5, fontWeight: 600 }}><X size={14} /> ยกเลิก</button>
+          <button onClick={cancelConnector} title="เธขเธเน€เธฅเธดเธเนเธซเธกเธ”เน€เธเธทเนเธญเธก (Esc)" style={{ display: 'flex', alignItems: 'center', gap: 3, border: 'none', borderRadius: 999, padding: '4px 7px', background: 'rgba(255,255,255,0.18)', color: 'white', cursor: 'pointer', fontFamily: 'Kanit, sans-serif', fontSize: 11.5, fontWeight: 600 }}><X size={14} /> เธขเธเน€เธฅเธดเธ</button>
         </div>
       )}
 
@@ -2795,19 +2821,34 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
             
             {/* Shapes */}
             {currentPage.shapes && currentPage.shapes.map((s, i) => {
-              // Connector: an arrow/line whose ends follow the objects they snap to.
-              if (s.type === 'connector') {
+               if (s.type === 'connector') {
                  const { a, b } = connectorPoints(s);
-                 // The user requested all connectors (including mindmap branches) to be 
-                 // curved lines rather than straight arrows.
-                 const curved = true; 
+                 
+                 const styleId = currentPage.mindmapStyle || DEFAULT_MINDMAP_STYLE;
+                 const style = MINDMAP_STYLES[styleId] || MINDMAP_STYLES.classic;
+                 
+                 let pts = [];
+                 let isBezier = false;
+                 if (style.type === 'angled') {
+                   pts = branchAngledPoints(a, b);
+                 } else if (style.type === 'straight') {
+                   pts = branchStraightPoints(a, b);
+                 } else {
+                   pts = branchCurvePoints(a, b);
+                   isBezier = true;
+                 }
+                 
+                 // If drawing an angled line, it's easier to use a Konva Line than an Arrow with bezier disabled,
+                 // but KonvaArrow also works if we just pass the points.
+                 // We need to set tension=0 for angled, but KonvaArrow will just draw straight lines between points.
+                 
                  return (
                    <KonvaArrow
                      key={s.id}
                      id={s.id}
                      name="object"
-                     points={branchCurvePoints(a, b)}
-                     bezier={true}
+                     points={pts}
+                     bezier={isBezier}
                      stroke={s.color}
                      fill={s.color}
                      strokeWidth={s.size || 3}
@@ -2823,6 +2864,44 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                    />
                  );
               }
+
+              if (s.type === 'icon') {
+                 return (
+                   <Group
+                     key={s.id} id={s.id} name="object"
+                     x={s.x + (objectOffset('shapes', s.id)?.x || 0)}
+                     y={s.y + (objectOffset('shapes', s.id)?.y || 0)}
+                     scaleX={s.scaleX || 1} scaleY={s.scaleY || 1}
+                     rotation={s.rotation || 0}
+                     draggable={tool === 'pan'}
+                     listening={['pan', 'lasso', 'select'].includes(tool) || selectedId === s.id}
+                     onDragEnd={(e) => {
+                       pushHistory();
+                       const { x, y } = e.target.position();
+                       updatePage(currentPageIndex, (p) => {
+                         const obj = p.shapes.find((o) => o.id === s.id);
+                         if (obj) { obj.x = x; obj.y = y; }
+                       });
+                     }}
+                     onTransformEnd={(e) => {
+                       const node = e.target;
+                       updatePage(currentPageIndex, (p) => {
+                         const obj = p.shapes.find((o) => o.id === s.id);
+                         if (obj) {
+                           obj.x = node.x(); obj.y = node.y();
+                           obj.scaleX = node.scaleX(); obj.scaleY = node.scaleY();
+                           obj.rotation = node.rotation();
+                         }
+                       });
+                     }}
+                     onClick={() => { if (tool === 'pan' || tool === 'lasso' || tool === 'shape') selectShape(s.id); }}
+                     onTap={() => { if (tool === 'pan' || tool === 'lasso' || tool === 'shape') selectShape(s.id); }}
+                   >
+                     <KonvaIcon iconName={s.iconName} color={s.color} width={s.width} height={s.height} />
+                   </Group>
+                 );
+               }
+
               // Editable polygon: absolute points, moved as a whole in pan mode and
               // reshaped by the vertex handles rendered separately when selected.
               if (s.type === 'polygon') {
@@ -2943,7 +3022,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   draggable={tool === 'pan' || tool === 'sticker'} 
                   // 'text' belongs here too. The tap handler below already opened
                   // the note for typing with the text tool, but a Konva node with
-                  // listening=false never receives the event — so the handler
+                  // listening=false never receives the event โ€” so the handler
                   // could not fire and tapping a note in typing mode did nothing.
                   listening={['pan', 'lasso', 'sticker', 'text', 'shape', 'image'].includes(tool) || selectedId === st.id}
                   onDragEnd={(e) => {
@@ -2985,8 +3064,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                   // Pan selects the note so the context menu appears; the sticky-note
                   // tool goes straight into typing, which is what you want with it.
                   // The text tool opens the note for typing too. It only listened
-                  // for the sticker tool, so in typing mode — where `text` is the
-                  // tool you land on — tapping a sticky note did nothing at all,
+                  // for the sticker tool, so in typing mode โ€” where `text` is the
+                  // tool you land on โ€” tapping a sticky note did nothing at all,
                   // and there was no obvious way to write on one.
                   onClick={(e) => { e.cancelBubble = true; if (tool === 'sticker' || tool === 'text') { setEditingStickerId(st.id); } else if (tool === 'pan' || tool === 'lasso') { selectShape(st.id); } }}
                   onTap={(e) => { e.cancelBubble = true; if (tool === 'sticker' || tool === 'text') { setEditingStickerId(st.id); } else if (tool === 'pan' || tool === 'lasso') { selectShape(st.id); } }}
@@ -3054,7 +3133,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                      let cursorY = top;
                      return (
                         // Clipped to the note's text area. Dropping whole lines
-                        // that start past the bottom is not enough on its own —
+                        // that start past the bottom is not enough on its own โ€”
                         // one long line wraps into several and spills over the
                         // page below the note. Konva clips at the group, so the
                         // note can hold as much text as it likes and never paint
@@ -3153,7 +3232,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               >
                 {/* A node made by branching is drawn as a rounded card behind
                     its words, in its branch's colour. Bare text floating on the
-                    page does not read as a mindmap node — the boxes are what
+                    page does not read as a mindmap node โ€” the boxes are what
                     make a map look like a map rather than scattered labels. */}
                 {t.isNode && (() => {
                    const tt = migrateText(t);
@@ -3166,7 +3245,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                    // around the words after the fact.
                    // Padding, not a hairline: the words were sitting against the
                    // border on every side. Measured rather than estimated, so a
-                   // Thai node no longer overflows its own card — tone marks and
+                   // Thai node no longer overflows its own card โ€” tone marks and
                    // vowels are separate characters that take no width, which a
                    // character count gets badly wrong.
                    const padX = 18;
@@ -3235,7 +3314,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                       />
                       {/* A link gets its own transparent hit area rather than
                           relying on the glyphs. Konva hit-tests text by its drawn
-                          pixels, which makes a line of type a fiddly target — and
+                          pixels, which makes a line of type a fiddly target โ€” and
                           on a tablet an even worse one. A band the height of the
                           line is what a finger is actually aiming at. */}
                       {l.link && (
@@ -3260,7 +3339,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         </Layer>
         
         {/* Drawing Layer (Strokes isolated so eraser only erases strokes).
-            Clipped to the paper so no ink — old or new — ever shows outside it. */}
+            Clipped to the paper so no ink โ€” old or new โ€” ever shows outside it. */}
         <Layer>
           <Group x={pageX} y={pageY} clipX={0} clipY={0} clipWidth={currentPage.width} clipHeight={currentPage.height}>
             {/* Strokes */}
@@ -3306,7 +3385,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                    >
                      <Rect width={ruler.length} height={58} fill="rgba(10,89,247,0.10)" stroke="rgba(10,89,247,0.45)" strokeWidth={1} cornerRadius={4} />
                      {ticks}
-                     <Text text={`${Math.round(((ruler.angle % 360) + 360) % 360)}°`} x={10} y={34} fontSize={14} fill={HW.accent} fontFamily="Kanit, sans-serif" />
+                     <Text text={`${Math.round(((ruler.angle % 360) + 360) % 360)}ยฐ`} x={10} y={34} fontSize={14} fill={HW.accent} fontFamily="Kanit, sans-serif" />
                    </Group>
                    <Circle
                      name="ruler-handle"
@@ -3335,7 +3414,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                );
             })()}
 
-            {/* Protractor: half-circle guide with 0–180° markings, draggable + rotatable */}
+            {/* Protractor: half-circle guide with 0โ€“180ยฐ markings, draggable + rotatable */}
             {protractorOn && !readonly && (() => {
                const r = protractor.radius;
                const rad = (protractor.angle * Math.PI) / 180;
@@ -3367,7 +3446,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                      {ticks}
                      {labels}
                      <Circle x={0} y={0} radius={4} fill={HW.accent} />
-                     <Text text={`${Math.round(((protractor.angle % 360) + 360) % 360)}°`} x={-14} y={12} fontSize={13} fill={HW.accent} fontFamily="Kanit, sans-serif" />
+                     <Text text={`${Math.round(((protractor.angle % 360) + 360) % 360)}ยฐ`} x={-14} y={12} fontSize={13} fill={HW.accent} fontFamily="Kanit, sans-serif" />
                    </Group>
                    <Circle
                      name="protractor-handle"
@@ -3483,7 +3562,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
            {selectedId && (
               <Transformer
                 ref={transformerRef}
-                // Fat, teal, rounded handles — easy to grab with a fingertip. Emoji,
+                // Fat, teal, rounded handles โ€” easy to grab with a fingertip. Emoji,
                 // Images and text scale uniformly (corner anchors only); shapes
                 // and note cards can stretch freely.
                 anchorSize={isCoarse ? 18 : 11}
@@ -3529,7 +3608,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                       const lx = vx + (dx / m) * lo, ly = vy + (dy / m) * lo;
                       return (
                         <React.Fragment key={`vtx-${poly.id}-${k}`}>
-                           <Text text={`${ang}°`} x={lx - fs * 1.4} y={ly - fs / 2} fontSize={fs} fill={HW.accent} fontStyle="bold" fontFamily="Kanit, sans-serif" listening={false} />
+                           <Text text={`${ang}ยฐ`} x={lx - fs * 1.4} y={ly - fs / 2} fontSize={fs} fill={HW.accent} fontStyle="bold" fontFamily="Kanit, sans-serif" listening={false} />
                            <Circle
                              name="poly-handle" x={vx} y={vy} radius={hr} fill="white" stroke={HW.accent} strokeWidth={2 / scale}
                              onDragStart={() => pushHistory()}
@@ -3588,7 +3667,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       {/* Right-click / long-press context menu */}
       {/* The selected-object floating toolbar (below) already covers a single
           selection, so only fall back to this context menu when that toolbar
-          isn't showing — otherwise both stacked up with duplicate actions. */}
+          isn't showing โ€” otherwise both stacked up with duplicate actions. */}
       {contextMenu && !selectedInfo && !croppingImageId && (() => {
         const page = pages[currentPageIndex];
         let kind = null;
@@ -3670,8 +3749,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       
       {/* In-place editor for a sticky note.
           This is the very same editor the text boxes use. A note used to have
-          its own cut-down one — a plain textarea with a single format for the
-          whole note — so laying out a heading above a bulleted line was not
+          its own cut-down one โ€” a plain textarea with a single format for the
+          whole note โ€” so laying out a heading above a bulleted line was not
           possible, and every fix to typing had to be made twice. Sharing it
           means notes get per-line formatting, the markdown shorthand and the
           IME-safe input handling for free. */}
@@ -3698,7 +3777,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
          };
          const noteZ = scale * (st.scaleX || 1);
          // Editing scale, not drawing scale. A note zoomed out renders its text
-         // at a handful of pixels — legible as a shape on the page, not as
+         // at a handful of pixels โ€” legible as a shape on the page, not as
          // something to type into. Scaling the font AND the column by the same
          // factor keeps every line breaking exactly where the canvas breaks it,
          // so nothing rewraps when the editor closes; the box simply sits a
@@ -3754,9 +3833,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                      page.stickers = (page.stickers || []).filter(s => s.id !== id);
                   });
                   setEditingStickerId(null);
-                  toast.success('ลบโพสต์อิทแล้ว');
+                  toast.success('เธฅเธเนเธเธชเธ•เนเธญเธดเธ—เนเธฅเนเธง');
                }}
-               title="ลบโพสต์อิท"
+               title="เธฅเธเนเธเธชเธ•เนเธญเธดเธ—"
                style={{ position: 'absolute', zIndex: 3001,
                         left: (st.x + pageX) * scale + position.x,
                         top: (st.y + pageY) * scale + position.y + noteH * scale * (st.scaleY || 1) + 8,
@@ -3777,21 +3856,21 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           {/* Strip controls */}
           <div style={{ height: 44, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', borderBottom: `1px solid ${HW.hairline}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <button title="เลื่อนซ้าย" onClick={() => moveWriterFocus(-writerBoxW * 0.45, 0)} style={{ width: 32, height: 32, borderRadius: 9, border: 'none', background: 'transparent', color: HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button title="เน€เธฅเธทเนเธญเธเธเนเธฒเธข" onClick={() => moveWriterFocus(-writerBoxW * 0.45, 0)} style={{ width: 32, height: 32, borderRadius: 9, border: 'none', background: 'transparent', color: HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <ChevronLeft size={19} strokeWidth={1.8} />
               </button>
-              <button title="เลื่อนขวา" onClick={() => moveWriterFocus(writerBoxW * 0.45, 0)} style={{ width: 32, height: 32, borderRadius: 9, border: 'none', background: 'transparent', color: HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button title="เน€เธฅเธทเนเธญเธเธเธงเธฒ" onClick={() => moveWriterFocus(writerBoxW * 0.45, 0)} style={{ width: 32, height: 32, borderRadius: 9, border: 'none', background: 'transparent', color: HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <ChevronRight size={19} strokeWidth={1.8} />
               </button>
-              <button title="บรรทัดถัดไป" onClick={() => moveWriterFocus(-writerFocus.x, writerBoxH * 0.62)} style={{ marginLeft: 6, padding: '5px 12px', borderRadius: 9, border: 'none', background: HW.accentSoft, color: HW.accent, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
-                บรรทัดถัดไป
+              <button title="เธเธฃเธฃเธ—เธฑเธ”เธ–เธฑเธ”เนเธ" onClick={() => moveWriterFocus(-writerFocus.x, writerBoxH * 0.62)} style={{ marginLeft: 6, padding: '5px 12px', borderRadius: 9, border: 'none', background: HW.accentSoft, color: HW.accent, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+                เธเธฃเธฃเธ—เธฑเธ”เธ–เธฑเธ”เนเธ
               </button>
-              <button title="บรรทัดก่อนหน้า" onClick={() => moveWriterFocus(0, -writerBoxH * 0.62)} style={{ padding: '5px 12px', borderRadius: 9, border: 'none', background: 'transparent', color: HW.textDim, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
-                ขึ้นบน
+              <button title="เธเธฃเธฃเธ—เธฑเธ”เธเนเธญเธเธซเธเนเธฒ" onClick={() => moveWriterFocus(0, -writerBoxH * 0.62)} style={{ padding: '5px 12px', borderRadius: 9, border: 'none', background: 'transparent', color: HW.textDim, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+                เธเธถเนเธเธเธ
               </button>
             </div>
             <button onClick={() => setZoomWriter(false)} style={{ padding: '5px 12px', borderRadius: 9, border: `1px solid ${HW.hairline}`, background: 'white', color: HW.text, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
-              ปิด
+              เธเธดเธ”
             </button>
           </div>
 
@@ -3864,7 +3943,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              // (or drag to) any destination to make a bound connector.
              onConnect={!(kind === 'shapes' && obj.type === 'connector') ? () => {
                beginConnector(obj.id);
-               toast('แตะหรือ ลาก ไปยังวัตถุปลายทางเพื่อเชื่อม เส้นจะเกาะทั้งสองฝั่ง', { icon: '🔗' });
+               toast('เนเธ•เธฐเธซเธฃเธทเธญ เธฅเธฒเธ เนเธเธขเธฑเธเธงเธฑเธ•เธ–เธธเธเธฅเธฒเธขเธ—เธฒเธเน€เธเธทเนเธญเน€เธเธทเนเธญเธก เน€เธชเนเธเธเธฐเน€เธเธฒเธฐเธ—เธฑเนเธเธชเธญเธเธเธฑเนเธ', { icon: '๐”—' });
              } : undefined}
              onRecolor={recolorSelectedObject}
              onFront={() => reorderSelectedObject(true)}
@@ -3898,7 +3977,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       })()}
 
       {/* Full palette for a lasso selection, in the same in-app picker the pen
-          uses — the toolbar's native colour input was inert on tablets. */}
+          uses โ€” the toolbar's native colour input was inert on tablets. */}
       {showLassoPalette && lassoBounds && hasSelection && (
         <div style={{ position: 'absolute', left: '50%', bottom: 100, transform: 'translateX(-50%)', zIndex: 4000 }}>
           <ColorPickerPanel
@@ -3911,8 +3990,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         </div>
       )}
 
-      {/* Paper template picker. The "เปลี่ยนแม่แบบกระดาษ" button set this flag but
-          nothing ever rendered — so the whole feature looked broken. */}
+      {/* Paper template picker. The "เน€เธเธฅเธตเนเธขเธเนเธกเนเนเธเธเธเธฃเธฐเธ”เธฒเธฉ" button set this flag but
+          nothing ever rendered โ€” so the whole feature looked broken. */}
       {showPageSettings && !readonly && (
         <PaperTemplateModal
           page={pages[currentPageIndex] || {}}
@@ -3921,7 +4000,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
             pushHistory();
             if (allPages) {
               setPages((prev) => prev.map((p) => (p.src ? p : { ...p, ...patch })));
-              toast.success('ใช้กับทุกหน้าแล้ว');
+              toast.success('เนเธเนเธเธฑเธเธ—เธธเธเธซเธเนเธฒเนเธฅเนเธง');
             } else {
               updatePage(currentPageIndex, (p) => { Object.assign(p, patch); });
             }
@@ -3929,7 +4008,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         />
       )}
 
-      {/* Export modal — choose format (image / PDF) and scope (this page / all) */}
+      {/* Export modal โ€” choose format (image / PDF) and scope (this page / all) */}
       {showExport && (
         <ExportModal
           format={exportFormat}
@@ -3953,12 +4032,12 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
          return (
            <button
              key={`srclink-${im.id}`}
-             title={`ไปหน้า ${im.sourcePage} ในหนังสือต้นฉบับ`}
+             title={`เนเธเธซเธเนเธฒ ${im.sourcePage} เนเธเธซเธเธฑเธเธชเธทเธญเธ•เนเธเธเธเธฑเธ`}
              onPointerDown={(e) => e.stopPropagation()}
              onClick={() => { setBookSnipInitialPage(im.sourcePage); setShowBookSnip(true); }}
              style={{ position: 'absolute', left: left - 28, top: top + 4, zIndex: 58, height: 24, padding: '0 7px', borderRadius: 8, border: 'none', background: HW.accent, color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 600, boxShadow: '0 2px 6px rgba(0,0,0,0.25)' }}
            >
-             <Link2 size={12} strokeWidth={2.4} /> น.{im.sourcePage}
+             <Link2 size={12} strokeWidth={2.4} /> เธ.{im.sourcePage}
            </button>
          );
       })}
@@ -3974,11 +4053,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              pushHistory();
              updatePage(currentPageIndex, (page) => {
                if (!page.images) page.images = [];
-               // sourcePage lets the image show a 🔗 that jumps back to the book page.
+               // sourcePage lets the image show a ๐”— that jumps back to the book page.
                page.images.push({ id: nextImageId(), src, x: (currentPage.width - w) / 2, y: 60, width: w, height: h, sourcePage: pageNum });
              });
              setShowBookSnip(false);
-             toast.success('แปะภาพจากหนังสือลงโน้ตแล้ว เลือกเครื่องมือเลื่อน (มือ) เพื่อจัดตำแหน่ง');
+             toast.success('เนเธเธฐเธ เธฒเธเธเธฒเธเธซเธเธฑเธเธชเธทเธญเธฅเธเนเธเนเธ•เนเธฅเนเธง เน€เธฅเธทเธญเธเน€เธเธฃเธทเนเธญเธเธกเธทเธญเน€เธฅเธทเนเธญเธ (เธกเธทเธญ) เน€เธเธทเนเธญเธเธฑเธ”เธ•เธณเนเธซเธเนเธ');
            }}
          />
       )}
@@ -3998,7 +4077,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                     if (i) i.src = newUrl;
                  });
                  setCroppingImageId(null);
-                 toast.success('ครอบตัดรูปภาพเรียบร้อย');
+                 toast.success('เธเธฃเธญเธเธ•เธฑเธ”เธฃเธนเธเธ เธฒเธเน€เธฃเธตเธขเธเธฃเนเธญเธข');
               }}
             />
          );

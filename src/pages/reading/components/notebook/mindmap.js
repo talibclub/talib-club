@@ -60,28 +60,61 @@ export function makeBranchConnector({ id, fromId, toId, color, size, from, to })
 
 // --- Looking like a mindmap -------------------------------------------------
 
-// One colour per top-level branch, inherited by everything under it, so a map
-// reads as a few limbs rather than one undifferentiated tangle. Taken from the
-// Talib palette rather than the rainbow, so a map still looks like this notebook.
-export const BRANCH_COLORS = [
-  '#0f6e56', // green
-  '#c0392b', // red
-  '#1d4ed8', // blue
-  '#b45309', // amber
-  '#6b21a8', // purple
-  '#0e7490', // teal
-];
+export const MINDMAP_STYLES = {
+  classic: {
+    id: 'classic',
+    name: 'Classic',
+    type: 'curved',
+    colors: ['#0f6e56', '#c0392b', '#1d4ed8', '#b45309', '#6b21a8', '#0e7490']
+  },
+  charcoal: {
+    id: 'charcoal',
+    name: 'Charcoal',
+    type: 'angled',
+    colors: ['#374151', '#4b5563', '#1f2937', '#111827', '#6b7280', '#9ca3af']
+  },
+  ocean: {
+    id: 'ocean',
+    name: 'Ocean',
+    type: 'curved',
+    colors: ['#0284c7', '#0369a1', '#0ea5e9', '#38bdf8', '#075985', '#7dd3fc']
+  },
+  sunset: {
+    id: 'sunset',
+    name: 'Sunset',
+    type: 'straight',
+    colors: ['#f97316', '#ea580c', '#f59e0b', '#ef4444', '#dc2626', '#fbbf24']
+  },
+  forest: {
+    id: 'forest',
+    name: 'Forest',
+    type: 'angled',
+    colors: ['#166534', '#15803d', '#14532d', '#22c55e', '#4ade80', '#10b981']
+  },
+  berry: {
+    id: 'berry',
+    name: 'Berry',
+    type: 'curved',
+    colors: ['#9d174d', '#be185d', '#831843', '#db2777', '#f472b6', '#c026d3']
+  }
+};
+
+export const DEFAULT_MINDMAP_STYLE = 'classic';
 
 // The colour a new child should take: the same as its parent's branch once one
 // exists, otherwise the next unused colour, so siblings of the root differ and
 // their descendants match.
 export function branchColorFor(page, parentId, rootId) {
+  const styleId = page?.mindmapStyle || DEFAULT_MINDMAP_STYLE;
+  const style = MINDMAP_STYLES[styleId] || MINDMAP_STYLES.classic;
+  const colors = style.colors;
+  
   const shapes = (page?.shapes || []).filter((s) => s?.type === 'connector');
   const incoming = shapes.find((s) => s.to?.id === parentId);
   if (incoming?.color) return incoming.color;
   const used = shapes.filter((s) => s.from?.id === (rootId ?? parentId)).map((s) => s.color);
-  const free = BRANCH_COLORS.find((c) => !used.includes(c));
-  return free || BRANCH_COLORS[used.length % BRANCH_COLORS.length];
+  const free = colors.find((c) => !used.includes(c));
+  return free || colors[used.length % colors.length];
 }
 
 // A cubic curve leaving the parent horizontally and arriving at the child the
@@ -92,6 +125,15 @@ export function branchCurvePoints(a, b) {
   const reach = Math.max(28, Math.min(dx * 0.55, 160));
   const dir = b.x >= a.x ? 1 : -1;
   return [a.x, a.y, a.x + reach * dir, a.y, b.x - reach * dir, b.y, b.x, b.y];
+}
+
+export function branchAngledPoints(a, b) {
+  const midX = a.x + (b.x - a.x) / 2;
+  return [a.x, a.y, midX, a.y, midX, b.y, b.x, b.y];
+}
+
+export function branchStraightPoints(a, b) {
+  return [a.x, a.y, b.x, b.y];
 }
 
 // Where the board has to move so a point is on screen.

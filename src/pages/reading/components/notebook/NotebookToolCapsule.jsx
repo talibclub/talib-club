@@ -4,6 +4,7 @@ import { HW, STICKY_COLORS, STICKY_STYLES, FONT_OPTIONS } from './theme.js';
 import { StickyStyleThumb } from './canvasElements.jsx';
 import ColorPickerPanel from '../ColorPickerPanel';
 import EmojiStickerPicker from '../EmojiStickerPicker';
+import MindmapStylePicker from './MindmapStylePicker.jsx';
 import { LASSO_KINDS, TOOLS_WITH_OPTIONS, DEFAULT_LASSO_FILTER } from './notebookConstants.js';
 import { TOOL_GROUPS, WRITE_MODES, ACTION_TOOLS, readWriteMode, WRITE_MODE_KEY } from './notebookTools.js';
 
@@ -15,7 +16,7 @@ export default function NotebookToolCapsule({ ui }) {
   const { TOOL_BTN, WRITER_H, applyColorToActiveText, autoShape, clearStrokes,
     closeOverlays, colors, currentPage, currentPageIndex, customColors,
     deleteSelected, editingTextId, eraserSettings, handleToolsScroll,
-    insertEmoji, isCoarse, isRecording, laserColor, lassoFilter,
+    insertEmoji, insertIcon, isCoarse, isRecording, laserColor, lassoFilter,
     leftToolbarScroll, penColor, penOpacity, penSize, protractorOn, readonly, rememberCustomColor, rightToolbarScroll, rulerOn, scale, selectedId, setAutoShape, setCroppingImageId,
     connectorHasArrow, setConnectorHasArrow, setEraserSettings, setLaserColor, setLassoFilter, setPenColor,
     setPenOpacity, setPenSize, setProtractorOn, setRulerOn, setShapeType,
@@ -27,10 +28,14 @@ export default function NotebookToolCapsule({ ui }) {
     undo, redo, canUndo, canRedo,
   } = ui;
 
+  const mindmapStyle = currentPage?.mindmapStyle || 'classic';
+  const setMindmapStyle = (s) => updatePage(currentPageIndex, p => { p.mindmapStyle = s; });
+
   // Typing vs handwriting. Remembered per person, because which one you are is
   // not something you switch between minute to minute.
   const [writeMode, setWriteMode] = React.useState(readWriteMode);
   const [inkOpen, setInkOpen] = React.useState(false);
+  const [showMindmapStylePicker, setShowMindmapStylePicker] = React.useState(false);
   const showInk = WRITE_MODES[writeMode].showInk;
 
   React.useEffect(() => {
@@ -331,8 +336,20 @@ export default function NotebookToolCapsule({ ui }) {
               <div style={{ order: -2 }}>
                 <EmojiStickerPicker
                   onPick={(e) => insertEmoji(e)}
+                  onPickIcon={(iconName) => insertIcon(iconName)}
                   onUpload={() => { document.getElementById('image-upload').click(); setShowEmojiPicker(false); }}
                   onClose={() => setShowEmojiPicker(false)}
+                />
+              </div>
+            )}
+
+            {/* Mindmap style picker */}
+            {showMindmapStylePicker && (
+              <div style={{ order: -2 }}>
+                <MindmapStylePicker
+                  currentStyle={mindmapStyle}
+                  onPick={(s) => setMindmapStyle(s)}
+                  onClose={() => setShowMindmapStylePicker(false)}
                 />
               </div>
             )}
@@ -352,11 +369,18 @@ export default function NotebookToolCapsule({ ui }) {
                                 ))}
                              </div>
                              {shapeType === 'connector' && (
-                               <button
-                                 onClick={() => setConnectorHasArrow((v) => !v)}
-                                 title={connectorHasArrow ? 'เส้นเชื่อมมีหัวลูกศร — กดเพื่อเป็นเส้นธรรมดา' : 'เส้นเชื่อมธรรมดา — กดเพื่อใส่หัวลูกศร'}
-                                 style={{ height: 32, padding: '0 10px', borderRadius: 10, border: 'none', background: connectorHasArrow ? HW.accentSoft : 'rgba(0,0,0,0.04)', color: connectorHasArrow ? HW.accent : HW.textDim, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
-                               >{connectorHasArrow ? 'มีหัวลูกศร' : 'เส้นธรรมดา'}</button>
+                               <>
+                                 <button
+                                   onClick={() => setConnectorHasArrow((v) => !v)}
+                                   title={connectorHasArrow ? 'เส้นเชื่อมมีหัวลูกศร — กดเพื่อเป็นเส้นธรรมดา' : 'เส้นเชื่อมธรรมดา — กดเพื่อใส่หัวลูกศร'}
+                                   style={{ height: 32, padding: '0 10px', borderRadius: 10, border: 'none', background: connectorHasArrow ? HW.accentSoft : 'rgba(0,0,0,0.04)', color: connectorHasArrow ? HW.accent : HW.textDim, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                                 >{connectorHasArrow ? 'มีหัวลูกศร' : 'เส้นธรรมดา'}</button>
+                                 <button
+                                   onClick={() => setShowMindmapStylePicker(v => !v)}
+                                   title="เลือกสไตล์มายแมพ"
+                                   style={{ display: 'flex', alignItems: 'center', gap: 6, height: 32, padding: '0 10px', borderRadius: 10, border: 'none', background: showMindmapStylePicker ? HW.accentSoft : 'rgba(0,0,0,0.04)', color: showMindmapStylePicker ? HW.accent : HW.textDim, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                                 ><Spline size={16} /> สไตล์มายแมพ</button>
+                               </>
                              )}
                              <div style={{ width: 1, background: HW.hairline, height: 22, flexShrink: 0 }}></div>
                            </>
