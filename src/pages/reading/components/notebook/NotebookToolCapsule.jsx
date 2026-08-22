@@ -221,6 +221,7 @@ export default function NotebookToolCapsule({ ui }) {
                          aria-pressed={active}
                          onClick={() => {
                             if (t.id === 'image') { document.getElementById('image-upload').click(); return; }
+                            if (t.id === 'pdfWidget') { document.getElementById('pdf-widget-upload').click(); return; }
                             if (t.id === 'mic') { toggleRecording(); return; }
                             if (t.id === 'emoji') { togglePanel('emoji', setShowEmojiPicker, showEmojiPicker); return; }
                             if (t.id === 'ruler') { setRulerOn(v => !v); return; }

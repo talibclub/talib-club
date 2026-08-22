@@ -1,4 +1,4 @@
-import { PenTool, Highlighter, Eraser, Type, Square, Lasso, Pencil, Pointer, StickyNote, Brush, Feather, Ruler, Compass, Smile, Mic, Wand2, Image as ImageIcon } from 'lucide-react';
+import { PenTool, Highlighter, Eraser, Type, Square, Lasso, Pencil, Pointer, StickyNote, Brush, Feather, Ruler, Compass, Smile, Mic, Wand2, Image as ImageIcon, FileText } from 'lucide-react';
 
 // The notebook's tools, grouped.
 //
@@ -17,6 +17,7 @@ export const TOOL_GROUPS = {
     { id: 'text', icon: Type, title: 'พิมพ์ข้อความ', label: 'ข้อความ' },
     { id: 'sticker', icon: StickyNote, title: 'โน้ตติดกระดาษ', label: 'โน้ต' },
     { id: 'image', icon: ImageIcon, title: 'แทรกรูปภาพ', label: 'รูป' },
+    { id: 'pdfWidget', icon: FileText, title: 'วาง PDF บนกระดาน', label: 'PDF' },
     { id: 'shape', icon: Square, title: 'รูปทรง เส้น ลูกศร', label: 'รูปทรง' },
     { id: 'eraser', icon: Eraser, title: 'ยางลบ', label: 'ลบ' },
   ],

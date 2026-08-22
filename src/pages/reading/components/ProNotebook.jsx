@@ -595,7 +595,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // geometry for viewing and export.
   const isInfiniteCanvas = !currentPage.src && currentPage.infinite !== false;
   const isCurrentPageEmpty = !currentPage.src
-    && !(currentPage.lines?.length || currentPage.stickers?.length || currentPage.images?.length || currentPage.texts?.length || currentPage.shapes?.length);
+    && !(currentPage.lines?.length || currentPage.stickers?.length || currentPage.images?.length || currentPage.pdfs?.length || currentPage.texts?.length || currentPage.shapes?.length);
   const pageX = Math.max(0, (dimensions.width - currentPage.width * scale) / 2 / scale);
   const pageY = 20;
 
@@ -1778,6 +1778,88 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      activeBook, dimensions, pages, setPages, setCurrentPageIndex,
      pushHistory, setLoadingPdf, onPdfPageCount, pagesRef,
   });
+  // PDF Widget upload and pagination
+  const handlePdfWidgetUpload = async (e) => {
+     const file = e.target.files[0];
+     e.target.value = null;
+     if (!file || file.type !== 'application/pdf') return;
+     
+     toast.loading('กำลังอัปโหลดและประมวลผล PDF...', { id: 'pdf-widget' });
+     try {
+        const storageRef = ref(storage, `notebooks/${uid || 'guest'}/${Date.now()}_${file.name}`);
+        await uploadBytes(storageRef, file);
+        const fileUrl = await getDownloadURL(storageRef);
+        
+        const pdf = await pdfjsLib.getDocument({ url: fileUrl }).promise;
+        const numPages = pdf.numPages;
+        
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 1.5 });
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await page.render({ canvasContext: context, viewport }).promise;
+        const currentDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        canvas.width = 0; canvas.height = 0;
+        
+        pushHistory();
+        updatePage(currentPageIndex, (p) => {
+           if (!p.pdfs) p.pdfs = [];
+           p.pdfs.push({
+             id: nextObjectId(),
+             x: pageX + 100,
+             y: pageY + 100,
+             width: 400,
+             height: 400 * (viewport.height / viewport.width),
+             scaleX: 1,
+             scaleY: 1,
+             fileUrl,
+             fileName: file.name,
+             numPages,
+             currentPage: 1,
+             currentDataUrl
+           });
+        });
+        toast.success('แทรก PDF เป็น Widget แล้ว', { id: 'pdf-widget' });
+     } catch (err) {
+        console.error(err);
+        toast.error('ไม่สามารถอัปโหลด PDF ได้', { id: 'pdf-widget' });
+     }
+  };
+
+  const changePdfWidgetPage = async (pdfId, newPage) => {
+     const pdfObj = currentPage.pdfs?.find(p => p.id === pdfId);
+     if (!pdfObj) return;
+     if (newPage < 1 || newPage > pdfObj.numPages) return;
+     
+     toast.loading(`กำลังโหลดหน้า ${newPage}...`, { id: 'pdf-page' });
+     try {
+        const pdf = await pdfjsLib.getDocument({ url: pdfObj.fileUrl }).promise;
+        const page = await pdf.getPage(newPage);
+        const viewport = page.getViewport({ scale: 1.5 });
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await page.render({ canvasContext: context, viewport }).promise;
+        const currentDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        canvas.width = 0; canvas.height = 0;
+        
+        updatePage(currentPageIndex, (p) => {
+           const obj = p.pdfs?.find(x => x.id === pdfId);
+           if (obj) {
+              obj.currentPage = newPage;
+              obj.currentDataUrl = currentDataUrl;
+           }
+        });
+        toast.success(`เปลี่ยนเป็นหน้า ${newPage} แล้ว`, { id: 'pdf-page' });
+     } catch (err) {
+        console.error(err);
+        toast.error('โหลดหน้าไม่สำเร็จ', { id: 'pdf-page' });
+     }
+  };
+
 
   // Lasso operations. Built here rather than at the top of the component because
   // they are handed lassoBounds and updatePage, both of which are derived above
@@ -2536,6 +2618,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
       <input type="file" id="pdf-upload" accept="application/pdf" style={{ display: 'none' }} onChange={handleFileUpload} />
       <input type="file" id="image-upload" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
+      <input type="file" id="pdf-widget-upload" accept="application/pdf" style={{ display: 'none' }} onChange={handlePdfWidgetUpload} />
 
       {loadingPdf && (
          <div style={{ position: 'absolute', inset: 0, zIndex: 10, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -2662,6 +2745,51 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                 onTap={() => { if (tool === 'pan' || tool === 'lasso') selectShape(img.id); }}
               >
                  <PDFPageImage src={img.src} width={img.width} height={img.height} />
+              </Group>
+            ))}
+            
+            {/* PDF Widgets */}
+            {currentPage.pdfs && currentPage.pdfs.map((pdf) => (
+              <Group 
+                key={pdf.id}
+                id={pdf.id}
+                name="object"
+                x={pdf.x + (objectOffset('pdfs', pdf.id)?.x || 0)}
+                y={pdf.y + (objectOffset('pdfs', pdf.id)?.y || 0)}
+                scaleX={pdf.scaleX || 1}
+                scaleY={pdf.scaleY || 1}
+                rotation={pdf.rotation || 0}
+                draggable={tool === 'pan' || tool === 'pdfWidget'}
+                listening={['pan', 'lasso', 'select', 'pdfWidget'].includes(tool) || selectedId === pdf.id}
+                onDragEnd={(e) => {
+                   pushHistory();
+                  const { x, y } = e.target.position();
+                  updatePage(currentPageIndex, (page) => {
+                    const p = page.pdfs.find(i => i.id === pdf.id);
+                    if(p) { p.x = x; p.y = y; }
+                  });
+                }}
+                onTransformEnd={(e) => {
+                  const node = e.target;
+                  updatePage(currentPageIndex, (page) => {
+                    const p = page.pdfs.find(i => i.id === pdf.id);
+                    if(p) {
+                       p.x = node.x();
+                       p.y = node.y();
+                       p.scaleX = node.scaleX();
+                       p.scaleY = node.scaleY();
+                       p.rotation = node.rotation();
+                    }
+                  });
+                }}
+                onClick={() => { if (['pan', 'lasso', 'pdfWidget'].includes(tool)) selectShape(pdf.id); }}
+                onTap={() => { if (['pan', 'lasso', 'pdfWidget'].includes(tool)) selectShape(pdf.id); }}
+              >
+                 {pdf.currentDataUrl ? (
+                    <PDFPageImage src={pdf.currentDataUrl} width={pdf.width} height={pdf.height} />
+                 ) : (
+                    <Rect width={pdf.width} height={pdf.height} fill="#f3f4f6" stroke="#d1d5db" />
+                 )}
               </Group>
             ))}
             
@@ -3482,6 +3610,29 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           />
         );
       })()}
+
+      {/* PDF Widget Controls */}
+      {currentPage.pdfs?.map(pdf => {
+         const x = (pdf.x + pageX) * scale + position.x;
+         const y = (pdf.y + pageY) * scale + position.y;
+         const screenWidth = pdf.width * scale;
+         const scaleY = pdf.scaleY || 1;
+         const screenHeight = pdf.height * scaleY * scale;
+         
+         return (
+            <div key={pdf.id} style={{ position: 'absolute', top: y - 36, left: x, width: screenWidth, zIndex: 10, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+               <div style={{ background: 'white', borderRadius: 8, padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.1)', pointerEvents: 'auto' }}>
+                  <FileText size={16} color="#EF4444" />
+                  <span style={{ fontSize: 12, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#111827', fontWeight: 600 }}>{pdf.fileName}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                     <button onClick={() => changePdfWidgetPage(pdf.id, pdf.currentPage - 1)} disabled={pdf.currentPage <= 1} style={{ border: 'none', background: 'transparent', cursor: pdf.currentPage <= 1 ? 'default' : 'pointer', color: pdf.currentPage <= 1 ? '#D1D5DB' : '#374151' }}>{'<'}</button>
+                     <span style={{ fontSize: 12, fontWeight: 500, color: '#374151' }}>{pdf.currentPage} / {pdf.numPages}</span>
+                     <button onClick={() => changePdfWidgetPage(pdf.id, pdf.currentPage + 1)} disabled={pdf.currentPage >= pdf.numPages} style={{ border: 'none', background: 'transparent', cursor: pdf.currentPage >= pdf.numPages ? 'default' : 'pointer', color: pdf.currentPage >= pdf.numPages ? '#D1D5DB' : '#374151' }}>{'>'}</button>
+                  </div>
+               </div>
+            </div>
+         );
+      })}
 
       {/* Floating text editor (format toolbar + textarea) */}
       {(() => {
