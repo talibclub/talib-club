@@ -13,6 +13,8 @@
 //     Duplicating on purpose always offsets the copy by 24px, so an exact
 //     overlap is never something a person asked for.
 
+import { sanitizeNotebookPages } from '../../../../utils/thaiText.js';
+
 const KINDS = ['lines', 'stickers', 'images', 'texts', 'shapes'];
 
 const signature = (obj) => {
@@ -57,10 +59,12 @@ export function dedupePage(page) {
 export function dedupePages(pages) {
   if (!Array.isArray(pages)) return { pages, removed: 0 };
   let removed = 0;
-  const next = pages.map((p) => {
+  const deduped = pages.map((p) => {
     const r = dedupePage(p);
     removed += r.removed;
     return r.removed ? r.page : p;
   });
-  return { pages: removed ? next : pages, removed };
+  const sanitized = sanitizeNotebookPages(deduped);
+  return { pages: sanitized, removed };
 }
+

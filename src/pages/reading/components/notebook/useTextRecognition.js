@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import toast from 'react-hot-toast';
 import { nextObjectId } from './notebookAssets.js';
 import { TEXT_BOX_WIDTH } from './theme.js';
+import { normalizeThaiText } from '../../../../utils/thaiText.js';
 
 // Reading text off the page: OCR on an image, and turning a lassoed piece of
 // handwriting into an editable note.
@@ -32,7 +33,7 @@ export function useTextRecognition({
           }
         },
       });
-      const text = (data?.text || '').trim();
+      const text = normalizeThaiText((data?.text || '').trim());
       if (!text) { toast.error('ไม่พบข้อความในรูปนี้', { id: 'ocr' }); return; }
       pushHistory();
       updatePage(currentPageIndex, (page) => {
@@ -116,7 +117,7 @@ export function useTextRecognition({
           }
         },
       });
-      const text = (data?.text || '').replace(/\n{3,}/g, '\n\n').trim();
+      const text = normalizeThaiText((data?.text || '').replace(/\n{3,}/g, '\n\n').trim());
       if (!text) {
         // Nothing recognised — put the ink back exactly where it was.
         bakeLassoSelection();

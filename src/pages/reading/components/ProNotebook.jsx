@@ -28,6 +28,7 @@ import { useSnapping } from './notebook/useSnapping.js';
 import { konvaFontStyle, stickerTextStyle } from './notebook/stickerText.js';
 import { backlinksTo, resolveLinkIndex } from './notebook/wikiLinks.js';
 import { dedupePages } from './notebook/dedupePage.js';
+import { normalizeThaiText } from '../../../utils/thaiText.js';
 import { boardPaperStyle, grownPageSize, pageContentBounds } from './notebook/pageGrowth.js';
 import { branchColorFor, branchCurvePoints, branchAngledPoints, branchStraightPoints, childIdsOf, childPlacement, makeBranchConnector, parentIdOf, revealOffset, siblingPlacement, MINDMAP_STYLES, DEFAULT_MINDMAP_STYLE } from './notebook/mindmap.js';
 import KonvaIcon from './notebook/KonvaIcon.jsx';
@@ -111,7 +112,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               setPages(cleaned.pages);
               toast.success("ซิงก์ข้อมูลสำเร็จ!", { id: "cloud-sync" });
               if (cleaned.removed) {
-                 toast(`เน€เธโฌเน€เธยเน€เธยเน€เธยเน€เธยเน€เธเธเน€เธเธ’เน€เธโ€เน€เธเธเน€เธเธ‘เน€เธโ€ขเน€เธโ€“เน€เธเธเน€เธโ€”เน€เธเธ•เน€เธยเน€เธยเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ‘เน€เธยเน€เธเธเน€เธเธเน€เธเธเน€เธย ${cleaned.removed} เน€เธยเน€เธเธ”เน€เธยเน€เธย`, { icon: 'เนยเธเธ', duration: 5000 });
+                 toast(`เคลียร์วัตถุที่ซ้ำกันออกไป ${cleaned.removed} ชิ้นแล้ว`, { icon: '🧹', duration: 5000 });
               }
            }
            // null = notebook doesn't exist yet → a fresh blank book is correct.
@@ -124,9 +125,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                  const cleaned = dedupePages(JSON.parse(saved));
                  setPages(cleaned.pages);
                  loadStateRef.current = 'ready';
-                 toast.error("เน€เธเธเน€เธเธเน€เธยเน€เธยเน€เธเธ…เน€เธยเน€เธย: เน€เธยเน€เธเธเน€เธเธ…เน€เธโ€เน€เธยเน€เธเธ’เน€เธยเน€เธโฌเน€เธยเน€เธเธเน€เธเธ—เน€เธยเน€เธเธเน€เธยเน€เธยเน€เธโ€”เน€เธย", { id: "cloud-sync" });
+                 toast.error("ออฟไลน์: โหลดจากเครื่องแทน", { id: "cloud-sync" });
                  if (cleaned.removed) {
-                    toast(`เน€เธโฌเน€เธยเน€เธยเน€เธยเน€เธยเน€เธเธเน€เธเธ’เน€เธโ€เน€เธเธเน€เธเธ‘เน€เธโ€ขเน€เธโ€“เน€เธเธเน€เธโ€”เน€เธเธ•เน€เธยเน€เธยเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ‘เน€เธยเน€เธเธเน€เธเธเน€เธเธเน€เธย ${cleaned.removed} เน€เธยเน€เธเธ”เน€เธยเน€เธย`, { icon: 'เนยเธเธ', duration: 5000 });
+                 toast(`เคลียร์วัตถุที่ซ้ำกันออกไป ${cleaned.removed} ชิ้นแล้ว`, { icon: '🧹', duration: 5000 });
                  }
               } catch (parseErr) {
                  console.error("Local backup unreadable", parseErr);
@@ -136,7 +137,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               loadStateRef.current = 'failed';
            }
            if (loadStateRef.current === 'failed') {
-              toast.error("เน€เธยเน€เธเธเน€เธเธ…เน€เธโ€เน€เธเธเน€เธเธเน€เธเธเน€เธโ€เน€เธยเน€เธยเน€เธยเน€เธโ€ขเน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธเธ“เน€เธโฌเน€เธเธเน€เธยเน€เธย เนโฌโ€ เน€เธยเน€เธเธ”เน€เธโ€เน€เธยเน€เธเธ’เน€เธเธเน€เธยเน€เธเธ‘เน€เธยเน€เธโ€”เน€เธเธ–เน€เธยเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ‘เน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธเธ’เน€เธเธเน€เธโฌเน€เธยเน€เธเธ—เน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ‘เน€เธยเน€เธยเน€เธยเน€เธเธเน€เธเธเน€เธเธเน€เธเธ…เน€เธโฌเน€เธโ€เน€เธเธ”เน€เธเธเน€เธเธเน€เธเธ’เน€เธเธ เน€เธเธ…เน€เธเธเน€เธยเน€เธเธเน€เธเธ•เน€เธโฌเน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธเธ•เน€เธยเน€เธยเน€เธเธเน€เธเธ‘เน€เธยเน€เธย", { id: "cloud-sync", duration: 10000 });
+              toast.error("โหลดสมุดโน้ตไม่สำเร็จ — ปิดการบันทึกไว้ชั่วคราวเพื่อป้องกันข้อมูลเดิมหาย ลองรีเฟรชอีกครั้ง", { id: "cloud-sync", duration: 10000 });
            }
         } finally {
            setIsSyncing(false);
@@ -155,7 +156,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               const cleaned = dedupePages(JSON.parse(saved));
               setPages(cleaned.pages);
               if (cleaned.removed) {
-                 toast(`เน€เธโฌเน€เธยเน€เธยเน€เธยเน€เธยเน€เธเธเน€เธเธ’เน€เธโ€เน€เธเธเน€เธเธ‘เน€เธโ€ขเน€เธโ€“เน€เธเธเน€เธโ€”เน€เธเธ•เน€เธยเน€เธยเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ‘เน€เธยเน€เธเธเน€เธเธเน€เธเธเน€เธย ${cleaned.removed} เน€เธยเน€เธเธ”เน€เธยเน€เธย`, { icon: 'เนยเธเธ', duration: 5000 });
+                 toast(`เคลียร์วัตถุที่ซ้ำกันออกไป ${cleaned.removed} ชิ้นแล้ว`, { icon: '🧹', duration: 5000 });
               }
            } catch { /* ignore */ }
         }
@@ -179,7 +180,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     if (typeof localStorage === 'undefined') return;
     if (localStorage.getItem('talib_lasso_pan_hint') === 'seen') return;
     localStorage.setItem('talib_lasso_pan_hint', 'seen');
-    toast('เน€เธยเน€เธเธเน€เธเธเน€เธโ€เน€เธยเน€เธยเน€เธเธเน€เธย: เน€เธยเน€เธยเน€เธยเน€เธเธเน€เธเธเน€เธยเน€เธยเน€เธเธ”เน€เธยเน€เธเธเน€เธโฌเน€เธเธ…เน€เธเธ—เน€เธยเน€เธเธเน€เธย/เน€เธยเน€เธเธเน€เธเธเน€เธเธเน€เธยเน€เธยเน€เธเธ’เน€เธยเน€เธโ€เน€เธยเน€เธโฌเน€เธเธ…เน€เธเธ เน€เธยเน€เธเธเน€เธยเน€เธโ€ขเน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธเธ…เน€เธเธ‘เน€เธยเน€เธโฌเน€เธยเน€เธเธเน€เธเธ—เน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธเธ—เน€เธเธ', { icon: 'เนยเธย', duration: 4500 });
+    toast('โหมดแบ่งหน้า: ใช้นิ้วเลื่อน/ซูมหน้าได้เลย ไม่ต้องสลับเครื่องมือ', { icon: '🖱️', duration: 4500 });
   }, [tool]);
 
   useEffect(() => {
@@ -468,7 +469,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         underline: false, strikethrough: false, align: 'left', list: 'none',
       });
     });
-    toast.success('เน€เธโฌเน€เธยเน€เธเธ”เน€เธยเน€เธเธเน€เธเธเน€เธเธ”เน€เธยเน€เธเธเน€เธยเน€เธเธ”เน€เธยเน€เธเธ…เน€เธยเน€เธเธ เน€เธยเน€เธยเน€เธยเน€เธโฌเน€เธยเน€เธเธเน€เธเธ—เน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธเธ—เน€เธเธเน€เธโฌเน€เธเธ…เน€เธเธ—เน€เธยเน€เธเธเน€เธย (เน€เธเธเน€เธเธ—เน€เธเธ) เน€เธโฌเน€เธยเน€เธเธ—เน€เธยเน€เธเธเน€เธเธเน€เธยเน€เธเธ’เน€เธเธ/เน€เธยเน€เธเธเน€เธเธ‘เน€เธยเน€เธยเน€เธยเน€เธเธ’เน€เธโ€', { id: 'emoji-add' });
+    toast.success('เพิ่มอิโมจิแล้ว ใช้เครื่องมือเลื่อน (มือ) เพื่อย้าย/ปรับขนาด', { id: 'emoji-add' });
   };
   
   const insertIcon = (iconName) => {
@@ -492,7 +493,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         color: penColor || '#111827',
       });
     });
-    toast.success('เน€เธโฌเน€เธยเน€เธเธ”เน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ…เน€เธยเน€เธเธ', { id: 'icon-add' });
+    toast.success('เพิ่มไอคอนแล้ว', { id: 'icon-add' });
   };
   
   const [showBookSnip, setShowBookSnip] = useState(false);
@@ -800,7 +801,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       // during this visit but becomes unusable after reload, so do not create a
       // misleading permanent-looking recording for a guest.
       if (!uid) {
-        toast.error('เน€เธยเน€เธเธเน€เธเธเน€เธโ€เน€เธเธ’เน€เธโฌเน€เธยเน€เธยเน€เธเธ’เน€เธเธเน€เธเธเน€เธยเน€เธเธเน€เธเธเน€เธยเน€เธยเน€เธยเน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธเธ‘เน€เธโ€เน€เธโฌเน€เธเธเน€เธเธ•เน€เธเธเน€เธย เน€เธโฌเน€เธยเน€เธเธ—เน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ‘เน€เธยเน€เธโ€”เน€เธเธ–เน€เธยเน€เธยเน€เธเธ…เน€เธเธเน€เธโฌเน€เธยเน€เธเธ”เน€เธโ€เน€เธยเน€เธเธ‘เน€เธยเน€เธย เน€เธเธ’เน€เธเธเน€เธเธเน€เธเธ…เน€เธเธ‘เน€เธยเน€เธยเน€เธโ€เน€เธย');
+        toast.error('กรุณาเข้าสู่ระบบก่อนอัดเสียง เพื่อให้บันทึกและเปิดฟังภายหลังได้');
         return;
       }
       try {
@@ -851,7 +852,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           });
           setShowRecordings(true);
 
-          toast.loading('เน€เธยเน€เธเธ“เน€เธเธ…เน€เธเธ‘เน€เธยเน€เธเธเน€เธเธ‘เน€เธยเน€เธยเน€เธเธเน€เธเธ…เน€เธโ€เน€เธโฌเน€เธเธเน€เธเธ•เน€เธเธเน€เธยเน€เธเธ…เน€เธยเน€เธยเน€เธเธ…เน€เธเธ’เน€เธเธเน€เธโ€เน€เธย...', { id: `upload-${stickerId}` });
+          toast.loading('กำลังอัปโหลดเสียงลงคลาวด์...', { id: `upload-${stickerId}` });
           
           try {
              const storageRef = ref(storage, `user_audio/${uid}/${Date.now()}.webm`);
@@ -865,7 +866,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                    s.isUploading = false;
                 }
              });
-             toast.success('เน€เธเธเน€เธเธ‘เน€เธยเน€เธยเน€เธเธเน€เธเธ…เน€เธโ€เน€เธโฌเน€เธเธเน€เธเธ•เน€เธเธเน€เธยเน€เธโฌเน€เธเธเน€เธเธเน€เธยเน€เธยเน€เธเธเน€เธเธ”เน€เธยเน€เธย!', { id: `upload-${stickerId}`, icon: 'เนยยเธ' });
+             toast.success('อัปโหลดเสียงเสร็จสิ้น!', { id: `upload-${stickerId}`, icon: '🎤' });
           } catch (err) {
              console.error(err);
              toast.error('อัปโหลดเสียงล้มเหลว', { id: `upload-${stickerId}` });
@@ -878,10 +879,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         
         mediaRecorder.start();
         setIsRecording(true);
-        toast('เน€เธยเน€เธเธ“เน€เธเธ…เน€เธเธ‘เน€เธยเน€เธเธเน€เธเธ‘เน€เธโ€เน€เธโฌเน€เธเธเน€เธเธ•เน€เธเธเน€เธย... (เน€เธยเน€เธโ€เน€เธเธเน€เธเธ•เน€เธยเน€เธยเน€เธเธเน€เธเธ‘เน€เธยเน€เธยเน€เธโฌเน€เธยเน€เธเธ—เน€เธยเน€เธเธเน€เธเธเน€เธเธเน€เธเธเน€เธโ€)', { icon: 'เนยโ€เธ”', duration: 4000 });
+        toast('กำลังอัดเสียง... (กดอีกครั้งเพื่อหยุด)', { icon: '🎙️', duration: 4000 });
       } catch (err) {
         console.error("Mic access denied", err);
-        toast.error('เน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธเธ’เน€เธเธเน€เธเธ’เน€เธเธเน€เธโ€“เน€เธโฌเน€เธยเน€เธยเน€เธเธ’เน€เธโ€“เน€เธเธ–เน€เธยเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธยเน€เธยเน€เธโ€เน€เธย');
+        toast.error('ไม่สามารถเข้าถึงไมโครโฟนได้');
       }
     }
   };
@@ -898,7 +899,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
        page.texts = [];
        page.shapes = [];
     });
-    toast.success('เน€เธเธ…เน€เธยเน€เธเธ’เน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ’เน€เธยเน€เธเธเน€เธเธเน€เธโ€เน€เธเธ’เน€เธเธเน€เธโฌเน€เธเธเน€เธเธ•เน€เธเธเน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธเธ');
+    toast.success('ล้างหน้ากระดาษเรียบร้อย');
   };
 
   const clearStrokes = () => {
@@ -928,7 +929,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   };
 
   const deletePage = () => {
-    if (pages.length <= 1) return toast.error("เน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธเธ’เน€เธเธเน€เธเธ’เน€เธเธเน€เธโ€“เน€เธเธ…เน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ’เน€เธเธเน€เธเธเน€เธโ€เน€เธโ€”เน€เธยเน€เธเธ’เน€เธเธเน€เธยเน€เธโ€เน€เธย");
+        toast.error('ไม่สามารถเข้าถึงไมโครโฟนได้');
     pushHistory();
     setPages(prev => {
        const newPages = [...prev];
@@ -959,7 +960,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     updatePage(currentPageIndex, (page) => {
        page.isBookmarked = !page.isBookmarked;
     });
-    toast.success(pages[currentPageIndex]?.isBookmarked ? "เน€เธเธ…เน€เธยเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธเน€เธเธ’เน€เธเธเน€เธยเน€เธยเน€เธยเน€เธเธ…เน€เธยเน€เธเธ" : "เน€เธโฌเน€เธยเน€เธเธ”เน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธเน€เธเธ’เน€เธเธเน€เธยเน€เธยเน€เธยเน€เธเธ…เน€เธยเน€เธเธ");
+    toast.success(pages[currentPageIndex]?.isBookmarked ? "ลบบุ๊กมาร์กแล้ว" : "เพิ่มบุ๊กมาร์กแล้ว");
   };
 
 
@@ -1041,7 +1042,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       penAutoSwitchDone.current = true;
       if (stylusMode !== 'pen') {
         setStylusMode('pen');
-        toast('เน€เธโ€ขเน€เธเธเน€เธเธเน€เธยเน€เธยเน€เธยเน€เธยเน€เธเธ’เน€เธยเน€เธยเน€เธเธ’เน€เธเธเน€เธยเน€เธโ€ขเน€เธเธ…เน€เธเธ‘เน€เธเธ: เน€เธยเน€เธเธ”เน€เธโ€เน€เธยเน€เธเธ’เน€เธเธเน€เธโฌเน€เธยเน€เธเธ•เน€เธเธเน€เธยเน€เธโ€เน€เธยเน€เธเธเน€เธเธเน€เธยเน€เธเธ”เน€เธยเน€เธเธเน€เธยเน€เธเธ…เน€เธยเน€เธเธ เน€เธยเน€เธยเน€เธยเน€เธยเน€เธเธ”เน€เธยเน€เธเธเน€เธโฌเน€เธเธ…เน€เธเธ—เน€เธยเน€เธเธเน€เธย/เน€เธยเน€เธเธเน€เธเธเน€เธเธเน€เธยเน€เธยเน€เธเธ’เน€เธยเน€เธโ€เน€เธยเน€เธโฌเน€เธเธ…เน€เธเธ', { icon: 'เนยยเนเธย', duration: 5000 });
+        toast('ตรวจพบปากกาสไตลัส: ปิดการเขียนด้วยนิ้วแล้ว ใช้นิ้วเลื่อน/ซูมหน้าได้เลย', { icon: '🖊️', duration: 5000 });
       }
     }
 
@@ -1516,7 +1517,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     if (kind === 'image') { document.getElementById('image-upload')?.click(); return; }
     if (kind === 'connector') {
       beginConnector(null);
-      toast('เน€เธเธ…เน€เธเธ’เน€เธยเน€เธยเน€เธเธ’เน€เธยเน€เธเธเน€เธเธ‘เน€เธโ€ขเน€เธโ€“เน€เธเธเน€เธเธเน€เธยเน€เธเธ–เน€เธยเน€เธยเน€เธยเน€เธยเน€เธเธเน€เธเธ‘เน€เธยเน€เธเธเน€เธเธ•เน€เธยเน€เธเธเน€เธเธ‘เน€เธโ€ขเน€เธโ€“เน€เธเธเน€เธโฌเน€เธยเน€เธเธ—เน€เธยเน€เธเธเน€เธโฌเน€เธยเน€เธเธ—เน€เธยเน€เธเธเน€เธเธ', { icon: 'เนยโ€โ€”' });
+      toast('ลากจากวัตถุหนึ่งไปยังอีกวัตถุเพื่อเชื่อม', { icon: '🔗' });
       return;
     }
     setTool(kind);
@@ -1622,7 +1623,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const removePolygonVertex = (id, k) => {
     const shp = pagesRef.current[currentPageIndex]?.shapes?.find(x => x.id === id);
     if (!shp || shp.type !== 'polygon') return;
-    if (shp.points.length / 2 <= 3) { toast('เน€เธเธเน€เธเธเน€เธยเน€เธเธเน€เธเธ…เน€เธเธ’เน€เธเธเน€เธโฌเน€เธเธเน€เธเธ…เน€เธเธ•เน€เธยเน€เธเธเน€เธเธเน€เธโ€ขเน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธเธ•เน€เธเธเน€เธเธเน€เธยเน€เธเธ’เน€เธยเน€เธยเน€เธยเน€เธเธเน€เธเธ 3 เน€เธยเน€เธเธเน€เธโ€'); return; }
+    if (shp.points.length / 2 <= 3) { toast('รูปหลายเหลี่ยมต้องมีอย่างน้อย 3 จุด'); return; }
     pushHistory();
     updatePage(currentPageIndex, (page) => {
       const sh = page.shapes.find(x => x.id === id);
@@ -1773,7 +1774,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // the link was written and a stale index would otherwise blank the notebook.
   const goToLinkedPage = (link) => {
      const target = resolveLinkIndex(pagesRef.current, link);
-     if (target === -1) { toast('เน€เธเธเน€เธยเน€เธยเน€เธเธ’เน€เธโ€”เน€เธเธ•เน€เธยเน€เธเธ…เน€เธเธ”เน€เธยเน€เธยเน€เธยเน€เธยเน€เธเธเน€เธยเน€เธโ€“เน€เธเธเน€เธยเน€เธเธ…เน€เธยเน€เธยเน€เธยเน€เธยเน€เธเธ…เน€เธยเน€เธเธ'); return; }
+     if (target === -1) { toast('หน้าที่ลิงก์ไปถูกลบไปแล้ว'); return; }
      selectShape(null);
      setCurrentPageIndex(target);
   };
@@ -1792,7 +1793,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      };
      pushHistory();
      setPages((prev) => [...prev, page]);
-     toast.success(name ? `เน€เธเธเน€เธเธเน€เธยเน€เธเธ’เน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ’ "${name}" เน€เธยเน€เธเธ…เน€เธยเน€เธเธ` : 'เน€เธเธเน€เธเธเน€เธยเน€เธเธ’เน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ’เน€เธยเน€เธเธเน€เธเธเน€เธยเน€เธยเน€เธเธ…เน€เธยเน€เธเธ');
+     toast.success(name ? `สร้างหน้า "${name}" แล้ว` : 'สร้างหน้าใหม่แล้ว');
      return { pageId: page.id, label: name || `หน้า ${pages.length + 1}` };
   };
 
@@ -1872,7 +1873,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      e.target.value = null;
      if (!file || file.type !== 'application/pdf') return;
      
-     toast.loading('เน€เธยเน€เธเธ“เน€เธเธ…เน€เธเธ‘เน€เธยเน€เธเธเน€เธเธ‘เน€เธยเน€เธยเน€เธเธเน€เธเธ…เน€เธโ€เน€เธยเน€เธเธ…เน€เธเธเน€เธยเน€เธเธเน€เธเธเน€เธเธเน€เธเธเน€เธเธ…เน€เธยเน€เธเธ… PDF...', { id: 'pdf-widget' });
+     toast.loading('กำลังอัปโหลดและประมวลผล PDF...', { id: 'pdf-widget' });
      try {
         const storageRef = ref(storage, `notebooks/${uid || 'guest'}/${Date.now()}_${file.name}`);
         await uploadBytes(storageRef, file);
@@ -2427,7 +2428,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
             <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#EF4444', animation: 'pulse 1.5s infinite' }}></div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#111827', fontFamily: 'Kanit, sans-serif' }}>{formatTime(recordingTimer)}</span>
             <button onClick={toggleRecording} style={{ marginLeft: 8, padding: '4px 12px', borderRadius: 16, border: 'none', background: '#FEE2E2', color: '#EF4444', fontWeight: 600, cursor: 'pointer' }}>
-               เน€เธเธเน€เธเธเน€เธเธเน€เธโ€
+               ย่อลง
             </button>
          </div>
       )}
@@ -2467,12 +2468,12 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       {!readonly && minimap?.hasOffscreenContent && (
         <div style={{ position: 'absolute', right: 14, top: 14, zIndex: 42 }}>
           {!showMinimap ? (
-            <button onClick={() => setShowMinimap(true)} title="เน€เธโฌเน€เธยเน€เธเธ”เน€เธโ€เน€เธยเน€เธยเน€เธยเน€เธโ€”เน€เธเธ•เน€เธยเน€เธเธเน€เธยเน€เธเธ" aria-label="เน€เธโฌเน€เธยเน€เธเธ”เน€เธโ€เน€เธยเน€เธยเน€เธยเน€เธโ€”เน€เธเธ•เน€เธยเน€เธเธเน€เธยเน€เธเธ" style={{ width: 38, height: 38, borderRadius: 12, border: `1px solid ${HW.hairline}`, background: HW.surface, color: HW.accent, cursor: 'pointer', boxShadow: '0 5px 14px rgba(35,31,27,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={() => setShowMinimap(true)} title="เปิดแผนที่ย่อ" aria-label="เปิดแผนที่ย่อ" style={{ width: 38, height: 38, borderRadius: 12, border: `1px solid ${HW.hairline}`, background: HW.surface, color: HW.accent, cursor: 'pointer', boxShadow: '0 5px 14px rgba(35,31,27,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <MapIcon size={19} strokeWidth={1.9} />
             </button>
           ) : (
             <div
-              title="เน€เธยเน€เธยเน€เธยเน€เธโ€”เน€เธเธ•เน€เธยเน€เธเธเน€เธยเน€เธเธ เนโฌโ€ เน€เธยเน€เธเธ…เน€เธเธ”เน€เธยเน€เธเธเน€เธเธเน€เธเธ—เน€เธเธเน€เธเธ…เน€เธเธ’เน€เธยเน€เธโฌเน€เธยเน€เธเธ—เน€เธยเน€เธเธเน€เธเธเน€เธยเน€เธเธ’เน€เธเธเน€เธเธเน€เธเธเน€เธเธเน€เธเธเน€เธเธเน€เธย"
+              title="แผนที่ย่อ — คลิกหรือลากเพื่อไปยังตำแหน่งต่างๆ"
               onPointerDown={panFromMinimap}
               onPointerMove={(event) => { if (event.buttons === 1) panFromMinimap(event); }}
               style={{ position: 'relative', width: minimap.width, height: minimap.height, overflow: 'hidden', borderRadius: 12, background: 'rgba(255,255,255,0.90)', border: `1px solid ${HW.hairline}`, boxShadow: '0 7px 20px rgba(35,31,27,0.14)', backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, cursor: 'crosshair', touchAction: 'none' }}
@@ -2483,7 +2484,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                 <span key={point.id} style={{ position: 'absolute', left: point.left - 2, top: point.top - 2, width: 4, height: 4, borderRadius: 99, background: point.color, boxShadow: '0 0 0 1px rgba(255,255,255,0.7)', pointerEvents: 'none' }} />
               ))}
               <div style={{ position: 'absolute', left: minimap.viewport.left, top: minimap.viewport.top, width: minimap.viewport.width, height: minimap.viewport.height, minWidth: 3, minHeight: 3, border: `1.5px solid ${HW.accent}`, borderRadius: 3, background: 'rgba(15,110,86,0.10)', boxSizing: 'border-box', pointerEvents: 'none' }} />
-              <button onPointerDown={(event) => event.stopPropagation()} onClick={() => setShowMinimap(false)} title="เน€เธยเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธยเน€เธยเน€เธโ€”เน€เธเธ•เน€เธยเน€เธเธเน€เธยเน€เธเธ" aria-label="เน€เธยเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธยเน€เธยเน€เธโ€”เน€เธเธ•เน€เธยเน€เธเธเน€เธยเน€เธเธ" style={{ position: 'absolute', right: 5, top: 5, width: 22, height: 22, padding: 0, border: 'none', borderRadius: 7, background: 'rgba(255,255,255,0.85)', color: HW.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
+              <button onPointerDown={(event) => event.stopPropagation()} onClick={() => setShowMinimap(false)} title="ซ่อนแผนที่ย่อ" aria-label="ซ่อนแผนที่ย่อ" style={{ position: 'absolute', right: 5, top: 5, width: 22, height: 22, padding: 0, border: 'none', borderRadius: 7, background: 'rgba(255,255,255,0.85)', color: HW.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
               <span style={{ position: 'absolute', left: 7, bottom: 5, color: HW.textDim, fontFamily: 'Kanit, sans-serif', fontSize: 9.5, fontWeight: 600, letterSpacing: 0.15, pointerEvents: 'none' }}>แผนที่</span>
             </div>
           )}
@@ -2519,7 +2520,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       {isDragOver && !readonly && (
         <div style={{ position: 'absolute', inset: 12, zIndex: 70, pointerEvents: 'none', border: `2.5px dashed ${HW.accent}`, borderRadius: 18, background: 'rgba(16,185,129,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'white', padding: '12px 22px', borderRadius: 999, boxShadow: '0 8px 28px rgba(0,0,0,0.14)', fontWeight: 700, color: HW.text, fontSize: 15 }}>
-            <ImageIcon size={20} color={HW.accent} /> เน€เธเธเน€เธเธ’เน€เธยเน€เธเธเน€เธเธเน€เธยเน€เธโ€”เน€เธเธ•เน€เธยเน€เธยเน€เธเธ•เน€เธยเน€เธโฌเน€เธยเน€เธเธ—เน€เธยเน€เธเธเน€เธยเน€เธโ€”เน€เธเธเน€เธยเน€เธเธ…เน€เธยเน€เธเธเน€เธเธเน€เธเธเน€เธโ€
+            <ImageIcon size={20} color={HW.accent} /> วางรูปที่นี่เพื่อแทรกลงสมุด
           </div>
         </div>
       )}
@@ -2531,7 +2532,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           <button onClick={dismissGettingStarted} title="ปิดคำแนะนำ" style={{ position: 'absolute', top: 10, right: 10, border: 'none', background: 'transparent', color: HW.textDim, cursor: 'pointer', display: 'flex', padding: 4 }}><X size={16} /></button>
           <div style={{ width: 42, height: 42, borderRadius: 14, margin: '0 auto 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: HW.accentSoft, color: HW.accent }}><PenTool size={22} /></div>
           <h3 style={{ margin: 0, color: HW.text, fontSize: 18 }}>เริ่มจดบนกระดานได้เลย</h3>
-          <p style={{ margin: '4px 0 14px', color: HW.textDim, fontSize: 13, lineHeight: 1.5 }}>เน€เธเธเน€เธยเน€เธยเน€เธเธ’เน€เธยเน€เธเธ•เน€เธยเน€เธโฌเน€เธยเน€เธยเน€เธยเน€เธยเน€เธเธเน€เธเธเน€เธโ€เน€เธเธ’เน€เธยเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธเน€เธย เน€เธโฌเน€เธเธ…เน€เธเธ—เน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ…เน€เธเธเน€เธยเน€เธเธเน€เธเธ’เน€เธเธเน€เธยเน€เธเธ—เน€เธยเน€เธยเน€เธโ€”เน€เธเธ•เน€เธยเน€เธโ€”เน€เธเธ“เน€เธยเน€เธเธ’เน€เธยเน€เธยเน€เธโ€เน€เธยเน€เธโ€ขเน€เธเธ’เน€เธเธเน€เธโ€ขเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ’เน€เธเธ</p>
+          <p style={{ margin: '4px 0 14px', color: HW.textDim, fontSize: 13, lineHeight: 1.5 }}>หน้านี้เป็นกระดานไร้ขอบ เลื่อนและขยายพื้นที่ทำงานได้ตามต้องการ</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 7 }}>
             <button onClick={() => { dismissGettingStarted(); startQuickAdd('text'); }} style={{ padding: '9px 8px', border: 'none', borderRadius: 11, background: HW.accent, color: 'white', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>พิมพ์ข้อความ</button>
             <button onClick={() => { dismissGettingStarted(); startQuickAdd('sticker'); }} style={{ padding: '9px 8px', border: 'none', borderRadius: 11, background: HW.accentSoft, color: HW.accent, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>พิมพ์ข้อความ</button>
@@ -2543,7 +2544,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       {showPdfHint && !readonly && activeBook?.book?.fileUrl && !isMobile && (
         <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 44, maxWidth: 'calc(100% - 24px)', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 12, background: 'rgba(255,251,235,0.97)', border: '1px solid #FDE68A', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', backdropFilter: 'blur(8px)' }}>
           <FileText size={18} color="#B45309" style={{ flexShrink: 0 }} />
-          <span style={{ fontSize: 12.5, color: '#92400E', lineHeight: 1.4 }}>เน€เธเธเน€เธยเน€เธยเน€เธเธ’ PDF เน€เธยเน€เธเธเน€เธยเน€เธเธเน€เธยเน€เธเธ‘เน€เธยเน€เธเธเน€เธเธ—เน€เธเธ <b>เน€เธโฌเน€เธยเน€เธเธ•เน€เธเธเน€เธยเน€เธโ€”เน€เธเธ‘เน€เธยเน€เธโ€ขเน€เธเธเน€เธยเน€เธย เน€เธยเน€เธเธเน€เธยเน€เธยเน€เธโ€เน€เธย</b> เนโฌโ€ เน€เธโ€ขเน€เธยเน€เธเธเน€เธยเน€เธโ€เน€เธเธ–เน€เธยเน€เธโฌเน€เธยเน€เธยเน€เธเธ’เน€เธเธเน€เธเธ’เน€เธยเน€เธยเน€เธยเน€เธยเน€เธยเน€เธโ€ขเน€เธยเน€เธยเน€เธเธเน€เธย</span>
+          <span style={{ fontSize: 12.5, color: '#92400E', lineHeight: 1.4 }}>หน้า PDF ของหนังสือ <b>เขียนทับตรงๆ ไม่ได้</b> — ต้องดึงเข้ามาในโน้ตก่อน</span>
           {/* The primary action said "ดึงหน้าจากหนังสือ" and opened the snip
               tool, which captures a region of one page. That is not what the
               words promise, and it is not what someone reading this hint wants:
@@ -2553,7 +2554,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
             onClick={() => { startLoadingPDF(); dismissPdfHint(); }}
             style={{ flexShrink: 0, border: 'none', background: HW.accent, color: 'white', fontWeight: 600, fontSize: 12, padding: '6px 12px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
           >
-            <BookOpen size={14} /> เน€เธโ€เน€เธเธ–เน€เธย PDF เน€เธโ€”เน€เธเธเน€เธยเน€เธเธเน€เธยเน€เธยเน€เธเธ’เน€เธโฌเน€เธยเน€เธยเน€เธเธ’เน€เธยเน€เธยเน€เธยเน€เธโ€ข
+            <BookOpen size={14} /> ดึง PDF ทุกหน้าเข้าโน้ต
           </button>
           <button
             onClick={() => { setBookSnipInitialPage(1); setShowBookSnip(true); dismissPdfHint(); }}
@@ -2698,12 +2699,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         <AiAssistantPanel
           onClose={() => setShowAi(false)}
           onInsertText={(text) => {
+            const clean = normalizeThaiText(text);
             pushHistory();
             updatePage(currentPageIndex, (page) => {
               if (!page.texts) page.texts = [];
-              page.texts.push({ id: nextObjectId('text'), text, x: 80, y: 80, color: '#111827', size: 22, fontFamily: 'Sarabun', bold: false, italic: false, underline: false, strikethrough: false, align: 'left', list: 'none', width: TEXT_BOX_WIDTH });
+              page.texts.push({ id: nextObjectId('text'), text: clean, x: 80, y: 80, color: '#111827', size: 22, fontFamily: 'Sarabun', bold: false, italic: false, underline: false, strikethrough: false, align: 'left', list: 'none', width: TEXT_BOX_WIDTH });
             });
-            toast.success('ครอบตัดรูปภาพเรียบร้อย');
+            toast.success('แทรกข้อความลงสมุดเรียบร้อย');
             setShowAi(false);
           }}
         />

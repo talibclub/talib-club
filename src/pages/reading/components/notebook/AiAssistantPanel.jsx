@@ -3,6 +3,7 @@ import Draggable from 'react-draggable';
 import { Sparkles, X, Send, Paperclip, FileText, Copy, StickyNote } from 'lucide-react';
 import { HW } from './theme.js';
 import { auth } from '../../../../lib/firebase.js';
+import { normalizeThaiText } from '../../../../utils/thaiText.js';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
 
@@ -22,20 +23,22 @@ async function extractTextFromPDF(file) {
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const strings = content.items.map(item => item.str);
-    fullText += strings.join(' ') + '\n';
+    const strings = content.items.map(item => normalizeThaiText(item.str || ''));
+    fullText += normalizeThaiText(strings.join(' ')) + '\n';
   }
-  return fullText;
+  return normalizeThaiText(fullText);
 }
 
 // Extract the assistant's reply from whatever JSON shape the upstream returns.
-const readAnswer = (data) =>
-  data?.choices?.[0]?.message?.content ||
-  data?.message?.content ||
-  data?.content ||
-  data?.answer ||
-  data?.response ||
-  (typeof data === 'string' ? data : '');
+const readAnswer = (data) => {
+  const raw = data?.choices?.[0]?.message?.content ||
+    data?.message?.content ||
+    data?.content ||
+    data?.answer ||
+    data?.response ||
+    (typeof data === 'string' ? data : '');
+  return normalizeThaiText(raw);
+};
 
 // Draggable AI panel: attach a PDF (or any file), ask a question, read the answer,
 // and drop it into the notebook as a text note. Talks to the /api/ai proxy so the
