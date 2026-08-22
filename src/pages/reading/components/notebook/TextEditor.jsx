@@ -583,7 +583,7 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
           font-style: normal;
           text-decoration: none;
         }
-        .pn-ed[data-empty="1"] .pn-ln::after {
+        .pn-ed[data-empty="1"]::before {
           /* "พิมพ์ข้อความที่นี่..." was instructions for a form. The caret is
              already at the spot and already blinking, so the only thing worth
              saying is what this editor can do that a plain box cannot. */
@@ -591,6 +591,9 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
           color: #B6B1A9;
           font-size: 0.82em;
           pointer-events: none;
+          position: absolute;
+          top: 2px;
+          left: 0;
         }
       `}</style>
 
