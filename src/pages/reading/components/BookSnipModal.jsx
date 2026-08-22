@@ -12,6 +12,7 @@ import { loadBookPdf } from '../utils/pdfCache.js';
 export default function BookSnipModal({ fileUrl, onInsert, onClose, initialPage = 1 }) {
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [pageNum, setPageNum] = useState(initialPage || 1);
+  const [pageInput, setPageInput] = useState(String(initialPage || 1));
   const [numPages, setNumPages] = useState(0);
   const [pageImg, setPageImg] = useState(null); // dataURL of the rendered page
   const [rendering, setRendering] = useState(false);
@@ -75,8 +76,18 @@ export default function BookSnipModal({ fileUrl, onInsert, onClose, initialPage 
     return () => { cancelled = true; };
   }, [fileUrl, renderPage]);
 
+  useEffect(() => {
+    setPageInput(String(pageNum));
+  }, [pageNum]);
+
   const goToPage = (n) => {
-    const clamped = Math.max(1, Math.min(numPages, n));
+    const parsed = parseInt(n, 10);
+    if (isNaN(parsed)) {
+      setPageInput(String(pageNum));
+      return;
+    }
+    const clamped = Math.max(1, Math.min(numPages || 1, parsed));
+    setPageInput(String(clamped));
     if (clamped === pageNum || !pdfRef.current) return;
     setPageNum(clamped);
     renderPage(pdfRef.current, clamped);
@@ -92,11 +103,12 @@ export default function BookSnipModal({ fileUrl, onInsert, onClose, initialPage 
     try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* pointer already gone */ }
     const rect = img.getBoundingClientRect();
     dragRef.current = { x0: e.clientX - rect.left, y0: e.clientY - rect.top };
-    setSel(null);
+    setSel({ x: dragRef.current.x0, y: dragRef.current.y0, w: 0, h: 0 });
   };
   const selMove = (e) => {
+    if (!dragRef.current) return;
     const img = imgRef.current;
-    if (!dragRef.current || !img) return;
+    if (!img) return;
     const rect = img.getBoundingClientRect();
     const x1 = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
     const y1 = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
@@ -140,12 +152,46 @@ export default function BookSnipModal({ fileUrl, onInsert, onClose, initialPage 
             </div>
           )}
           {status === 'ready' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.04)', borderRadius: 100, padding: '2px 4px' }}>
-              <button onClick={() => goToPage(pageNum - 1)} disabled={pageNum <= 1 || rendering} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'transparent', cursor: pageNum <= 1 ? 'default' : 'pointer', opacity: pageNum <= 1 ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(0,0,0,0.04)', borderRadius: 100, padding: '2px 6px' }}>
+              <button onClick={() => goToPage(pageNum - 1)} disabled={pageNum <= 1 || rendering} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'transparent', cursor: pageNum <= 1 ? 'default' : 'pointer', opacity: pageNum <= 1 ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#111827' }}>
                 <ChevronLeft size={17} />
               </button>
-              <span style={{ fontSize: 13, fontWeight: 600, minWidth: 56, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{pageNum} / {numPages}</span>
-              <button onClick={() => goToPage(pageNum + 1)} disabled={pageNum >= numPages || rendering} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'transparent', cursor: pageNum >= numPages ? 'default' : 'pointer', opacity: pageNum >= numPages ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={pageInput}
+                disabled={rendering}
+                onChange={(e) => setPageInput(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    goToPage(pageInput);
+                    e.currentTarget.blur();
+                  }
+                }}
+                onBlur={() => goToPage(pageInput)}
+                style={{
+                  width: `${Math.max(32, String(numPages || 100).length * 8.5 + 16)}px`,
+                  height: 24,
+                  padding: '0 4px',
+                  borderRadius: 6,
+                  border: '1px solid rgba(0,0,0,0.15)',
+                  background: 'white',
+                  textAlign: 'center',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: '#111827',
+                  outline: 'none',
+                  fontVariantNumeric: 'tabular-nums',
+                  fontFamily: 'Kanit, sans-serif',
+                  boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.06)'
+                }}
+                title="พิมพ์เลขหน้าแล้วกด Enter เพื่อไปยังหน้านั้นทันที"
+                aria-label="พิมพ์เลขหน้าที่ต้องการ"
+              />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#6B7280', paddingRight: 4, fontVariantNumeric: 'tabular-nums' }}>/ {numPages}</span>
+              <button onClick={() => goToPage(pageNum + 1)} disabled={pageNum >= numPages || rendering} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'transparent', cursor: pageNum >= numPages ? 'default' : 'pointer', opacity: pageNum >= numPages ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#111827' }}>
                 <ChevronRight size={17} />
               </button>
             </div>

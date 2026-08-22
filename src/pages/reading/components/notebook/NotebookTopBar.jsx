@@ -48,6 +48,21 @@ export default function NotebookTopBar({ ui }) {
   }, [syncHints]);
 
   const drag = useRef(null);
+  const [nbPageInput, setNbPageInput] = useState(String(currentPageIndex + 1));
+  useEffect(() => {
+    setNbPageInput(String(currentPageIndex + 1));
+  }, [currentPageIndex]);
+
+  const goToNbPage = (n) => {
+    const parsed = parseInt(n, 10);
+    if (isNaN(parsed)) {
+      setNbPageInput(String(currentPageIndex + 1));
+      return;
+    }
+    const clamped = Math.max(1, Math.min(pages.length || 1, parsed));
+    setNbPageInput(String(clamped));
+    setCurrentPageIndex(clamped - 1);
+  };
 
   return (
     <>
@@ -97,8 +112,40 @@ export default function NotebookTopBar({ ui }) {
                      style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent', cursor: currentPageIndex === 0 ? 'default' : 'pointer', opacity: currentPageIndex === 0 ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
                      <ChevronLeft size={16} strokeWidth={2} />
                    </button>
-                   <span style={{ fontSize: 12, fontWeight: 600, color: HW.text, minWidth: 38, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
-                     {currentPageIndex + 1} / {pages.length}
+                   <input
+                     type="text"
+                     inputMode="numeric"
+                     pattern="[0-9]*"
+                     value={nbPageInput}
+                     onChange={(e) => setNbPageInput(e.target.value)}
+                     onFocus={(e) => e.target.select()}
+                     onKeyDown={(e) => {
+                       if (e.key === 'Enter') {
+                         goToNbPage(nbPageInput);
+                         e.currentTarget.blur();
+                       }
+                     }}
+                     onBlur={() => goToNbPage(nbPageInput)}
+                     style={{
+                       width: `${Math.max(26, String(pages.length || 1).length * 8 + 12)}px`,
+                       height: 22,
+                       padding: '0 2px',
+                       borderRadius: 5,
+                       border: '1px solid rgba(0,0,0,0.12)',
+                       background: 'white',
+                       textAlign: 'center',
+                       fontSize: 12,
+                       fontWeight: 600,
+                       color: HW.text,
+                       outline: 'none',
+                       fontVariantNumeric: 'tabular-nums',
+                       fontFamily: 'inherit'
+                     }}
+                     title="พิมพ์เลขหน้าแล้วกด Enter เพื่อไปยังหน้านั้น"
+                     aria-label="พิมพ์เลขหน้าที่ต้องการ"
+                   />
+                   <span style={{ fontSize: 12, fontWeight: 600, color: HW.textDim, paddingRight: 2, fontVariantNumeric: 'tabular-nums' }}>
+                     / {pages.length}
                    </span>
                    <button
                      onClick={() => setCurrentPageIndex(Math.min(pages.length - 1, currentPageIndex + 1))}
