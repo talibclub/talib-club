@@ -2827,6 +2827,20 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                        if (sticker) { sticker.x = e.target.x(); sticker.y = e.target.y(); }
                     });
                   }}
+                  onTransform={(e) => {
+                    const node = e.target;
+                    updatePage(currentPageIndex, (page) => {
+                       const sticker = page.stickers.find(s => s.id === st.id);
+                       if (sticker) {
+                          sticker.x = node.x(); sticker.y = node.y();
+                          sticker.width = Math.max(90, (sticker.width || 150) * node.scaleX());
+                          sticker.height = Math.max(72, (sticker.height || 150) * node.scaleY());
+                          sticker.rotation = node.rotation();
+                       }
+                    });
+                    node.scaleX(1);
+                    node.scaleY(1);
+                  }}
                   onTransformEnd={(e) => {
                     const node = e.target;
                     pushHistory();
@@ -2834,14 +2848,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                        const sticker = page.stickers.find(s => s.id === st.id);
                        if (sticker) {
                           sticker.x = node.x(); sticker.y = node.y();
-                          // Store a real card size instead of a permanently
-                          // stretched 150px square. This keeps the font natural
-                          // when the reader drags a side handle to make room.
                           sticker.width = Math.max(90, (sticker.width || 150) * node.scaleX());
                           sticker.height = Math.max(72, (sticker.height || 150) * node.scaleY());
-                          sticker.scaleX = 1; sticker.scaleY = 1; sticker.rotation = node.rotation();
+                          sticker.rotation = node.rotation();
                        }
                     });
+                    node.scaleX(1);
+                    node.scaleY(1);
                   }}
                   // Pan selects the note so the context menu appears; the sticky-note
                   // tool goes straight into typing, which is what you want with it.
