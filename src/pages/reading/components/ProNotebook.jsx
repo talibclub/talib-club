@@ -1909,7 +1909,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              currentDataUrl
            });
         });
-        toast.success('อัปโหลดเสียงเสร็จสิ้น!', { id: `upload-${stickerId}`, icon: '🎤' });
+        toast.success('อัปโหลด PDF เสร็จสิ้น!', { id: 'pdf-widget', icon: '📄' });
      } catch (err) {
         console.error(err);
         toast.error('ไม่สามารถอัปโหลด PDF ได้', { id: 'pdf-widget' });
@@ -2506,7 +2506,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                <button
                  key={b.index}
                  onClick={() => { selectShape(null); setCurrentPageIndex(b.index); }}
-                 title={`ไปหน้า ${im.sourcePage} ในหนังสือต้นฉบับ`}
+                 title={`ไปหน้า ${b.label}`}
                  style={{ flexShrink: 0, border: 'none', background: HW.accentSoft, color: HW.accent, fontSize: 11.5, fontWeight: 600, fontFamily: 'Kanit, sans-serif', padding: '3px 9px', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}
                >
                  {b.label}
