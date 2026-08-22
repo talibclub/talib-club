@@ -1,10 +1,10 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { Image as KonvaImage } from 'react-konva';
 import { renderToString } from 'react-dom/server';
-import { ICON_MAP } from './icons.js';
+import { ALL_ICONS } from './icons.js';
 
 export default function KonvaIcon({ iconName, color, width, height, ...props }) {
-  const IconComponent = ICON_MAP[iconName] || ICON_MAP['Star'];
+  const IconComponent = ALL_ICONS[iconName] || ALL_ICONS['Star'];
   const [image, setImage] = useState(null);
 
   useEffect(() => {
