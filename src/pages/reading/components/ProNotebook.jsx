@@ -360,6 +360,49 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     }
   }, [selectedId, currentPageIndex, editingTextId, editingStickerId]);
 
+  const autoLayoutMindmap = (rootId) => {
+    const page = pagesRef.current[currentPageIndex];
+    if (!page) return;
+    const updates = {};
+    const getChildren = (nodeId) => (page.shapes || []).filter(s => s.type === 'connector' && s.from?.id === nodeId && s.to?.id).map(s => s.to.id);
+    const layoutNode = (nodeId, startX, startY) => {
+      const box = objectBoundsById(nodeId);
+      if (!box) return startY;
+      const width = box.maxX - box.minX;
+      const height = box.maxY - box.minY;
+      updates[nodeId] = { x: startX, y: startY, dx: startX - box.minX, dy: startY - box.minY };
+      let maxSubY = startY + height;
+      const children = getChildren(nodeId);
+      if (children.length > 0) {
+        const childX = startX + width + 90;
+        let childStartY = startY;
+        for (const childId of children) {
+          const childMaxY = layoutNode(childId, childX, childStartY);
+          childStartY = childMaxY + 22;
+          maxSubY = Math.max(maxSubY, childMaxY);
+        }
+      }
+      return maxSubY;
+    };
+    const rootBox = objectBoundsById(rootId);
+    if (!rootBox) return;
+    layoutNode(rootId, rootBox.minX, rootBox.minY);
+    pushHistory();
+    updatePage(currentPageIndex, (p) => {
+      ['texts', 'shapes', 'images', 'pdfs', 'stickers'].forEach(kind => {
+        if (p[kind]) {
+          p[kind].forEach(obj => {
+            if (updates[obj.id]) {
+              obj.x += updates[obj.id].dx;
+              obj.y += updates[obj.id].dy;
+            }
+          });
+        }
+      });
+    });
+    selectShape(null);
+  };
+
   const checkDeselect = (e) => {
     const clickedOnEmpty = e.target === e.target.getStage() || e.target.name() === 'background';
     if (clickedOnEmpty) {
@@ -1230,7 +1273,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     // Shared hit predicates, reused for the "did we hit anything?" check and for
     // the actual filtering inside updatePage (which must run against the latest
     // draft, not this snapshot, so fast strokes never resurrect erased items).
-    const lineKeep = (l) => !strokeHitsPoint(l, pos, radius, distToSegmentXY);
+    const lineKeep = (l) => {
+      if (l.pdfId) {
+        const pdf = page.pdfs?.find(p => p.id === l.pdfId);
+        if (pdf && pdf.currentPage !== l.pdfPage) return true;
+      }
+      return !strokeHitsPoint(l, pos, radius, distToSegmentXY);
+    };
     const shapeKeep = (s) => {
       const b = s.type === 'polygon' ? polygonBounds(s.points)
         : s.type === 'connector' ? (() => { const { a, b: bb } = connectorPoints(s); return { minX: Math.min(a.x, bb.x), maxX: Math.max(a.x, bb.x), minY: Math.min(a.y, bb.y), maxY: Math.max(a.y, bb.y) }; })()
@@ -1288,6 +1337,18 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       if (p.dist <= RULER_SNAP) { start = { x: p.x, y: p.y }; ruled = true; }
     }
 
+    let pdfBinding = null;
+    const page = pagesRef.current[currentPageIndex];
+    if (page && page.pdfs && strokeTool !== 'eraser') {
+       for (let i = page.pdfs.length - 1; i >= 0; i--) {
+          const p = page.pdfs[i];
+          if (pos.x >= p.x && pos.x <= p.x + p.width && pos.y >= p.y && pos.y <= p.y + p.height) {
+             pdfBinding = { pdfId: p.id, pdfPage: p.currentPage };
+             break;
+          }
+       }
+    }
+
     const stroke = {
       // Strokes were rendered with key={index}. Erasing one in the middle of a
       // page shifted every later index, so React re-created the whole list
@@ -1298,6 +1359,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       size: strokeTool === 'eraser' ? eraserSettings.size : penSize,
       opacity: penOpacity,
       points: [start.x, start.y],
+      ...(pdfBinding || {}),
       pressures: [pressure],
       startTime: relativeTime,
       recordingId: isRecording ? recordingIdRef.current : null,
@@ -2102,8 +2164,15 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
        (page.lines || []).forEach((line) => {
           let hit = false;
           if (want.lines) {
-             for (let i = 0; i < line.points.length; i += 2) {
-                if (pointInPolygon(line.points[i], line.points[i + 1], path)) { hit = true; break; }
+             let isVisible = true;
+             if (line.pdfId) {
+                const pdf = page.pdfs?.find(p => p.id === line.pdfId);
+                if (pdf && pdf.currentPage !== line.pdfPage) isVisible = false;
+             }
+             if (isVisible) {
+               for (let i = 0; i < line.points.length; i += 2) {
+                  if (pointInPolygon(line.points[i], line.points[i + 1], path)) { hit = true; break; }
+               }
              }
           }
           (hit ? inside : outside).push(line);
@@ -2688,6 +2757,20 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       )}
 
       
+      {/* PDF Stroke Filtering */}
+      {(() => {
+         const visibleLines = (currentPage.lines || []).filter(line => {
+           if (line.pdfId) {
+             const pdf = currentPage.pdfs?.find(p => p.id === line.pdfId);
+             if (!pdf) return true;
+             return pdf.currentPage === line.pdfPage;
+           }
+           return true;
+         });
+         // Override currentPage.lines temporarily during render
+         currentPage._visibleLines = visibleLines;
+      })()}
+
       <Stage
         ref={stageRef}
         width={dimensions.width}
@@ -3366,7 +3449,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         <Layer>
           <Group x={pageX} y={pageY} clipX={0} clipY={0} clipWidth={currentPage.width} clipHeight={currentPage.height}>
             {/* Strokes */}
-            <CommittedStrokes lines={currentPage.lines} playbackTime={playbackTime} nowPlayingId={nowPlaying?.id} />
+            <CommittedStrokes lines={currentPage._visibleLines || currentPage.lines} playbackTime={playbackTime} nowPlayingId={nowPlaying?.id} />
             {/* The stroke under the pointer lives here so committed ink stays untouched
                 while drawing. It has to share this layer for the area eraser's
                 destination-out compositing to bite into the ink below it. */}
@@ -3925,7 +4008,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               )}
             </Layer>
             <Layer>
-              <CommittedStrokes lines={currentPage.lines} playbackTime={playbackTime} nowPlayingId={nowPlaying?.id} />
+              <CommittedStrokes lines={currentPage._visibleLines || currentPage.lines} playbackTime={playbackTime} nowPlayingId={nowPlaying?.id} />
               {liveStroke && <StrokeShape line={liveStroke} />}
             </Layer>
           </Stage>
