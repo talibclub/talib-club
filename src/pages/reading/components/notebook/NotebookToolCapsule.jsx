@@ -109,7 +109,16 @@ export default function NotebookToolCapsule({ ui }) {
       {/* Huawei Notes floating tool capsule (bottom-centered, overlays the canvas) */}
       {!readonly && (
          <div ref={wrapRef} style={{ position: 'absolute', bottom: zoomWriter ? WRITER_H + 44 + 14 : 20, left: '50%', transform: 'translateX(-50%)', zIndex: 46, maxWidth: 'calc(100% - 24px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, transition: 'bottom 0.22s cubic-bezier(0.2,0.8,0.2,1)' }}>
-            <div style={{ height: TOOL_BTN + 12, background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, borderRadius: HW.radius, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`, display: 'flex', alignItems: 'center', padding: '0 8px', gap: isCoarse ? 4 : 6, maxWidth: '100%' }}>
+            <div
+                 style={{
+                   display: 'flex', alignItems: 'center', gap: 6,
+                   background: 'rgba(255, 255, 255, 0.85)', 
+                   backdropFilter: 'saturate(200%) blur(24px)', WebkitBackdropFilter: 'saturate(200%) blur(24px)',
+                   padding: '8px 12px', borderRadius: 32,
+                   boxShadow: '0 16px 48px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0,0,0,0.1)', 
+                   border: `1px solid rgba(255, 255, 255, 0.5)`,
+                   maxWidth: '100%', flexShrink: 0,
+                 }}>
                  {/* Typing vs handwriting. Sits first because it changes what
                      the rest of the row contains. */}
                  <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0, background: 'rgba(35,31,27,0.06)', borderRadius: 999, padding: 3, marginRight: 3 }}>
@@ -329,7 +338,7 @@ export default function NotebookToolCapsule({ ui }) {
 
             {/* Tool options popover — floats above the capsule, Huawei style */}
             {showToolOptions && TOOLS_WITH_OPTIONS.includes(tool) && (
-              <div className="hide-scroll" style={{ order: -1, display: 'flex', alignItems: 'center', gap: 7, maxWidth: '100%', overflowX: 'auto', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, borderRadius: 16, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`, padding: '7px 12px' }} onWheel={(e) => { if (e.deltaY !== 0) e.currentTarget.scrollLeft += e.deltaY; }} {...rightToolbarScroll}>
+              <div className="hide-scroll" style={{ order: -1, display: 'flex', alignItems: 'center', gap: 7, maxWidth: '100%', overflowX: 'auto', background: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'saturate(200%) blur(24px)', WebkitBackdropFilter: 'saturate(200%) blur(24px)', borderRadius: 24, boxShadow: '0 12px 40px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0,0,0,0.1)', border: `1px solid rgba(255, 255, 255, 0.5)`, padding: '8px 14px', marginBottom: 4 }} onWheel={(e) => { if (e.deltaY !== 0) e.currentTarget.scrollLeft += e.deltaY; }} {...rightToolbarScroll}>
                   {['pen', 'fountain', 'marker', 'pencil', 'highlighter', 'shape'].includes(tool) && (
                      <>
                         {tool === 'shape' && (

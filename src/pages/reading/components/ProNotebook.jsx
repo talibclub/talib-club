@@ -2670,23 +2670,21 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               // Connector: an arrow/line whose ends follow the objects they snap to.
               if (s.type === 'connector') {
                  const { a, b } = connectorPoints(s);
-                 // A branch curves; a connector drawn by hand stays the straight
-                 // line it was drawn as. A mindmap limb rendered as a straight
-                 // diagonal reads as a mistake rather than a branch, which is
-                 // exactly how it looked.
-                 const curved = !!s.isBranch;
+                 // The user requested all connectors (including mindmap branches) to be 
+                 // curved lines rather than straight arrows.
+                 const curved = true; 
                  return (
                    <KonvaArrow
                      key={s.id}
                      id={s.id}
                      name="object"
-                     points={curved ? branchCurvePoints(a, b) : [a.x, a.y, b.x, b.y]}
-                     bezier={curved}
+                     points={branchCurvePoints(a, b)}
+                     bezier={true}
                      stroke={s.color}
                      fill={s.color}
                      strokeWidth={s.size || 3}
-                     pointerLength={s.hasArrow === false || curved ? 0 : 11}
-                     pointerWidth={s.hasArrow === false || curved ? 0 : 11}
+                     pointerLength={0}
+                     pointerWidth={0}
                      hitStrokeWidth={16}
                      lineCap="round"
                      dash={s.id === connectorPreviewId ? [8, 6] : undefined}
