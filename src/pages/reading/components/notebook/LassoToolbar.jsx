@@ -1,12 +1,12 @@
 import React from 'react';
-import { FileStack, Minus, Plus, Trash2, Check, ScanText } from 'lucide-react';
+import { FileStack, Minus, Plus, Trash2, Check, ScanText, Copy } from 'lucide-react';
 import { HW } from './theme.js';
 
 const SWATCHES = ['#111827', '#EF4444', '#F59E0B', '#10B981', '#3B82F6'];
 
 // Huawei-style action bar above a lasso (marquee) selection of freehand ink and
 // objects. Presentational; the parent computes position and binds the actions.
-export default function LassoToolbar({ left, top, hasInk, onToText, onDuplicate, onScale, onRecolor, onDelete, onDone, onOpenPalette }) {
+export default function LassoToolbar({ left, top, hasInk, onToText, onCopy, onDuplicate, onScale, onRecolor, onDelete, onDone, onOpenPalette }) {
   const btn = { width: 34, height: 34, borderRadius: 10, border: 'none', background: 'transparent', color: HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' };
 
   return (
@@ -26,7 +26,8 @@ export default function LassoToolbar({ left, top, hasInk, onToText, onDuplicate,
           <div style={{ width: 1, height: 20, background: HW.hairline, margin: '0 4px' }} />
         </>
       )}
-      <button title="ทำซ้ำ" onClick={onDuplicate} style={btn}><FileStack size={18} strokeWidth={1.6} /></button>
+      {onCopy && <button title="คัดลอก (Ctrl+C)" onClick={onCopy} style={btn}><Copy size={18} strokeWidth={1.6} /></button>}
+      <button title="ทำซ้ำ (Ctrl+D)" onClick={onDuplicate} style={btn}><FileStack size={18} strokeWidth={1.6} /></button>
       <button title="ย่อ" onClick={() => onScale(0.85)} style={btn}><Minus size={18} strokeWidth={1.8} /></button>
       <button title="ขยาย" onClick={() => onScale(1.18)} style={btn}><Plus size={18} strokeWidth={1.8} /></button>
 

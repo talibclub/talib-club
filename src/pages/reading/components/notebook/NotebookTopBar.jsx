@@ -167,13 +167,13 @@ export default function NotebookTopBar({ ui }) {
                {/* Zoom cluster — the quick way back when the page has drifted off screen */}
                {!isMobile && (
                  <div style={{ display: 'flex', alignItems: 'center', gap: 1, background: 'rgba(0,0,0,0.04)', borderRadius: 100, padding: '2px 4px' }}>
-                   <button title="ย่อ" onClick={() => setScale(s => Math.max(0.1, s / 1.2))} style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
+                   <button title="ย่อขนาด (Ctrl -)" onClick={() => setScale(s => Math.max(0.1, s / 1.2))} style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
                      <Minus size={14} strokeWidth={2} />
                    </button>
-                   <button title="พอดีหน้าจอ" onClick={fitToScreen} style={{ minWidth: 42, height: 24, borderRadius: 100, border: 'none', background: 'transparent', cursor: 'pointer', color: HW.text, fontSize: 11.5, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                   <button title="พอดีหน้าจอ (Ctrl 0)" onClick={fitToScreen} style={{ minWidth: 42, height: 24, borderRadius: 100, border: 'none', background: 'transparent', cursor: 'pointer', color: HW.text, fontSize: 11.5, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
                      {Math.round(scale * 100)}%
                    </button>
-                   <button title="ขยาย" onClick={() => setScale(s => Math.min(5, s * 1.2))} style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
+                   <button title="ขยายขนาด (Ctrl +)" onClick={() => setScale(s => Math.min(5, s * 1.2))} style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
                      <Plus size={14} strokeWidth={2} />
                    </button>
                  </div>

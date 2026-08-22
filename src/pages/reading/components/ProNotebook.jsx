@@ -769,6 +769,14 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     setPosition({ x: 0, y: 40 });
   }, [dimensions.width, dimensions.height, currentPageIndex, isMobile]);
 
+  const zoomIn = useCallback(() => {
+    setScale(s => Math.min(5, Math.round(s * 1.18 * 100) / 100));
+  }, []);
+
+  const zoomOut = useCallback(() => {
+    setScale(s => Math.max(0.1, Math.round(s / 1.18 * 100) / 100));
+  }, []);
+
   // Auto-fit on mount, on a real resize, and when moving to another page.
   //
   // — so the zoom and pan reset themselves in the middle of writing. Refit on
@@ -1648,12 +1656,34 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           return { kind, obj: clone };
        }).filter(Boolean);
        clipboardRef.current = { lines, objects };
-       toast.success('ครอบตัดรูปภาพเรียบร้อย');
+       toast.success('คัดลอกส่วนที่เลือกแล้ว (Ctrl+V เพื่อวาง)');
        return;
     }
     if (selectedInfo) {
-       clipboardRef.current = { lines: [], objects: [{ kind: selectedInfo.kind, obj: JSON.parse(JSON.stringify(selectedInfo.obj)) }] };
-       toast.success('ครอบตัดรูปภาพเรียบร้อย');
+       const { kind, obj } = selectedInfo;
+       clipboardRef.current = { lines: [], objects: [{ kind, obj: JSON.parse(JSON.stringify(obj)) }] };
+       if (kind === 'texts' && obj.text) {
+         try { navigator.clipboard?.writeText(obj.text); } catch (_) {}
+       }
+       toast.success('คัดลอกแล้ว (Ctrl+V เพื่อวาง)');
+    }
+  };
+
+  const cutSelection = () => {
+    if (selectionRef.current.length > 0 || selectedObjectsRef.current.length > 0 || selectedId) {
+       copySelection();
+       deleteSelected();
+       toast.success('ตัดวัตถุแล้ว (Ctrl+V เพื่อวาง)');
+    }
+  };
+
+  const duplicateSelection = () => {
+    if (selectionRef.current.length > 0 || selectedObjectsRef.current.length > 0) {
+       duplicateLassoSelection();
+       return;
+    }
+    if (selectedInfo) {
+       duplicateSelectedObject();
     }
   };
 
@@ -1674,7 +1704,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           page[kind] = [...(page[kind] || []), clone];
        });
     });
-    toast.success('ทำซ้ำแล้ว');
+    toast.success('วางแล้ว');
   };
   // --- Mindmap branching ---------------------------------------------------
   // Tab adds a child, Enter adds a sibling: the new node is placed, connected
@@ -2224,8 +2254,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
   
 
-  // Paste a copied image anywhere on the page. Skipped while typing (text box,
-  // sticky note, or any input) so normal text paste keeps working.
+  // Paste a copied image, text, or notebook object anywhere on the page. Skipped while typing
+  // in a text box or input so normal text editing keeps working.
   useEffect(() => {
      const onPaste = async (e) => {
         if (readonly) return;
@@ -2235,34 +2265,76 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         if (typing) return;
         const cd = e.clipboardData;
         if (!cd) return;
+
+        // 1. Image from system clipboard (e.g. Screenshot, Snipping Tool, or Image Copy)
         const item = Array.from(cd.items || []).find(it => it.type.startsWith('image/'));
         if (item) {
            const file = item.getAsFile();
            if (file) {
               e.preventDefault();
-              insertImageSrcAt(await compressImageFile(file), null, null);
+              toast.loading('กำลังวางรูปภาพ...', { id: 'paste-img' });
+              const src = await compressImageFile(file);
+              toast.success('วางรูปภาพสำเร็จ', { id: 'paste-img' });
+              insertImageSrcAt(src, null, null);
               return;
            }
         }
-        const text = cd.getData('text/plain');
-        if (text && /^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg|avif)(\?|#|$)/i.test(text.trim())) {
-           e.preventDefault();
-           toast.loading('กำลังแทรกรูป...', { id: 'drop-img' });
-           const src = await fetchAsDataUrlOrRemote(text.trim());
-           insertImageSrcAt(src, null, null);
-           return;
-        }
-        // Nothing pasteable came from the system clipboard, so this is a plain
-        // Ctrl/Cmd+V meant for the notebook's own copy buffer (strokes/objects
-        // copied with Ctrl+C inside the canvas).
-        if (clipboardRef.current) {
+
+        // 2. Notebook internal clipboard buffer (strokes or objects copied inside app)
+        const clip = clipboardRef.current;
+        if (clip && (clip.lines?.length > 0 || clip.objects?.length > 0)) {
            e.preventDefault();
            pasteClipboard();
+           return;
+        }
+
+        // 3. Text from system clipboard (e.g. copied from website, PDF, chat, etc.)
+        const text = cd.getData('text/plain');
+        if (text && text.trim().length > 0) {
+           const trimmed = text.trim();
+           // If image URL, fetch as image
+           if (/^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg|avif)(\?|#|$)/i.test(trimmed)) {
+              e.preventDefault();
+              toast.loading('กำลังแทรกรูป...', { id: 'drop-img' });
+              const src = await fetchAsDataUrlOrRemote(trimmed);
+              insertImageSrcAt(src, null, null);
+              return;
+           }
+
+           // Plain text note box placed at visible viewport center
+           e.preventDefault();
+           const cleanText = normalizeThaiText(trimmed);
+           pushHistory();
+           updatePage(currentPageIndex, (page) => {
+              if (!page.texts) page.texts = [];
+              const cx = Math.max(30, -position.x / scale + (dimensions.width || 800) / (2 * scale) - 120);
+              const cy = Math.max(30, -position.y / scale + (dimensions.height || 600) / (2 * scale) - 40);
+              const newTextObj = {
+                 id: nextObjectId('text'),
+                 text: cleanText,
+                 x: Math.round(cx),
+                 y: Math.round(cy),
+                 color: '#111827',
+                 size: 20,
+                 fontFamily: 'Kanit',
+                 bold: false,
+                 italic: false,
+                 underline: false,
+                 strikethrough: false,
+                 align: 'left',
+                 list: 'none',
+                 width: TEXT_BOX_WIDTH,
+              };
+              page.texts.push(newTextObj);
+              selectShape(newTextObj.id);
+           });
+           toast.success('วางข้อความลงในสมุดแล้ว', { icon: '📝' });
+           return;
         }
      };
      document.addEventListener('paste', onPaste);
      return () => document.removeEventListener('paste', onPaste);
-  }, [readonly, editingStickerId, currentPageIndex]);
+  }, [readonly, editingStickerId, currentPageIndex, scale, position, dimensions]);
 
   const [showPageSettings, setShowPageSettings] = useState(false);
   const [showPageManager, setShowPageManager] = useState(false);
@@ -2342,12 +2414,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
       if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); saveNotebook(); return; }
       if (mod && e.key.toLowerCase() === 'c') { e.preventDefault(); copySelection(); return; }
-      // Ctrl/Cmd+V is deliberately NOT handled here. Calling preventDefault on
-      // the keydown cancels the browser's `paste` event outright, which killed
-      // the document-level paste listener below — the one whose whole job is to
-      // drop a copied image onto the page. The listener now handles both: it
-      // takes an image off the system clipboard when there is one, and falls
-      // back to the notebook's own copy buffer when there isn't.
+      if (mod && e.key.toLowerCase() === 'x') { e.preventDefault(); cutSelection(); return; }
+      if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSelection(); return; }
+      if (mod && (e.key === '=' || e.key === '+')) { e.preventDefault(); zoomIn(); return; }
+      if (mod && (e.key === '-' || e.key === '_')) { e.preventDefault(); zoomOut(); return; }
+      if (mod && e.key === '0') { e.preventDefault(); fitToScreen(); return; }
       if (mod) return;
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -3775,10 +3846,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       </Stage>
 
       {/* Right-click / long-press context menu */}
-      {/* The selected-object floating toolbar (below) already covers a single
-          selection, so only fall back to this context menu when that toolbar
-          isn't showing — otherwise both stacked up with duplicate actions. */}
-      {contextMenu && !selectedInfo && !croppingImageId && (() => {
+      {contextMenu && !croppingImageId && (() => {
         const page = pages[currentPageIndex];
         let kind = null;
         for (const k of ['images', 'shapes', 'texts', 'stickers']) {
@@ -3791,6 +3859,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
             y={contextMenu.y}
             canRecolor={kind === 'shapes' || kind === 'texts' || kind === 'stickers'}
             onClose={() => setContextMenu(null)}
+            onCopy={copySelection}
+            onCut={cutSelection}
             onDuplicate={duplicateSelectedObject}
             onFront={() => reorderSelectedObject(true)}
             onBack={() => reorderSelectedObject(false)}
@@ -4058,6 +4128,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              onRecolor={recolorSelectedObject}
              onFront={() => reorderSelectedObject(true)}
              onBack={() => reorderSelectedObject(false)}
+             onCopy={copySelection}
              onDuplicate={duplicateSelectedObject}
              onDelete={deleteSelected}
              onDone={() => selectShape(null)}
@@ -4076,6 +4147,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              top={top}
              hasInk={selectedLassoLines.length > 0}
              onToText={convertLassoToText}
+             onCopy={copySelection}
              onDuplicate={duplicateLassoSelection}
              onScale={scaleLassoSelection}
              onRecolor={recolorLassoSelection}

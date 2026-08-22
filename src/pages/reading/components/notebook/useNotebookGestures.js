@@ -119,29 +119,43 @@ export function useNotebookGestures({
 
   const handleWheel = (e) => {
     e.evt.preventDefault();
-    if (e.evt.ctrlKey || e.evt.metaKey) {
-      // Zoom
-      const stage = stageRef.current;
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    if (e.evt.ctrlKey || e.evt.metaKey || e.evt.altKey) {
+      // Smooth Zoom centered at mouse pointer
       const oldScale = stage.scaleX();
-      const pointer = stage.getPointerPosition();
+      const pointer = stage.getPointerPosition() || {
+        x: (dimensions?.width || window.innerWidth) / 2,
+        y: (dimensions?.height || window.innerHeight) / 2
+      };
 
       const mousePointTo = {
         x: (pointer.x - stage.x()) / oldScale,
         y: (pointer.y - stage.y()) / oldScale,
       };
 
-      // Math.exp handles both standard wheel and smooth trackpad pinch
-      const scaleBy = Math.exp(-e.evt.deltaY / 300); 
-      let newScale = oldScale * scaleBy;
-      newScale = Math.max(0.1, Math.min(newScale, 5));
+      // Handle both physical mouse wheel (discrete steps) and trackpad pinch
+      const isTrackpad = Math.abs(e.evt.deltaY) < 30 && !Number.isInteger(e.evt.deltaY);
+      const scaleBy = isTrackpad
+        ? Math.exp(-e.evt.deltaY / 180)
+        : (e.evt.deltaY < 0 ? 1.14 : 1 / 1.14);
+
+      let newScale = Math.max(0.1, Math.min(5, oldScale * scaleBy));
       
       setScale(newScale);
       setPosition({
         x: pointer.x - mousePointTo.x * newScale,
         y: pointer.y - mousePointTo.y * newScale,
       });
+    } else if (e.evt.shiftKey) {
+      // Shift + Wheel = Horizontal pan
+      setPosition(prev => ({
+        x: prev.x - (e.evt.deltaY || e.evt.deltaX),
+        y: prev.y
+      }));
     } else {
-      // Pan (Trackpad 2-finger scroll works perfectly here via deltaX and deltaY)
+      // Standard Wheel = Vertical pan (and deltaX for 2-finger trackpad pan)
       setPosition(prev => ({
         x: prev.x - e.evt.deltaX,
         y: prev.y - e.evt.deltaY
