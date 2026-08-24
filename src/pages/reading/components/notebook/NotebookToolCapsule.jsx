@@ -5,6 +5,7 @@ import { StickyStyleThumb } from './canvasElements.jsx';
 import ColorPickerPanel from '../ColorPickerPanel';
 import EmojiStickerPicker from '../EmojiStickerPicker';
 import MindmapStylePicker from './MindmapStylePicker.jsx';
+import { MINDMAP_STYLES } from './mindmap.js';
 import { LASSO_KINDS, TOOLS_WITH_OPTIONS, DEFAULT_LASSO_FILTER } from './notebookConstants.js';
 import { PEN_TYPES, EXTRA_TOOLS, TOOL_GROUPS, WRITE_MODES, ACTION_TOOLS, readWriteMode, WRITE_MODE_KEY } from './notebookTools.js';
 
@@ -23,11 +24,37 @@ export default function NotebookToolCapsule({ ui }) {
     showEmojiPicker, showLeftScrollHint, showRightScrollHint, showToolOptions,
     sizes, stickerStyle, textStyle, togglePanel, toggleRecording, tool,
     toolsScrollRef, updatePage, zoomWriter,
-    undo, redo, canUndo, canRedo,
+    undo, redo, canUndo, canRedo, insertMindmapTemplate,
   } = ui;
 
   const mindmapStyle = currentPage?.mindmapStyle || 'classic';
-  const setMindmapStyle = (s) => updatePage(currentPageIndex, p => { p.mindmapStyle = s; });
+  const setMindmapStyle = (s) => {
+    updatePage(currentPageIndex, (p) => {
+      p.mindmapStyle = s;
+      const style = MINDMAP_STYLES[s] || MINDMAP_STYLES.classic;
+      const colors = style.colors || [];
+      if (!colors.length) return;
+      
+      const branchShapes = (p.shapes || []).filter(sh => sh.type === 'connector');
+      branchShapes.forEach((sh, idx) => {
+        const c = colors[idx % colors.length];
+        sh.color = c;
+        if (sh.to?.id && p.texts) {
+          const targetNode = p.texts.find(t => t.id === sh.to.id);
+          if (targetNode && targetNode.isNode && !targetNode.isRootNode) {
+            targetNode.nodeColor = c;
+          }
+        }
+      });
+      if (p.texts) {
+        const rootNode = p.texts.find(t => t.isRootNode);
+        if (rootNode) {
+          rootNode.nodeColor = colors[0];
+          rootNode.nodeFill = colors[0];
+        }
+      }
+    });
+  };
 
   const [writeMode, setWriteMode] = React.useState(readWriteMode);
   const [inkOpen, setInkOpen] = React.useState(false);
@@ -413,6 +440,10 @@ export default function NotebookToolCapsule({ ui }) {
                 <MindmapStylePicker
                   currentStyle={mindmapStyle}
                   onPick={(s) => setMindmapStyle(s)}
+                  onInsertMindmap={(s) => {
+                    if (insertMindmapTemplate) insertMindmapTemplate(s);
+                    setShowMindmapStylePicker(false);
+                  }}
                   onClose={() => setShowMindmapStylePicker(false)}
                 />
               </div>

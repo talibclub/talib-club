@@ -527,6 +527,96 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     setEditingStickerId(newSticker.id);
     toast.success('เพิ่มโน้ตติดกระดาษแล้ว', { id: 'sticky-add' });
   };
+
+  const insertMindmapTemplate = (customStyle) => {
+    const styleId = customStyle || currentPage?.mindmapStyle || 'classic';
+    const style = MINDMAP_STYLES[styleId] || MINDMAP_STYLES.classic;
+    const colors = style.colors || ['#0f6e56', '#c0392b', '#1d4ed8'];
+    const page = pagesRef.current[currentPageIndex] || { width: 800, height: 1130 };
+    
+    let cx = page.width / 2, cy = page.height / 2;
+    const stage = stageRef.current;
+    if (stage) {
+      const rect = stage.container().getBoundingClientRect();
+      const s = stage.scaleX() || scale || 1;
+      cx = (rect.width / 2 - stage.x()) / s - pageX;
+      cy = (rect.height / 2 - stage.y()) / s - pageY;
+    }
+
+    const rootId = nextObjectId('text');
+    const child1Id = nextObjectId('text');
+    const child2Id = nextObjectId('text');
+    const child3Id = nextObjectId('text');
+
+    const rootNode = {
+      id: rootId, text: 'หัวข้อหลัก', lines: [{ text: 'หัวข้อหลัก', size: 22, bold: true }],
+      x: cx - 60, y: cy - 20,
+      color: '#FFFFFF', size: 22, fontFamily: 'Kanit',
+      bold: true, italic: false, underline: false, strikethrough: false,
+      align: 'center', list: 'none', width: 120,
+      isNode: true, isRootNode: true, nodeColor: colors[0], nodeFill: colors[0],
+    };
+
+    const child1 = {
+      id: child1Id, text: 'หัวข้อย่อย 1', lines: [{ text: 'หัวข้อย่อย 1', size: 18 }],
+      x: cx + 140, y: cy - 65,
+      color: '#111827', size: 18, fontFamily: 'Kanit',
+      bold: false, italic: false, underline: false, strikethrough: false,
+      align: 'left', list: 'none', width: 120,
+      isNode: true, nodeColor: colors[0], nodeFill: '#FFFFFF',
+    };
+
+    const child2 = {
+      id: child2Id, text: 'หัวข้อย่อย 2', lines: [{ text: 'หัวข้อย่อย 2', size: 18 }],
+      x: cx + 140, y: cy + 40,
+      color: '#111827', size: 18, fontFamily: 'Kanit',
+      bold: false, italic: false, underline: false, strikethrough: false,
+      align: 'left', list: 'none', width: 120,
+      isNode: true, nodeColor: colors[1] || colors[0], nodeFill: '#FFFFFF',
+    };
+
+    const child3 = {
+      id: child3Id, text: 'หัวข้อย่อย 3', lines: [{ text: 'หัวข้อย่อย 3', size: 18 }],
+      x: cx - 260, y: cy - 10,
+      color: '#111827', size: 18, fontFamily: 'Kanit',
+      bold: false, italic: false, underline: false, strikethrough: false,
+      align: 'left', list: 'none', width: 120,
+      isNode: true, nodeColor: colors[2] || colors[0], nodeFill: '#FFFFFF',
+    };
+
+    const conn1 = {
+      id: nextObjectId('shape'), type: 'connector', isBranch: true,
+      from: { id: rootId, x: cx, y: cy },
+      to: { id: child1Id, x: cx + 140, y: cy - 65 },
+      color: colors[0], size: 3, hasArrow: true
+    };
+
+    const conn2 = {
+      id: nextObjectId('shape'), type: 'connector', isBranch: true,
+      from: { id: rootId, x: cx, y: cy },
+      to: { id: child2Id, x: cx + 140, y: cy + 40 },
+      color: colors[1] || colors[0], size: 3, hasArrow: true
+    };
+
+    const conn3 = {
+      id: nextObjectId('shape'), type: 'connector', isBranch: true,
+      from: { id: rootId, x: cx, y: cy },
+      to: { id: child3Id, x: cx - 260, y: cy - 10 },
+      color: colors[2] || colors[0], size: 3, hasArrow: true
+    };
+
+    pushHistory();
+    updatePage(currentPageIndex, (p) => {
+      p.mindmapStyle = styleId;
+      if (!p.texts) p.texts = [];
+      if (!p.shapes) p.shapes = [];
+      p.texts.push(rootNode, child1, child2, child3);
+      p.shapes.push(conn1, conn2, conn3);
+    });
+
+    selectShape(rootId);
+    toast.success('สร้างโครงสร้าง Mindmap เรียบร้อยแล้ว 🎉', { id: 'mindmap-init' });
+  };
   
   const [showBookSnip, setShowBookSnip] = useState(false);
   // Page a "jump back to source" link should open the book snipper on. 1 for a
@@ -2510,7 +2600,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     autoShape, clearPage, clearStrokes, closeOverlays, colors, currentPage,
     connectorHasArrow, currentPageIndex, customColors, deletePage, deleteRecording,
     deleteSelected, editingTextId, eraserSettings, exportNotebookPDF,
-    fitToScreen, fullView, handleAddPage, handleToolsScroll, insertEmoji, insertIcon, insertSticky,
+    fitToScreen, fullView, handleAddPage, handleToolsScroll, insertEmoji, insertIcon, insertSticky, insertMindmapTemplate,
     isCoarse, isMobile, isRecording, isSaving, laserColor, lassoFilter,
     leftToolbarScroll, nowPlaying, onToggleFullView, pages, penColor,
     penOpacity, penSize, playRecording, position, pressureEnabled,
