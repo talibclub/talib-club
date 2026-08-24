@@ -19,19 +19,7 @@ export function useImageDrop({
     e.target.value = null;
     if (!file || !file.type.startsWith('image/')) return;
     const base64 = await compressImageFile(file);
-    pushHistory();
-    updatePage(currentPageIndex, (page) => {
-       if (!page.images) page.images = [];
-       page.images.push({
-         id: nextImageId(),
-         src: base64,
-         x: 100,
-         y: 100,
-         width: 300,
-         height: 300
-       });
-    });
-    toast.success('แทรกรูปภาพเรียบร้อย');
+    insertImageSrcAt(base64);
   };
 
 
@@ -64,12 +52,14 @@ export function useImageDrop({
   // transform, so a dropped image lands under the pointer at any zoom/pan.
   const clientToPage = (clientX, clientY) => {
      const stage = stageRef.current;
-     if (!stage || clientX == null) return { x: currentPage.width / 2, y: 220 };
+     if (!stage) return { x: (currentPage?.width || 800) / 2, y: (currentPage?.height || 1130) / 2 };
      const rect = stage.container().getBoundingClientRect();
      const s = stage.scaleX() || scale || 1;
+     const cx = clientX != null ? clientX : (rect.left + rect.width / 2);
+     const cy = clientY != null ? clientY : (rect.top + rect.height / 2);
      return {
-        x: (clientX - rect.left - stage.x()) / s - pageX,
-        y: (clientY - rect.top - stage.y()) / s - pageY,
+        x: (cx - rect.left - stage.x()) / s - pageX,
+        y: (cy - rect.top - stage.y()) / s - pageY,
      };
   };
 

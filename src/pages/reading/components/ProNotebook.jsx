@@ -1479,8 +1479,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     const rangeY = Math.max(1, bounds.maxY - bounds.minY);
     const project = (x, y) => ({ left: ((x - bounds.minX) / rangeX) * width, top: ((y - bounds.minY) / rangeY) * height });
     const points = [
-      ...(currentPage.texts || []).map((o) => ({ id: o.id, x: o.x, y: o.y, color: '#2563EB' })),
-      ...(currentPage.stickers || []).map((o) => ({ id: o.id, x: o.x, y: o.y, color: '#D97706' })),
+      ...(currentPage.texts || []).filter((o) => (o.text || '').trim().length > 0 || (o.lines || []).some(l => (l.text || '').trim().length > 0)).map((o) => ({ id: o.id, x: o.x, y: o.y, color: '#2563EB' })),
+      ...(currentPage.stickers || []).filter((o) => (o.text || '').trim().length > 0 || (o.lines || []).some(l => (l.text || '').trim().length > 0) || o.audioUrl || o.audioBlob).map((o) => ({ id: o.id, x: o.x, y: o.y, color: '#D97706' })),
       ...(currentPage.images || []).map((o) => ({ id: o.id, x: o.x, y: o.y, color: '#7C3AED' })),
       ...(currentPage.lines || []).filter((o) => o.points?.length >= 2).map((o) => ({ id: o.id, x: o.points[0], y: o.points[1], color: '#0F766E' })),
       ...(currentPage.shapes || []).filter((o) => o.type !== 'connector').map((o) => ({ id: o.id, x: Number.isFinite(o.x1) ? o.x1 : o.x, y: Number.isFinite(o.y1) ? o.y1 : o.y, color: '#DB2777' })),
@@ -1922,15 +1922,28 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         const currentDataUrl = canvas.toDataURL('image/jpeg', 0.85);
         canvas.width = 0; canvas.height = 0;
         
+        const pageObj = pagesRef.current[currentPageIndex] || { width: 800, height: 1130 };
+        const pw = 400;
+        const ph = 400 * (viewport.height / viewport.width);
+        let pdfX = (pageObj.width - pw) / 2;
+        let pdfY = (pageObj.height - ph) / 2;
+        const stage = stageRef.current;
+        if (stage) {
+           const rect = stage.container().getBoundingClientRect();
+           const s = stage.scaleX() || scale || 1;
+           pdfX = (rect.width / 2 - stage.x()) / s - pageX - pw / 2;
+           pdfY = (rect.height / 2 - stage.y()) / s - pageY - ph / 2;
+        }
+
         pushHistory();
         updatePage(currentPageIndex, (p) => {
            if (!p.pdfs) p.pdfs = [];
            p.pdfs.push({
              id: nextObjectId(),
-             x: pageX + 100,
-             y: pageY + 100,
-             width: 400,
-             height: 400 * (viewport.height / viewport.width),
+             x: pdfX,
+             y: pdfY,
+             width: pw,
+             height: ph,
              scaleX: 1,
              scaleY: 1,
              fileUrl,
@@ -2779,10 +2792,20 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
           onClose={() => setShowAi(false)}
           onInsertText={(text) => {
             const clean = normalizeThaiText(text);
+            const pageObj = pagesRef.current[currentPageIndex] || { width: 800, height: 1130 };
+            let tx = (pageObj.width - TEXT_BOX_WIDTH) / 2;
+            let ty = (pageObj.height / 2) - 60;
+            const stage = stageRef.current;
+            if (stage) {
+              const rect = stage.container().getBoundingClientRect();
+              const s = stage.scaleX() || scale || 1;
+              tx = (rect.width / 2 - stage.x()) / s - pageX - TEXT_BOX_WIDTH / 2;
+              ty = (rect.height / 2 - stage.y()) / s - pageY - 60;
+            }
             pushHistory();
             updatePage(currentPageIndex, (page) => {
               if (!page.texts) page.texts = [];
-              page.texts.push({ id: nextObjectId('text'), text: clean, x: 80, y: 80, color: '#111827', size: 22, fontFamily: 'Sarabun', bold: false, italic: false, underline: false, strikethrough: false, align: 'left', list: 'none', width: TEXT_BOX_WIDTH });
+              page.texts.push({ id: nextObjectId('text'), text: clean, x: tx, y: ty, color: '#111827', size: 22, fontFamily: 'Sarabun', bold: false, italic: false, underline: false, strikethrough: false, align: 'left', list: 'none', width: TEXT_BOX_WIDTH });
             });
             toast.success('แทรกข้อความลงสมุดเรียบร้อย');
             setShowAi(false);
@@ -3918,9 +3941,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
              onCommit={() => {
                 if (!isEditingText.current) return;
                 isEditingText.current = false;
-                if (editingTextValue.trim() === '') {
-                   updatePage(currentPageIndex, (page) => { page.texts = page.texts.filter(tx => tx.id !== editingTextId); });
-                }
+                 updatePage(currentPageIndex, (page) => {
+                    const txt = (page.texts || []).find(tx => tx.id === editingTextId);
+                    const hasText = txt && ((txt.text || '').trim().length > 0 || (txt.lines || []).some(l => (l.text || '').trim().length > 0));
+                    if (!hasText) {
+                       page.texts = (page.texts || []).filter(tx => tx.id !== editingTextId);
+                    }
+                 });
                 setEditingTextId(null);
              }}
            />
@@ -3999,7 +4026,16 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                onFont={() => {}}
                onSize={(n) => updSticker((x) => { x.textSize = n; })}
                onColor={(c) => updSticker((x) => { x.textColor = c; })}
-               onCommit={() => setEditingStickerId(null)}
+               onCommit={() => {
+                  updatePage(currentPageIndex, (page) => {
+                    const stk = (page.stickers || []).find(s => s.id === editingStickerId);
+                    const hasContent = stk && ((stk.text || '').trim().length > 0 || (stk.lines || []).some(l => (l.text || '').trim().length > 0) || stk.audioUrl || stk.audioBlob);
+                    if (!hasContent) {
+                      page.stickers = (page.stickers || []).filter(s => s.id !== editingStickerId);
+                    }
+                  });
+                  setEditingStickerId(null);
+                }}
              />
              {/* Delete stays reachable while editing: the selection bar that
                  normally carries it is hidden for as long as an editor is open. */}
@@ -4013,7 +4049,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                      page.stickers = (page.stickers || []).filter(s => s.id !== id);
                   });
                   setEditingStickerId(null);
-                  toast.success('ครอบตัดรูปภาพเรียบร้อย');
+                  toast.success('ลบโพสต์อิทเรียบร้อย');
                }}
                title="ลบโพสต์อิท"
                style={{ position: 'absolute', zIndex: 3001,

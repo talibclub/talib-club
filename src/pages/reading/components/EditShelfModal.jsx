@@ -82,7 +82,7 @@ export default function EditShelfModal({ item, onClose, onSave, uid }) {
         position: "fixed",
         inset: 0,
         zIndex: 10000,
-        background: "rgba(0,0,0,0.65)",
+        background: "transparent",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -94,16 +94,23 @@ export default function EditShelfModal({ item, onClose, onSave, uid }) {
         style={{
           background: "var(--card, #FFFFFF)",
           color: "var(--text, #111827)",
-          borderRadius: 20,
+          borderRadius: 24,
           width: "100%",
           maxWidth: 520,
-          maxHeight: "92vh",
+          maxHeight: "90vh",
           overflowY: "auto",
-          padding: "24px 24px 28px",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+          padding: "22px 24px 26px",
+          boxShadow: "0 24px 60px rgba(0,0,0,0.22), 0 4px 16px rgba(0,0,0,0.08), 0 0 0 1px var(--br2, rgba(0,0,0,0.1))",
           border: "1px solid var(--br, #E5E7EB)",
+          animation: "editPopIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
         }}
       >
+        <style>{`
+          @keyframes editPopIn {
+            0% { transform: scale(0.92) translateY(12px); opacity: 0; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+          }
+        `}</style>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
