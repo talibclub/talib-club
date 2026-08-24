@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
 import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage";
 import { storage, app } from "../../../lib/firebase.js";
@@ -73,7 +74,7 @@ export default function EditShelfModal({ item, onClose, onSave, uid }) {
     }
   };
 
-  return (
+  return createPortal(
     <div
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSaving) onClose();
@@ -81,34 +82,42 @@ export default function EditShelfModal({ item, onClose, onSave, uid }) {
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 10000,
-        background: "transparent",
+        zIndex: 99999,
+        background: "rgba(0, 0, 0, 0.55)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: 16,
+        padding: "20px 16px",
         overflowY: "auto",
+        boxSizing: "border-box",
+        fontFamily: "'Prompt', 'Kanit', sans-serif",
       }}
     >
       <div
+        onClick={(e) => e.stopPropagation()}
         style={{
           background: "var(--card, #FFFFFF)",
           color: "var(--text, #111827)",
-          borderRadius: 24,
+          borderRadius: 20,
           width: "100%",
           maxWidth: 520,
-          maxHeight: "90vh",
-          overflowY: "auto",
-          padding: "22px 24px 26px",
-          boxShadow: "0 24px 60px rgba(0,0,0,0.22), 0 4px 16px rgba(0,0,0,0.08), 0 0 0 1px var(--br2, rgba(0,0,0,0.1))",
+          maxHeight: "calc(100vh - 40px)",
+          margin: "auto",
+          display: "flex",
+          flexDirection: "column",
+          padding: "24px",
+          boxShadow: "0 24px 60px rgba(0, 0, 0, 0.35), 0 4px 16px rgba(0, 0, 0, 0.1)",
           border: "1px solid var(--br, #E5E7EB)",
-          animation: "editPopIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+          boxSizing: "border-box",
+          animation: "modalFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards",
         }}
       >
         <style>{`
-          @keyframes editPopIn {
-            0% { transform: scale(0.92) translateY(12px); opacity: 0; }
-            100% { transform: scale(1) translateY(0); opacity: 1; }
+          @keyframes modalFadeIn {
+            0% { transform: scale(0.95); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
           }
         `}</style>
         {/* Header */}
@@ -157,7 +166,7 @@ export default function EditShelfModal({ item, onClose, onSave, uid }) {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 14, overflowY: "auto", paddingRight: 4, flex: 1 }}>
           {/* Title */}
           <div>
             <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--t2, #374151)", marginBottom: 5 }}>
@@ -502,6 +511,7 @@ export default function EditShelfModal({ item, onClose, onSave, uid }) {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
