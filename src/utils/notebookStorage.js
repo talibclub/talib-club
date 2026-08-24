@@ -1,4 +1,4 @@
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { storage } from "../lib/firebase.js";
 
 // Gzip via CompressionStream is unavailable on Safari < 16.4 (the very iPads the
@@ -100,3 +100,18 @@ export async function downloadNotebookData(uid, notebookId, onProgress) {
   }
   return JSON.parse(jsonStr);
 }
+
+/**
+ * Deletes notebook file from Firebase Storage.
+ */
+export async function deleteNotebookData(uid, notebookId) {
+  if (!uid || !notebookId) return;
+  try {
+    const storageRef = ref(storage, `notebooks/${uid}/${notebookId}.json.gz`);
+    await deleteObject(storageRef);
+  } catch (err) {
+    if (err?.code === "storage/object-not-found") return; // already removed
+    console.warn("Failed to delete notebook file from storage", err);
+  }
+}
+
