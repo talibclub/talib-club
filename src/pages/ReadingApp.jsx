@@ -7,7 +7,7 @@ import { useContentCollection, useTaxonomySettings, useUserDoc, invalidateUserDo
 import { loadBookPdf } from "./reading/utils/pdfCache.js"
 import { confirmAction } from "../utils/feedback.jsx"
 import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage"
-import { doc, getDoc, setDoc, serverTimestamp, runTransaction } from "firebase/firestore"
+import { doc, getDoc, setDoc, serverTimestamp, runTransaction, updateDoc } from "firebase/firestore"
 import { storage, app, db } from "../lib/firebase.js"
 import { safeDateNow } from "../utils/time.js"
 import { getLocalDayKey, addDaysToKey, todayKey, calculateReadingStreak } from "../utils/streak.js"
@@ -755,6 +755,63 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     }
   }
 
+  async function updateShelfBook(shelfItemId, updatedData) {
+    if (!uid || !shelfItemId) return
+    try {
+      const item = shelfItems.find(s => String(s.id) === String(shelfItemId))
+      if (!item) return
+
+      const isExternal = item.sourceType === "external" || !!item.customBook
+      const currentCustom = item.customBook || (item.book ? { ...item.book } : {})
+
+      let nextCustomBook = item.customBook
+      if (isExternal || updatedData.fileUrl || updatedData.title || updatedData.author) {
+        nextCustomBook = {
+          ...currentCustom,
+          id: item.customBook?.id || item.bookId || `custom-${Date.now()}`,
+          title: updatedData.title !== undefined ? updatedData.title.trim() : (currentCustom.title || ""),
+          author: updatedData.author !== undefined ? updatedData.author.trim() : (currentCustom.author || ""),
+          fileUrl: updatedData.fileUrl !== undefined ? updatedData.fileUrl.trim() : (currentCustom.fileUrl || ""),
+          totalPages: updatedData.totalPages !== undefined ? Number(updatedData.totalPages || 0) : (currentCustom.totalPages || 0),
+          desc: updatedData.desc !== undefined ? updatedData.desc.trim() : (currentCustom.desc || ""),
+          type: currentCustom.type || "ไฟล์นอก",
+          source: currentCustom.source || "เพิ่มโดยสมาชิก",
+          category: currentCustom.category || "หนังสือส่วนตัว",
+          ...(updatedData.fileMeta || {}),
+        }
+      }
+
+      const patch = {
+        ...item,
+        customBook: nextCustomBook,
+        totalPages: updatedData.totalPages !== undefined ? Number(updatedData.totalPages || 0) : item.totalPages,
+        progress: updatedData.progress !== undefined ? Number(updatedData.progress || 0) : item.progress,
+        status: updatedData.status || item.status || (Number(updatedData.progress || 0) >= 100 ? "finished" : "reading"),
+        note: updatedData.desc !== undefined ? updatedData.desc : item.note,
+        updatedAt: safeDateNow(),
+      }
+
+      await saveShelfItem(patch)
+
+      // Sync title with notebook metadata if exists
+      if (updatedData.title && item.bookId) {
+        try {
+          const nbRef = doc(db, "content_notebooks", `${uid}_${item.bookId}`)
+          await updateDoc(nbRef, { title: updatedData.title.trim() })
+        } catch (e) {
+          // notebook might not exist, ignore
+        }
+      }
+
+      toast.success("บันทึกการแก้ไขข้อมูลหนังสือเรียบร้อยแล้ว")
+    } catch (err) {
+      console.error("Failed to update shelf book", err)
+      toast.error("บันทึกการแก้ไขไม่สำเร็จ: " + (err.message || "เกิดข้อผิดพลาด"))
+      throw err
+    }
+  }
+
+
 
 
   // Auto-start reading session when shelfItemId is passed via context
@@ -1368,6 +1425,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       externalBook={externalBook} setExternalBook={setExternalBook}
       uploadingExternal={uploadingExternal} addExternalBook={addExternalBook}
       removeShelfItem={removeShelfItem}
+      updateShelfBook={updateShelfBook}
       go={go}
       availableBooks={availableBooks}
       startReading={startReading}

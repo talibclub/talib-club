@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import { TutorialModal } from './TutorialModal.jsx';
 import { QuizModal } from './QuizModal.jsx';
 import { MissionRow } from './MissionRow.jsx';
+import EditShelfModal from './EditShelfModal.jsx';
 
 export default function ReadingDashboard(props) {
   const {
@@ -30,6 +31,7 @@ export default function ReadingDashboard(props) {
     authState,
     handleSaveQuizScore,
     removeShelfItem,
+    updateShelfBook,
     stats,
     hasConfiguredNotif,
     notifEnabled, setNotifEnabled,
@@ -40,6 +42,8 @@ export default function ReadingDashboard(props) {
     DAILY_READING_GOAL_MINUTES,
     activeQuizShelfItem, setActiveQuizShelfItem
   } = props;
+
+  const [editingShelfItem, setEditingShelfItem] = useState(null);
 
   // --- Reading App Home / Dashboard View ---
   return (
@@ -286,9 +290,17 @@ export default function ReadingDashboard(props) {
                           <i className="ti ti-device-desktop"></i> เปิดห้องอ่าน (จับเวลา)
                         </button>
                         <button
+                          onClick={() => setEditingShelfItem(item)}
+                          className="btn btn-outline"
+                          style={{ padding: "6px 8px", fontSize: 11, color: "var(--teal)", borderColor: "rgba(5, 150, 105, 0.35)", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          title="แก้ไขข้อมูลหนังสือ / เปลี่ยนลิงก์ไฟล์"
+                        >
+                          <i className="ti ti-pencil"></i>
+                        </button>
+                        <button
                           onClick={() => removeShelfItem(item.id)}
                           className="btn btn-outline"
-                          style={{ padding: "6px 10px", fontSize: 11, color: "#e05555", borderColor: "rgba(224,85,85,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          style={{ padding: "6px 8px", fontSize: 11, color: "#e05555", borderColor: "rgba(224,85,85,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}
                           title="ลบหนังสือออกจากชั้น"
                         >
                           <i className="ti ti-trash"></i>
@@ -348,11 +360,20 @@ export default function ReadingDashboard(props) {
                             <i className="ti ti-help"></i> ทำแบบทดสอบ
                           </button>
                           <button
+                            onClick={() => setEditingShelfItem(item)}
+                            className="btn btn-outline"
+                            style={{ padding: "6px 9px", fontSize: 11, color: "var(--teal)", borderColor: "rgba(5, 150, 105, 0.35)", display: "flex", alignItems: "center", justifyContent: "center" }}
+                            title="แก้ไขข้อมูลหนังสือ / เปลี่ยนลิงก์ไฟล์"
+                          >
+                            <i className="ti ti-pencil"></i>
+                          </button>
+                          <button
                             onClick={() => removeShelfItem(item.id)}
                             className="btn btn-outline"
-                            style={{ flex: 1, padding: "6px 0", fontSize: 11, color: "#e05555", borderColor: "rgba(224,85,85,0.3)", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}
+                            style={{ padding: "6px 9px", fontSize: 11, color: "#e05555", borderColor: "rgba(224,85,85,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}
+                            title="ลบหนังสือออกจากชั้น"
                           >
-                            <i className="ti ti-trash"></i> ลบ
+                            <i className="ti ti-trash"></i>
                           </button>
                         </div>
                       </div>
@@ -606,6 +627,14 @@ export default function ReadingDashboard(props) {
           user={authState?.user}
           onClose={() => setActiveQuizShelfItem(null)}
           onSaveScore={handleSaveQuizScore}
+        />
+      )}
+      {editingShelfItem && (
+        <EditShelfModal
+          item={editingShelfItem}
+          uid={authState?.user?.uid}
+          onClose={() => setEditingShelfItem(null)}
+          onSave={updateShelfBook}
         />
       )}
     </div>
