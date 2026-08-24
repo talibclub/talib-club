@@ -81,8 +81,8 @@ export default function NotebookToolCapsule({ ui }) {
 
   const chromeWidth = 220;
   const fullCount = visibleTools.length + (showInk ? 0 : 1);
-  const showLabels = availWidth > 0 && availWidth >= fullCount * 58 + chromeWidth;
-  const compactModes = availWidth > 0 && availWidth < 560;
+  const showLabels = availWidth >= 400 || availWidth === 0;
+  const compactModes = availWidth > 0 && availWidth < 500;
 
   const shownTools = visibleTools;
 
@@ -342,7 +342,8 @@ export default function NotebookToolCapsule({ ui }) {
                 }}
               >
                 {EXTRA_TOOLS.map((xt) => {
-                  const isAct = xt.id === 'ruler' ? rulerOn
+                  const isAct = xt.id === 'mindmap' ? showMindmapStylePicker
+                    : xt.id === 'ruler' ? rulerOn
                     : xt.id === 'protractor' ? protractorOn
                     : xt.id === 'emoji' ? showEmojiPicker
                     : xt.id === 'laser' ? tool === 'laser'
@@ -351,7 +352,8 @@ export default function NotebookToolCapsule({ ui }) {
                     <button
                       key={xt.id}
                       onClick={() => {
-                        if (xt.id === 'pdfWidget') { document.getElementById('pdf-widget-upload').click(); setShowExtrasMenu(false); }
+                        if (xt.id === 'mindmap') { setShowMindmapStylePicker(true); setShowExtrasMenu(false); }
+                        else if (xt.id === 'pdfWidget') { document.getElementById('pdf-widget-upload').click(); setShowExtrasMenu(false); }
                         else if (xt.id === 'emoji') { togglePanel('emoji', setShowEmojiPicker, showEmojiPicker); setShowExtrasMenu(false); }
                         else if (xt.id === 'ruler') { setRulerOn(v => !v); }
                         else if (xt.id === 'protractor') { setProtractorOn(v => !v); }

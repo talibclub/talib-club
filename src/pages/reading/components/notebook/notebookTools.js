@@ -2,7 +2,7 @@ import {
   PenTool, Highlighter, Eraser, Type, Square, Lasso,
   Pencil, Pointer, StickyNote, Brush, Feather,
   Ruler, Compass, Smile, Mic, Wand2, Image as ImageIcon,
-  FileText, Sparkles
+  FileText, Sparkles, Spline
 } from 'lucide-react';
 
 export const PEN_TYPES = [
@@ -13,6 +13,7 @@ export const PEN_TYPES = [
 ];
 
 export const EXTRA_TOOLS = [
+  { id: 'mindmap', icon: Spline, title: 'สไตล์ Mindmap', label: 'สไตล์มายแมพ' },
   { id: 'pdfWidget', icon: FileText, title: 'วาง PDF บนกระดาน', label: 'PDF' },
   { id: 'emoji', icon: Smile, title: 'สติกเกอร์และอิโมจิ', label: 'สติกเกอร์' },
   { id: 'ruler', icon: Ruler, title: 'ไม้บรรทัด — ลากเส้นตรง', label: 'ไม้บรรทัด' },
