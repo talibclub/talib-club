@@ -38,24 +38,24 @@ export default function EmojiStickerPicker({ onPick, onPickIcon, onUpload, onClo
   return (
     <div
       onPointerDown={(e) => e.stopPropagation()}
-      style={{ width: 320, maxWidth: '92vw', background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(20px)', borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.16)', border: '1px solid rgba(0,0,0,0.06)', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}
+      style={{ width: 330, maxWidth: '92vw', background: 'rgba(255,255,255,0.96)', backdropFilter: 'saturate(200%) blur(26px)', borderRadius: 20, boxShadow: '0 16px 48px rgba(15,110,86,0.16), 0 2px 10px rgba(0,0,0,0.06)', border: '1px solid rgba(15,110,86,0.12)', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 14, fontWeight: 700, color: '#111827', fontFamily: 'Kanit, sans-serif' }}>อิโมจิ & ไอคอน</span>
-        <button onClick={onClose} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6B7280', display: 'flex' }}>
+        <span style={{ fontSize: 14, fontWeight: 700, color: HW.accent, fontFamily: 'Kanit, sans-serif' }}>✨ อิโมจิ & ไอคอน</span>
+        <button onClick={onClose} className="cute-btn-press" style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6B7280', display: 'flex', padding: 4, borderRadius: '50%' }}>
           <X size={18} />
         </button>
       </div>
       
       {/* Search Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', background: '#F3F4F6', borderRadius: 8, padding: '6px 10px', gap: 8 }}>
-         <Search size={16} color="#9CA3AF" />
+      <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(15,110,86,0.05)', borderRadius: 999, padding: '6px 12px', gap: 8, border: '1px solid rgba(15,110,86,0.1)' }}>
+         <Search size={15} color="#0f6e56" />
          <input 
             type="text" 
             placeholder="ค้นหาไอคอน (ภาษาอังกฤษ)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ border: 'none', background: 'transparent', flex: 1, outline: 'none', fontSize: 13, fontFamily: 'Kanit, sans-serif' }}
+            style={{ border: 'none', background: 'transparent', flex: 1, outline: 'none', fontSize: 12.5, fontFamily: 'Kanit, sans-serif' }}
          />
          {search && <button onClick={() => setSearch('')} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#9CA3AF', display: 'flex', padding: 0 }}><X size={14} /></button>}
       </div>
@@ -67,7 +67,8 @@ export default function EmojiStickerPicker({ onPick, onPickIcon, onUpload, onClo
             <button
               key={c}
               onClick={() => setCat(c)}
-              style={{ flexShrink: 0, padding: '5px 10px', borderRadius: 8, border: 'none', background: cat === c ? HW.accent : '#F3F4F6', color: cat === c ? 'white' : '#4B5563', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Kanit, sans-serif', whiteSpace: 'nowrap' }}
+              className="cute-btn-press"
+              style={{ flexShrink: 0, padding: '4px 10px', borderRadius: 999, border: 'none', background: cat === c ? HW.accent : 'rgba(0,0,0,0.04)', color: cat === c ? 'white' : HW.textDim, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'Kanit, sans-serif', whiteSpace: 'nowrap', boxShadow: cat === c ? '0 2px 6px rgba(15,110,86,0.25)' : 'none' }}
             >
               {c}
             </button>
@@ -97,11 +98,10 @@ export default function EmojiStickerPicker({ onPick, onPickIcon, onUpload, onClo
                    onClose();
                 }}
                 title={item.value}
-                style={{ aspectRatio: '1', border: 'none', background: 'transparent', borderRadius: 8, cursor: 'pointer', fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s', color: '#374151' }}
-                onMouseEnter={(ev) => (ev.currentTarget.style.background = '#F3F4F6')}
-                onMouseLeave={(ev) => (ev.currentTarget.style.background = 'transparent')}
+                className="cute-swatch-bubble"
+                style={{ aspectRatio: '1', border: 'none', background: 'transparent', borderRadius: 8, cursor: 'pointer', fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#374151' }}
               >
-                {isIcon && IconComponent ? <IconComponent size={24} strokeWidth={1.5} /> : item.value}
+                {isIcon && IconComponent ? <IconComponent size={22} strokeWidth={1.6} /> : item.value}
               </button>
             );
           })
@@ -110,9 +110,10 @@ export default function EmojiStickerPicker({ onPick, onPickIcon, onUpload, onClo
 
       <button
         onClick={onUpload}
-        style={{ height: 38, borderRadius: 10, border: `1.5px dashed ${HW.accentSoft}`, background: '#EEF2FF', color: HW.accent, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'Kanit, sans-serif' }}
+        className="cute-btn-press"
+        style={{ height: 36, borderRadius: 999, border: `1.5px dashed ${HW.accent}`, background: 'rgba(15,110,86,0.06)', color: HW.accent, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'Kanit, sans-serif' }}
       >
-        <Upload size={16} /> นำเข้าสติกเกอร์ของคุณเอง
+        <Upload size={15} /> นำเข้าสติกเกอร์ของคุณเอง
       </button>
     </div>
   );

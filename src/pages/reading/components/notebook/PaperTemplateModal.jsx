@@ -30,27 +30,27 @@ export default function PaperTemplateModal({ page, onClose, onApply }) {
   const lineCol = isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.18)';
 
   return (
-    <div onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ background: 'white', borderRadius: 18, width: '100%', maxWidth: 460, padding: 22, boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+    <div onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div className="cute-pop-in" style={{ background: 'white', borderRadius: 24, width: '100%', maxWidth: 460, padding: 24, boxShadow: '0 24px 64px rgba(15,110,86,0.18), 0 4px 20px rgba(0,0,0,0.08)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#111827', fontFamily: 'Kanit, sans-serif' }}>แม่แบบกระดาษ</h3>
-          <button onClick={onClose} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6B7280', display: 'flex' }}><X size={22} /></button>
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: HW.accent, fontFamily: 'Kanit, sans-serif' }}>📝 แม่แบบกระดาษ</h3>
+          <button onClick={onClose} className="cute-btn-press" style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6B7280', display: 'flex', padding: 4, borderRadius: '50%' }}><X size={20} /></button>
         </div>
 
         {cur.src && (
-          <div style={{ marginBottom: 14, padding: '8px 12px', borderRadius: 10, background: '#FEF3C7', color: '#92400E', fontSize: 12.5, fontFamily: 'Kanit, sans-serif' }}>
+          <div style={{ marginBottom: 14, padding: '8px 12px', borderRadius: 12, background: '#FEF3C7', color: '#92400E', fontSize: 12.5, fontFamily: 'Kanit, sans-serif' }}>
             หน้านี้เป็นหน้าจาก PDF — เปลี่ยนแม่แบบได้เฉพาะหน้าเปล่าเท่านั้น
           </div>
         )}
 
         {/* Pattern */}
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#6B7280', marginBottom: 8, fontFamily: 'Kanit, sans-serif' }}>ลวดลาย</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#4B5563', marginBottom: 8, fontFamily: 'Kanit, sans-serif' }}>ลวดลายกระดาษ</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 20 }}>
           {PAPER_TYPES.map((pt) => {
             const active = (cur.paperType || 'lines') === pt.id;
             return (
-              <button key={pt.id} disabled={!!cur.src} onClick={() => onApply({ paperType: pt.id })} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, border: 'none', background: 'transparent', cursor: cur.src ? 'default' : 'pointer', opacity: cur.src ? 0.4 : 1, padding: 0 }}>
-                <div style={{ width: '100%', aspectRatio: '3/4', borderRadius: 8, background: previewBg(cur.paperColor), boxShadow: active ? `0 0 0 2.5px ${HW.accent}` : 'inset 0 0 0 1px rgba(0,0,0,0.1)', ...patternCss(pt.id, lineCol) }} />
+              <button key={pt.id} disabled={!!cur.src} onClick={() => onApply({ paperType: pt.id })} className="cute-btn-press" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, border: 'none', background: 'transparent', cursor: cur.src ? 'default' : 'pointer', opacity: cur.src ? 0.4 : 1, padding: 0 }}>
+                <div style={{ width: '100%', aspectRatio: '3/4', borderRadius: 12, background: previewBg(cur.paperColor), boxShadow: active ? `0 0 0 2.5px white, 0 0 0 4.5px ${HW.accent}, 0 4px 12px rgba(15,110,86,0.15)` : 'inset 0 0 0 1px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.04)', ...patternCss(pt.id, lineCol) }} />
                 <span style={{ fontSize: 12, fontWeight: active ? 700 : 500, color: active ? HW.accent : '#4B5563', fontFamily: 'Kanit, sans-serif' }}>{pt.label}</span>
               </button>
             );
@@ -58,13 +58,13 @@ export default function PaperTemplateModal({ page, onClose, onApply }) {
         </div>
 
         {/* Colour */}
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#6B7280', marginBottom: 8, fontFamily: 'Kanit, sans-serif' }}>สีกระดาษ</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#4B5563', marginBottom: 8, fontFamily: 'Kanit, sans-serif' }}>สีกระดาษ</div>
         <div style={{ display: 'flex', gap: 10, marginBottom: 22 }}>
           {PAPER_COLORS.map((pc) => {
             const active = (cur.paperColor || 'white') === pc.id;
             return (
-              <button key={pc.id} disabled={!!cur.src} onClick={() => onApply({ paperColor: pc.id })} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, border: 'none', background: 'transparent', cursor: cur.src ? 'default' : 'pointer', opacity: cur.src ? 0.4 : 1 }}>
-                <div style={{ width: '100%', height: 40, borderRadius: 8, background: pc.bg, boxShadow: active ? `0 0 0 2.5px ${HW.accent}` : 'inset 0 0 0 1px rgba(0,0,0,0.12)' }} />
+              <button key={pc.id} disabled={!!cur.src} onClick={() => onApply({ paperColor: pc.id })} className="cute-btn-press" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, border: 'none', background: 'transparent', cursor: cur.src ? 'default' : 'pointer', opacity: cur.src ? 0.4 : 1 }}>
+                <div style={{ width: '100%', height: 40, borderRadius: 12, background: pc.bg, boxShadow: active ? `0 0 0 2.5px white, 0 0 0 4.5px ${HW.accent}, 0 4px 12px rgba(15,110,86,0.15)` : 'inset 0 0 0 1px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.04)' }} />
                 <span style={{ fontSize: 12, fontWeight: active ? 700 : 500, color: active ? HW.accent : '#4B5563', fontFamily: 'Kanit, sans-serif' }}>{pc.label}</span>
               </button>
             );
@@ -72,12 +72,8 @@ export default function PaperTemplateModal({ page, onClose, onApply }) {
         </div>
 
         <div style={{ display: 'flex', gap: 10 }}>
-          {/* cur.paperType / cur.paperColor are undefined on a page that has
-              never had a template set, and this wrote those undefined values
-              onto every page in the notebook. Fall back to the same defaults
-              the swatches show as selected. */}
-          <button onClick={() => { if (!cur.src) onApply({ paperType: cur.paperType || 'blank', paperColor: cur.paperColor || 'white' }, true); }} disabled={!!cur.src} style={{ flex: 1, height: 42, borderRadius: 11, border: '1px solid #D1D5DB', background: 'white', color: cur.src ? '#D1D5DB' : '#4B5563', fontWeight: 600, cursor: cur.src ? 'default' : 'pointer', fontFamily: 'Kanit, sans-serif', fontSize: 13.5 }}>ใช้กับทุกหน้า</button>
-          <button onClick={onClose} style={{ flex: 1, height: 42, borderRadius: 11, border: 'none', background: HW.accent, color: 'white', fontWeight: 600, cursor: 'pointer', fontFamily: 'Kanit, sans-serif', fontSize: 13.5 }}>ปิด</button>
+          <button onClick={() => { if (!cur.src) onApply({ paperType: cur.paperType || 'blank', paperColor: cur.paperColor || 'white' }, true); }} disabled={!!cur.src} className="cute-btn-press" style={{ flex: 1, height: 42, borderRadius: 999, border: '1px solid rgba(15,110,86,0.2)', background: 'rgba(15,110,86,0.04)', color: cur.src ? '#D1D5DB' : HW.accent, fontWeight: 700, cursor: cur.src ? 'default' : 'pointer', fontFamily: 'Kanit, sans-serif', fontSize: 13 }}>ใช้กับทุกหน้า</button>
+          <button onClick={onClose} className="cute-btn-press" style={{ flex: 1, height: 42, borderRadius: 999, border: 'none', background: HW.accent, color: 'white', fontWeight: 700, cursor: 'pointer', fontFamily: 'Kanit, sans-serif', fontSize: 13, boxShadow: '0 3px 10px rgba(15,110,86,0.25)' }}>ปิด</button>
         </div>
       </div>
     </div>

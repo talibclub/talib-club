@@ -96,36 +96,36 @@ export default function ColorPickerPanel({ color, onChange, onCommit, onClose, r
   return (
     <div
       onPointerDown={(e) => e.stopPropagation()}
-      style={{ width: 262, background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(20px)', borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.16)', border: '1px solid rgba(0,0,0,0.06)', padding: 14, display: 'flex', flexDirection: 'column', gap: 10, touchAction: 'none' }}
+      style={{ width: 270, background: 'rgba(255,255,255,0.96)', backdropFilter: 'saturate(200%) blur(26px)', borderRadius: 20, boxShadow: '0 16px 48px rgba(15,110,86,0.16), 0 2px 10px rgba(0,0,0,0.06)', border: '1px solid rgba(15,110,86,0.12)', padding: 14, display: 'flex', flexDirection: 'column', gap: 10, touchAction: 'none' }}
     >
       {/* Saturation / brightness pad */}
       <div
         ref={svRef}
         onPointerDown={onSvDrag}
-        style={{ position: 'relative', height: 140, borderRadius: 10, cursor: 'crosshair', background: `linear-gradient(to top, #000, rgba(0,0,0,0)), linear-gradient(to right, #fff, hsl(${hsv.h}, 100%, 50%))` }}
+        style={{ position: 'relative', height: 140, borderRadius: 14, cursor: 'crosshair', background: `linear-gradient(to top, #000, rgba(0,0,0,0)), linear-gradient(to right, #fff, hsl(${hsv.h}, 100%, 50%))` }}
       >
-        <div style={{ position: 'absolute', left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, transform: 'translate(-50%, -50%)', width: 18, height: 18, borderRadius: '50%', border: '3px solid white', boxShadow: '0 1px 4px rgba(0,0,0,0.4)', background: hex, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, transform: 'translate(-50%, -50%)', width: 20, height: 20, borderRadius: '50%', border: '3px solid white', boxShadow: '0 2px 6px rgba(0,0,0,0.4)', background: hex, pointerEvents: 'none' }} />
       </div>
 
       {/* Hue bar */}
       <div
         ref={hueRef}
         onPointerDown={onHueDrag}
-        style={{ position: 'relative', height: 16, borderRadius: 8, cursor: 'pointer', background: 'linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)' }}
+        style={{ position: 'relative', height: 16, borderRadius: 999, cursor: 'pointer', background: 'linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)' }}
       >
         <div style={{ position: 'absolute', left: `${(hsv.h / 360) * 100}%`, top: '50%', transform: 'translate(-50%, -50%)', width: 20, height: 20, borderRadius: '50%', border: '3px solid white', boxShadow: '0 1px 4px rgba(0,0,0,0.4)', background: `hsl(${hsv.h}, 100%, 50%)`, pointerEvents: 'none' }} />
       </div>
 
       {/* Preview + hex + eyedropper */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ width: 30, height: 30, borderRadius: 8, background: hex, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)', flexShrink: 0 }} />
+        <div style={{ width: 32, height: 32, borderRadius: 999, background: hex, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.1)', flexShrink: 0 }} />
         <input
           value={hexInput}
           onChange={(e) => setHexInput(e.target.value)}
           onBlur={commitHexInput}
           onKeyDown={(e) => { if (e.key === 'Enter') commitHexInput(); }}
           spellCheck={false}
-          style={{ flex: 1, minWidth: 0, height: 30, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', padding: '0 8px', fontSize: 13, fontFamily: 'monospace', color: '#111827', textTransform: 'lowercase' }}
+          style={{ flex: 1, minWidth: 0, height: 32, borderRadius: 999, border: '1px solid rgba(15,110,86,0.18)', padding: '0 10px', fontSize: 13, fontFamily: 'monospace', color: '#111827', textTransform: 'lowercase', outline: 'none' }}
         />
         {supportsEyeDropper && (
           <button
@@ -137,7 +137,8 @@ export default function ColorPickerPanel({ color, onChange, onCommit, onClose, r
                 if (parsed) apply(parsed);
               } catch { /* cancelled */ }
             }}
-            style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', background: 'white', color: '#4B5563', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+            className="cute-btn-press"
+            style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid rgba(15,110,86,0.15)', background: 'white', color: '#0f6e56', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
           >
             <Pipette size={16} strokeWidth={1.8} />
           </button>
@@ -152,17 +153,18 @@ export default function ColorPickerPanel({ color, onChange, onCommit, onClose, r
               key={c}
               onClick={() => { const p = hexToHsv(c); if (p) apply(p); }}
               title={c}
-              style={{ width: 22, height: 22, borderRadius: '50%', background: c, cursor: 'pointer', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)', outline: hex.toLowerCase() === c.toLowerCase() ? '2px solid #0A59F7' : 'none', outlineOffset: 2 }}
+              className="cute-swatch-bubble"
+              style={{ width: 22, height: 22, borderRadius: '50%', background: c, cursor: 'pointer', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)', outline: hex.toLowerCase() === c.toLowerCase() ? '2px solid #0f6e56' : 'none', outlineOffset: 2 }}
             />
           ))}
         </div>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-        <button onClick={onClose} style={{ height: 32, padding: '0 14px', borderRadius: 9, border: '1px solid rgba(0,0,0,0.1)', background: 'white', color: '#4B5563', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Kanit, sans-serif' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+        <button onClick={onClose} className="cute-btn-press" style={{ height: 32, padding: '0 14px', borderRadius: 999, border: '1px solid rgba(0,0,0,0.1)', background: 'white', color: '#4B5563', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'Kanit, sans-serif' }}>
           <X size={15} /> ปิด
         </button>
-        <button onClick={() => onCommit(hex)} style={{ height: 32, padding: '0 14px', borderRadius: 9, border: 'none', background: '#0A59F7', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Kanit, sans-serif' }}>
+        <button onClick={() => onCommit(hex)} className="cute-btn-press" style={{ height: 32, padding: '0 16px', borderRadius: 999, border: 'none', background: 'var(--teal)', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'Kanit, sans-serif', boxShadow: '0 3px 10px rgba(15,110,86,0.25)' }}>
           <Check size={15} /> ใช้สีนี้
         </button>
       </div>

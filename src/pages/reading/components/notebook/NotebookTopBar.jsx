@@ -91,26 +91,18 @@ export default function NotebookTopBar({ ui }) {
              if (!drag.current) return;
              e.currentTarget.scrollLeft = drag.current.left - (e.pageX - drag.current.x);
            }}
-           // `safe center` rather than plain `center`: the bar scrolls when the
-           // tools do not fit, and a plain `center` on an overflowing flex row
-           // pushes the first items off the left edge where nothing can scroll
-           // back to them. `safe` centres while there is room and falls back to
-           // the start once there is not. It was flex-start, which never lost an
-           // icon but left the whole bar hugging the left of a wide screen.
-           style={{ height: 52, width: '100%', background: 'linear-gradient(115deg, rgba(255,255,255,0.85), rgba(247,245,241,0.78))', backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, display: 'flex', alignItems: 'center', justifyContent: readonly ? 'center' : 'safe center', gap: 8, padding: '0 12px', borderBottom: `1px solid ${HW.hairline}`, overflowX: 'auto', overflowY: 'hidden', touchAction: 'pan-x', scrollBehavior: 'auto' }}
+           style={{ height: 52, width: '100%', background: 'linear-gradient(115deg, rgba(255,255,255,0.92), rgba(247,245,241,0.85))', backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, display: 'flex', alignItems: 'center', justifyContent: readonly ? 'center' : 'safe center', gap: 8, padding: '0 12px', borderBottom: `1px solid ${HW.hairline}`, overflowX: 'auto', overflowY: 'hidden', touchAction: 'pan-x', scrollBehavior: 'auto' }}
          >
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-               {/* No in-notebook back button: it called window.history.back(), which
-                   would kick the user out of the reading room entirely. The reader
-                   (and the gallery viewer) already provide their own exit. */}
-               {/* Page stepper (Huawei keeps this in the header, not over the canvas) */}
+               {/* Page stepper */}
                {!isMobile && (
-                 <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.04)', borderRadius: 100, padding: '2px 4px' }}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(15,110,86,0.06)', borderRadius: 999, padding: '2px 5px' }}>
                    <button
                      onClick={() => setCurrentPageIndex(Math.max(0, currentPageIndex - 1))}
                      disabled={currentPageIndex === 0}
-                     style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent', cursor: currentPageIndex === 0 ? 'default' : 'pointer', opacity: currentPageIndex === 0 ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
-                     <ChevronLeft size={16} strokeWidth={2} />
+                     className="cute-btn-press"
+                     style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'transparent', cursor: currentPageIndex === 0 ? 'default' : 'pointer', opacity: currentPageIndex === 0 ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.accent }}>
+                     <ChevronLeft size={16} strokeWidth={2.2} />
                    </button>
                    <input
                      type="text"
@@ -130,51 +122,52 @@ export default function NotebookTopBar({ ui }) {
                        width: `${Math.max(26, String(pages.length || 1).length * 8 + 12)}px`,
                        height: 22,
                        padding: '0 2px',
-                       borderRadius: 5,
-                       border: '1px solid rgba(0,0,0,0.12)',
+                       borderRadius: 999,
+                       border: '1px solid rgba(15,110,86,0.2)',
                        background: 'white',
                        textAlign: 'center',
                        fontSize: 12,
-                       fontWeight: 600,
-                       color: HW.text,
+                       fontWeight: 700,
+                       color: HW.accent,
                        outline: 'none',
                        fontVariantNumeric: 'tabular-nums',
-                       fontFamily: 'inherit'
+                       fontFamily: 'Kanit, sans-serif'
                      }}
                      title="พิมพ์เลขหน้าแล้วกด Enter เพื่อไปยังหน้านั้น"
                      aria-label="พิมพ์เลขหน้าที่ต้องการ"
                    />
-                   <span style={{ fontSize: 12, fontWeight: 600, color: HW.textDim, paddingRight: 2, fontVariantNumeric: 'tabular-nums' }}>
+                   <span style={{ fontSize: 12, fontWeight: 700, color: HW.textDim, paddingRight: 4, fontVariantNumeric: 'tabular-nums' }}>
                      / {pages.length}
                    </span>
                    <button
                      onClick={() => setCurrentPageIndex(Math.min(pages.length - 1, currentPageIndex + 1))}
                      disabled={currentPageIndex === pages.length - 1}
-                     style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent', cursor: currentPageIndex === pages.length - 1 ? 'default' : 'pointer', opacity: currentPageIndex === pages.length - 1 ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
-                     <ChevronRight size={16} strokeWidth={2} />
+                     className="cute-btn-press"
+                     style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'transparent', cursor: currentPageIndex === pages.length - 1 ? 'default' : 'pointer', opacity: currentPageIndex === pages.length - 1 ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.accent }}>
+                     <ChevronRight size={16} strokeWidth={2.2} />
                    </button>
                  </div>
                )}
                {!isMobile && (
-                 <div title={`${notebookTitle} · ${pageTitle}`} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: fullView ? 240 : 140, padding: '4px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.72)', border: `1px solid ${HW.hairline}`, boxShadow: '0 1px 4px rgba(35,31,27,0.03)' }}>
-                   <span style={{ width: 22, height: 22, borderRadius: 7, background: HW.accentSoft, color: HW.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><BookOpen size={13} strokeWidth={2} /></span>
+                 <div title={`${notebookTitle} · ${pageTitle}`} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: fullView ? 240 : 140, padding: '4px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.85)', border: `1px solid rgba(15,110,86,0.12)`, boxShadow: '0 2px 6px rgba(15,110,86,0.06)' }}>
+                   <span style={{ width: 22, height: 22, borderRadius: '50%', background: HW.accentSoft, color: HW.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><BookOpen size={13} strokeWidth={2} /></span>
                    <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11.5, fontWeight: 700, color: HW.text }}>{notebookTitle}</span>
                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, color: HW.textDim }}>{pageTitle}</span>
                    </span>
                  </div>
                )}
-               {/* Zoom cluster — the quick way back when the page has drifted off screen */}
+               {/* Zoom cluster */}
                {!isMobile && (
-                 <div style={{ display: 'flex', alignItems: 'center', gap: 1, background: 'rgba(0,0,0,0.04)', borderRadius: 100, padding: '2px 4px' }}>
-                   <button title="ย่อขนาด (Ctrl -)" onClick={() => setScale(s => Math.max(0.1, s / 1.2))} style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
-                     <Minus size={14} strokeWidth={2} />
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 1, background: 'rgba(15,110,86,0.06)', borderRadius: 999, padding: '2px 5px' }}>
+                   <button title="ย่อขนาด (Ctrl -)" onClick={() => setScale(s => Math.max(0.1, s / 1.2))} className="cute-btn-press" style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.accent }}>
+                     <Minus size={14} strokeWidth={2.2} />
                    </button>
-                   <button title="พอดีหน้าจอ (Ctrl 0)" onClick={fitToScreen} style={{ minWidth: 42, height: 24, borderRadius: 100, border: 'none', background: 'transparent', cursor: 'pointer', color: HW.text, fontSize: 11.5, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                   <button title="พอดีหน้าจอ (Ctrl 0)" onClick={fitToScreen} className="cute-btn-press" style={{ minWidth: 42, height: 24, borderRadius: 999, border: 'none', background: 'transparent', cursor: 'pointer', color: HW.accent, fontSize: 11.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                      {Math.round(scale * 100)}%
                    </button>
-                   <button title="ขยายขนาด (Ctrl +)" onClick={() => setScale(s => Math.min(5, s * 1.2))} style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.text }}>
-                     <Plus size={14} strokeWidth={2} />
+                   <button title="ขยายขนาด (Ctrl +)" onClick={() => setScale(s => Math.min(5, s * 1.2))} className="cute-btn-press" style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HW.accent }}>
+                     <Plus size={14} strokeWidth={2.2} />
                    </button>
                  </div>
                )}
@@ -184,8 +177,8 @@ export default function NotebookTopBar({ ui }) {
                   </span>
                )}
                {!isSaving && !readonly && (
-                  <button title="บันทึกแล้ว (คลิกเพื่อบังคับบันทึก)" onClick={() => saveNotebook()} style={{ background: 'transparent', border: 'none', color: '#9CA3AF', display: 'flex', alignItems: 'center', cursor: 'pointer', padding: 0 }}>
-                     <CheckCircle size={16} />
+                  <button title="บันทึกแล้ว (คลิกเพื่อบังคับบันทึก)" onClick={() => saveNotebook()} className="cute-btn-press" style={{ background: 'transparent', border: 'none', color: HW.accent, display: 'flex', alignItems: 'center', cursor: 'pointer', padding: 0 }}>
+                     <CheckCircle size={17} />
                   </button>
                )}
             </div>
@@ -193,34 +186,23 @@ export default function NotebookTopBar({ ui }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, position: 'relative' }}>
                {!readonly && (
                  <>
-                   {/* Full-view: give the whole browser width to the notebook and
-                       hide the PDF panel — for people who attach the PDF inside the
-                       notebook and only want to write. A labelled button, not a bare
-                       icon: nobody could guess what the panel glyph meant. */}
                    {onToggleFullView && (
                      <button
                        onClick={onToggleFullView}
                        title={fullView ? 'กลับมุมมองคู่กับ PDF' : 'ขยายสมุดโน้ตเต็มจอ ซ่อน PDF ด้านข้าง'}
-                       style={{ height: 32, padding: '0 10px', borderRadius: 9, border: 'none', background: fullView ? HW.accentSoft : 'rgba(0,0,0,0.05)', color: fullView ? HW.accent : HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'Kanit, sans-serif', transition: 'all 0.18s' }}
+                       className="cute-btn-press"
+                       style={{ height: 32, padding: '0 12px', borderRadius: 999, border: 'none', background: fullView ? HW.accentSoft : 'rgba(15,110,86,0.06)', color: HW.accent, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'Kanit, sans-serif' }}
                      >
-                       {fullView ? <PanelLeftOpen size={15} strokeWidth={1.8} /> : <PanelLeftClose size={15} strokeWidth={1.8} />}
+                       {fullView ? <PanelLeftOpen size={15} strokeWidth={2} /> : <PanelLeftClose size={15} strokeWidth={2} />}
                        {fullView ? 'แสดง PDF' : 'โน้ตเต็มจอ'}
                      </button>
                    )}
                    {[
                      { id: 'addpage', icon: FilePlus, title: 'เพิ่มหน้าใหม่', onClick: handleAddPage },
-                     // With a book already open, the obvious thing is to bring THAT
-                     // pdf in. startLoadingPDF() has always supported it — called
-                     // with no url it loads activeBook through the shared byte
-                     // cache — but nothing in the UI ever did, so the only
-                     // book-aware action on offer was screenshotting it page by
-                     // page. "นำเข้า PDF" still opens the file picker for
-                     // everything else.
                      ...(activeBook?.book?.fileUrl
                        ? [{ id: 'bookpdf', icon: BookOpen, title: 'ดึงหนังสือเล่มนี้เข้าโน้ต', onClick: () => startLoadingPDF() }]
                        : []),
                      { id: 'pdf', icon: FileText, title: activeBook?.book?.fileUrl ? 'นำเข้า PDF อื่น' : 'นำเข้า PDF', onClick: () => document.getElementById('pdf-upload').click() },
-                     // Snip a region of the companion book straight into the note.
                      ...(activeBook?.book?.fileUrl ? [{ id: 'snip', icon: Camera, title: 'แคปเฉพาะบางส่วน', onClick: () => { closeOverlays('snip'); setBookSnipInitialPage(1); setShowBookSnip(true); }, active: showBookSnip }] : []),
                      { id: 'zoomwrite', icon: Maximize2, title: 'ขยายเขียน', onClick: () => setZoomWriter(v => !v), active: zoomWriter },
                      { id: 'recordings', icon: ListMusic, title: 'บันทึกเสียง', onClick: () => togglePanel('recordings', setShowRecordings, showRecordings), active: showRecordings, badge: recordings.length },
@@ -232,18 +214,19 @@ export default function NotebookTopBar({ ui }) {
                        key={b.id}
                        onClick={b.onClick}
                        title={b.title}
-                       style={{ position: 'relative', width: 33, height: 33, borderRadius: 10, border: `1px solid ${b.active ? HW.accentRing : 'transparent'}`, background: b.active ? HW.accentSoft : 'rgba(255,255,255,0.45)', color: b.active ? HW.accent : HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.18s' }}
+                       className="cute-btn-press"
+                       style={{ position: 'relative', width: 34, height: 34, borderRadius: 12, border: `1px solid ${b.active ? HW.accentRing : 'rgba(15,110,86,0.1)'}`, background: b.active ? HW.accentSoft : 'rgba(255,255,255,0.7)', color: b.active ? HW.accent : HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: b.active ? '0 2px 6px rgba(15,110,86,0.15)' : 'none' }}
                      >
-                       <b.icon size={18} strokeWidth={1.6} />
+                       <b.icon size={17} strokeWidth={b.active ? 2.1 : 1.7} />
                        {b.badge > 0 && (
-                         <span style={{ position: 'absolute', top: -2, right: -2, minWidth: 15, height: 15, padding: '0 3px', borderRadius: 8, background: '#EF4444', color: 'white', fontSize: 9.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{b.badge}</span>
+                         <span style={{ position: 'absolute', top: -2, right: -2, minWidth: 15, height: 15, padding: '0 3px', borderRadius: 999, background: '#EF4444', color: 'white', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}>{b.badge}</span>
                        )}
                      </button>
                    ))}
                  </>
                )}
                {readonly && (
-                 <button onClick={() => { closeOverlays('export'); setShowExport(true); }} style={{ padding: '8px 16px', borderRadius: 20, border: 'none', background: 'var(--teal)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600 }}>
+                 <button onClick={() => { closeOverlays('export'); setShowExport(true); }} className="cute-btn-press" style={{ padding: '8px 18px', borderRadius: 999, border: 'none', background: 'var(--teal)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 700, boxShadow: '0 4px 12px rgba(15,110,86,0.25)' }}>
                     <Download size={18} strokeWidth={2} /> ส่งออก
                  </button>
                )}
@@ -271,50 +254,50 @@ export default function NotebookTopBar({ ui }) {
          {showMoreMenu && !readonly && (
              <>
                  <div style={{ position: 'fixed', inset: 0, zIndex: 59 }} onClick={() => setShowMoreMenu(false)} />
-                 <div style={{ position: 'absolute', top: 58, right: 12, zIndex: 60, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', padding: 8, borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.12)', border: '1px solid rgba(0,0,0,0.05)', width: 280, display: 'flex', flexDirection: 'column', maxHeight: 'calc(100% - 70px)', overflowY: 'auto' }}>
-                    <button onClick={() => { document.getElementById('image-upload').click(); setShowMoreMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <ImageIcon size={20} strokeWidth={1.5} color="#4B5563" /> นำเข้ารูปภาพจากเครื่อง
+                 <div className="cute-pop-in" style={{ position: 'absolute', top: 58, right: 12, zIndex: 60, background: 'rgba(255,255,255,0.96)', backdropFilter: 'saturate(200%) blur(26px)', padding: 10, borderRadius: 20, boxShadow: '0 16px 48px rgba(15,110,86,0.16), 0 2px 10px rgba(0,0,0,0.06)', border: '1px solid rgba(15,110,86,0.12)', width: 280, display: 'flex', flexDirection: 'column', maxHeight: 'calc(100% - 70px)', overflowY: 'auto' }}>
+                    <button onClick={() => { document.getElementById('image-upload').click(); setShowMoreMenu(false); }} className="cute-btn-press" style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, textAlign: 'left', fontWeight: 500 }}>
+                       <ImageIcon size={18} strokeWidth={1.8} color={HW.accent} /> นำเข้ารูปภาพจากเครื่อง
                     </button>
-                    <button onClick={() => { closeOverlays('imgSearch'); setShowImgSearch(true); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Search size={20} strokeWidth={1.5} color="#4B5563" /> ค้นหารูป/สติกเกอร์จากเน็ต
+                    <button onClick={() => { closeOverlays('imgSearch'); setShowImgSearch(true); }} className="cute-btn-press" style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, textAlign: 'left', fontWeight: 500 }}>
+                       <Search size={18} strokeWidth={1.8} color={HW.accent} /> ค้นหารูป/สติกเกอร์จากเน็ต
                     </button>
-                    <button onClick={() => { closeOverlays('ai'); setShowAi(true); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Wand2 size={20} strokeWidth={1.5} color="#4B5563" /> ผู้ช่วย AI · ถาม PDF
+                    <button onClick={() => { closeOverlays('ai'); setShowAi(true); }} className="cute-btn-press" style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, textAlign: 'left', fontWeight: 500 }}>
+                       <Wand2 size={18} strokeWidth={1.8} color={HW.accent} /> ผู้ช่วย AI · ถาม PDF
                     </button>
-                    <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>
-                    <button onClick={() => { closeOverlays('pageSettings'); setShowPageSettings(true); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Settings size={20} strokeWidth={1.5} color="#4B5563" /> เปลี่ยนแม่แบบกระดาษ
+                    <div style={{ height: 1, background: 'rgba(0,0,0,0.06)', margin: '4px 0' }}></div>
+                    <button onClick={() => { closeOverlays('pageSettings'); setShowPageSettings(true); }} className="cute-btn-press" style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, textAlign: 'left', fontWeight: 500 }}>
+                       <Settings size={18} strokeWidth={1.8} color="#4B5563" /> เปลี่ยนแม่แบบกระดาษ
                     </button>
-                    <button onClick={() => { closeOverlays('export'); setShowExport(true); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Download size={20} strokeWidth={1.5} color="#4B5563" /> ส่งออก (รูป / PDF)
+                    <button onClick={() => { closeOverlays('export'); setShowExport(true); }} className="cute-btn-press" style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, textAlign: 'left', fontWeight: 500 }}>
+                       <Download size={18} strokeWidth={1.8} color="#4B5563" /> ส่งออก (รูป / PDF)
                     </button>
-                    <button onClick={toggleBookmark} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Bookmark size={20} strokeWidth={1.5} color={pages[currentPageIndex]?.isBookmarked ? "#F59E0B" : "#4B5563"} fill={pages[currentPageIndex]?.isBookmarked ? "#F59E0B" : "none"} /> {pages[currentPageIndex]?.isBookmarked ? "ลบบุ๊คมาร์ก" : "บุ๊คมาร์กหน้า"}
+                    <button onClick={toggleBookmark} className="cute-btn-press" style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, textAlign: 'left', fontWeight: 500 }}>
+                       <Bookmark size={18} strokeWidth={1.8} color={pages[currentPageIndex]?.isBookmarked ? "#F59E0B" : "#4B5563"} fill={pages[currentPageIndex]?.isBookmarked ? "#F59E0B" : "none"} /> {pages[currentPageIndex]?.isBookmarked ? "ลบบุ๊คมาร์ก" : "บุ๊คมาร์กหน้า"}
                     </button>
-                    <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>
-                    <button onClick={() => setStylusMode(m => (m === 'pen' ? 'auto' : 'pen'))} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <PenTool size={20} strokeWidth={1.5} color={stylusMode === 'pen' ? HW.accent : '#4B5563'} />
+                    <div style={{ height: 1, background: 'rgba(0,0,0,0.06)', margin: '4px 0' }}></div>
+                    <button onClick={() => setStylusMode(m => (m === 'pen' ? 'auto' : 'pen'))} className="cute-btn-press" style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, textAlign: 'left', fontWeight: 500 }}>
+                       <PenTool size={18} strokeWidth={1.8} color={stylusMode === 'pen' ? HW.accent : '#4B5563'} />
                        <span style={{ flex: 1 }}>เขียนด้วยปากกาเท่านั้น</span>
-                       {stylusMode === 'pen' && <Check size={18} strokeWidth={2} color={HW.accent} />}
+                       {stylusMode === 'pen' && <Check size={18} strokeWidth={2.2} color={HW.accent} />}
                     </button>
-                    <button onClick={() => setPressureEnabled(v => !v)} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Zap size={20} strokeWidth={1.5} color={pressureEnabled ? HW.accent : '#4B5563'} />
+                    <button onClick={() => setPressureEnabled(v => !v)} className="cute-btn-press" style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, textAlign: 'left', fontWeight: 500 }}>
+                       <Zap size={18} strokeWidth={1.8} color={pressureEnabled ? HW.accent : '#4B5563'} />
                        <span style={{ flex: 1 }}>ไวต่อแรงกด</span>
-                       {pressureEnabled && <Check size={18} strokeWidth={2} color={HW.accent} />}
+                       {pressureEnabled && <Check size={18} strokeWidth={2.2} color={HW.accent} />}
                     </button>
-                    <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>
-                    <button onClick={clearPage} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Eraser size={20} strokeWidth={1.5} color="#4B5563" /> ล้างหน้า
+                    <div style={{ height: 1, background: 'rgba(0,0,0,0.06)', margin: '4px 0' }}></div>
+                    <button onClick={clearPage} className="cute-btn-press" style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, textAlign: 'left', fontWeight: 500 }}>
+                       <Eraser size={18} strokeWidth={1.8} color="#4B5563" /> ล้างหน้า
                     </button>
-                    <button onClick={deletePage} disabled={pages.length <= 1} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: pages.length <= 1 ? '#D1D5DB' : '#EF4444', cursor: pages.length <= 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Minus size={20} strokeWidth={1.5} color={pages.length <= 1 ? '#D1D5DB' : '#EF4444'} /> ลบหน้า
+                    <button onClick={deletePage} disabled={pages.length <= 1} className="cute-btn-press" style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: 'transparent', color: pages.length <= 1 ? '#D1D5DB' : '#EF4444', cursor: pages.length <= 1 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, textAlign: 'left', fontWeight: 500 }}>
+                       <Minus size={18} strokeWidth={1.8} color={pages.length <= 1 ? '#D1D5DB' : '#EF4444'} /> ลบหน้า
                     </button>
-                    <div style={{ height: 1, background: '#F3F4F6', margin: '4px 0' }}></div>
-                    <button onClick={() => { exportNotebookPDF(); setShowMoreMenu(false); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <Download size={20} strokeWidth={1.5} color="#4B5563" /> ดาวน์โหลดทั้งเล่ม (PDF)
+                    <div style={{ height: 1, background: 'rgba(0,0,0,0.06)', margin: '4px 0' }}></div>
+                    <button onClick={() => { exportNotebookPDF(); setShowMoreMenu(false); }} className="cute-btn-press" style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, textAlign: 'left', fontWeight: 500 }}>
+                       <Download size={18} strokeWidth={1.8} color={HW.accent} /> ดาวน์โหลดทั้งเล่ม (PDF)
                     </button>
-                    <button onClick={() => { setShowMoreMenu(false); runExport('png', 'current'); }} style={{ padding: '12px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, textAlign: 'left' }}>
-                       <ImageIcon size={20} strokeWidth={1.5} color="#4B5563" /> บันทึกรูปหน้านี้ (PNG)
+                    <button onClick={() => { setShowMoreMenu(false); runExport('png', 'current'); }} className="cute-btn-press" style={{ padding: '10px 14px', borderRadius: 12, border: 'none', background: 'transparent', color: '#111827', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, textAlign: 'left', fontWeight: 500 }}>
+                       <ImageIcon size={18} strokeWidth={1.8} color={HW.accent} /> บันทึกรูปหน้านี้ (PNG)
                     </button>
                  </div>
              </>
