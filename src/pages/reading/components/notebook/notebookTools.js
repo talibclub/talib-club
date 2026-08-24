@@ -23,7 +23,6 @@ export const EXTRA_TOOLS = [
 
 export const TOOL_GROUPS = {
   write: [
-    { id: 'pan', icon: Pointer, title: 'เลื่อนกระดาษ / สัมผัส', label: 'เลื่อน' },
     { id: 'penGroup', icon: PenTool, title: 'ปากกา (แตะเพื่อเลือกหัวปากกา)', label: 'ปากกา' },
     { id: 'highlighter', icon: Highlighter, title: 'ปากกาเน้นข้อความ', label: 'ไฮไลต์' },
     { id: 'eraser', icon: Eraser, title: 'ยางลบ', label: 'ลบ' },
@@ -35,7 +34,6 @@ export const TOOL_GROUPS = {
     { id: 'more', icon: Sparkles, title: 'เครื่องมือเพิ่มเติม (PDF, ไม้บรรทัด, วัดมุม, เลเซอร์ ฯลฯ)', label: 'เพิ่มเติม' },
   ],
   type: [
-    { id: 'pan', icon: Pointer, title: 'เลื่อนกระดาษ / สัมผัส', label: 'เลื่อน' },
     { id: 'text', icon: Type, title: 'พิมพ์ข้อความ', label: 'ข้อความ' },
     { id: 'sticker', icon: StickyNote, title: 'โน้ตติดกระดาษ', label: 'โน้ต' },
     { id: 'image', icon: ImageIcon, title: 'แทรกรูปภาพ', label: 'รูป' },
