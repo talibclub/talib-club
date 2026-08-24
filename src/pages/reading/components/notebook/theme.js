@@ -77,7 +77,20 @@ export const TEXT_BOX_WIDTH = 340;
 export const LINE_HEIGHT = 1.2;
 
 // Sticky-note palette and styles, shared by the tool options and the context menu.
-export const STICKY_COLORS = ['#FEF08A', '#FBCFE8', '#BAE6FD', '#BBF7D0', '#FED7AA', '#DDD6FE', '#FECACA', '#A7F3D0'];
+export const STICKY_COLORS = [
+  '#FEF08A', // Yellow
+  '#FBCFE8', // Sakura Pink
+  '#BAE6FD', // Sky Blue
+  '#BBF7D0', // Mint Green
+  '#FED7AA', // Peach Orange
+  '#DDD6FE', // Lavender
+  '#FECACA', // Rose Coral
+  '#A7F3D0', // Jade Green
+  '#E0E7FF', // Periwinkle
+  '#FCE7F3', // Blush
+  '#F3F4F6', // Minimal Gray
+  '#374151', // Charcoal Slate
+];
 
 export const STICKY_STYLES = [
   { id: 'classic', label: 'คลาสสิก' },

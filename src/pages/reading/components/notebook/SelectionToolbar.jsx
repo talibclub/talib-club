@@ -10,14 +10,16 @@ import { HW, STICKY_COLORS } from './theme.js';
 export default function SelectionToolbar({ left, top, kind, canEdit, onCrop, onOcr, onEdit, onBranch, onConnect, onAutoLayout, onRecolor, onFront, onBack, onCopy, onDuplicate, onDelete, onDone }) {
   const btn = { width: 34, height: 34, borderRadius: 9, border: 'none', background: 'transparent', color: HW.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
   const divider = <div style={{ width: 1, height: 18, background: HW.hairline, margin: '0 2px', flexShrink: 0 }} />;
-  const swatches = kind === 'stickers' ? STICKY_COLORS.slice(0, 5) : ['#111827', '#EF4444', '#F59E0B', '#10B981', '#3B82F6'];
+  const swatches = kind === 'stickers'
+    ? STICKY_COLORS.slice(0, 8)
+    : ['#111827', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#6B7280'];
 
   return (
     <div
       onPointerDown={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.preventDefault()}
       className="hide-scroll"
-      style={{ position: 'absolute', left, top: Math.max(8, top), transform: 'translateX(-50%)', zIndex: 60, display: 'flex', alignItems: 'center', flexWrap: 'nowrap', gap: 1, padding: '4px 6px', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, borderRadius: 12, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`, maxWidth: 'min(96vw, 340px)', overflowX: 'auto' }}
+      style={{ position: 'absolute', left, top: Math.max(8, top), transform: 'translateX(-50%)', zIndex: 60, display: 'flex', alignItems: 'center', flexWrap: 'nowrap', gap: 1, padding: '4px 6px', background: HW.surface, backdropFilter: HW.blur, WebkitBackdropFilter: HW.blur, borderRadius: 12, boxShadow: HW.shadow, border: `1px solid ${HW.hairline}`, maxWidth: 'min(96vw, 460px)', overflowX: 'auto' }}
     >
       {kind === 'images' && (
         <>
@@ -65,9 +67,50 @@ export default function SelectionToolbar({ left, top, kind, canEdit, onCrop, onO
                 key={c}
                 title="เปลี่ยนสี"
                 onClick={() => onRecolor(c)}
-                style={{ width: 16, height: 16, borderRadius: kind === 'stickers' ? 4 : '50%', background: c, cursor: 'pointer', flexShrink: 0, boxShadow: `inset 0 0 0 1px ${HW.hairline}` }}
+                style={{
+                  width: 17, height: 17,
+                  borderRadius: kind === 'stickers' ? 4 : '50%',
+                  background: c,
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  boxShadow: `0 1px 3px rgba(0,0,0,0.15), inset 0 0 0 1px rgba(0,0,0,0.1)`,
+                  transition: 'transform 0.1s ease',
+                }}
               />
             ))}
+            {/* Custom Color Wheel Picker */}
+            <label
+              title="เลือกสีเอง (จานสีอิสระ)"
+              style={{
+                width: 18,
+                height: 18,
+                borderRadius: '50%',
+                background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)',
+                cursor: 'pointer',
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                position: 'relative',
+                overflow: 'hidden',
+                marginLeft: 2,
+              }}
+            >
+              <input
+                type="color"
+                onChange={(e) => onRecolor(e.target.value)}
+                style={{
+                  position: 'absolute',
+                  opacity: 0,
+                  width: '100%',
+                  height: '100%',
+                  cursor: 'pointer',
+                  padding: 0,
+                  border: 'none',
+                }}
+              />
+            </label>
           </div>
           {divider}
         </>

@@ -702,6 +702,38 @@ export default function NotebookToolCapsule({ ui }) {
                           {STICKY_COLORS.map(c => (
                              <div key={c} onClick={() => setPenColor(c)} className="cute-swatch-bubble" style={{ width: 22, height: 22, borderRadius: 6, background: c, cursor: 'pointer', boxShadow: penColor === c ? `0 0 0 2px white, 0 0 0 4px ${HW.accent}` : '0 2px 4px rgba(0,0,0,0.1)' }} />
                           ))}
+                          <label
+                            title="เลือกสีโน้ตเอง (จานสีอิสระ)"
+                            style={{
+                              width: 22,
+                              height: 22,
+                              borderRadius: 6,
+                              background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)',
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                              position: 'relative',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            <input
+                              type="color"
+                              value={penColor.startsWith('#') && penColor.length === 7 ? penColor : '#FEF08A'}
+                              onChange={(e) => setPenColor(e.target.value)}
+                              style={{
+                                position: 'absolute',
+                                opacity: 0,
+                                width: '100%',
+                                height: '100%',
+                                cursor: 'pointer',
+                                padding: 0,
+                                border: 'none',
+                              }}
+                            />
+                          </label>
                         </div>
                         <div style={{ width: 1, background: '#E5E7EB', height: 20, flexShrink: 0 }}></div>
                         <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
