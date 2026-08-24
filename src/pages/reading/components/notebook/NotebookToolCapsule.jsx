@@ -6,7 +6,7 @@ import ColorPickerPanel from '../ColorPickerPanel';
 import EmojiStickerPicker from '../EmojiStickerPicker';
 import MindmapStylePicker from './MindmapStylePicker.jsx';
 import { LASSO_KINDS, TOOLS_WITH_OPTIONS, DEFAULT_LASSO_FILTER } from './notebookConstants.js';
-import { TOOL_GROUPS, WRITE_MODES, ACTION_TOOLS, readWriteMode, WRITE_MODE_KEY } from './notebookTools.js';
+import { PEN_TYPES, EXTRA_TOOLS, TOOL_GROUPS, WRITE_MODES, ACTION_TOOLS, readWriteMode, WRITE_MODE_KEY } from './notebookTools.js';
 
 // The floating tool capsule at the bottom of the notebook: pen/eraser/shape
 // pickers and every tool's options popover.
@@ -33,15 +33,22 @@ export default function NotebookToolCapsule({ ui }) {
   const [inkOpen, setInkOpen] = React.useState(false);
   const [showMindmapStylePicker, setShowMindmapStylePicker] = React.useState(false);
   const showInk = WRITE_MODES[writeMode].showInk;
+  const [lastPenType, setLastPenType] = React.useState('pen');
+  const [showExtrasMenu, setShowExtrasMenu] = React.useState(false);
+
+  React.useEffect(() => {
+    if (['pen', 'fountain', 'pencil', 'marker'].includes(tool)) {
+      setLastPenType(tool);
+    }
+  }, [tool]);
 
   React.useEffect(() => {
     try { localStorage.setItem(WRITE_MODE_KEY, writeMode); } catch (e) { console.warn(e); }
   }, [writeMode]);
 
   const visibleTools = React.useMemo(() => {
-    const ink = (showInk || inkOpen) ? TOOL_GROUPS.ink : [];
-    return [...TOOL_GROUPS.core, ...ink, ...TOOL_GROUPS.extras];
-  }, [showInk, inkOpen]);
+    return TOOL_GROUPS[writeMode] || TOOL_GROUPS.write;
+  }, [writeMode]);
 
   const wrapRef = React.useRef(null);
   const [availWidth, setAvailWidth] = React.useState(0);
@@ -77,10 +84,7 @@ export default function NotebookToolCapsule({ ui }) {
   const showLabels = availWidth > 0 && availWidth >= fullCount * 58 + chromeWidth;
   const compactModes = availWidth > 0 && availWidth < 560;
 
-  const foldExtras = availWidth > 0 && availWidth < fullCount * 44 + chromeWidth;
-  const shownTools = foldExtras
-    ? visibleTools.filter((t) => !TOOL_GROUPS.extras.some((e) => e.id === t.id))
-    : visibleTools;
+  const shownTools = visibleTools;
 
   // Active palette depending on highlighter vs normal pens
   const currentPalette = tool === 'highlighter' ? CUTE_HIGHLIGHTER_PALETTE : CUTE_PEN_PALETTE;
@@ -185,20 +189,43 @@ export default function NotebookToolCapsule({ ui }) {
                    >
                   
                   {shownTools.map(t => {
-                     const isAction = ACTION_TOOLS.includes(t.id);
-                     const isPenLike = ['pen', 'fountain', 'pencil', 'marker', 'highlighter'].includes(t.id);
-                     const active = t.id === 'ruler' ? rulerOn
+                     const isPenGroup = t.id === 'penGroup';
+                     const isMore = t.id === 'more';
+                     const currentPen = PEN_TYPES.find(p => p.id === (['pen', 'fountain', 'pencil', 'marker'].includes(tool) ? tool : lastPenType)) || PEN_TYPES[0];
+                     const ToolIcon = isPenGroup ? currentPen.icon : t.icon;
+                     const label = isPenGroup ? currentPen.label : t.label;
+                     const title = isPenGroup ? currentPen.title : t.title;
+
+                     const isPenLike = isPenGroup || t.id === 'highlighter';
+                     const active = isPenGroup ? ['pen', 'fountain', 'pencil', 'marker'].includes(tool)
+                        : isMore ? (showExtrasMenu || rulerOn || protractorOn || (isRecording) || tool === 'laser')
+                        : t.id === 'ruler' ? rulerOn
                         : t.id === 'protractor' ? protractorOn
                         : t.id === 'emoji' ? showEmojiPicker
                         : (tool === t.id && !['image', 'mic'].includes(t.id));
+
                      return (
                        <button
                          key={t.id}
-                         title={t.title}
-                         aria-label={t.title}
+                         title={title}
+                         aria-label={title}
                          aria-pressed={active}
                          className="cute-btn-press"
                          onClick={() => {
+                            if (isPenGroup) {
+                               if (['pen', 'fountain', 'pencil', 'marker'].includes(tool)) {
+                                 togglePanel('tools', setShowToolOptions, showToolOptions);
+                               } else {
+                                 setTool(lastPenType || 'pen');
+                                 closeOverlays('tools');
+                                 setShowToolOptions(true);
+                               }
+                               return;
+                            }
+                            if (isMore) {
+                               togglePanel('extras', setShowExtrasMenu, showExtrasMenu);
+                               return;
+                            }
                             if (t.id === 'image') { document.getElementById('image-upload').click(); return; }
                             if (t.id === 'pdfWidget') { document.getElementById('pdf-widget-upload').click(); return; }
                             if (t.id === 'mic') { toggleRecording(); return; }
@@ -232,7 +259,7 @@ export default function NotebookToolCapsule({ ui }) {
                             boxShadow: active ? `0 2px 8px rgba(15,110,86,0.12), inset 0 0 0 1px ${HW.accentRing}` : 'none',
                          }}
                        >
-                         <t.icon size={showLabels ? 18 : 19} strokeWidth={active ? 2.1 : 1.7} />
+                         <ToolIcon size={showLabels ? 18 : 19} strokeWidth={active ? 2.1 : 1.7} />
                          
                          {/* Live Color Dot Indicator on Pen Tools */}
                          {isPenLike && (
@@ -251,32 +278,28 @@ export default function NotebookToolCapsule({ ui }) {
                            />
                          )}
 
-                         {showLabels && <span style={{ whiteSpace: 'nowrap' }}>{t.label}</span>}
+                         {isMore && (rulerOn || protractorOn || isRecording || tool === 'laser') && (
+                           <span
+                             style={{
+                               position: 'absolute',
+                               top: 2,
+                               right: 2,
+                               width: 6,
+                               height: 6,
+                               borderRadius: '50%',
+                               background: isRecording ? '#e11d48' : HW.accent,
+                               boxShadow: '0 0 0 1.5px white',
+                             }}
+                           />
+                         )}
+
+                         {showLabels && <span style={{ whiteSpace: 'nowrap' }}>{label}</span>}
                          {t.id === 'mic' && isRecording && <div style={{ position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: '50%', background: '#e11d48', animation: 'pulse 1s infinite' }}></div>}
                        </button>
                      );
                   })}
 
-                  {!showInk && (
-                    <button
-                      onClick={() => setInkOpen(v => !v)}
-                      title="เครื่องมือเขียนด้วยมือ — ปากกา ดินสอ ไฮไลต์"
-                      aria-expanded={inkOpen}
-                      className="cute-btn-press"
-                      style={{
-                        flexShrink: 0, minWidth: TOOL_BTN, height: showLabels ? TOOL_BTN + 12 : TOOL_BTN,
-                        padding: showLabels ? '4px 8px' : 0, borderRadius: 14, border: 'none',
-                        background: inkOpen ? HW.accentSoft : 'transparent',
-                        color: inkOpen ? HW.accent : HW.textDim, cursor: 'pointer',
-                        display: 'flex', flexDirection: showLabels ? 'column' : 'row',
-                        alignItems: 'center', justifyContent: 'center', gap: showLabels ? 2 : 0,
-                        fontFamily: 'Kanit, sans-serif', fontSize: 10.5, fontWeight: 600, lineHeight: 1.1,
-                      }}
-                    >
-                      <PenTool size={showLabels ? 18 : 19} strokeWidth={1.7} />
-                      {showLabels && <span style={{ whiteSpace: 'nowrap' }}>เขียนมือ</span>}
-                    </button>
-                  )}
+                  
 
                   {selectedId && (
                      <>
@@ -299,6 +322,63 @@ export default function NotebookToolCapsule({ ui }) {
                )}
              </div>
             </div>
+
+            
+            {/* Floating Extras Tools Popover */}
+            {showExtrasMenu && (
+              <div
+                className="hide-scroll cute-pop-in"
+                style={{
+                  order: -1,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  backdropFilter: 'saturate(200%) blur(28px)',
+                  WebkitBackdropFilter: 'saturate(200%) blur(28px)',
+                  borderRadius: 999,
+                  boxShadow: '0 16px 40px rgba(15, 110, 86, 0.15), 0 4px 14px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(255,255,255,0.9) inset',
+                  border: '1px solid rgba(15, 110, 86, 0.12)',
+                  padding: '6px 12px', marginBottom: 4,
+                  overflowX: 'auto', maxWidth: '100%',
+                }}
+              >
+                {EXTRA_TOOLS.map((xt) => {
+                  const isAct = xt.id === 'ruler' ? rulerOn
+                    : xt.id === 'protractor' ? protractorOn
+                    : xt.id === 'emoji' ? showEmojiPicker
+                    : xt.id === 'laser' ? tool === 'laser'
+                    : (xt.id === 'mic' && isRecording);
+                  return (
+                    <button
+                      key={xt.id}
+                      onClick={() => {
+                        if (xt.id === 'pdfWidget') { document.getElementById('pdf-widget-upload').click(); setShowExtrasMenu(false); }
+                        else if (xt.id === 'emoji') { togglePanel('emoji', setShowEmojiPicker, showEmojiPicker); setShowExtrasMenu(false); }
+                        else if (xt.id === 'ruler') { setRulerOn(v => !v); }
+                        else if (xt.id === 'protractor') { setProtractorOn(v => !v); }
+                        else if (xt.id === 'laser') { setTool('laser'); setShowExtrasMenu(false); }
+                        else if (xt.id === 'mic') { toggleRecording(); }
+                      }}
+                      className="cute-btn-press"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        padding: '5px 11px', borderRadius: 999, border: 'none',
+                        background: isAct ? HW.accentSoft : 'transparent',
+                        color: isAct ? HW.accent : (xt.id === 'mic' && isRecording ? '#e11d48' : HW.textDim),
+                        fontSize: 11.5, fontWeight: isAct ? 700 : 500,
+                        cursor: 'pointer', whiteSpace: 'nowrap',
+                        boxShadow: isAct ? `0 2px 6px rgba(15,110,86,0.15), inset 0 0 0 1px ${HW.accentRing}` : 'none',
+                      }}
+                    >
+                      <xt.icon size={15} strokeWidth={isAct ? 2.1 : 1.7} />
+                      <span>{xt.label}</span>
+                      {xt.id === 'mic' && isRecording && (
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e11d48', animation: 'pulse 1s infinite' }} />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* In-app colour picker */}
             {showColorPicker && (

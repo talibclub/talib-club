@@ -1,46 +1,51 @@
-import { PenTool, Highlighter, Eraser, Type, Square, Lasso, Pencil, Pointer, StickyNote, Brush, Feather, Ruler, Compass, Smile, Mic, Wand2, Image as ImageIcon, FileText } from 'lucide-react';
+import {
+  PenTool, Highlighter, Eraser, Type, Square, Lasso,
+  Pencil, Pointer, StickyNote, Brush, Feather,
+  Ruler, Compass, Smile, Mic, Wand2, Image as ImageIcon,
+  FileText, Sparkles
+} from 'lucide-react';
 
-// The notebook's tools, grouped.
-//
-// They used to be one flat, horizontally scrolling strip in this order:
-// pan, pen, fountain, pencil, marker, highlighter, eraser, lasso, ruler,
-// protractor, TEXT, shape, image, sticker, emoji, laser, mic.
-//
-// "ข้อความ" was the eleventh item. Anyone who types rather than draws had to
-// scroll past ten pens to reach the one tool they use, every single time. The
-// groups below let the capsule show a short, relevant row and keep the rest one
-// tap away — see WRITE_MODES.
+export const PEN_TYPES = [
+  { id: 'pen', icon: PenTool, title: 'ปากกาลูกลื่น', label: 'ปากกา' },
+  { id: 'fountain', icon: Feather, title: 'ปากกาหมึกซึม', label: 'หมึกซึม' },
+  { id: 'pencil', icon: Pencil, title: 'ดินสอ', label: 'ดินสอ' },
+  { id: 'marker', icon: Brush, title: 'มาร์กเกอร์', label: 'มาร์กเกอร์' },
+];
+
+export const EXTRA_TOOLS = [
+  { id: 'pdfWidget', icon: FileText, title: 'วาง PDF บนกระดาน', label: 'PDF' },
+  { id: 'emoji', icon: Smile, title: 'สติกเกอร์และอิโมจิ', label: 'สติกเกอร์' },
+  { id: 'ruler', icon: Ruler, title: 'ไม้บรรทัด — ลากเส้นตรง', label: 'ไม้บรรทัด' },
+  { id: 'protractor', icon: Compass, title: 'ไม้โปรแทรกเตอร์ — วัดมุม', label: 'วัดมุม' },
+  { id: 'laser', icon: Wand2, title: 'เลเซอร์พอยเตอร์ (เส้นจางหายเอง)', label: 'เลเซอร์' },
+  { id: 'mic', icon: Mic, title: 'อัดเสียงระหว่างจด', label: 'อัดเสียง' },
+];
+
 export const TOOL_GROUPS = {
-  // Always visible, whichever mode you are in.
-  core: [
+  write: [
+    { id: 'pan', icon: Pointer, title: 'เลื่อนกระดาษ / สัมผัส', label: 'เลื่อน' },
+    { id: 'penGroup', icon: PenTool, title: 'ปากกา (แตะเพื่อเลือกหัวปากกา)', label: 'ปากกา' },
+    { id: 'highlighter', icon: Highlighter, title: 'ปากกาเน้นข้อความ', label: 'ไฮไลต์' },
+    { id: 'eraser', icon: Eraser, title: 'ยางลบ', label: 'ลบ' },
     { id: 'text', icon: Type, title: 'พิมพ์ข้อความ', label: 'ข้อความ' },
     { id: 'sticker', icon: StickyNote, title: 'โน้ตติดกระดาษ', label: 'โน้ต' },
     { id: 'image', icon: ImageIcon, title: 'แทรกรูปภาพ', label: 'รูป' },
-    { id: 'pdfWidget', icon: FileText, title: 'วาง PDF บนกระดาน', label: 'PDF' },
+    { id: 'shape', icon: Square, title: 'รูปทรง เส้น ลูกศร', label: 'รูปทรง' },
+    { id: 'lasso', icon: Lasso, title: 'เลือกลายมือเป็นกลุ่ม', label: 'เลือกกลุ่ม' },
+    { id: 'more', icon: Sparkles, title: 'เครื่องมือเพิ่มเติม (PDF, ไม้บรรทัด, วัดมุม, เลเซอร์ ฯลฯ)', label: 'เพิ่มเติม' },
+  ],
+  type: [
+    { id: 'pan', icon: Pointer, title: 'เลื่อนกระดาษ / สัมผัส', label: 'เลื่อน' },
+    { id: 'text', icon: Type, title: 'พิมพ์ข้อความ', label: 'ข้อความ' },
+    { id: 'sticker', icon: StickyNote, title: 'โน้ตติดกระดาษ', label: 'โน้ต' },
+    { id: 'image', icon: ImageIcon, title: 'แทรกรูปภาพ', label: 'รูป' },
     { id: 'shape', icon: Square, title: 'รูปทรง เส้น ลูกศร', label: 'รูปทรง' },
     { id: 'eraser', icon: Eraser, title: 'ยางลบ', label: 'ลบ' },
-  ],
-  // The pens. Hidden in typing mode behind "เครื่องมือเขียน".
-  ink: [
-    { id: 'pen', icon: PenTool, title: 'ปากกาลูกลื่น', label: 'ปากกา' },
-    { id: 'fountain', icon: Feather, title: 'ปากกาหมึกซึม', label: 'หมึกซึม' },
-    { id: 'pencil', icon: Pencil, title: 'ดินสอ', label: 'ดินสอ' },
-    { id: 'marker', icon: Brush, title: 'มาร์กเกอร์', label: 'มาร์กเกอร์' },
-    { id: 'highlighter', icon: Highlighter, title: 'ปากกาเน้นข้อความ', label: 'ไฮไลต์' },
-    { id: 'lasso', icon: Lasso, title: 'เลือกลายมือเป็นกลุ่ม', label: 'เลือกกลุ่ม' },
-    { id: 'ruler', icon: Ruler, title: 'ไม้บรรทัด — ลากเส้นตรง', label: 'ไม้บรรทัด' },
-    { id: 'protractor', icon: Compass, title: 'ไม้โปรแทรกเตอร์ — วัดมุม', label: 'วัดมุม' },
-  ],
-  // Occasional extras, never in the main row.
-  extras: [
-    { id: 'emoji', icon: Smile, title: 'อิโมจิและสติกเกอร์', label: 'สติกเกอร์' },
-    { id: 'laser', icon: Wand2, title: 'เลเซอร์พอยเตอร์ (เส้นจางหายเอง)', label: 'เลเซอร์' },
-    { id: 'mic', icon: Mic, title: 'อัดเสียงระหว่างจด', label: 'อัดเสียง' },
+    { id: 'penGroup', icon: PenTool, title: 'ปากกา (แตะเพื่อเขียนมือ)', label: 'ปากกา' },
+    { id: 'more', icon: Sparkles, title: 'เครื่องมือเพิ่มเติม', label: 'เพิ่มเติม' },
   ],
 };
 
-// Two ways of working, remembered per person. `type` opens on the text tool and
-// keeps the pens folded away; `write` is the original pen-first layout.
 export const WRITE_MODES = {
   type:  { id: 'type',  label: 'พิมพ์',  defaultTool: 'text', showInk: false },
   write: { id: 'write', label: 'เขียน', defaultTool: 'pen',  showInk: true },
@@ -51,11 +56,10 @@ export const WRITE_MODE_KEY = 'talib_notebook_mode';
 export function readWriteMode() {
   try {
     const stored = localStorage.getItem(WRITE_MODE_KEY);
-    return WRITE_MODES[stored] ? stored : 'type';
+    return WRITE_MODES[stored] ? stored : 'write';
   } catch {
-    return 'type';
+    return 'write';
   }
 }
 
-// Tools that are actions rather than modes — they fire and hand control back.
-export const ACTION_TOOLS = ['image', 'mic', 'emoji', 'ruler', 'protractor'];
+export const ACTION_TOOLS = ['image', 'mic', 'emoji', 'ruler', 'protractor', 'more'];
