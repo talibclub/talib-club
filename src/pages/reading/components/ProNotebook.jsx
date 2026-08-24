@@ -495,6 +495,38 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     });
     toast.success('เพิ่มไอคอนแล้ว', { id: 'icon-add' });
   };
+
+  const insertSticky = (customColor, customStyle) => {
+    const page = pagesRef.current[currentPageIndex] || { width: 800, height: 1130 };
+    const jitter = () => (Math.random() - 0.5) * 30;
+    let cx = page.width / 2, cy = page.height / 2;
+    const stage = stageRef.current;
+    if (stage) {
+      const rect = stage.container().getBoundingClientRect();
+      const s = stage.scaleX() || scale || 1;
+      cx = (rect.width / 2 - stage.x()) / s - pageX;
+      cy = (rect.height / 2 - stage.y()) / s - pageY;
+    }
+    const col = customColor || (STICKY_COLORS.includes(penColor) ? penColor : '#FEF08A');
+    const sty = customStyle || stickerStyle || 'classic';
+    const newSticker = {
+      id: nextObjectId('sticker'),
+      x: cx - 75 + jitter(),
+      y: cy - 75 + jitter(),
+      width: 150,
+      height: 150,
+      color: col,
+      text: '',
+      style: sty
+    };
+    pushHistory();
+    updatePage(currentPageIndex, (p) => {
+      if (!p.stickers) p.stickers = [];
+      p.stickers.push(newSticker);
+    });
+    setEditingStickerId(newSticker.id);
+    toast.success('เพิ่มโน้ตติดกระดาษแล้ว', { id: 'sticky-add' });
+  };
   
   const [showBookSnip, setShowBookSnip] = useState(false);
   // Page a "jump back to source" link should open the book snipper on. 1 for a
@@ -1170,9 +1202,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     }
     
     if (tool === 'sticker') {
-       if (hitExistingObject || editingStickerId) return;
+       if (hitExistingObject) return;
+       if (editingStickerId) setEditingStickerId(null);
        const stickerColor = STICKY_COLORS.includes(penColor) ? penColor : '#FEF08A';
-       const newSticker = { id: nextObjectId('sticker'), x: pos.x, y: pos.y, color: stickerColor, text: '', style: stickerStyle };
+       const newSticker = { id: nextObjectId('sticker'), x: pos.x - 75, y: pos.y - 75, width: 150, height: 150, color: stickerColor, text: '', style: stickerStyle };
        pushHistory();
        updatePage(currentPageIndex, (page) => {
           if (!page.stickers) page.stickers = [];
@@ -1480,7 +1513,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     const project = (x, y) => ({ left: ((x - bounds.minX) / rangeX) * width, top: ((y - bounds.minY) / rangeY) * height });
     const points = [
       ...(currentPage.texts || []).filter((o) => (o.text || '').trim().length > 0 || (o.lines || []).some(l => (l.text || '').trim().length > 0)).map((o) => ({ id: o.id, x: o.x, y: o.y, color: '#2563EB' })),
-      ...(currentPage.stickers || []).filter((o) => (o.text || '').trim().length > 0 || (o.lines || []).some(l => (l.text || '').trim().length > 0) || o.audioUrl || o.audioBlob).map((o) => ({ id: o.id, x: o.x, y: o.y, color: '#D97706' })),
+      ...(currentPage.stickers || []).map((o) => ({ id: o.id, x: o.x, y: o.y, color: '#D97706' })),
       ...(currentPage.images || []).map((o) => ({ id: o.id, x: o.x, y: o.y, color: '#7C3AED' })),
       ...(currentPage.lines || []).filter((o) => o.points?.length >= 2).map((o) => ({ id: o.id, x: o.points[0], y: o.points[1], color: '#0F766E' })),
       ...(currentPage.shapes || []).filter((o) => o.type !== 'connector').map((o) => ({ id: o.id, x: Number.isFinite(o.x1) ? o.x1 : o.x, y: Number.isFinite(o.y1) ? o.y1 : o.y, color: '#DB2777' })),
@@ -2477,7 +2510,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
     autoShape, clearPage, clearStrokes, closeOverlays, colors, currentPage,
     connectorHasArrow, currentPageIndex, customColors, deletePage, deleteRecording,
     deleteSelected, editingTextId, eraserSettings, exportNotebookPDF,
-    fitToScreen, fullView, handleAddPage, handleToolsScroll, insertEmoji, insertIcon,
+    fitToScreen, fullView, handleAddPage, handleToolsScroll, insertEmoji, insertIcon, insertSticky,
     isCoarse, isMobile, isRecording, isSaving, laserColor, lassoFilter,
     leftToolbarScroll, nowPlaying, onToggleFullView, pages, penColor,
     penOpacity, penSize, playRecording, position, pressureEnabled,
@@ -4026,16 +4059,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
                onFont={() => {}}
                onSize={(n) => updSticker((x) => { x.textSize = n; })}
                onColor={(c) => updSticker((x) => { x.textColor = c; })}
-               onCommit={() => {
-                  updatePage(currentPageIndex, (page) => {
-                    const stk = (page.stickers || []).find(s => s.id === editingStickerId);
-                    const hasContent = stk && ((stk.text || '').trim().length > 0 || (stk.lines || []).some(l => (l.text || '').trim().length > 0) || stk.audioUrl || stk.audioBlob);
-                    if (!hasContent) {
-                      page.stickers = (page.stickers || []).filter(s => s.id !== editingStickerId);
-                    }
-                  });
-                  setEditingStickerId(null);
-                }}
+                onCommit={() => setEditingStickerId(null)}
              />
              {/* Delete stays reachable while editing: the selection bar that
                  normally carries it is hidden for as long as an editor is open. */}

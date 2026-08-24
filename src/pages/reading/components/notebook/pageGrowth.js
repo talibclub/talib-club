@@ -45,10 +45,6 @@ const spanOf = (obj, kind) => {
     const hasText = (obj.text || '').trim().length > 0 || (obj.lines || []).some(l => (l.text || '').trim().length > 0);
     if (!hasText) return null;
   }
-  if (kind === 'stickers') {
-    const hasContent = (obj.text || '').trim().length > 0 || (obj.lines || []).some(l => (l.text || '').trim().length > 0) || obj.audioUrl || obj.audioBlob;
-    if (!hasContent) return null;
-  }
   // Sticky notes retain the original 150px default, but can now grow sideways
   // (and vertically) for longer writing.
   const w = kind === 'stickers' ? (obj.width || 150) : (obj.width || (kind === 'texts' ? 340 : 120));

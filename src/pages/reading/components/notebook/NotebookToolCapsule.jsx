@@ -14,7 +14,7 @@ export default function NotebookToolCapsule({ ui }) {
   const { TOOL_BTN, WRITER_H, applyColorToActiveText, autoShape, clearStrokes,
     closeOverlays, colors, currentPage, currentPageIndex, customColors,
     deleteSelected, editingTextId, eraserSettings, handleToolsScroll,
-    insertEmoji, insertIcon, isCoarse, isRecording, laserColor, lassoFilter,
+    insertEmoji, insertIcon, insertSticky, isCoarse, isRecording, laserColor, lassoFilter,
     leftToolbarScroll, penColor, penOpacity, penSize, protractorOn, readonly, rememberCustomColor, rightToolbarScroll, rulerOn, scale, selectedId, setAutoShape, setCroppingImageId,
     connectorHasArrow, setConnectorHasArrow, setEraserSettings, setLaserColor, setLassoFilter, setPenColor,
     setPenOpacity, setPenSize, setProtractorOn, setRulerOn, setShapeType,
@@ -609,7 +609,16 @@ export default function NotebookToolCapsule({ ui }) {
 
                   {tool === 'sticker' && (
                      <>
-                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                        {insertSticky && (
+                          <button
+                            onClick={() => insertSticky(penColor, stickerStyle)}
+                            className="cute-btn-press"
+                            style={{ height: 28, padding: '0 12px', borderRadius: 999, border: 'none', background: 'var(--teal)', color: 'white', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, boxShadow: '0 2px 6px rgba(15,110,86,0.2)' }}
+                          >
+                            + แปะโน้ตลงหน้า
+                          </button>
+                        )}
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
                           {STICKY_COLORS.map(c => (
                              <div key={c} onClick={() => setPenColor(c)} className="cute-swatch-bubble" style={{ width: 22, height: 22, borderRadius: 6, background: c, cursor: 'pointer', boxShadow: penColor === c ? `0 0 0 2px white, 0 0 0 4px ${HW.accent}` : '0 2px 4px rgba(0,0,0,0.1)' }} />
                           ))}
