@@ -421,6 +421,37 @@ export default function NotebookToolCapsule({ ui }) {
               <div className="hide-scroll cute-pop-in" style={{ order: -1, display: 'flex', alignItems: 'center', gap: 8, maxWidth: '100%', overflowX: 'auto', background: 'rgba(255, 255, 255, 0.94)', backdropFilter: 'saturate(200%) blur(28px)', WebkitBackdropFilter: 'saturate(200%) blur(28px)', borderRadius: 999, boxShadow: '0 16px 40px rgba(15, 110, 86, 0.14), 0 4px 14px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(255,255,255,0.9) inset', border: `1px solid rgba(15, 110, 86, 0.12)`, padding: '7px 16px', marginBottom: 4 }} onWheel={(e) => { if (e.deltaY !== 0) e.currentTarget.scrollLeft += e.deltaY; }} {...rightToolbarScroll}>
                   {['pen', 'fountain', 'marker', 'pencil', 'highlighter', 'shape'].includes(tool) && (
                      <>
+                        {['pen', 'fountain', 'marker', 'pencil'].includes(tool) && (
+                           <>
+                             <div style={{ display: 'flex', gap: 4, background: 'rgba(15,110,86,0.08)', padding: 3, borderRadius: 999, flexShrink: 0 }}>
+                                {PEN_TYPES.map((p) => {
+                                   const isCurrent = tool === p.id;
+                                   return (
+                                     <button
+                                       key={p.id}
+                                       onClick={() => { setTool(p.id); setLastPenType(p.id); }}
+                                       title={p.title}
+                                       className="cute-btn-press"
+                                       style={{
+                                         display: 'flex', alignItems: 'center', gap: 4,
+                                         padding: '4px 10px', borderRadius: 999, border: 'none',
+                                         background: isCurrent ? HW.accent : 'transparent',
+                                         color: isCurrent ? 'white' : HW.textDim,
+                                         fontSize: 11.5, fontWeight: isCurrent ? 700 : 500,
+                                         cursor: 'pointer', whiteSpace: 'nowrap',
+                                         boxShadow: isCurrent ? '0 2px 6px rgba(15,110,86,0.25)' : 'none',
+                                         transition: 'all 0.15s ease',
+                                       }}
+                                     >
+                                       <p.icon size={13} strokeWidth={isCurrent ? 2.2 : 1.8} />
+                                       <span>{p.label}</span>
+                                     </button>
+                                   );
+                                })}
+                             </div>
+                             <div style={{ width: 1, background: HW.hairline, height: 20, flexShrink: 0 }}></div>
+                           </>
+                        )}
                         {tool === 'shape' && (
                            <>
                              <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
