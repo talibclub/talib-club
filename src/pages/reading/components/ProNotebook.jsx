@@ -53,6 +53,7 @@ import { useTextRecognition } from './notebook/useTextRecognition.js';
 import NotebookStyles from './notebook/NotebookStyles.jsx';
 import NotebookTopBar from './notebook/NotebookTopBar.jsx';
 import NotebookToolCapsule from './notebook/NotebookToolCapsule.jsx';
+import PdfWidgetControls from './notebook/PdfWidgetControls.jsx';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -81,6 +82,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const TOOL_BTN = isCoarse ? 46 : 40;   // tool button size in the bottom capsule
   
   const notebookId = bookId || 'default';
+  const pdfDocCacheRef = useRef(new Map());
+  const [loadingPdfWidgetIds, setLoadingPdfWidgetIds] = useState(new Set());
 
   // Initial cloud sync. A full-canvas overlay (spinner + percent bar) replaces the
   // old corner toast, which users never noticed on a tablet.
@@ -2033,6 +2036,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         const fileUrl = await getDownloadURL(storageRef);
         
         const pdf = await pdfjsLib.getDocument({ url: fileUrl }).promise;
+        pdfDocCacheRef.current.set(fileUrl, pdf);
         const numPages = pdf.numPages;
         
         const page = await pdf.getPage(1);
@@ -2087,10 +2091,16 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      const pdfObj = currentPage.pdfs?.find(p => p.id === pdfId);
      if (!pdfObj) return;
      if (newPage < 1 || newPage > pdfObj.numPages) return;
+     if (newPage === pdfObj.currentPage) return;
      
-     toast.loading(`กำลังโหลดหน้า ${newPage}...`, { id: 'pdf-page' });
+     setLoadingPdfWidgetIds(prev => new Set(prev).add(pdfId));
+     toast.loading(`กำลังโหลดหน้า ${newPage}...`, { id: `pdf-page-${pdfId}` });
      try {
-        const pdf = await pdfjsLib.getDocument({ url: pdfObj.fileUrl }).promise;
+        let pdf = pdfDocCacheRef.current.get(pdfObj.fileUrl);
+        if (!pdf) {
+           pdf = await pdfjsLib.getDocument({ url: pdfObj.fileUrl }).promise;
+           pdfDocCacheRef.current.set(pdfObj.fileUrl, pdf);
+        }
         const page = await pdf.getPage(newPage);
         const viewport = page.getViewport({ scale: 1.5 });
         const canvas = document.createElement('canvas');
@@ -2108,10 +2118,16 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               obj.currentDataUrl = currentDataUrl;
            }
         });
-        toast.success(`เปลี่ยนเป็นหน้า ${newPage} แล้ว`, { id: 'pdf-page' });
+        toast.success(`เปลี่ยนเป็นหน้า ${newPage} แล้ว`, { id: `pdf-page-${pdfId}` });
      } catch (err) {
         console.error(err);
-        toast.error('โหลดหน้าไม่สำเร็จ', { id: 'pdf-page' });
+        toast.error('โหลดหน้าไม่สำเร็จ', { id: `pdf-page-${pdfId}` });
+     } finally {
+        setLoadingPdfWidgetIds(prev => {
+           const next = new Set(prev);
+           next.delete(pdfId);
+           return next;
+        });
      }
   };
 
@@ -4017,27 +4033,18 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
       })()}
 
       {/* PDF Widget Controls */}
-      {currentPage.pdfs?.map(pdf => {
-         const x = (pdf.x + pageX) * scale + position.x;
-         const y = (pdf.y + pageY) * scale + position.y;
-         const screenWidth = pdf.width * scale;
-         const scaleY = pdf.scaleY || 1;
-         const screenHeight = pdf.height * scaleY * scale;
-         
-         return (
-            <div key={pdf.id} style={{ position: 'absolute', top: y - 36, left: x, width: screenWidth, zIndex: 10, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
-               <div style={{ background: 'white', borderRadius: 8, padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.1)', pointerEvents: 'auto' }}>
-                  <FileText size={16} color="#EF4444" />
-                  <span style={{ fontSize: 12, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#111827', fontWeight: 600 }}>{pdf.fileName}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                     <button onClick={() => changePdfWidgetPage(pdf.id, pdf.currentPage - 1)} disabled={pdf.currentPage <= 1} style={{ border: 'none', background: 'transparent', cursor: pdf.currentPage <= 1 ? 'default' : 'pointer', color: pdf.currentPage <= 1 ? '#D1D5DB' : '#374151' }}>{'<'}</button>
-                     <span style={{ fontSize: 12, fontWeight: 500, color: '#374151' }}>{pdf.currentPage} / {pdf.numPages}</span>
-                     <button onClick={() => changePdfWidgetPage(pdf.id, pdf.currentPage + 1)} disabled={pdf.currentPage >= pdf.numPages} style={{ border: 'none', background: 'transparent', cursor: pdf.currentPage >= pdf.numPages ? 'default' : 'pointer', color: pdf.currentPage >= pdf.numPages ? '#D1D5DB' : '#374151' }}>{'>'}</button>
-                  </div>
-               </div>
-            </div>
-         );
-      })}
+      {currentPage.pdfs?.map(pdf => (
+         <PdfWidgetControls
+           key={pdf.id}
+           pdf={pdf}
+           pageX={pageX}
+           pageY={pageY}
+           scale={scale}
+           position={position}
+           onPageChange={(newPage) => changePdfWidgetPage(pdf.id, newPage)}
+           isLoading={loadingPdfWidgetIds.has(pdf.id)}
+         />
+      ))}
 
       {/* Floating text editor (format toolbar + textarea) */}
       {(() => {
