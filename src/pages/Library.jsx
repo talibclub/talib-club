@@ -8,6 +8,7 @@ import PaginationBar from "../components/PaginationBar.jsx"
 import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
+import { isJournal, getTimestampMs } from "../utils/library.js"
 
 // ฟังก์ชันดึงรูปปก
 function getDirectUrl(url) {
@@ -37,7 +38,7 @@ export default function Library({ go, authState, ctx }) {
   const filter = ctx?.filter || "all"
   const categoryFilter = ctx?.cat || "all"
   const sourceFilter = ctx?.source || "all"
-  const sortBy = ctx?.sortBy || (filter === "journal" ? "issue-desc" : "newest")
+  const sortBy = ctx?.sortBy || (isJournal(filter) ? "issue-desc" : "newest")
   const showAdvancedFilters = ctx?.showAdv === "true"
   const requestedPage = parseInt(ctx?.page, 10) || 1
   const ITEMS_PER_PAGE = 12
@@ -74,9 +75,9 @@ export default function Library({ go, authState, ctx }) {
     if (newParams.filter !== undefined || newParams.cat !== undefined || newParams.source !== undefined || newParams.search !== undefined || newParams.showAdv !== undefined || newParams.sortBy !== undefined) {
       updated.page = 1
     }
-    if (newParams.filter === "journal" && newParams.sortBy === undefined) {
+    if (isJournal(newParams.filter) && newParams.sortBy === undefined) {
       updated.sortBy = "issue-desc"
-    } else if (newParams.filter !== undefined && newParams.filter !== "journal" && newParams.sortBy === undefined) {
+    } else if (newParams.filter !== undefined && !isJournal(newParams.filter) && newParams.sortBy === undefined) {
       updated.sortBy = "newest"
     }
     go("library", updated, { replace: true, noScroll: true })
@@ -103,7 +104,7 @@ export default function Library({ go, authState, ctx }) {
 
   const filtered = useMemo(() => {
     const result = books.filter(b => {
-      const matchType = filter === "all" || b.type === filter
+      const matchType = filter === "all" || b.type === filter || (isJournal(filter) && isJournal(b.type))
       const matchCategory = categoryFilter === "all" || b.category === categoryFilter
       const matchSource = sourceFilter === "all" || b.source === sourceFilter
       const matchSearch =
@@ -118,7 +119,7 @@ export default function Library({ go, authState, ctx }) {
     })
 
     return [...result].sort((a, b) => {
-      if (filter === "journal") {
+      if (isJournal(filter)) {
         const issueA = Number(a.issueNumber) || 0
         const issueB = Number(b.issueNumber) || 0
         if (sortBy === "issue-asc") {
@@ -145,11 +146,11 @@ export default function Library({ go, authState, ctx }) {
         }
         
         // Fallback to creation time
-        const timeA = a.createdAt?.seconds || a.createdAt?.seconds || 0
-        const timeB = b.createdAt?.seconds || b.createdAt?.seconds || 0
+        const timeA = getTimestampMs(a.createdAt)
+        const timeB = getTimestampMs(b.createdAt)
         if (timeA !== timeB) return timeA - timeB
         
-        return String(a.id || "").localeCompare(String(b.id || ""))
+        return String(a.id || "").localeCompare(String(a.id || ""), undefined, { numeric: true })
       } else {
         if (yearA !== yearB) return yearB - yearA
         
@@ -161,11 +162,11 @@ export default function Library({ go, authState, ctx }) {
         }
         
         // Fallback to creation time (newest first)
-        const timeA = a.createdAt?.seconds || 0
-        const timeB = b.createdAt?.seconds || 0
+        const timeA = getTimestampMs(a.createdAt)
+        const timeB = getTimestampMs(b.createdAt)
         if (timeA !== timeB) return timeB - timeA
         
-        return String(b.id || "").localeCompare(String(a.id || ""))
+        return String(b.id || "").localeCompare(String(a.id || ""), undefined, { numeric: true })
       }
     })
   }, [books, filter, categoryFilter, sourceFilter, search, sortBy])
@@ -254,7 +255,7 @@ export default function Library({ go, authState, ctx }) {
 
           <label style={{ display: "grid", gap: 6 }}>
             <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>เรียงลำดับ</span>
-            {filter === "journal" ? (
+            {isJournal(filter) ? (
               <select value={sortBy} onChange={e => updateFilters({ sortBy: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
                 <option value="issue-desc">เล่มใหม่ล่าสุด ➜ เล่มเก่า</option>
                 <option value="issue-asc">เล่มเก่าสุด ➜ เล่มใหม่</option>
@@ -332,7 +333,7 @@ export default function Library({ go, authState, ctx }) {
                     <ImageWithFallback src={getDirectUrl(b.coverUrl)} alt={b.title} fallbackEmoji="📚" style={{ width: "100%", borderRadius: 6, objectFit: "cover", aspectRatio: "3/4", border: ".5px solid var(--br2)", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }} />
                   ) : (
                     <div style={{ width: "100%", aspectRatio: "3/4", borderRadius: 6, background: "var(--acc2)", display: "flex", alignItems: "center", justifyContent: "center", border: ".5px solid var(--br2)" }}>
-                      <i className={`ti ${b.type === "วารสาร" ? "ti-news" : b.type === "PDF" ? "ti-file-text" : "ti-book"}`} style={{ fontSize: 24, color: "var(--acc)" }}></i>
+                      <i className={`ti ${isJournal(b.type) ? "ti-news" : b.type === "PDF" ? "ti-file-text" : "ti-book"}`} style={{ fontSize: 24, color: "var(--acc)" }}></i>
                     </div>
                   )}
                 </div>
@@ -341,7 +342,7 @@ export default function Library({ go, authState, ctx }) {
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 4 }}>
                     <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                       <span className="tag tag-acc" style={{ fontSize: 10 }}>{b.type}</span>
-                      {b.type === "วารสาร" && b.issueNumber !== undefined && b.issueNumber !== "" && (
+                      {isJournal(b.type) && b.issueNumber !== undefined && b.issueNumber !== "" && (
                         <span className="tag" style={{ fontSize: 10, background: "rgba(45, 190, 160, 0.15)", color: "var(--teal)" }}>เล่มที่ {b.issueNumber}</span>
                       )}
                       {b.category && <span className="tag" style={{ fontSize: 10, background: "var(--bg2)", color: "var(--t2)" }}>{b.category}</span>}

@@ -7,6 +7,7 @@ import ImageWithFallback from "../components/ImageWithFallback.jsx"
 import SEOHead, { BASE_URL } from "../components/SEOHead.jsx"
 import { detailUrl } from "../utils/slug.js"
 import { useCanonicalDetailUrl, useDetailId } from "../hooks/useDetailRoute.js"
+import { isJournal } from "../utils/library.js"
 
 function getDirectUrl(url) {
   if (!url) return ""
@@ -182,7 +183,7 @@ export default function LibraryDetail({ item, go, authState }) {
           />
         ) : (
           <div style={{ width: 280, aspectRatio: "3/4", background: "var(--acc2)", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", border: ".5px solid var(--br2)" }}>
-            <i className={`ti ${displayItem.type === "วารสาร" ? "ti-news" : displayItem.type === "PDF" ? "ti-file-text" : "ti-book"}`} style={{ fontSize: 64, color: "var(--acc)" }}></i>
+            <i className={`ti ${isJournal(displayItem.type) ? "ti-news" : displayItem.type === "PDF" ? "ti-file-text" : "ti-book"}`} style={{ fontSize: 64, color: "var(--acc)" }}></i>
           </div>
         )}
       </div>
@@ -190,6 +191,9 @@ export default function LibraryDetail({ item, go, authState }) {
       <div className="card" style={{ padding: 24, marginBottom: 32, minWidth: 0 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
           <span className="tag tag-acc">{displayItem.type}</span>
+          {isJournal(displayItem.type) && displayItem.issueNumber !== undefined && displayItem.issueNumber !== "" && (
+            <span className="tag" style={{ background: "rgba(45, 190, 160, 0.15)", color: "var(--teal)" }}>เล่มที่ {displayItem.issueNumber}</span>
+          )}
           {displayItem.category && <span className="tag tag-teal">{displayItem.category}</span>}
           {displayItem.source && <span className="tag" style={{ background: "var(--bg2)", color: "var(--t2)" }}>{displayItem.source}</span>}
         </div>

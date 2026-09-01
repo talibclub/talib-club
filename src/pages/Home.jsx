@@ -3,6 +3,7 @@ import { ARTICLES, BOOKS, MEDIA, SITE } from "../data/index.js"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 import { useContentCollection, useSiteSettings, useCollectionCount } from "../lib/contentStore.js"
 import ArticleCard from "../components/ArticleCard.jsx"
+import { isJournal } from "../utils/library.js"
 
 const QURAN_DUAS = [
   { sura: 1, aya: 6 },
@@ -367,11 +368,11 @@ export default function Home({ go }) {
                 }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go("library") } }}
                   onClick={() => go("library")}>
                   <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                    <i className={`ti ${b.type==="วารสาร" ? "ti-news" : b.type==="PDF" ? "ti-file-text" : "ti-book"}`}
+                    <i className={`ti ${isJournal(b.type) ? "ti-news" : b.type==="PDF" ? "ti-file-text" : "ti-book"}`}
                       style={{ fontSize:16, color:"var(--teal)", flexShrink:0 }}></i>
                     <div>
                       <div style={{ fontSize:12, fontWeight:500, color:"var(--text)" }}>{b.title}</div>
-                      <div style={{ fontSize:10, color:"var(--t3)", fontWeight:300 }}>{b.type} · {b.year}</div>
+                      <div style={{ fontSize:10, color:"var(--t3)", fontWeight:300 }}>{b.type} {isJournal(b.type) && b.issueNumber ? `เล่มที่ ${b.issueNumber}` : ""} · {b.year}</div>
                     </div>
                   </div>
                   {b.isNew && <span className="tag tag-new" style={{ flexShrink:0 }}>ใหม่</span>}

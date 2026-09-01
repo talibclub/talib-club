@@ -8,6 +8,7 @@ import { storage, app, db } from "../../lib/firebase.js"
 import { compressImage } from "../../utils/image.js"
 import ContentStatusBanner from "../../components/ContentStatusBanner.jsx"
 import { clampPage } from "../../utils/pagination.js"
+import { isJournal, getTimestampMs } from "../../utils/library.js"
 
 const ALMAKTABAH_SOURCE = "อัลมักตะบะฮ์ อัษรียะฮ์"
 
@@ -99,11 +100,13 @@ function AlMaktabahSyncBanner() {
   )
 }
 
+export { isJournal, getTimestampMs }
+
 const EMPTY = {
   title: "",
   author: "Talib Club",
   source: "Talib Club",
-  type: "วารสาร",
+  type: "journal",
   category: "aqeedah",
   year: new Date().getFullYear() + 543,
   fileUrl: "",
@@ -149,7 +152,9 @@ export default function AdminLibrary() {
   const filtered = items.filter(b => {
     const matchSearch = String(b.title || "").toLowerCase().includes(search.toLowerCase()) || 
                         String(b.author || "").toLowerCase().includes(search.toLowerCase())
-    const matchType = typeFilter === "all" || b.type === typeFilter
+    const matchType = typeFilter === "all" || 
+                      b.type === typeFilter || 
+                      (isJournal(typeFilter) && isJournal(b.type))
     const matchCat = categoryFilter === "all" || b.category === categoryFilter
     const matchSource = sourceFilter === "all" || b.source === sourceFilter
     
@@ -164,34 +169,65 @@ export default function AdminLibrary() {
     }
     const yearA = normalizeYear(a.year)
     const yearB = normalizeYear(b.year)
+
     if (sortOrder === "newest") {
+      // 1. เรียงตามปีที่พิมพ์ (ใหม่ไปเก่า)
       if (yearA !== yearB) return yearB - yearA
-      const getMs = (val) => {
-        if (!val) return 0
-        if (typeof val.toDate === "function") return val.toDate().getTime()
-        if (val.seconds) return val.seconds * 1000
-        if (typeof val === "number") return val
-        const parsed = Date.parse(val)
-        return isNaN(parsed) ? 0 : parsed
+
+      // 2. หากปีเท่ากัน: ถ้าเป็นวารสาร ให้เรียงตามลำดับเล่มที่/ฉบับที่ (issueNumber) มากไปน้อย
+      const isJournalA = isJournal(a.type)
+      const isJournalB = isJournal(b.type)
+      if (isJournalA && isJournalB) {
+        const issueA = Number(a.issueNumber) || 0
+        const issueB = Number(b.issueNumber) || 0
+        if (issueA !== issueB) return issueB - issueA
+      } else if (a.issueNumber !== undefined && b.issueNumber !== undefined && a.issueNumber !== "" && b.issueNumber !== "") {
+        const issueA = Number(a.issueNumber) || 0
+        const issueB = Number(b.issueNumber) || 0
+        if (issueA !== issueB) return issueB - issueA
       }
-      const timeA = getMs(a.createdAt) || getMs(a.updatedAt)
-      const timeB = getMs(b.createdAt) || getMs(b.updatedAt)
-      if (timeA !== timeB) return timeB - timeA
-      return String(b.id || "").localeCompare(String(a.id || ""))
+
+      // 3. หากปีเท่ากัน (หรือเล่มที่เท่ากัน/ไม่ใช่เล่มวารสารทั้งคู่): เรียงตามวันที่สร้าง (createdAt) ใหม่ไปเก่า
+      const createdA = getTimestampMs(a.createdAt)
+      const createdB = getTimestampMs(b.createdAt)
+      if (createdA !== createdB) return createdB - createdA
+
+      // 4. Fallback วันที่อัปเดต (updatedAt)
+      const updatedA = getTimestampMs(a.updatedAt)
+      const updatedB = getTimestampMs(b.updatedAt)
+      if (updatedA !== updatedB) return updatedB - updatedA
+
+      // 5. Fallback รหัสเอกสารแบบตัวเลขอัจฉริยะ (numeric-aware sort)
+      return String(b.id || "").localeCompare(String(a.id || ""), undefined, { numeric: true })
     } else {
+      // 1. เรียงตามปีที่พิมพ์ (เก่าไปใหม่)
       if (yearA !== yearB) return yearA - yearB
-      const getMs = (val) => {
-        if (!val) return 0
-        if (typeof val.toDate === "function") return val.toDate().getTime()
-        if (val.seconds) return val.seconds * 1000
-        if (typeof val === "number") return val
-        const parsed = Date.parse(val)
-        return isNaN(parsed) ? 0 : parsed
+
+      // 2. หากปีเท่ากัน: ถ้าเป็นวารสาร เรียงตามเล่มที่ น้อยไปมาก
+      const isJournalA = isJournal(a.type)
+      const isJournalB = isJournal(b.type)
+      if (isJournalA && isJournalB) {
+        const issueA = Number(a.issueNumber) || 0
+        const issueB = Number(b.issueNumber) || 0
+        if (issueA !== issueB) return issueA - issueB
+      } else if (a.issueNumber !== undefined && b.issueNumber !== undefined && a.issueNumber !== "" && b.issueNumber !== "") {
+        const issueA = Number(a.issueNumber) || 0
+        const issueB = Number(b.issueNumber) || 0
+        if (issueA !== issueB) return issueA - issueB
       }
-      const timeA = getMs(a.createdAt) || getMs(a.updatedAt)
-      const timeB = getMs(b.createdAt) || getMs(b.updatedAt)
-      if (timeA !== timeB) return timeA - timeB
-      return String(a.id || "").localeCompare(String(a.id || ""))
+
+      // 3. วันที่สร้าง เก่าไปใหม่
+      const createdA = getTimestampMs(a.createdAt)
+      const createdB = getTimestampMs(b.createdAt)
+      if (createdA !== createdB) return createdA - createdB
+
+      // 4. Fallback วันที่อัปเดต
+      const updatedA = getTimestampMs(a.updatedAt)
+      const updatedB = getTimestampMs(b.updatedAt)
+      if (updatedA !== updatedB) return updatedA - updatedB
+
+      // 5. Fallback ID
+      return String(a.id || "").localeCompare(String(a.id || ""), undefined, { numeric: true })
     }
   })
 
@@ -225,7 +261,14 @@ export default function AdminLibrary() {
 
   async function save() {
     if (!editing.title?.trim()) return notifyError("กรุณาใส่ชื่อหนังสือ")
-    const payload = { ...editing, year: Number(editing.year || (new Date().getFullYear() + 543)) }
+    const isJr = isJournal(editing.type)
+    const payload = { 
+      ...editing, 
+      year: Number(editing.year || (new Date().getFullYear() + 543)),
+      issueNumber: isJr && editing.issueNumber !== undefined && editing.issueNumber !== ""
+        ? Number(editing.issueNumber)
+        : (isJr ? "" : null)
+    }
     setBusy(true)
     try {
       await saveItem(payload)
@@ -413,8 +456,8 @@ export default function AdminLibrary() {
           <label style={{ display: "grid", gap: 6 }}>
             <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>เรียงลำดับ</span>
             <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
-              <option value="newest">ปีที่พิมพ์ ใหม่ ➜ เก่า</option>
-              <option value="oldest">ปีที่พิมพ์ เก่า ➜ ใหม่</option>
+              <option value="newest">ปีพิมพ์/ลำดับล่าสุด ➜ เก่าสุด</option>
+              <option value="oldest">ปีพิมพ์/ลำดับเก่าสุด ➜ ล่าสุด</option>
             </select>
           </label>
         </div>
@@ -511,7 +554,7 @@ export default function AdminLibrary() {
                 <div style={{ display: "flex", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
                   <span className="tag tag-teal">{book.category || "ไม่มีหมวดหมู่"}</span>
                   <span className="tag" style={{ background: "var(--acc2)" }}>{book.type}</span>
-                  {book.type === "journal" && book.issueNumber !== undefined && book.issueNumber !== "" && (
+                  {isJournal(book.type) && book.issueNumber !== undefined && book.issueNumber !== "" && (
                     <span className="tag" style={{ background: "rgba(45, 190, 160, 0.15)", color: "var(--teal)" }}>เล่มที่ {book.issueNumber}</span>
                   )}
                   <span className="tag" style={{ background: "var(--acc2)", color: "var(--t2)", border: ".5px solid var(--br)" }}>{book.source}</span>
@@ -605,7 +648,14 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
           </select>
         </Field>
         <Field label="ประเภท">
-          <select value={item.type || ""} onChange={e => set("type", e.target.value)}>
+          <select 
+            value={
+              bookTypes.some(t => t.id === item.type)
+                ? item.type
+                : (isJournal(item.type) ? bookTypes.find(t => isJournal(t.id) || isJournal(t.label))?.id || item.type : item.type) || ""
+            } 
+            onChange={e => set("type", e.target.value)}
+          >
             {bookTypes.map(type => <option key={type.id} value={type.id}>{type.label}</option>)}
           </select>
         </Field>
@@ -615,13 +665,13 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
           </select>
         </Field>
         <Field label="ปีพิมพ์ (พ.ศ.)"><input type="number" value={item.year || ""} onChange={e => set("year", e.target.value)} /></Field>
-        {item.type === "journal" && (
-          <Field label="ลำดับเล่มที่ (issueNumber)">
+        {isJournal(item.type) && (
+          <Field label="ลำดับเล่มที่ / ฉบับที่ (issueNumber)">
             <input 
               type="number" 
-              value={item.issueNumber || ""} 
-              onChange={e => set("issueNumber", e.target.value ? Number(e.target.value) : "")} 
-              placeholder="ตัวอย่าง 1"
+              value={item.issueNumber ?? ""} 
+              onChange={e => set("issueNumber", e.target.value === "" ? "" : Number(e.target.value))} 
+              placeholder="ตัวอย่าง: 1 หรือ 2"
             />
           </Field>
         )}
