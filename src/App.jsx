@@ -177,7 +177,7 @@ export default function App() {
   }, [])
 
   const uid = authState?.user?.uid
-  const readingSessionsQueryOptions = useMemo(() => ({ limit: 20, orderByField: "completedAt", orderDirection: "desc", live: false }), [])
+  const readingSessionsQueryOptions = useMemo(() => ({ limit: 20, orderByField: "completedAt", orderDirection: "desc", live: true }), [])
   const { items: readingSessions } = useContentCollection("reading_sessions", [], uid, readingSessionsQueryOptions)
   const countdownNotifRef = useRef(null)
 

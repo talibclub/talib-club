@@ -10,6 +10,7 @@ import { NotificationDropdown, NotificationDrawer } from "./nav/NotificationComp
 // M2: Import shared utilities instead of duplicating them
 import { getLocalDayKey } from "../utils/streak.js"
 import { safeDateNow } from "../utils/time.js"
+import { isJournal, getTimestampMs } from "../utils/library.js"
 
 
 
@@ -48,21 +49,19 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
 
   useEffect(() => { goRef.current = go }, [go])
 
-  // The notification bell only renders for signed-in users, so this ran four
-  // permanent onSnapshot listeners on behalf of every anonymous visitor too —
-  // and kept them open for the whole session to show "what's the newest item",
-  // which never needs to be realtime. One getDocs per collection, once, and
-  // only once someone is actually signed in.
+  // Realtime notification listeners for signed-in users
   const notifUid = authState?.user?.uid
   useEffect(() => {
     if (!notifUid) {
       setDynamicNotifications([])
       return undefined
     }
-    let cancelled = false
-    async function setupDynamicNotifications() {
+
+    const unsubs = []
+
+    async function setupRealtimeNotifications() {
       try {
-        const { collection, query, orderBy, limit, getDocs } = await import("firebase/firestore")
+        const { collection, query, limit, onSnapshot } = await import("firebase/firestore")
         const { db } = await import("../lib/firebase.js")
         
         const latestDocs = { article: null, media: null, book: null, campaign: null }
@@ -96,13 +95,16 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
           }
           
           if (book) {
+            const isJr = isJournal(book.type)
             newNotifs.push({
               id: `book-${book.id}`,
-              title: "หนังสือและตำราใหม่",
-              desc: `ดาวน์โหลดผลงานล่าสุด: "${book.title}" หมวดหมู่ ${book.category}`,
-              time: "เมื่อเร็วๆ นี้",
-              icon: "ti-book",
-              color: "rgb(255, 179, 0)",
+              title: isJr ? "วารสารฉบับใหม่" : "หนังสือและตำราใหม่",
+              desc: isJr
+                ? `วารสารล่าสุด: "${book.title}"${book.issueNumber !== undefined && book.issueNumber !== "" ? ` (เล่มที่ ${book.issueNumber})` : ""}`
+                : `ดาวน์โหลดผลงานล่าสุด: "${book.title}" หมวดหมู่ ${book.category || "ทั่วไป"}`,
+              time: book.year ? `ปี ${book.year}` : "เมื่อเร็วๆ นี้",
+              icon: isJr ? "ti-news" : "ti-book",
+              color: isJr ? "var(--teal)" : "rgb(255, 179, 0)",
               onClick: () => { goRef.current("library-detail", book); setMenuOpen(false); setAccountOpen(false); setNotificationOpen(false) }
             })
           }
@@ -111,8 +113,8 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
             newNotifs.push({
               id: `camp-${campaign.id}`,
               title: "แจกหนังสือ/ตำราใหม่",
-              desc: `แคมเปญใหม่: "${campaign.title || campaign.items?.[0]?.name || "แจกหนังสือฟรี"}" มารับได้เลย!`,
-              time: "เมื่อเร็วๆ นี้",
+              desc: `แคมเปญ: "${campaign.title || campaign.items?.[0]?.name || "แจกหนังสือฟรี"}" มารับได้เลย!`,
+              time: "กำลังเปิดรับ",
               icon: "ti-gift",
               color: "var(--teal)",
               onClick: () => { goRef.current("books"); setMenuOpen(false); setAccountOpen(false); setNotificationOpen(false) }
@@ -122,34 +124,114 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
           setDynamicNotifications(newNotifs)
         }
 
-        const fetchLatestDoc = async (colName, orderField, key) => {
-          try {
-            const q = query(collection(db, colName), orderBy(orderField, "desc"), limit(5))
-            const snap = await getDocs(q)
-            const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-            latestDocs[key] = docs.find(d => d.deleted !== true) || null
-          } catch (err) {
-            console.error(`Error loading notifications from ${colName}:`, err)
+        const parseDateToMs = (dateStr) => {
+          if (!dateStr || typeof dateStr !== "string") return 0
+          const match = dateStr.trim().match(/^(\d{4})-(\d{2})-(\d{2})/)
+          if (match) {
+            let year = parseInt(match[1], 10)
+            const month = parseInt(match[2], 10) - 1
+            const day = parseInt(match[3], 10)
+            if (year > 2400) year -= 543
+            return new Date(year, month, day).getTime()
           }
+          const parsed = Date.parse(dateStr)
+          return isNaN(parsed) ? 0 : parsed
         }
 
-        await Promise.all([
-          fetchLatestDoc("content_articles", "date", "article"),
-          fetchLatestDoc("content_media", "date", "media"),
-          fetchLatestDoc("content_books", "createdAt", "book"),
-          fetchLatestDoc("book_campaigns", "createdAt", "campaign"),
-        ])
+        const getDocTime = (doc) => {
+          return getTimestampMs(doc.createdAt) || parseDateToMs(doc.date) || getTimestampMs(doc.updatedAt) || 0
+        }
 
-        if (!cancelled) updateNotifs()
+        const sortBooks = (items) => {
+          return [...items].sort((a, b) => {
+            let yA = Number(a.year) || 0
+            if (yA > 2400) yA -= 543
+            let yB = Number(b.year) || 0
+            if (yB > 2400) yB -= 543
+            if (yA !== yB) return yB - yA
+
+            const isJA = isJournal(a.type)
+            const isJB = isJournal(b.type)
+            if (isJA && isJB) {
+              const issA = Number(a.issueNumber) || 0
+              const issB = Number(b.issueNumber) || 0
+              if (issA !== issB) return issB - issA
+            }
+            const tA = getTimestampMs(a.createdAt)
+            const tB = getTimestampMs(b.createdAt)
+            if (tA !== tB) return tB - tA
+            return getTimestampMs(b.updatedAt) - getTimestampMs(a.updatedAt)
+          })
+        }
+
+        // 1. Articles listener
+        unsubs.push(
+          onSnapshot(
+            query(collection(db, "content_articles"), limit(25)),
+            (snap) => {
+              const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => !d.deleted)
+              docs.sort((a, b) => getDocTime(b) - getDocTime(a))
+              latestDocs.article = docs[0] || null
+              updateNotifs()
+            },
+            (err) => console.error("Error listening to articles:", err)
+          )
+        )
+
+        // 2. Media listener
+        unsubs.push(
+          onSnapshot(
+            query(collection(db, "content_media"), limit(25)),
+            (snap) => {
+              const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => !d.deleted)
+              docs.sort((a, b) => getDocTime(b) - getDocTime(a))
+              latestDocs.media = docs[0] || null
+              updateNotifs()
+            },
+            (err) => console.error("Error listening to media:", err)
+          )
+        )
+
+        // 3. Books listener
+        unsubs.push(
+          onSnapshot(
+            query(collection(db, "content_books"), limit(40)),
+            (snap) => {
+              const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => !d.deleted)
+              const sorted = sortBooks(docs)
+              latestDocs.book = sorted[0] || null
+              updateNotifs()
+            },
+            (err) => console.error("Error listening to books:", err)
+          )
+        )
+
+        // 4. Campaigns listener
+        unsubs.push(
+          onSnapshot(
+            query(collection(db, "book_campaigns"), limit(10)),
+            (snap) => {
+              const docs = snap.docs
+                .map(d => ({ id: d.id, ...d.data() }))
+                .filter(d => !d.deleted && d.status !== "closed" && d.status !== "inactive")
+              docs.sort((a, b) => getDocTime(b) - getDocTime(a))
+              latestDocs.campaign = docs[0] || null
+              updateNotifs()
+            },
+            (err) => console.error("Error listening to campaigns:", err)
+          )
+        )
       } catch(e) {
-        console.error("Failed to setup dynamic notifications:", e)
+        console.error("Failed to setup realtime dynamic notifications:", e)
       }
     }
     
-    setupDynamicNotifications()
+    setupRealtimeNotifications()
     
     return () => {
-      cancelled = true
+      unsubs.forEach(unsub => {
+        if (typeof unsub === "function") unsub()
+      })
     }
   }, [notifUid])
 
