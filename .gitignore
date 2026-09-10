@@ -4,6 +4,8 @@ dist/
 *.log
 .env
 .env.local
+.env.drive.local
+drive-migration-report.json
 
 public/this_profile's_activity_across_facebook/posts/media/videos/
 

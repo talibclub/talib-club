@@ -4,6 +4,15 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import { AudioProvider } from './context/AudioContext.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import { onIdTokenChanged } from 'firebase/auth'
+import { auth } from './lib/firebase.js'
+import { syncDriveSession } from './lib/driveStorage.js'
+
+// Keep the HttpOnly media cookie in step with login, logout and token refresh.
+// Serialize exchanges so an old login response cannot restore a logged-out session.
+onIdTokenChanged(auth, user => {
+  syncDriveSession(user).catch(() => console.warn('Drive media session unavailable; uploads will retry when used.'));
+});
 
 // The build this page is running, for when "is that the new code or a cached
 // copy?" comes up. It used to be printed in the notebook's top bar; it is one

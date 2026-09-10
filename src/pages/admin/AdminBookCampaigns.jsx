@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { collection, query, orderBy, getDocs, doc, setDoc, deleteDoc, serverTimestamp, updateDoc, where, writeBatch } from "firebase/firestore"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { ref, uploadBytes, getDownloadURL } from "../../lib/driveStorage.js"
 import { db, storage } from "../../lib/firebase.js"
 import toast from "react-hot-toast"
 import { confirmAction } from "../../utils/feedback.jsx"
@@ -8,6 +8,7 @@ import BroadcastModal from "./components/BroadcastModal.jsx"
 import { triggerPushNotification } from "../../utils/pushNotifications.js"
 import CampaignRegistrationsViewer from "./CampaignRegistrationsViewer.jsx"
 import { getNextSequenceId } from "../../lib/contentStore/hooks.js"
+import { compressImage } from '../../utils/image.js'
 
 export default function AdminBookCampaigns() {
   const [campaigns, setCampaigns] = useState([])
@@ -181,13 +182,14 @@ export default function AdminBookCampaigns() {
       const ext = file.name.split('.').pop()
       const fileName = `campaign_images/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${ext}`
       const storageRef = ref(storage, fileName)
-      await uploadBytes(storageRef, file)
+      const compressed = await compressImage(file, { maxWidth: 1400, maxHeight: 1400, quality: 0.8 })
+      await uploadBytes(storageRef, compressed)
       const url = await getDownloadURL(storageRef)
       onComplete(url)
       toast.success("อัปโหลดรูปภาพสำเร็จ")
     } catch (err) {
       console.error(err)
-      toast.error("เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ")
+      toast.error(err.message || "เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ")
     } finally {
       setUploadingImage(false)
     }

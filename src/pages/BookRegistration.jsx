@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { doc, getDoc } from "firebase/firestore"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { ref, uploadBytes, getDownloadURL } from "../lib/driveStorage.js"
 import { db, storage } from "../lib/firebase.js"
 import toast from "react-hot-toast"
 

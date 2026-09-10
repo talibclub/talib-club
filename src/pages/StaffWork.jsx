@@ -4,7 +4,7 @@ import {
   collection, query, updateDoc, doc, getDocs, runTransaction,
   serverTimestamp, addDoc, deleteDoc, setDoc, orderBy, onSnapshot
 } from "firebase/firestore"
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { getStorage, ref, uploadBytes, getDownloadURL } from "../lib/driveStorage.js"
 import { toast } from "react-hot-toast"
 import { db, app, auth } from "../lib/firebase.js"
 import { triggerPushNotification } from "../utils/pushNotifications.js"
@@ -341,7 +341,7 @@ export default function StaffWork({ authState, go }) {
               storageRef = ref(storage, `staff_submissions/${Date.now()}_${safeName}`)
               await uploadBytes(storageRef, file)
               const url = await getDownloadURL(storageRef)
-              fileLinks.push({ name: file.name, url, source: "firebase" })
+              fileLinks.push({ name: file.name, url, source: "drive" })
             } catch (uploadErr) {
               console.error("Staff submission upload error:", uploadErr?.code || "-", uploadErr?.message || uploadErr, "ref:", storageRef?.fullPath)
               throw uploadErr

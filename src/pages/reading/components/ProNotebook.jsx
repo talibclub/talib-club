@@ -15,7 +15,7 @@ import { loadBookPdf } from '../utils/pdfCache.js';
 import { uploadNotebookData, downloadNotebookData } from '../../../utils/notebookStorage.js';
 import { auth, db, storage } from '../../../lib/firebase.js';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from '../../../lib/driveStorage.js';
 import { PDFPageImage, PaperPattern, getSvgPathFromStroke, PEN_STYLES, StrokeShape, CommittedStrokes, StickyStyleThumb } from './notebook/canvasElements.jsx';
 import { polygonBounds, polygonCentroid, polygonInteriorAngle, applyListPrefix, textDecorationOf, migrateText, migrateSticker, textOf, isUniformText, uniformFormatOf, listPrefixes, boundsCenter, strokeHitsPoint, projectOntoRuler, textVisualWidth } from './notebook/geometry.js';
 import { HW, ZERO_OFFSET, TEXT_BOX_WIDTH, LINE_HEIGHT, STICKY_COLORS, DRAW_CURSOR } from './notebook/theme.js';
@@ -127,7 +127,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               try {
                  const cleaned = dedupePages(JSON.parse(saved));
                  setPages(cleaned.pages);
-                 loadStateRef.current = 'ready';
+                 loadStateRef.current = e.code === 'drive/legacy-unavailable' ? 'failed' : 'ready';
                  toast.error("ออฟไลน์: โหลดจากเครื่องแทน", { id: "cloud-sync" });
                  if (cleaned.removed) {
                  toast(`เคลียร์วัตถุที่ซ้ำกันออกไป ${cleaned.removed} ชิ้นแล้ว`, { icon: '🧹', duration: 5000 });
@@ -2035,7 +2035,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         await uploadBytes(storageRef, file);
         const fileUrl = await getDownloadURL(storageRef);
         
-        const pdf = await pdfjsLib.getDocument({ url: fileUrl }).promise;
+        const pdf = await loadBookPdf(fileUrl);
         pdfDocCacheRef.current.set(fileUrl, pdf);
         const numPages = pdf.numPages;
         
@@ -2098,7 +2098,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      try {
         let pdf = pdfDocCacheRef.current.get(pdfObj.fileUrl);
         if (!pdf) {
-           pdf = await pdfjsLib.getDocument({ url: pdfObj.fileUrl }).promise;
+           pdf = await loadBookPdf(pdfObj.fileUrl);
            pdfDocCacheRef.current.set(pdfObj.fileUrl, pdf);
         }
         const page = await pdf.getPage(newPage);

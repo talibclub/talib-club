@@ -3,7 +3,8 @@ import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp } f
 import { BOOKS, DEFAULT_TAXONOMY } from "../../data/index.js"
 import { useContentCollection, useTaxonomySettings, updateCollectionMetadata, invalidateCollectionCache, CONTENT_COLLECTIONS } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
-import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage"
+import { getDownloadURL, ref, uploadBytes, getStorage } from "../../lib/driveStorage.js"
+import DriveUploadButton from '../../components/DriveUploadButton.jsx'
 import { storage, app, db } from "../../lib/firebase.js"
 import { compressImage } from "../../utils/image.js"
 import ContentStatusBanner from "../../components/ContentStatusBanner.jsx"
@@ -613,21 +614,21 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
       let storageRef = null
       try {
         storageRef = ref(usedStorage, `library_covers/${Date.now()}_${safeName}`)
-        if (import.meta.env.DEV) console.log("Uploading bytes to Firebase Storage reference:", storageRef.fullPath);
+        if (import.meta.env.DEV) console.log("Uploading bytes to Google Drive reference:", storageRef.fullPath);
         await uploadBytes(storageRef, compressedFile)
       } catch (uploadErr) {
         console.error("Upload error (storageRef):", uploadErr?.code || "-", uploadErr?.message || uploadErr, "ref:", storageRef?.fullPath)
         throw uploadErr
       }
 
-      if (import.meta.env.DEV) console.log("Firebase upload completed. Retrieving download URL...");
+      if (import.meta.env.DEV) console.log("Google Drive upload completed. Retrieving download URL...");
       const url = await getDownloadURL(storageRef)
       if (import.meta.env.DEV) console.log("Success! Cover URL obtained:", url);
       set("coverUrl", url)
       notifySuccess("อัปโหลดรูปภาพปกเรียบร้อยแล้ว")
     } catch (err) {
       console.error("Diagnostic error caught inside handleUploadImage:", err?.code || "-", err?.message || err)
-      notifyError("อัปโหลดรูปภาพล้มเหลว")
+      notifyError(err.message || "อัปโหลดรูปภาพล้มเหลว")
     } finally {
       if (import.meta.env.DEV) console.log("Finally block executed. Setting uploadingImage back to false.");
       setUploadingImage(false)
@@ -675,7 +676,7 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
             />
           </Field>
         )}
-        <Field label="ลิงก์ไฟล์ PDF/Drive" span><input value={item.fileUrl || ""} onChange={e => set("fileUrl", e.target.value)} placeholder="https://..." /></Field>
+        <Field label="ไฟล์ PDF / ลิงก์ Drive" span><input value={item.fileUrl || ""} onChange={e => set("fileUrl", e.target.value)} placeholder="https://..." /><DriveUploadButton prefix="library_files" accept="application/pdf" onUploaded={url => set('fileUrl', url)} onBusyChange={setUploadingImage} disabled={uploadingImage} /></Field>
         <Field label="รูปภาพปกหนังสือ (URL)" span>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <input
@@ -726,7 +727,7 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
 
       <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
         <button className="btn btn-outline" onClick={onCancel}>ยกเลิก</button>
-        <button className="btn btn-teal" onClick={onSave} disabled={busy}>
+        <button className="btn btn-teal" onClick={onSave} disabled={busy || uploadingImage}>
           <i className={`ti ${busy ? "ti-loader-2 spin" : "ti-check"}`} style={{ marginRight: 6 }}></i>{busy ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
         </button>
       </div>

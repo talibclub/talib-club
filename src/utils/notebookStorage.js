@@ -1,5 +1,7 @@
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "../lib/driveStorage.js";
 import { storage } from "../lib/firebase.js";
+import { fetchDriveFile } from '../lib/driveStorage.js';
+import { ref as legacyRef, getDownloadURL as legacyDownloadURL } from 'firebase/storage';
 
 // Gzip via CompressionStream is unavailable on Safari < 16.4 (the very iPads the
 // notebook targets). Feature-detect and fall back to plain JSON — the download
@@ -27,7 +29,7 @@ async function isGzipBlob(blob) {
 }
 
 /**
- * Uploads notebook data to Firebase Storage (gzip when supported, plain JSON otherwise).
+ * Uploads notebook data to Google Drive (gzip when supported, plain JSON otherwise).
  */
 export async function uploadNotebookData(uid, notebookId, dataObj) {
   try {
@@ -64,11 +66,22 @@ export async function downloadNotebookData(uid, notebookId, onProgress) {
   try {
     url = await getDownloadURL(storageRef);
   } catch (err) {
-    if (err?.code === "storage/object-not-found") return null; // new notebook
-    throw err;
+    if (err?.code === 'drive/new-notebook') return null;
+    if (err?.code !== 'storage/object-not-found') throw err;
+    // An absent Drive mapping does NOT prove that an old Firebase notebook
+    // never existed. Only a confirmed legacy 404 permits a blank notebook.
+    // During migration, billing/permission failures must remain failures.
+    try {
+      url = await legacyDownloadURL(legacyRef(storage, `notebooks/${uid}/${notebookId}.json.gz`));
+    } catch (legacyError) {
+      if (legacyError?.code === 'storage/object-not-found') return null;
+      throw Object.assign(new Error('ยังตรวจสอบสมุดเดิมใน Firebase ไม่ได้ จึงหยุดซิงก์เพื่อป้องกันข้อมูลหาย กรุณาย้ายสมุดเดิมก่อน'), { code: 'drive/legacy-unavailable' });
+    }
   }
 
-  const response = await fetch(url);
+  const response = url.includes('/api/files?')
+    ? new Response(await fetchDriveFile(url, onProgress))
+    : await fetch(url);
   if (!response.ok) throw new Error(`Notebook fetch failed: ${response.status}`);
 
   let blob;

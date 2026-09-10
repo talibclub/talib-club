@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import { syncDriveSession } from '../lib/driveStorage.js'
 import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
@@ -91,6 +92,8 @@ export function useAuth() {
     const unsubscribe = onAuthStateChanged(auth, async currentUser => {
       clearTimeout(initTimeout)
       const currentSeq = ++activeSeq
+      try { await syncDriveSession(currentUser) } catch { /* Keep login available if Drive isn't deployed yet. */ }
+      if (currentSeq !== activeSeq) return
       setUser(currentUser)
       if (!currentUser) {
         setProfile(null)

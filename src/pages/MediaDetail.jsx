@@ -5,8 +5,10 @@ import SEOHead, { toIsoDate, BASE_URL } from '../components/SEOHead.jsx'
 import { detailUrl } from "../utils/slug.js"
 import { isoDuration, mediaDescription, mediaSummary, mediaThumbnail } from "../utils/mediaSeo.js"
 import { useCanonicalDetailUrl, useDetailId } from "../hooks/useDetailRoute.js"
+import { useDriveMediaVersion } from '../hooks/useDriveMediaVersion.js'
 
 export default function MediaDetail({ item: initialItem, go, authState }) {
+  const driveMediaVersion = useDriveMediaVersion();
   const uid = authState?.user?.uid;
   const mediaId = useDetailId(initialItem)
   const fallbackMedia = useMemo(
@@ -158,6 +160,7 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
         </div>
       )}
 
+      {item.type === 'audio' && <audio key={driveMediaVersion} src={item.videoUrl} controls preload="metadata" style={{ width: '100%', marginBottom: 24 }} />}
       {item.type === "video" && (
         <div style={{
           marginBottom: 24, borderRadius: 16, overflow: "hidden",
@@ -166,6 +169,7 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
           width: "100%", position: "relative", paddingBottom: "56.25%", height: 0
         }}>
           <video
+            key={driveMediaVersion}
             src={item.videoUrl}
             controls
             autoPlay

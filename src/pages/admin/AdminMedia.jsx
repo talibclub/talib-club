@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react"
+import DriveUploadButton from '../../components/DriveUploadButton.jsx'
 import { DEFAULT_TAXONOMY, MEDIA } from "../../data/index.js"
 import { useContentCollection, useTaxonomySettings, bulkDeleteItems, bulkSaveItems } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
@@ -425,6 +426,7 @@ export default function AdminMedia() {
 function MediaForm({ item, setItem, onSave, onCancel, taxonomy, existingPlaylists, busy }) {
   const set = (key, value) => setItem(prev => ({ ...prev, [key]: value }))
   const [isNewPlaylist, setIsNewPlaylist] = useState(false)
+  const [uploading, setUploading] = useState(false)
 
   const handleFetchDuration = () => {
     notifyError("ระบบยังไม่เชื่อม YouTube API กรุณากรอกความยาวคลิป (mm:ss) ด้วยตนเอง")
@@ -439,6 +441,8 @@ function MediaForm({ item, setItem, onSave, onCancel, taxonomy, existingPlaylist
         <Field label="ชื่อรายการ/ตอน *" span><input value={item.title || ""} onChange={e => set("title", e.target.value)} placeholder="เช่น ปรัชญาอิสลาม Ep.1" /></Field>
         <Field label="ประเภท">
           <select value={item.type || "youtube"} onChange={e => set("type", e.target.value)}>
+            {!(taxonomy.mediaTypes || []).some(t => (typeof t === 'string' ? t : t.id) === 'video') && <option value="video">วิดีโอจากไฟล์</option>}
+            {!(taxonomy.mediaTypes || []).some(t => (typeof t === 'string' ? t : t.id) === 'audio') && <option value="audio">ไฟล์เสียง</option>}
             {(taxonomy.mediaTypes || []).map(type => {
               const t = typeof type === "string" ? { id: type, label: type } : type
               return <option key={t.id} value={t.id}>{t.label}</option>
@@ -474,8 +478,12 @@ function MediaForm({ item, setItem, onSave, onCancel, taxonomy, existingPlaylist
         )}
 
         {item.type === "spotify" && <Field label="Spotify URL" span><input value={item.spotifyUrl || ""} onChange={e => set("spotifyUrl", e.target.value)} placeholder="https://open.spotify.com/episode/..." /></Field>}
+        {['video', 'audio'].includes(item.type) && <Field label="ไฟล์วิดีโอ / เสียง" span>
+          <input value={item.videoUrl || ''} onChange={e => set('videoUrl', e.target.value)} placeholder="https://..." />
+          <DriveUploadButton prefix="media_files" accept={item.type === 'audio' ? 'audio/*' : 'video/*'} onUploaded={url => set('videoUrl', url)} onBusyChange={setUploading} disabled={uploading} />
+        </Field>}
         <Field label="วันที่เผยแพร่"><input type="date" value={item.date || ""} onChange={e => set("date", e.target.value)} /></Field>
-        <Field label="ลิงก์รูปปก (ใส่เฉพาะถ้าต้องการใช้รูปอื่นแทนของ YouTube)"><input value={item.coverUrl || ""} onChange={e => set("coverUrl", e.target.value)} placeholder="https://..." /></Field>
+        <Field label="รูปปก"><input value={item.coverUrl || ""} onChange={e => set("coverUrl", e.target.value)} placeholder="https://..." /><DriveUploadButton prefix="media_covers" accept="image/*" onUploaded={url => set('coverUrl', url)} onBusyChange={setUploading} disabled={uploading} /></Field>
         {/* สื่อทุกชิ้นมีแต่ชื่อ ช่อง เพลย์ลิสต์ และความยาว — ข้อมูลชุดเดียวกันทั้งซีรีส์
             จนกูเกิลอ่านหน้าเหล่านี้เป็นหน้าเนื้อหาบางและไม่จัดทำดัชนีให้
             คำอธิบายตรงนี้คือข้อความเดียวที่บอกได้ว่าคลิปนี้ต่างจากตอนอื่นอย่างไร */}
@@ -486,7 +494,7 @@ function MediaForm({ item, setItem, onSave, onCancel, taxonomy, existingPlaylist
 
       <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
         <button className="btn btn-outline" onClick={onCancel}>ยกเลิก</button>
-        <button className="btn btn-teal" onClick={onSave} disabled={busy}><i className={`ti ${busy ? "ti-loader-2 spin" : "ti-check"}`} style={{ marginRight: 6 }}></i>{busy ? "กำลังบันทึก..." : "บันทึกข้อมูล"}</button>
+        <button className="btn btn-teal" onClick={onSave} disabled={busy || uploading}><i className={`ti ${busy ? "ti-loader-2 spin" : "ti-check"}`} style={{ marginRight: 6 }}></i>{busy ? "กำลังบันทึก..." : "บันทึกข้อมูล"}</button>
       </div>
     </div>
   )

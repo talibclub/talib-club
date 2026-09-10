@@ -1,5 +1,6 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { auth } from '../../../lib/firebase.js';
+import { isDriveStorageUrl, fetchDriveFile } from '../../../lib/driveStorage.js';
 
 // Shared PDF cache for the reading room.
 //
@@ -16,31 +17,35 @@ const bytesCache = new Map();
 // Google Drive "/view" links aren't direct downloads; rewrite them and route
 // everything through our proxy so pdf.js can fetch cross-origin files.
 export function resolvePdfUrl(url) {
+  if (isDriveStorageUrl(url)) return url;
   let u = url;
   if (u.includes('drive.google.com') && u.includes('/view')) {
     const m = u.match(/\/d\/(.*?)\//);
     if (m && m[1]) u = `https://drive.google.com/uc?export=download&id=${m[1]}`;
   }
-  return `/api/proxy-pdf?url=${encodeURIComponent(u)}`;
+  return `/api/files?mode=legacy&url=${encodeURIComponent(u)}`;
 }
 
 // Fetch (and cache) the raw PDF bytes for a book file URL. Failures are not
 // cached, so a transient network error can be retried by opening again.
 export function getBookPdfBytes(fileUrl) {
   const proxyUrl = resolvePdfUrl(fileUrl);
-  if (!bytesCache.has(proxyUrl)) {
+  const cacheKey = `${auth.currentUser?.uid || 'public'}:${proxyUrl}`;
+  if (!bytesCache.has(cacheKey)) {
     // The proxy requires a signed-in user (it would otherwise be an open relay).
     const p = Promise.resolve(auth.currentUser?.getIdToken())
-      .then((idToken) => fetch(proxyUrl, idToken ? { headers: { Authorization: `Bearer ${idToken}` } } : undefined))
+      .then((idToken) => isDriveStorageUrl(proxyUrl)
+        ? fetchDriveFile(proxyUrl).then(blob => new Response(blob))
+        : fetch(proxyUrl, idToken ? { headers: { Authorization: `Bearer ${idToken}` } } : undefined))
       .then((r) => {
         if (!r.ok) throw new Error(`PDF fetch failed: ${r.status}`);
         return r.arrayBuffer();
       })
       .then((buf) => new Uint8Array(buf))
-      .catch((err) => { bytesCache.delete(proxyUrl); throw err; });
-    bytesCache.set(proxyUrl, p);
+      .catch((err) => { bytesCache.delete(cacheKey); throw err; });
+    bytesCache.set(cacheKey, p);
   }
-  return bytesCache.get(proxyUrl);
+  return bytesCache.get(cacheKey);
 }
 
 // Open a pdf.js document from the cached bytes. Each call gets a fresh copy

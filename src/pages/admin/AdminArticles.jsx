@@ -155,7 +155,7 @@ import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.
 import ContentStatusBanner from "../../components/ContentStatusBanner.jsx"
 import BroadcastModal from "./components/BroadcastModal.jsx"
 import { clampPage } from "../../utils/pagination.js"
-import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage"
+import { getDownloadURL, ref, uploadBytes, getStorage } from "../../lib/driveStorage.js"
 import { storage, app } from "../../lib/firebase.js"
 import { compressImage } from "../../utils/image.js"
 import { triggerPushNotification } from "../../utils/pushNotifications.js"
@@ -1070,21 +1070,21 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articles
       let storageRef = null
       try {
         storageRef = ref(usedStorage, `article_covers/${Date.now()}_${safeName}`)
-        if (import.meta.env.DEV) console.log("Uploading bytes to Firebase Storage reference:", storageRef.fullPath);
+        if (import.meta.env.DEV) console.log("Uploading bytes to Google Drive reference:", storageRef.fullPath);
         await uploadBytes(storageRef, compressedFile)
       } catch (uploadErr) {
         console.error("Upload error (storageRef):", uploadErr?.code || "-", uploadErr?.message || uploadErr, "ref:", storageRef?.fullPath)
         throw uploadErr
       }
 
-      if (import.meta.env.DEV) console.log("Firebase upload completed. Retrieving download URL...");
+      if (import.meta.env.DEV) console.log("Google Drive upload completed. Retrieving download URL...");
       const url = await getDownloadURL(storageRef)
       if (import.meta.env.DEV) console.log("Success! Cover URL obtained:", url);
       set("coverUrl", url)
       notifySuccess("อัปโหลดรูปภาพปกเรียบร้อยแล้ว")
     } catch (err) {
       console.error("Diagnostic error caught inside handleUploadImage:", err?.code || "-", err?.message || err)
-      notifyError("อัปโหลดรูปภาพล้มเหลว")
+      notifyError(err.message || "อัปโหลดรูปภาพล้มเหลว")
     } finally {
       if (import.meta.env.DEV) console.log("Finally block executed. Setting uploadingImage back to false.");
       setUploadingImage(false)
@@ -1312,7 +1312,7 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articles
 
       <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
         <button className="btn btn-outline" onClick={onCancel}>ยกเลิก</button>
-        <button className="btn btn-teal" onClick={onSave} disabled={busy}>
+        <button className="btn btn-teal" onClick={onSave} disabled={busy || uploadingImage}>
           <i className={`ti ${busy ? "ti-loader-2 spin" : "ti-check"}`} style={{ marginRight: 6 }}></i>{busy ? "กำลังบันทึก..." : "บันทึกบทความ"}
         </button>
       </div>

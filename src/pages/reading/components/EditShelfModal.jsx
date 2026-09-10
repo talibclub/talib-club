@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
-import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage";
+import { getDownloadURL, ref, uploadBytes, getStorage } from "../../../lib/driveStorage.js";
 import { storage, app } from "../../../lib/firebase.js";
 
 function sanitizeStorageName(name) {

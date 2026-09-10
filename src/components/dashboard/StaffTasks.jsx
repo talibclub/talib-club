@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, deleteDoc, arrayUnion, where, getDocs, limit } from "firebase/firestore"
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { getStorage, ref, uploadBytes, getDownloadURL } from "../../lib/driveStorage.js"
 import { toast } from "react-hot-toast"
 import { db, app } from "../../lib/firebase.js"
 import { triggerPushNotification } from "../../utils/pushNotifications.js"
@@ -75,7 +75,7 @@ export default function StaffTasks({ currentUser, staffTeam, sendBotNotification
           const storageRef = ref(storage, `staff_tasks/${Date.now()}_${safeName}`)
           await uploadBytes(storageRef, file)
           const url = await getDownloadURL(storageRef)
-          fileLinks.push({ name: file.name, url, source: "firebase" })
+          fileLinks.push({ name: file.name, url, source: "drive" })
         }
       }
 

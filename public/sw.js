@@ -1,4 +1,5 @@
-const CACHE_NAME = 'talib-club-cache-v4';
+importScripts('/drive-stream.js');
+const CACHE_NAME = 'talib-club-cache-v5';
 const ASSETS = [
   '/',
   '/index.html',
@@ -44,6 +45,10 @@ self.addEventListener('fetch', (e) => {
   }
   
   const url = new URL(e.request.url);
+  if (url.pathname === '/api/files' && url.searchParams.has('id') && !url.searchParams.has('mode') && !url.searchParams.has('meta') && !url.searchParams.has('part')) {
+    e.respondWith(streamDriveFile(e.request));
+    return;
+  }
   // Skip dev files, built assets, APIs, and auth endpoints from caching
   if (
     url.pathname.startsWith('/assets/') ||

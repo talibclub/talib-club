@@ -8,6 +8,8 @@ import SEOHead, { BASE_URL } from "../components/SEOHead.jsx"
 import { detailUrl } from "../utils/slug.js"
 import { useCanonicalDetailUrl, useDetailId } from "../hooks/useDetailRoute.js"
 import { isJournal } from "../utils/library.js"
+import { isDriveStorageUrl } from '../lib/driveStorage.js'
+import { useDriveMediaVersion } from '../hooks/useDriveMediaVersion.js'
 
 function getDirectUrl(url) {
   if (!url) return ""
@@ -18,6 +20,7 @@ function getDirectUrl(url) {
 
 function getDownloadUrl(url) {
   if (!url) return ""
+  if (isDriveStorageUrl(url)) { const download = new URL(url, window.location.origin); download.searchParams.set('download', '1'); return download.href; }
   const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)\//)
   if (match && match[1]) return `https://drive.google.com/uc?export=download&id=${match[1]}`
   return url
@@ -34,6 +37,7 @@ function getPreviewUrl(url) {
 const VIEW_DWELL_MS = 8000
 
 export default function LibraryDetail({ item, go, authState }) {
+  const driveMediaVersion = useDriveMediaVersion();
   const uid = authState?.user?.uid;
   const isLoggedIn = !!uid;
   const bookId = useDetailId(item)
@@ -303,6 +307,7 @@ export default function LibraryDetail({ item, go, authState }) {
               ></div>
             )}
             <iframe 
+              key={driveMediaVersion}
               src={getPreviewUrl(displayItem.fileUrl)} 
               style={{ width: "100%", height: "100%", border: "none" }} 
               title="PDF Preview"

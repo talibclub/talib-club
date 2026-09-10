@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/proxy-pdf",
+      "destination": "/api/files?mode=legacy"
+    },
+    {
       "source": "/__/auth/:path*",
       "destination": "https://talib-club-web.firebaseapp.com/__/auth/:path*"
     },

@@ -9,6 +9,7 @@ import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 import { isJournal, getTimestampMs } from "../utils/library.js"
+import { isDriveStorageUrl } from '../lib/driveStorage.js'
 
 // ฟังก์ชันดึงรูปปก
 function getDirectUrl(url) {
@@ -23,6 +24,7 @@ function getDirectUrl(url) {
 // ฟังก์ชันแปลงลิงก์ดาวน์โหลด
 function getDownloadUrl(url) {
   if (!url) return ""
+  if (isDriveStorageUrl(url)) { const download = new URL(url, window.location.origin); download.searchParams.set('download', '1'); return download.href; }
   const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)\//)
   if (match && match[1]) {
     return `https://drive.google.com/uc?export=download&id=${match[1]}`
