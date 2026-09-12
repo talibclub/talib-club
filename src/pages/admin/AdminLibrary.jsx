@@ -151,7 +151,7 @@ export default function AdminLibrary() {
     const report = () => setCoverBatch({ ...progress, failures: [...progress.failures] })
     report()
     try {
-      const { createPdfCover } = await import('../../utils/pdfCover.js')
+      const { createBookCover } = await import('../../utils/createBookCover.js')
       const { runCoverQueue } = await import('../../utils/coverQueue.js')
       const { hasUsableCover } = await import('../../utils/bookCover.js')
       const active = new Map()
@@ -163,9 +163,9 @@ export default function AdminLibrary() {
           if (await hasUsableCover(book.coverUrl)) {
             progress.skipped++
           } else {
-            if (!book.fileUrl) throw new Error('ไม่มีลิงก์ PDF')
-            const cover = await createPdfCover(book.fileUrl)
-            const target = ref(null, `library_covers/${crypto.randomUUID()}_pdf-cover.jpg`)
+            if (!book.fileUrl) throw new Error('ไม่มีลิงก์ไฟล์หนังสือ')
+            const cover = await createBookCover(book.fileUrl)
+            const target = ref(null, `library_covers/${crypto.randomUUID()}_book-cover.jpg`)
             await uploadBytes(target, cover)
             const coverUrl = await getDownloadURL(target)
             // Patch only the cover; preserve other fields edited by another admin.
@@ -547,7 +547,7 @@ export default function AdminLibrary() {
             </div>
           </div>
 
-          <p style={{ fontSize: 12, marginBottom: 12 }}>ดึงหน้าแรกจาก PDF แล้วบันทึกเป็นปกให้แต่ละเล่มทันที เฉพาะเล่มที่ไม่มีปกหรือรูปปกโหลดไม่ได้ ปกที่แสดงได้จะถูกข้าม รายการที่ไม่สำเร็จจะยังถูกเลือกไว้เพื่อลองใหม่</p>
+          <p style={{ fontSize: 12, marginBottom: 12 }}>ดึงปกจาก PDF, รูปภาพ, EPUB หรือ AnyFlip แล้วบันทึกให้แต่ละเล่มทันที เฉพาะเล่มที่ไม่มีปกหรือรูปปกโหลดไม่ได้ ปกที่แสดงได้จะถูกข้าม รายการที่ไม่สำเร็จจะยังถูกเลือกไว้เพื่อลองใหม่</p>
           <div className="divider" style={{ margin: "0 0 16px" }} />
           
           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>
@@ -662,20 +662,20 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
   const [uploadingImage, setUploadingImage] = useState(false)
   const [autoCover, setAutoCover] = useState(true)
   const generateCover = async (source) => {
-    const { createPdfCover } = await import('../../utils/pdfCover.js')
-    const cover = await createPdfCover(source)
-    const target = ref(null, `library_covers/${crypto.randomUUID()}_pdf-cover.jpg`)
+    const { createBookCover } = await import('../../utils/createBookCover.js')
+    const cover = await createBookCover(source)
+    const target = ref(null, `library_covers/${crypto.randomUUID()}_book-cover.jpg`)
     await uploadBytes(target, cover)
     set('coverUrl', await getDownloadURL(target))
   }
-  const uploadPdfDone = async (url, file) => {
+  const uploadBookDone = async (url, file) => {
     set('fileUrl', url)
     if (autoCover) {
       try {
         await generateCover(file)
-        notifySuccess('อัปโหลด PDF และสร้างรูปปกจากหน้าแรกแล้ว กรุณากดบันทึกข้อมูล')
+        notifySuccess('อัปโหลดไฟล์และสร้างรูปปกแล้ว กรุณากดบันทึกข้อมูล')
       } catch (err) {
-        notifyError(`อัปโหลด PDF แล้ว แต่ ${err.message} คุณยังอัปโหลดรูปปกเองได้`)
+        notifyError(`อัปโหลดไฟล์แล้ว แต่ ${err.message} คุณยังอัปโหลดรูปปกเองได้`)
       }
     }
   }
@@ -767,9 +767,9 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
             />
           </Field>
         )}
-        <Field label="ไฟล์ PDF / ลิงก์ Drive" span>
+        <Field label="ไฟล์หนังสือ / ลิงก์ Drive หรือ AnyFlip" span>
           <input value={item.fileUrl || ""} disabled={uploadingImage} onChange={e => set("fileUrl", e.target.value)} placeholder="https://..." />
-          <DriveUploadButton label="อัปโหลดไฟล์ PDF" prefix="library_files" accept="application/pdf" onUploaded={uploadPdfDone} onBusyChange={setUploadingImage} disabled={uploadingImage || busy} />
+          <DriveUploadButton label="อัปโหลด PDF / EPUB / รูปภาพ" prefix="library_files" accept=".pdf,.epub,.jpg,.jpeg,.png,.webp,application/pdf,application/epub+zip,image/jpeg,image/png,image/webp" onUploaded={uploadBookDone} onBusyChange={setUploadingImage} disabled={uploadingImage || busy} />
         </Field>
         <Field label="รูปภาพปกหนังสือ (URL)" span>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -784,11 +784,11 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
               {uploadingImage ? "กำลังอัปโหลด..." : "อัปโหลดรูปปก"}
               <input type="file" accept="image/*" onChange={handleUploadImage} disabled={uploadingImage} style={{ display: "none" }} />
             </label>
-            <button type="button" className="btn btn-outline" disabled={!item.fileUrl || uploadingImage || busy} onClick={coverFromLink}>{uploadingImage ? 'กำลังประมวลผล…' : 'ดึงรูปปกจากหน้าแรก PDF'}</button>
+            <button type="button" className="btn btn-outline" disabled={!item.fileUrl || uploadingImage || busy} onClick={coverFromLink}>{uploadingImage ? 'กำลังประมวลผล…' : 'ดึงรูปปกจากไฟล์ / ลิงก์'}</button>
           </div>
           <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 12, fontSize: 13, cursor: 'pointer' }}>
             <input type="checkbox" style={{ width: 16, height: 16, flexShrink: 0, marginTop: 3 }} checked={autoCover} disabled={uploadingImage || busy} onChange={e => setAutoCover(e.target.checked)} />
-            <span>สร้างรูปปกจากหน้าแรกอัตโนมัติเมื่ออัปโหลด PDF ใหม่ (แทนที่ปกเดิม)</span>
+            <span>สร้างรูปปกอัตโนมัติเมื่ออัปโหลดไฟล์ใหม่ (แทนที่ปกเดิม)</span>
           </label>
           {item.coverUrl && (
             <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12 }}>

@@ -17,7 +17,7 @@ beforeEach(() => {
   mocks.getDocument.mockReturnValue(task);
   vi.stubGlobal('document', { createElement: () => canvas });
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 it('renders only the first page at bounded dimensions and releases resources', async () => {
   const cover = await createPdfCover(new Blob(['pdf']));
   expect(cover.type).toBe('image/jpeg');
@@ -38,4 +38,26 @@ it('loads remote covers on demand instead of buffering the entire PDF', async ()
     httpHeaders: { Authorization: 'Bearer token' },
     disableAutoFetch: true, disableStream: true, rangeChunkSize: 256 * 1024,
   });
+});
+it('does not cancel active PDF loading at the old 60-second limit', async () => {
+  vi.useFakeTimers();
+  task.promise = new Promise(() => {});
+  const result = createPdfCover(new Blob(['pdf']));
+  const rejected = expect(result).rejects.toThrow('ไม่มีความคืบหน้า');
+  await vi.advanceTimersByTimeAsync(90000);
+  expect(task.destroy).not.toHaveBeenCalled();
+  task.onProgress({ loaded: 1024 });
+  await vi.advanceTimersByTimeAsync(90000);
+  expect(task.destroy).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(30001);
+  await rejected;
+  expect(task.destroy).toHaveBeenCalled();
+});
+it('reports a password only when the PDF reader requests one', async () => {
+  task.promise = new Promise(() => {});
+  const result = createPdfCover(new Blob(['pdf']));
+  const rejected = expect(result).rejects.toThrow('ต้องใช้รหัสผ่าน');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  task.onPassword();
+  await rejected;
 });

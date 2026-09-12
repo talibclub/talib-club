@@ -40,7 +40,7 @@ function isPrivateHost(hostname) {
   return false;
 }
 
-function validateTarget(raw) {
+export function validateTarget(raw) {
   let target;
   try { target = new URL(raw); } catch { return { error: 'Invalid url' }; }
   if (target.protocol !== 'https:') return { error: 'https only' };
@@ -49,12 +49,15 @@ function validateTarget(raw) {
 }
 
 // fetch with manual redirect handling so every hop is re-validated.
-async function fetchValidated(url, range) {
+export async function fetchValidated(url, range) {
+  const initial = validateTarget(url);
+  if (initial.error) return { error: initial.error };
   let current = url;
   for (let i = 0; i <= MAX_REDIRECTS; i++) {
     const response = await fetch(current, { redirect: 'manual', signal: AbortSignal.timeout(30000), headers: range ? { Range: range, 'Accept-Encoding': 'identity' } : { 'Accept-Encoding': 'identity' } });
     if (response.status >= 300 && response.status < 400) {
       const loc = response.headers.get('location');
+      await response.body?.cancel();
       if (!loc) return { error: 'Bad redirect' };
       const next = new URL(loc, current).toString();
       const check = validateTarget(next);
@@ -65,6 +68,23 @@ async function fetchValidated(url, range) {
     return { response, finalUrl: current };
   }
   return { error: 'Too many redirects' };
+}
+
+export function normalizeDownloadUrl(url) {
+  let target = new URL(url);
+  const original = new URL(url);
+  // Normalize view, preview, open?id= and uc links before following redirects.
+  if (target.hostname === 'drive.google.com') {
+    const id = target.pathname.match(/\/file\/d\/([\w-]+)/)?.[1] || target.searchParams.get('id');
+    if (id && /^[\w-]+$/.test(id)) {
+      target = new URL('https://drive.usercontent.google.com/download');
+      target.searchParams.set('id', id);
+      target.searchParams.set('export', 'download');
+      target.searchParams.set('confirm', 't');
+      if (original.searchParams.has('resourcekey')) target.searchParams.set('resourcekey', original.searchParams.get('resourcekey'));
+    }
+  }
+  return target;
 }
 
 export default async function handler(req, res) {
@@ -85,18 +105,7 @@ export default async function handler(req, res) {
   try {
     const range = req.headers?.range;
     if (range && !/^bytes=\d+-\d*$/.test(range)) return res.status(400).send('Invalid range');
-    let target = check.target;
-    // Normalize view, preview, open?id= and uc links before following redirects.
-    if (target.hostname === 'drive.google.com') {
-      const id = target.pathname.match(/\/file\/d\/([\w-]+)/)?.[1] || target.searchParams.get('id');
-      if (id && /^[\w-]+$/.test(id)) {
-        target = new URL('https://drive.usercontent.google.com/download');
-        target.searchParams.set('id', id);
-        target.searchParams.set('export', 'download');
-        target.searchParams.set('confirm', 't');
-        if (check.target.searchParams.has('resourcekey')) target.searchParams.set('resourcekey', check.target.searchParams.get('resourcekey'));
-      }
-    }
+    const target = normalizeDownloadUrl(check.target);
     let { response, finalUrl, error } = await fetchValidated(target.toString(), range);
     if (error) return res.status(400).send(error);
 
