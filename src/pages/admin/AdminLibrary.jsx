@@ -142,18 +142,26 @@ export default function AdminLibrary() {
 
   async function generateSelectedCovers() {
     if (busy) return
-    const books = items.filter(book => selected.includes(book.id))
-    if (!books.length) return
+    const selectedBooks = items.filter(book => selected.includes(book.id))
+    if (!selectedBooks.length) return
+    const books = selectedBooks.filter(book => !String(book.coverUrl || '').trim())
+    const skipped = selectedBooks.length - books.length
+    if (!books.length) {
+      notifySuccess(`หนังสือที่เลือกมีปกแล้วทั้งหมด ${skipped} เล่ม ไม่ต้องดึงปกซ้ำ`)
+      return
+    }
     stopCovers.current = false
     setBusy(true)
-    const progress = { total: books.length, done: 0, success: 0, failures: [], current: '', running: true }
+    const progress = { total: books.length, done: 0, success: 0, skipped, failures: [], current: '', running: true }
     const report = () => setCoverBatch({ ...progress, failures: [...progress.failures] })
     report()
     try {
       const { createPdfCover } = await import('../../utils/pdfCover.js')
-      for (const book of books) {
-        if (stopCovers.current) break
-        progress.current = book.title || String(book.id)
+      const { runCoverQueue } = await import('../../utils/coverQueue.js')
+      const active = new Map()
+      await runCoverQueue(books, async (book) => {
+        active.set(book.id, book.title || String(book.id))
+        progress.current = [...active.values()].join(' · ')
         report()
         try {
           if (!book.fileUrl) throw new Error('ไม่มีลิงก์ PDF')
@@ -168,9 +176,11 @@ export default function AdminLibrary() {
         } catch (err) {
           progress.failures.push({ id: book.id, title: book.title || String(book.id), message: err.message || 'สร้างปกไม่สำเร็จ' })
         }
+        active.delete(book.id)
+        progress.current = [...active.values()].join(' · ')
         progress.done++
         report()
-      }
+      }, () => stopCovers.current)
     } catch (err) {
       notifyError(err.message || 'เริ่มสร้างรูปปกไม่สำเร็จ')
     } finally {
@@ -511,9 +521,9 @@ export default function AdminLibrary() {
       {coverBatch && (
         <div className="card" style={{ padding: 16, marginBottom: 16 }} aria-live="polite">
           <strong>{coverBatch.running ? 'กำลังสร้างรูปปก' : 'ผลการสร้างรูปปก'} — {coverBatch.done}/{coverBatch.total} เล่ม</strong>
-          <p>สำเร็จ {coverBatch.success} เล่ม · ไม่สำเร็จ {coverBatch.failures.length} เล่ม</p>
+          <p>สำเร็จ {coverBatch.success} เล่ม · ไม่สำเร็จ {coverBatch.failures.length} เล่ม · ข้ามเพราะมีปกแล้ว {coverBatch.skipped} เล่ม</p>
           {coverBatch.current && <p>{coverBatch.current}</p>}
-          {coverBatch.running && <button className="btn btn-outline" onClick={() => { stopCovers.current = true }}>หยุดหลังเล่มปัจจุบัน</button>}
+          {coverBatch.running && <button className="btn btn-outline" onClick={() => { stopCovers.current = true }}>หยุดหลังเล่มที่กำลังทำ</button>}
           {coverBatch.failures.length > 0 && <details><summary>ดูรายการที่ไม่สำเร็จ</summary><ul>{coverBatch.failures.map(f => <li key={f.id}>{f.title}: {f.message}</li>)}</ul></details>}
           {!coverBatch.running && <button className="btn btn-outline" onClick={() => setCoverBatch(null)}>ปิดผลลัพธ์</button>}
         </div>

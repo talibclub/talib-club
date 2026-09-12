@@ -64,7 +64,7 @@ export function dedupePages(pages) {
     removed += r.removed;
     return r.removed ? r.page : p;
   });
-  const sanitized = sanitizeNotebookPages(deduped);
+  const sanitized = sanitizeNotebookPages(removed ? deduped : pages);
   return { pages: sanitized, removed };
 }
 

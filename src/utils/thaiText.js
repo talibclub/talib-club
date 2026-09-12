@@ -207,65 +207,23 @@ export function cleanThaiPdfString(str) {
  */
 export function sanitizeNotebookPages(pages) {
   if (!Array.isArray(pages)) return pages;
-  return pages.map((page) => {
+  const mapUnchanged = (items, transform) => {
+    const next = items.map(transform);
+    return next.every((item, i) => item === items[i]) ? items : next;
+  };
+  const cleanObject = (obj) => {
+    if (!obj) return obj;
+    const text = typeof obj.text === 'string' ? normalizeThaiText(obj.text) : obj.text;
+    const lines = Array.isArray(obj.lines) ? mapUnchanged(obj.lines, cleanObject) : obj.lines;
+    if (text === obj.text && lines === obj.lines) return obj;
+    return { ...obj, ...(text !== obj.text ? { text } : {}), ...(lines !== obj.lines ? { lines } : {}) };
+  };
+  return mapUnchanged(pages, (page) => {
     if (!page) return page;
-    let modified = false;
-
-    let nextTexts = page.texts;
-    if (Array.isArray(page.texts)) {
-      nextTexts = page.texts.map((t) => {
-        if (!t) return t;
-        const cleanText = normalizeThaiText(t.text || '');
-        let cleanLines = t.lines;
-        if (Array.isArray(t.lines)) {
-          cleanLines = t.lines.map((l) => {
-            if (!l) return l;
-            const cl = normalizeThaiText(l.text || '');
-            if (cl !== l.text) modified = true;
-            return cl !== l.text ? { ...l, text: cl } : l;
-          });
-        }
-        if (cleanText !== t.text || cleanLines !== t.lines) {
-          modified = true;
-          return { ...t, text: cleanText, lines: cleanLines };
-        }
-        return t;
-      });
-    }
-
-    let nextStickers = page.stickers;
-    if (Array.isArray(page.stickers)) {
-      nextStickers = page.stickers.map((st) => {
-        if (!st) return st;
-        const cleanText = normalizeThaiText(st.text || '');
-        let cleanLines = st.lines;
-        if (Array.isArray(st.lines)) {
-          cleanLines = st.lines.map((l) => {
-            if (!l) return l;
-            const cl = normalizeThaiText(l.text || '');
-            if (cl !== l.text) modified = true;
-            return cl !== l.text ? { ...l, text: cl } : l;
-          });
-        }
-        if (cleanText !== st.text || cleanLines !== st.lines) {
-          modified = true;
-          return { ...st, text: cleanText, lines: cleanLines };
-        }
-        return st;
-      });
-    }
-
-    let nextName = page.name ? normalizeThaiText(page.name) : page.name;
-    if (nextName !== page.name) modified = true;
-
-    if (modified) {
-      return {
-        ...page,
-        texts: nextTexts,
-        stickers: nextStickers,
-        name: nextName,
-      };
-    }
-    return page;
+    const texts = Array.isArray(page.texts) ? mapUnchanged(page.texts, cleanObject) : page.texts;
+    const stickers = Array.isArray(page.stickers) ? mapUnchanged(page.stickers, cleanObject) : page.stickers;
+    const name = typeof page.name === 'string' ? normalizeThaiText(page.name) : page.name;
+    if (texts === page.texts && stickers === page.stickers && name === page.name) return page;
+    return { ...page, ...(texts !== page.texts ? { texts } : {}), ...(stickers !== page.stickers ? { stickers } : {}), ...(name !== page.name ? { name } : {}) };
   });
 }

@@ -97,7 +97,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   const loadStateRef = useRef('loading'); // 'loading' | 'ready' | 'failed'
 
   useEffect(() => {
+     let cancelled = false;
      loadStateRef.current = 'loading';
+     setPages([{ id: 'page-default', src: null, width: 800, height: 1130, lines: [], stickers: [], images: [], texts: [], shapes: [], paperType: 'lines', paperColor: 'white' }]);
      // A different book can have fewer pages. Reset before its data arrives so
      // the canvas never tries to render a stale out-of-range page index.
      setCurrentPageIndex(0);
@@ -106,6 +108,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         setSyncProgress(null);
         try {
            const cloudData = await downloadNotebookData(uid, notebookId, (p) => setSyncProgress(p));
+           if (cancelled) return;
            if (cloudData && cloudData.length > 0) {
               // Notebooks saved while updatePage was impure hold objects stacked
               // exactly on top of each other. They are close to invisible — you
@@ -121,8 +124,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
            // null = notebook doesn't exist yet → a fresh blank book is correct.
            loadStateRef.current = 'ready';
         } catch (e) {
+           if (cancelled) return;
            console.error("Cloud load failed", e);
-           const saved = localStorage.getItem(`talib_notebook_${notebookId}`);
+           const saved = localStorage.getItem(`talib_notebook_${uid || "guest"}_${notebookId}`);
            if (saved) {
               try {
                  const cleaned = dedupePages(JSON.parse(saved));
@@ -143,15 +147,17 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               toast.error("โหลดสมุดโน้ตไม่สำเร็จ — ปิดการบันทึกไว้ชั่วคราวเพื่อป้องกันข้อมูลเดิมหาย ลองรีเฟรชอีกครั้ง", { id: "cloud-sync", duration: 10000 });
            }
         } finally {
-           setIsSyncing(false);
-           setSyncProgress(null);
+           if (!cancelled) {
+             setIsSyncing(false);
+             setSyncProgress(null);
+           }
         }
      };
 
      if (uid && notebookId !== 'default') {
         loadData();
      } else {
-        const saved = localStorage.getItem(`talib_notebook_${notebookId}`);
+        const saved = localStorage.getItem(`talib_notebook_${uid || "guest"}_${notebookId}`);
         if (saved) {
            // The signed-out path reads the same possibly-damaged data, so it
            // gets the same clean-up. Three load paths, one rule.
@@ -165,6 +171,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         }
         loadStateRef.current = 'ready';
      }
+     return () => { cancelled = true; };
   }, [notebookId, uid]);
   
   const [loadingPdf, setLoadingPdf] = useState(false);

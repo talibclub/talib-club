@@ -1,13 +1,14 @@
+import { commitReadingSession } from "./reading/utils/readingSession.js"
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { createPortal } from "react-dom"
 import Draggable from "react-draggable"
 import toast from "react-hot-toast"
 import { BOOKS, DEFAULT_TAXONOMY } from "../data/index.js"
-import { useContentCollection, useTaxonomySettings, useUserDoc, invalidateUserDocumentCache } from "../lib/contentStore.js"
+import { useContentCollection, useTaxonomySettings, useUserDoc, invalidateUserDocumentCache, invalidateCollectionCache } from "../lib/contentStore.js"
 import { loadBookPdf } from "./reading/utils/pdfCache.js"
 import { confirmAction } from "../utils/feedback.jsx"
 import { getDownloadURL, ref, uploadBytes, getStorage } from "../lib/driveStorage.js"
-import { doc, getDoc, setDoc, serverTimestamp, runTransaction, updateDoc } from "firebase/firestore"
+import { doc, setDoc, serverTimestamp, runTransaction, updateDoc } from "firebase/firestore"
 import { storage, app, db } from "../lib/firebase.js"
 import { safeDateNow } from "../utils/time.js"
 import { getLocalDayKey, addDaysToKey, todayKey, calculateReadingStreak } from "../utils/streak.js"
@@ -105,6 +106,9 @@ function getPreviewUrl(url) {
 export default function ReadingApp({ authState, go, ctx, theme }) {
   const uid = authState?.user?.uid
   const dismissedShelfRef = useRef(null)
+  const readingRequestRef = useRef(0)
+  const readingSessionIdRef = useRef(null)
+  const savingSessionRef = useRef(false)
 
   function clearShelfLaunchContext() {
     if (!ctx?.shelfItemId) return
@@ -118,8 +122,8 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   
   const { items: books } = useContentCollection("books", BOOKS, null, readOnlyQueryOptions)
   const { items: shelfItems, saveItem: saveShelfItem, deleteItem: deleteShelfItem } = useContentCollection("bookshelf", [], uid, liveQueryOptions)
-  const { items: readingSessions, loading: loadingSessions, saveItem: saveReadingSession } = useContentCollection("reading_sessions", [], uid, liveQueryOptions)
-  const { item: streakRecord, loading: loadingStreaks, saveItem: saveStreakSettings, refetch: refetchStreak } = useUserDoc("reading_streaks", uid, uid, null)
+  const { items: readingSessions, loading: loadingSessions } = useContentCollection("reading_sessions", [], uid, liveQueryOptions)
+  const { item: streakRecord, loading: loadingStreaks, refetch: refetchStreak } = useUserDoc("reading_streaks", uid, uid, null)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
 
   // Reading Mode State
@@ -310,10 +314,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       }
     }
     try {
-      await saveStreakSettings({
-        ...streakSettings,
-        remindersEnabled: enabled
-      })
+      await mutateStreakDoc(() => ({ remindersEnabled: enabled }))
       toast.success(enabled ? "เปิดใช้งานระบบการแจ้งเตือนให้อ่านหนังสือแล้ว 🔔" : "ปิดใช้งานระบบการแจ้งเตือนแล้ว")
     } catch (err) {
       console.error(err)
@@ -327,12 +328,8 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       toast.error("คุณตั้งค่าการแจ้งเตือนเวลานี้ไว้แล้ว")
       return
     }
-    const updatedTimes = [...streakSettings.reminderTimes, timeStr].sort()
     try {
-      await saveStreakSettings({
-        ...streakSettings,
-        reminderTimes: updatedTimes
-      })
+      await mutateStreakDoc((current) => ({ reminderTimes: [...new Set([...current.reminderTimes, timeStr])].sort() }))
       toast.success(`เพิ่มเวลาแจ้งเตือน ${timeStr} น. สำเร็จ`)
     } catch (err) {
       console.error(err)
@@ -342,12 +339,8 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
 
   const handleRemoveReminderTime = async (timeStr) => {
     if (!streakSettings) return
-    const updatedTimes = streakSettings.reminderTimes.filter(t => t !== timeStr)
     try {
-      await saveStreakSettings({
-        ...streakSettings,
-        reminderTimes: updatedTimes
-      })
+      await mutateStreakDoc((current) => ({ reminderTimes: current.reminderTimes.filter(t => t !== timeStr) }))
       toast.success(`ลบเวลาแจ้งเตือน ${timeStr} น. เรียบร้อย`)
     } catch (err) {
       console.error(err)
@@ -555,13 +548,12 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     ) {
       const syncStreak = async () => {
         try {
-          await saveStreakSettings({
-            ...streakSettings,
+          await mutateStreakDoc(() => ({
             streakCount: currentStreakCount,
             bestStreak: currentBestStreak,
             displayName: userDisplayName,
             updatedAt: safeDateNow()
-          })
+          }))
           // Mirror the three public numbers into their own collection.
           // content_reading_streaks cannot be listed by members — and must not
           // be, because the same document holds gems, freeze/leave credits and
@@ -581,7 +573,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       }
       syncStreak()
     }
-  }, [uid, loadingStreaks, loadingSessions, streakSettings, streak.current, streak.best, authState?.user?.displayName, authState?.user?.email, saveStreakSettings])
+  }, [uid, loadingStreaks, loadingSessions, streakSettings, streak.current, streak.best, authState?.user?.displayName, authState?.user?.email, mutateStreakDoc])
 
   async function protectToday(type) {
     if (!uid) return
@@ -827,6 +819,8 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   }, [ctx?.shelfItemId, shelfItems, books, activeBook])
 
   function startReading(shelfItem) {
+    const requestId = ++readingRequestRef.current
+    readingSessionIdRef.current = `${uid}_${crypto.randomUUID()}`
     setActiveBook(shelfItem)
     setRealPdfPages(0)
     // Find out how many pages the book really has, so the page fields can be
@@ -840,7 +834,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     const fileUrl = shelfItem?.book?.fileUrl
     if (fileUrl) {
       loadBookPdf(fileUrl)
-        .then((pdf) => { if (pdf?.numPages > 0) setRealPdfPages(pdf.numPages) })
+        .then((pdf) => { if (readingRequestRef.current === requestId && pdf?.numPages > 0) setRealPdfPages(pdf.numPages) })
         .catch((err) => console.warn("Could not read the book's page count", err))
     }
     sessionStorage.setItem("activeReadingSession", shelfItem.id)
@@ -852,6 +846,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   }
 
   function cancelReading() {
+    readingRequestRef.current += 1
     setActiveBook(null)
     sessionStorage.removeItem("activeReadingSession")
     resetTimer()
@@ -881,6 +876,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
     })
     if (!ok) return
     stopReading()
+    readingRequestRef.current += 1
     setActiveBook(null)
     sessionStorage.removeItem("activeReadingSession")
     resetTimer()
@@ -888,7 +884,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   }
 
   const saveReadingProgress = async () => {
-    if (!activeBook) return
+    if (!activeBook || !uid || savingSessionRef.current) return
     const start = parseInt(startPage, 10)
     const end = parseInt(endPage, 10)
 
@@ -911,6 +907,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       return
     }
 
+    savingSessionRef.current = true
     setSaving(true)
     try {
       const payload = {
@@ -930,9 +927,9 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
         return
       }
 
-      const sessionId = `${uid}_${activeBook.id}_${safeDateNow()}`
+      const sessionId = readingSessionIdRef.current
 
-      await saveReadingSession({
+      const session = {
         id: sessionId,
         uid,
         shelfItemId: activeBook.id,
@@ -951,41 +948,22 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
         focusRatio: report.focusRatio,
         verificationScore: report.score,
         verified: report.verified,
+      }
+      const sessionGems = Math.min(10, Math.floor(seconds / 120))
+      await commitReadingSession({
+        db, uid, sessionId, session, shelfId: activeBook.id,
+        seconds, gems: sessionGems,
+        progress: getProgressFromSession(activeBook, end, report.pagesRead),
+        normalizeStreakSettings,
       })
-
-      // Calculate session rewards
-      const sessionGems = Math.min(10, Math.floor(seconds / 120)) // 1 Gem per 2 mins, max 10
-
-      // Awarding gems used to read the document, then write the whole cached
-      // settings object back with a new total — the read-then-write left a gap
-      // where a concurrent claim or purchase was overwritten. The transaction
-      // reads and writes as one step.
-      await mutateStreakDoc((current) => ({ gems: Number(current.gems || 0) + sessionGems }))
-
-      const nextProgress = getProgressFromSession(activeBook, end, report.pagesRead)
-
-      const cleanItem = { ...activeBook }
-      delete cleanItem.book
-
-      // Get latest shelf item to avoid overwriting concurrent read time
-      const latestBookSnap = await getDoc(doc(db, "content_bookshelf", activeBook.id))
-      const latestBookData = latestBookSnap.exists() ? latestBookSnap.data() : activeBook
-      const currentReadSeconds = Number(latestBookData.totalReadSeconds || 0)
-      const currentVerifiedSessions = Number(latestBookData.verifiedSessions || 0)
-
-      await saveShelfItem({
-        ...cleanItem,
-        progress: nextProgress,
-        currentPage: end,
-        status: nextProgress >= 100 ? "finished" : "reading",
-        totalReadSeconds: currentReadSeconds + seconds,
-        verifiedSessions: currentVerifiedSessions + 1,
-        lastReadAt: safeDateNow(),
-        lastVerificationScore: report.score,
-      })
+      invalidateCollectionCache("content_reading_sessions")
+      invalidateCollectionCache("content_bookshelf")
+      invalidateUserDocumentCache("content_reading_streaks", uid)
+      refetchStreak?.().catch(console.error)
 
       toast.success(`บันทึกการอ่านเสร็จสมบูรณ์! (+${sessionGems} 💎) คะแนนยืนยันการเรียนรู้: ${report.score}/100`)
       resetTimer()
+      readingRequestRef.current += 1
       setActiveBook(null)
       sessionStorage.removeItem("activeReadingSession")
       clearShelfLaunchContext()
@@ -993,6 +971,7 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
       console.error(err)
       toast.error("บันทึกข้อมูลล้มเหลว กรุณาลองอีกครั้ง")
     } finally {
+      savingSessionRef.current = false
       setSaving(false)
     }
   }

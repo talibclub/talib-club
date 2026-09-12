@@ -145,6 +145,10 @@ service cloud.firestore {
     }
 
     match /content_reading_sessions/{docId} {
+      // Transactions must check a new session ID before creating it. Missing
+      // documents have no uid field; only permit that lookup in the caller's namespace.
+      allow get: if signedIn() && !exists(/databases/$(database)/documents/content_reading_sessions/$(docId))
+        && docId.matches('^' + request.auth.uid + '_.*');
       allow read: if signedIn() && (resource.data.uid == request.auth.uid || isStaff());
       allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
       allow update: if ownsExistingDocument() && keepsOwnership();

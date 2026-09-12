@@ -2,6 +2,12 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ getDocument: vi.fn() }));
 vi.mock('pdfjs-dist', () => ({ getDocument: mocks.getDocument, GlobalWorkerOptions: {} }));
 vi.mock('pdfjs-dist/build/pdf.worker.min.mjs?url', () => ({ default: 'worker.mjs' }));
+vi.mock('../lib/firebase.js', () => ({ auth: { currentUser: { getIdToken: async () => 'token' } } }));
+vi.mock('../lib/driveStorage.js', () => ({ isDriveStorageUrl: () => false }));
+vi.mock('../pages/reading/utils/pdfCache.js', () => ({
+  resolvePdfUrl: url => `/proxy?url=${encodeURIComponent(url)}`,
+  getBookPdfBytes: () => { throw new Error('Remote covers must not download the whole PDF'); },
+}));
 import { createPdfCover } from '../utils/pdfCover.js';
 let canvas, page, task;
 beforeEach(() => {
@@ -24,4 +30,12 @@ it('reports unreadable PDFs and still releases the loading task', async () => {
   task.promise = Promise.reject(new Error('Invalid PDF'));
   await expect(createPdfCover(new Blob(['invalid']))).rejects.toThrow('ดึงหน้าปกไม่ได้');
   expect(task.destroy).toHaveBeenCalled();
+});
+it('loads remote covers on demand instead of buffering the entire PDF', async () => {
+  await createPdfCover('https://example.com/large.pdf');
+  expect(mocks.getDocument).toHaveBeenLastCalledWith({
+    url: '/proxy?url=https%3A%2F%2Fexample.com%2Flarge.pdf',
+    httpHeaders: { Authorization: 'Bearer token' },
+    disableAutoFetch: true, disableStream: true, rangeChunkSize: 256 * 1024,
+  });
 });

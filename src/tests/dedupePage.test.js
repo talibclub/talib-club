@@ -65,6 +65,12 @@ describe('dedupePages', () => {
     expect(dedupePages(pages).pages).toBe(pages);
   });
 
+  it('preserves clean text and line objects without inserting absent fields', () => {
+    const pages = [{ texts: [{ id: 'a', lines: [{ text: 'hello' }] }], stickers: [{ text: 'note' }] }];
+    expect(dedupePages(pages).pages).toBe(pages);
+    expect(pages[0].texts[0]).not.toHaveProperty('text');
+  });
+
   it('survives a missing notebook', () => {
     expect(dedupePages(null).removed).toBe(0);
   });

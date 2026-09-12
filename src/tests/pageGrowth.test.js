@@ -31,7 +31,7 @@ describe('pageContentBounds', () => {
 
   it('spans every kind at once', () => {
     const page = blank({
-      texts: [{ x: 0, y: 0, width: 100, height: 50 }],
+      texts: [{ text: 'hello', x: 0, y: 0, width: 100, height: 50 }],
       images: [{ x: 900, y: 700, width: 200, height: 100 }],
     });
     expect(pageContentBounds(page)).toEqual({ minX: 0, minY: 0, maxX: 1100, maxY: 800 });
@@ -54,11 +54,11 @@ describe('pageContentBounds', () => {
 
 describe('grownPageSize', () => {
   it('leaves a page that already fits alone', () => {
-    expect(grownPageSize(blank({ texts: [{ x: 10, y: 10, width: 100, height: 50 }] }))).toBeNull();
+    expect(grownPageSize(blank({ texts: [{ text: 'hello', x: 10, y: 10, width: 100, height: 50 }] }))).toBeNull();
   });
 
   it('widens for something past the right edge', () => {
-    const page = blank({ texts: [{ x: 1400, y: 10, width: 100, height: 50 }] });
+    const page = blank({ texts: [{ text: 'hello', x: 1400, y: 10, width: 100, height: 50 }] });
     expect(grownPageSize(page)).toEqual({ width: 1500 + PAGE_PAD, height: MIN_HEIGHT });
   });
 
@@ -68,7 +68,7 @@ describe('grownPageSize', () => {
   });
 
   it('never shrinks a page that was already grown', () => {
-    const page = { width: 4000, height: 3000, src: null, texts: [{ x: 10, y: 10, width: 50, height: 50 }] };
+    const page = { width: 4000, height: 3000, src: null, texts: [{ text: 'hello', x: 10, y: 10, width: 50, height: 50 }] };
     expect(grownPageSize(page)).toBeNull();
   });
 

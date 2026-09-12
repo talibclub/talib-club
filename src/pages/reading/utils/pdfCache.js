@@ -18,12 +18,8 @@ const bytesCache = new Map();
 // everything through our proxy so pdf.js can fetch cross-origin files.
 export function resolvePdfUrl(url) {
   if (isDriveStorageUrl(url)) return url;
-  let u = url;
-  if (u.includes('drive.google.com') && u.includes('/view')) {
-    const m = u.match(/\/d\/(.*?)\//);
-    if (m && m[1]) u = `https://drive.google.com/uc?export=download&id=${m[1]}`;
-  }
-  return `/api/files?mode=legacy&url=${encodeURIComponent(u)}`;
+  // The server normalizes Drive links without dropping resourcekey parameters.
+  return `/api/files?mode=legacy&url=${encodeURIComponent(url)}`;
 }
 
 // Fetch (and cache) the raw PDF bytes for a book file URL. Failures are not

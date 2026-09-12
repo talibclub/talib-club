@@ -44,7 +44,7 @@ export function useNotebookPersistence({
      // tab happened to close.
      if (!uid) {
         try {
-          localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pages));
+          localStorage.setItem(`talib_notebook_${uid || "guest"}_${notebookId}`, JSON.stringify(pages));
           if (!isAuto) toast.success('บันทึกไว้ในอุปกรณ์นี้แล้ว', { id: 'local-save', icon: '💾' });
         } catch (e) {
           console.warn('Local storage quota exceeded on guest save', e);
@@ -62,12 +62,12 @@ export function useNotebookPersistence({
         await uploadNotebookData(uid, notebookId, pages);
         await writeNotebookMeta();
         // Backup locally
-         try { localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pages)); } catch (e) { console.warn("Local storage quota exceeded on backup", e); }
+         try { localStorage.setItem(`talib_notebook_${uid || "guest"}_${notebookId}`, JSON.stringify(pages)); } catch (e) { console.warn("Local storage quota exceeded on backup", e); }
         if (!isAuto) toast.success("บันทึกคลาวด์เรียบร้อย!", { id: "cloud-save", icon: '💾' });
      } catch (err) {
         console.error(err);
          let localSaved = false;
-         try { localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pages)); localSaved = true; } catch (e) { console.warn("Local storage quota exceeded on fallback", e); }
+         try { localStorage.setItem(`talib_notebook_${uid || "guest"}_${notebookId}`, JSON.stringify(pages)); localSaved = true; } catch (e) { console.warn("Local storage quota exceeded on fallback", e); }
          if (localSaved) {
         toast.error("บันทึกคลาวด์ล้มเหลว (เซฟลงเครื่องแล้ว)", { id: "cloud-save" });
          } else {
@@ -112,7 +112,7 @@ export function useNotebookPersistence({
       if (pagesRef.current && pagesRef.current.length > 0) {
         if (uid) uploadNotebookData(uid, notebookId, pagesRef.current).catch(console.error);
         writeNotebookMeta().catch(console.error);
-        try { localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pagesRef.current)); } catch { /* ignore */ }
+        try { localStorage.setItem(`talib_notebook_${uid || "guest"}_${notebookId}`, JSON.stringify(pagesRef.current)); } catch { /* ignore */ }
       }
     };
   }, [readonly, uid, notebookId]);
@@ -123,12 +123,12 @@ export function useNotebookPersistence({
     const flush = () => {
       if (readonly || loadStateRef.current !== 'ready') return;
       if (pagesRef.current && pagesRef.current.length > 0) {
-        try { localStorage.setItem(`talib_notebook_${notebookId}`, JSON.stringify(pagesRef.current)); } catch { /* ignore */ }
+        try { localStorage.setItem(`talib_notebook_${uid || "guest"}_${notebookId}`, JSON.stringify(pagesRef.current)); } catch { /* ignore */ }
       }
     };
     window.addEventListener('beforeunload', flush);
     return () => window.removeEventListener('beforeunload', flush);
-  }, [readonly, notebookId]);
+  }, [readonly, uid, notebookId]);
 
   return { saveNotebook, writeNotebookMeta };
 }

@@ -49,10 +49,10 @@ function validateTarget(raw) {
 }
 
 // fetch with manual redirect handling so every hop is re-validated.
-async function fetchValidated(url) {
+async function fetchValidated(url, range) {
   let current = url;
   for (let i = 0; i <= MAX_REDIRECTS; i++) {
-    const response = await fetch(current, { redirect: 'manual' });
+    const response = await fetch(current, { redirect: 'manual', signal: AbortSignal.timeout(30000), headers: range ? { Range: range, 'Accept-Encoding': 'identity' } : { 'Accept-Encoding': 'identity' } });
     if (response.status >= 300 && response.status < 400) {
       const loc = response.headers.get('location');
       if (!loc) return { error: 'Bad redirect' };
@@ -83,17 +83,31 @@ export default async function handler(req, res) {
   if (check.error) return res.status(check.error === 'Host not allowed' ? 403 : 400).send(check.error);
 
   try {
-    let { response, finalUrl, error } = await fetchValidated(check.target.toString());
+    const range = req.headers?.range;
+    if (range && !/^bytes=\d+-\d*$/.test(range)) return res.status(400).send('Invalid range');
+    let target = check.target;
+    // Normalize view, preview, open?id= and uc links before following redirects.
+    if (target.hostname === 'drive.google.com') {
+      const id = target.pathname.match(/\/file\/d\/([\w-]+)/)?.[1] || target.searchParams.get('id');
+      if (id && /^[\w-]+$/.test(id)) {
+        target = new URL('https://drive.usercontent.google.com/download');
+        target.searchParams.set('id', id);
+        target.searchParams.set('export', 'download');
+        target.searchParams.set('confirm', 't');
+        if (check.target.searchParams.has('resourcekey')) target.searchParams.set('resourcekey', check.target.searchParams.get('resourcekey'));
+      }
+    }
+    let { response, finalUrl, error } = await fetchValidated(target.toString(), range);
     if (error) return res.status(400).send(error);
 
     // Bypass Google Drive Virus Scan Warning
     const contentType = response.headers.get('content-type') || '';
-    if (contentType.includes('text/html') && finalUrl.includes('drive.google.com')) {
+    if (contentType.includes('text/html') && new URL(finalUrl).hostname === 'drive.google.com') {
       const text = await response.text();
       const match = text.match(/confirm=([a-zA-Z0-9_-]+)/);
       if (!match) return res.status(502).send('Failed to bypass Google Drive virus scan.');
       const joinChar = finalUrl.includes('?') ? '&' : '?';
-      const retry = await fetchValidated(finalUrl + joinChar + 'confirm=' + match[1]);
+      const retry = await fetchValidated(finalUrl + joinChar + 'confirm=' + match[1], range);
       if (retry.error) return res.status(400).send(retry.error);
       response = retry.response;
     }
@@ -104,16 +118,19 @@ export default async function handler(req, res) {
 
     const finalType = response.headers.get('content-type') || '';
     if (!/application\/(pdf|octet-stream|x-download)|binary\/octet-stream/i.test(finalType)) {
-      return res.status(415).send('Target is not a PDF');
+      return res.status(415).send('ลิงก์นี้ส่งกลับหน้าเว็บแทน PDF กรุณาใช้ลิงก์ไฟล์โดยตรง และตรวจสิทธิ์ดาวน์โหลดหรือโควตา Google Drive');
     }
 
     // Fresh headers only — never mirror the upstream's (Set-Cookie etc).
-    res.status(200);
+    res.status(response.status === 206 ? 206 : 200);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline; filename="document.pdf"');
     const len = response.headers.get('content-length');
     if (len) res.setHeader('Content-Length', len);
-    res.setHeader('Cache-Control', 'public, max-age=3600');
+    if (response.headers.get('accept-ranges') === 'bytes') res.setHeader('Accept-Ranges', 'bytes');
+    const contentRange = response.headers.get('content-range');
+    if (response.status === 206 && contentRange) res.setHeader('Content-Range', contentRange);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
 
     Readable.fromWeb(response.body).pipe(res);
   } catch (error) {

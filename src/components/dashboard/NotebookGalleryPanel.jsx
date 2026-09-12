@@ -60,7 +60,7 @@ export default function NotebookGalleryPanel({ authState, setView }) {
       await deleteNotebookData(authState.user.uid, deletingNotebook.bookId);
       // 3. Clear local storage
       try {
-        localStorage.removeItem(`talib_notebook_${deletingNotebook.bookId}`);
+        localStorage.removeItem(`talib_notebook_${authState.user.uid}_${deletingNotebook.bookId}`);
       } catch (e) { /* ignore */ }
 
       // 4. Update UI
