@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { getDownloadURL, ref, uploadBytes } from '../lib/driveStorage.js';
 import { compressImage } from '../utils/image.js';
 
-export default function DriveUploadButton({ prefix, accept, onUploaded, onBusyChange, disabled = false }) {
+export default function DriveUploadButton({ prefix, accept, onUploaded, onBusyChange, disabled = false, label = 'อัปโหลดไป Google Drive' }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function upload(event) {
@@ -21,7 +21,7 @@ export default function DriveUploadButton({ prefix, accept, onUploaded, onBusyCh
   }
   return <div>
     <label className="btn btn-outline" style={{ cursor: busy ? 'wait' : 'pointer', marginTop: 8 }}>
-      {busy ? 'กำลังอัปโหลดไป Google Drive…' : 'อัปโหลดไป Google Drive'}
+      {busy ? 'กำลังอัปโหลด…' : label}
       <input type="file" accept={accept} disabled={busy || disabled} onChange={upload} style={{ display: 'none' }} />
     </label>
     {error && <p role="alert" style={{ color: '#b42318', fontSize: 13 }}>{error}</p>}

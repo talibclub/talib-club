@@ -703,24 +703,27 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
         )}
         <Field label="ไฟล์ PDF / ลิงก์ Drive" span>
           <input value={item.fileUrl || ""} disabled={uploadingImage} onChange={e => set("fileUrl", e.target.value)} placeholder="https://..." />
-          <div style={{ marginTop: 8 }}><input type="checkbox" checked={autoCover} disabled={uploadingImage} onChange={e => setAutoCover(e.target.checked)} aria-label="ใช้หน้าแรกของ PDF เป็นปกเมื่ออัปโหลด" /> ใช้หน้าแรกของ PDF เป็นปกเมื่ออัปโหลด (แทนที่ปกเดิม)</div>
-          <DriveUploadButton prefix="library_files" accept="application/pdf" onUploaded={uploadPdfDone} onBusyChange={setUploadingImage} disabled={uploadingImage || busy} />
-          <button type="button" className="btn btn-outline" style={{ marginTop: 8 }} disabled={!item.fileUrl || uploadingImage || busy} onClick={coverFromLink}>{uploadingImage ? 'กำลังประมวลผล…' : 'ดึงปกจากหน้าแรกของ PDF ที่ระบุ'}</button>
+          <DriveUploadButton label="อัปโหลดไฟล์ PDF" prefix="library_files" accept="application/pdf" onUploaded={uploadPdfDone} onBusyChange={setUploadingImage} disabled={uploadingImage || busy} />
         </Field>
         <Field label="รูปภาพปกหนังสือ (URL)" span>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <input
               value={item.coverUrl || ""}
               onChange={e => set("coverUrl", e.target.value)}
               placeholder="https://example.com/image.jpg หรืออัปโหลดไฟล์..."
-              style={{ flex: 1 }}
+              style={{ flex: '1 1 100%' }}
             />
             <label className="btn btn-outline" style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", flexShrink: 0, padding: "10px 16px" }}>
               <i className={uploadingImage ? "ti ti-loader-2 spin" : "ti ti-upload"}></i>
-              {uploadingImage ? "กำลังอัปโหลด..." : "อัปโหลดรูปภาพ"}
+              {uploadingImage ? "กำลังอัปโหลด..." : "อัปโหลดรูปปก"}
               <input type="file" accept="image/*" onChange={handleUploadImage} disabled={uploadingImage} style={{ display: "none" }} />
             </label>
+            <button type="button" className="btn btn-outline" disabled={!item.fileUrl || uploadingImage || busy} onClick={coverFromLink}>{uploadingImage ? 'กำลังประมวลผล…' : 'ดึงรูปปกจากหน้าแรก PDF'}</button>
           </div>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 12, fontSize: 13, cursor: 'pointer' }}>
+            <input type="checkbox" style={{ width: 16, height: 16, flexShrink: 0, marginTop: 3 }} checked={autoCover} disabled={uploadingImage || busy} onChange={e => setAutoCover(e.target.checked)} />
+            <span>สร้างรูปปกจากหน้าแรกอัตโนมัติเมื่ออัปโหลด PDF ใหม่ (แทนที่ปกเดิม)</span>
+          </label>
           {item.coverUrl && (
             <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ position: "relative", width: 120, height: 75, borderRadius: 8, overflow: "hidden", border: "1px solid var(--br2)", flexShrink: 0 }}>
@@ -767,9 +770,9 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
 
 function Field({ label, children, span }) {
   return (
-    <label style={span ? { gridColumn: "1 / -1" } : undefined}>
+    <div style={span ? { gridColumn: "1 / -1" } : undefined}>
       <span style={{ display: "block", fontSize: 13, color: "var(--t2)", marginBottom: 8, fontWeight: 500 }}>{label}</span>
       {children}
-    </label>
+    </div>
   )
 }
