@@ -40,7 +40,9 @@ export default async function handler(req, res) {
       const fileId = ids.ids[0];
       const uploadId = randomUUID();
       const response = await driveFetch('upload/drive/v3/files?uploadType=resumable', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Upload-Content-Type': type, 'X-Upload-Content-Length': String(size) },
+        // Drive binds the upload response's CORS headers to the initiating origin.
+        // sameOrigin above validates this value before it reaches Google.
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Upload-Content-Type': type, 'X-Upload-Content-Length': String(size), Origin: req.headers.origin || process.env.ALLOWED_ORIGIN || 'https://talibclub.org' },
         body: JSON.stringify({ id: fileId, name: path.split('/').pop(), parents: [process.env.GOOGLE_DRIVE_FOLDER_ID], mimeType: type, appProperties: { talibPath: key, talibUpload: uploadId } }),
       });
       const sessionUrl = response.headers.get('location');

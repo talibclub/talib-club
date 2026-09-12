@@ -31,6 +31,14 @@ beforeEach(() => {
   mocked.upstream.mockResolvedValue(Response.json({ size: '10', mimeType: pending.type, parents: ['folder'], appProperties: { talibUpload: uploadId } }));
 });
 describe('Drive upload publication', () => {
+  it('binds resumable uploads to the validated browser origin for CORS', async () => {
+    mocked.upstream.mockResolvedValueOnce(Response.json({ ids: ['testfileid'] }))
+      .mockResolvedValueOnce(new Response(null, { headers: { location: 'https://www.googleapis.com/upload/drive/v3/files?upload_id=test' } }));
+    const res = response();
+    await handler({ method: 'POST', headers: { authorization: 'Bearer token', origin: 'https://talibclub.org' }, body: { action: 'init', path: pending.path, size: 10, type: pending.type } }, res);
+    expect(res.statusCode).toBe(200);
+    expect(mocked.upstream.mock.calls.find(([path]) => path.startsWith('upload/'))[1].headers.Origin).toBe('https://talibclub.org');
+  });
   it('does not accept a cookie alone for writes', async () => {
     const res = response();
     await handler({ method: 'POST', headers: {}, body: { action: 'complete', uploadId } }, res);
