@@ -594,6 +594,31 @@ export default function AdminLibrary() {
 function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
   const set = (key, value) => setItem(prev => ({ ...prev, [key]: value }))
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [autoCover, setAutoCover] = useState(true)
+  const generateCover = async (source) => {
+    const { createPdfCover } = await import('../../utils/pdfCover.js')
+    const cover = await createPdfCover(source)
+    const target = ref(null, `library_covers/${crypto.randomUUID()}_pdf-cover.jpg`)
+    await uploadBytes(target, cover)
+    set('coverUrl', await getDownloadURL(target))
+  }
+  const uploadPdfDone = async (url, file) => {
+    set('fileUrl', url)
+    if (autoCover) {
+      try {
+        await generateCover(file)
+        notifySuccess('อัปโหลด PDF และสร้างรูปปกจากหน้าแรกแล้ว กรุณากดบันทึกข้อมูล')
+      } catch (err) {
+        notifyError(`อัปโหลด PDF แล้ว แต่ ${err.message} คุณยังอัปโหลดรูปปกเองได้`)
+      }
+    }
+  }
+  const coverFromLink = async () => {
+    setUploadingImage(true)
+    try { await generateCover(item.fileUrl); notifySuccess('สร้างรูปปกแล้ว กรุณากดบันทึกข้อมูล') }
+    catch (err) { notifyError(err.message) }
+    finally { setUploadingImage(false) }
+  }
   const bookTypes = (taxonomy.bookTypes || []).map(t => typeof t === "string" ? { id: t, label: t } : t)
 
   const handleUploadImage = async (e) => {
@@ -676,7 +701,12 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
             />
           </Field>
         )}
-        <Field label="ไฟล์ PDF / ลิงก์ Drive" span><input value={item.fileUrl || ""} onChange={e => set("fileUrl", e.target.value)} placeholder="https://..." /><DriveUploadButton prefix="library_files" accept="application/pdf" onUploaded={url => set('fileUrl', url)} onBusyChange={setUploadingImage} disabled={uploadingImage} /></Field>
+        <Field label="ไฟล์ PDF / ลิงก์ Drive" span>
+          <input value={item.fileUrl || ""} disabled={uploadingImage} onChange={e => set("fileUrl", e.target.value)} placeholder="https://..." />
+          <div style={{ marginTop: 8 }}><input type="checkbox" checked={autoCover} disabled={uploadingImage} onChange={e => setAutoCover(e.target.checked)} aria-label="ใช้หน้าแรกของ PDF เป็นปกเมื่ออัปโหลด" /> ใช้หน้าแรกของ PDF เป็นปกเมื่ออัปโหลด (แทนที่ปกเดิม)</div>
+          <DriveUploadButton prefix="library_files" accept="application/pdf" onUploaded={uploadPdfDone} onBusyChange={setUploadingImage} disabled={uploadingImage || busy} />
+          <button type="button" className="btn btn-outline" style={{ marginTop: 8 }} disabled={!item.fileUrl || uploadingImage || busy} onClick={coverFromLink}>{uploadingImage ? 'กำลังประมวลผล…' : 'ดึงปกจากหน้าแรกของ PDF ที่ระบุ'}</button>
+        </Field>
         <Field label="รูปภาพปกหนังสือ (URL)" span>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <input

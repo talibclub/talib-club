@@ -15,7 +15,7 @@ export default function DriveUploadButton({ prefix, accept, onUploaded, onBusyCh
         ? await compressImage(original, { maxWidth: 1400, maxHeight: 1400, quality: 0.8 }) : original;
       const target = ref(null, `${prefix}/${Date.now()}_${crypto.randomUUID()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`);
       await uploadBytes(target, file);
-      onUploaded(await getDownloadURL(target));
+      await onUploaded(await getDownloadURL(target), original);
     } catch (err) { setError(err.message || 'อัปโหลดไม่สำเร็จ'); }
     finally { setBusy(false); onBusyChange?.(false); }
   }
