@@ -1,3 +1,4 @@
+import { getCoverUrl as getDirectUrl } from "../utils/bookCover.js"
 import { useEffect, useMemo, useRef } from "react"
 import toast from "react-hot-toast"
 import { BOOKS } from "../data/index.js"
@@ -11,12 +12,7 @@ import { isJournal } from "../utils/library.js"
 import { isDriveStorageUrl } from '../lib/driveStorage.js'
 import { useDriveMediaVersion } from '../hooks/useDriveMediaVersion.js'
 
-function getDirectUrl(url) {
-  if (!url) return ""
-  const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)\//)
-  if (match && match[1]) return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w800`
-  return url
-}
+
 
 function getDownloadUrl(url) {
   if (!url) return ""

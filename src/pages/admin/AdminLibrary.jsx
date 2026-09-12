@@ -144,34 +144,34 @@ export default function AdminLibrary() {
     if (busy) return
     const selectedBooks = items.filter(book => selected.includes(book.id))
     if (!selectedBooks.length) return
-    const books = selectedBooks.filter(book => !String(book.coverUrl || '').trim())
-    const skipped = selectedBooks.length - books.length
-    if (!books.length) {
-      notifySuccess(`หนังสือที่เลือกมีปกแล้วทั้งหมด ${skipped} เล่ม ไม่ต้องดึงปกซ้ำ`)
-      return
-    }
+    const books = selectedBooks
     stopCovers.current = false
     setBusy(true)
-    const progress = { total: books.length, done: 0, success: 0, skipped, failures: [], current: '', running: true }
+    const progress = { total: books.length, done: 0, success: 0, skipped: 0, failures: [], current: '', running: true }
     const report = () => setCoverBatch({ ...progress, failures: [...progress.failures] })
     report()
     try {
       const { createPdfCover } = await import('../../utils/pdfCover.js')
       const { runCoverQueue } = await import('../../utils/coverQueue.js')
+      const { hasUsableCover } = await import('../../utils/bookCover.js')
       const active = new Map()
       await runCoverQueue(books, async (book) => {
         active.set(book.id, book.title || String(book.id))
         progress.current = [...active.values()].join(' · ')
         report()
         try {
-          if (!book.fileUrl) throw new Error('ไม่มีลิงก์ PDF')
-          const cover = await createPdfCover(book.fileUrl)
-          const target = ref(null, `library_covers/${crypto.randomUUID()}_pdf-cover.jpg`)
-          await uploadBytes(target, cover)
-          const coverUrl = await getDownloadURL(target)
-          // Patch only the cover; preserve other fields edited by another admin.
-          await saveItem({ id: book.id, coverUrl, ...(book.createdAt ? { createdAt: book.createdAt } : {}) })
-          progress.success++
+          if (await hasUsableCover(book.coverUrl)) {
+            progress.skipped++
+          } else {
+            if (!book.fileUrl) throw new Error('ไม่มีลิงก์ PDF')
+            const cover = await createPdfCover(book.fileUrl)
+            const target = ref(null, `library_covers/${crypto.randomUUID()}_pdf-cover.jpg`)
+            await uploadBytes(target, cover)
+            const coverUrl = await getDownloadURL(target)
+            // Patch only the cover; preserve other fields edited by another admin.
+            await saveItem({ id: book.id, coverUrl, ...(book.createdAt ? { createdAt: book.createdAt } : {}) })
+            progress.success++
+          }
           setSelected(prev => prev.filter(id => id !== book.id))
         } catch (err) {
           progress.failures.push({ id: book.id, title: book.title || String(book.id), message: err.message || 'สร้างปกไม่สำเร็จ' })
@@ -547,7 +547,7 @@ export default function AdminLibrary() {
             </div>
           </div>
 
-          <p style={{ fontSize: 12, marginBottom: 12 }}>ดึงหน้าแรกจาก PDF แล้วบันทึกเป็นปกให้แต่ละเล่มทันที โดยแทนที่รูปปกเดิม รายการที่ไม่สำเร็จจะยังถูกเลือกไว้เพื่อลองใหม่</p>
+          <p style={{ fontSize: 12, marginBottom: 12 }}>ดึงหน้าแรกจาก PDF แล้วบันทึกเป็นปกให้แต่ละเล่มทันที เฉพาะเล่มที่ไม่มีปกหรือรูปปกโหลดไม่ได้ ปกที่แสดงได้จะถูกข้าม รายการที่ไม่สำเร็จจะยังถูกเลือกไว้เพื่อลองใหม่</p>
           <div className="divider" style={{ margin: "0 0 16px" }} />
           
           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>
