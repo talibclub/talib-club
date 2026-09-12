@@ -6,7 +6,7 @@ export async function createPdfCover(source) {
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
   const bytes = source instanceof Blob
     ? new Uint8Array(await source.arrayBuffer())
-    : (await (await import('../pages/reading/utils/pdfCache.js')).getBookPdfBytes(source)).slice();
+    : (await (await import('../pages/reading/utils/pdfCache.js')).getBookPdfBytes(source, { cache: false })).slice();
   const task = pdfjs.getDocument({ data: bytes });
   task.onPassword = () => task.destroy();
   const canvas = document.createElement('canvas');

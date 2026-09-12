@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp } from "firebase/firestore"
 import { BOOKS, DEFAULT_TAXONOMY } from "../../data/index.js"
 import { useContentCollection, useTaxonomySettings, updateCollectionMetadata, invalidateCollectionCache, CONTENT_COLLECTIONS } from "../../lib/contentStore.js"
@@ -136,6 +136,50 @@ export default function AdminLibrary() {
 
   const [selected, setSelected] = useState([]) 
   const [busy, setBusy] = useState(false)
+  const [coverBatch, setCoverBatch] = useState(null)
+  const stopCovers = useRef(false)
+  useEffect(() => () => { stopCovers.current = true }, [])
+
+  async function generateSelectedCovers() {
+    if (busy) return
+    const books = items.filter(book => selected.includes(book.id))
+    if (!books.length) return
+    stopCovers.current = false
+    setBusy(true)
+    const progress = { total: books.length, done: 0, success: 0, failures: [], current: '', running: true }
+    const report = () => setCoverBatch({ ...progress, failures: [...progress.failures] })
+    report()
+    try {
+      const { createPdfCover } = await import('../../utils/pdfCover.js')
+      for (const book of books) {
+        if (stopCovers.current) break
+        progress.current = book.title || String(book.id)
+        report()
+        try {
+          if (!book.fileUrl) throw new Error('ไม่มีลิงก์ PDF')
+          const cover = await createPdfCover(book.fileUrl)
+          const target = ref(null, `library_covers/${crypto.randomUUID()}_pdf-cover.jpg`)
+          await uploadBytes(target, cover)
+          const coverUrl = await getDownloadURL(target)
+          // Patch only the cover; preserve other fields edited by another admin.
+          await saveItem({ id: book.id, coverUrl, ...(book.createdAt ? { createdAt: book.createdAt } : {}) })
+          progress.success++
+          setSelected(prev => prev.filter(id => id !== book.id))
+        } catch (err) {
+          progress.failures.push({ id: book.id, title: book.title || String(book.id), message: err.message || 'สร้างปกไม่สำเร็จ' })
+        }
+        progress.done++
+        report()
+      }
+    } catch (err) {
+      notifyError(err.message || 'เริ่มสร้างรูปปกไม่สำเร็จ')
+    } finally {
+      progress.running = false
+      progress.current = ''
+      report()
+      setBusy(false)
+    }
+  }
 
   const [bulkSource, setBulkSource] = useState("")
   const [bulkType, setBulkType] = useState("")
@@ -464,6 +508,16 @@ export default function AdminLibrary() {
         </div>
       )}
 
+      {coverBatch && (
+        <div className="card" style={{ padding: 16, marginBottom: 16 }} aria-live="polite">
+          <strong>{coverBatch.running ? 'กำลังสร้างรูปปก' : 'ผลการสร้างรูปปก'} — {coverBatch.done}/{coverBatch.total} เล่ม</strong>
+          <p>สำเร็จ {coverBatch.success} เล่ม · ไม่สำเร็จ {coverBatch.failures.length} เล่ม</p>
+          {coverBatch.current && <p>{coverBatch.current}</p>}
+          {coverBatch.running && <button className="btn btn-outline" onClick={() => { stopCovers.current = true }}>หยุดหลังเล่มปัจจุบัน</button>}
+          {coverBatch.failures.length > 0 && <details><summary>ดูรายการที่ไม่สำเร็จ</summary><ul>{coverBatch.failures.map(f => <li key={f.id}>{f.title}: {f.message}</li>)}</ul></details>}
+          {!coverBatch.running && <button className="btn btn-outline" onClick={() => setCoverBatch(null)}>ปิดผลลัพธ์</button>}
+        </div>
+      )}
       {selected.length > 0 && (
         <div className="card" style={{ border: "1.5px solid var(--teal)", padding: 20, borderRadius: 16, marginBottom: 20, background: "var(--teal-bg)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
@@ -471,8 +525,9 @@ export default function AdminLibrary() {
               <i className="ti ti-checkbox" style={{ marginRight: 6 }}></i>
               เลือกอยู่ {selected.length} รายการ
             </span>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn btn-outline" onClick={() => setSelected([])} style={{ fontSize: 12, padding: "6px 12px" }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn btn-teal" onClick={generateSelectedCovers} disabled={busy}>ดึงรูปปกรายการที่เลือก</button>
+              <button className="btn btn-outline" disabled={busy} onClick={() => setSelected([])} style={{ fontSize: 12, padding: "6px 12px" }}>
                 ยกเลิกการเลือก
               </button>
               <button className="btn" style={{ background: "#e05555", color: "#fff", padding: "6px 12px", fontSize: 12 }} onClick={removeSelected} disabled={busy}>
@@ -482,6 +537,7 @@ export default function AdminLibrary() {
             </div>
           </div>
 
+          <p style={{ fontSize: 12, marginBottom: 12 }}>ดึงหน้าแรกจาก PDF แล้วบันทึกเป็นปกให้แต่ละเล่มทันที โดยแทนที่รูปปกเดิม รายการที่ไม่สำเร็จจะยังถูกเลือกไว้เพื่อลองใหม่</p>
           <div className="divider" style={{ margin: "0 0 16px" }} />
           
           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>

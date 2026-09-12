@@ -28,7 +28,7 @@ export function resolvePdfUrl(url) {
 
 // Fetch (and cache) the raw PDF bytes for a book file URL. Failures are not
 // cached, so a transient network error can be retried by opening again.
-export function getBookPdfBytes(fileUrl) {
+export function getBookPdfBytes(fileUrl, { cache = true } = {}) {
   const proxyUrl = resolvePdfUrl(fileUrl);
   const cacheKey = `${auth.currentUser?.uid || 'public'}:${proxyUrl}`;
   if (!bytesCache.has(cacheKey)) {
@@ -45,7 +45,10 @@ export function getBookPdfBytes(fileUrl) {
       .catch((err) => { bytesCache.delete(cacheKey); throw err; });
     bytesCache.set(cacheKey, p);
   }
-  return bytesCache.get(cacheKey);
+  const result = bytesCache.get(cacheKey);
+  // Cover batches must not retain every source PDF in memory.
+  if (!cache) bytesCache.delete(cacheKey);
+  return result;
 }
 
 // Open a pdf.js document from the cached bytes. Each call gets a fresh copy
