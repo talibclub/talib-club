@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocked = vi.hoisted(() => ({ docs: new Map(), writes: [], upstream: vi.fn(), user: { uid: 'alice', role: 'member', token: 'token' } }));
 vi.mock('../../api/_drive.js', () => {
   const doc = path => ({ path,
-    get: async () => ({ data: () => mocked.docs.get(path) }),
+    get: async () => ({ exists: mocked.docs.has(path), data: () => mocked.docs.get(path) }),
     set: async data => mocked.writes.push([path, data]),
     update: async data => mocked.writes.push([path, data]),
   });
@@ -64,5 +64,27 @@ describe('Drive upload publication', () => {
     mocked.docs.set(`_driveUploads/${uploadId}`, { ...pending, uploader: 'bob', createdAt: Date.now() });
     expect((await complete()).statusCode).toBe(404);
     expect(mocked.upstream).not.toHaveBeenCalled();
+  });
+});
+
+describe('Private notebook lookup', () => {
+  async function lookup(path) {
+    const res = response();
+    await handler({ method: 'POST', headers: { authorization: 'Bearer token' }, body: { action: 'lookup', path } }, res);
+    return res;
+  }
+  it('permits a fresh notebook without contacting legacy storage', async () => {
+    const res = await lookup('notebooks/alice/new.json.gz');
+    expect(res.body.code).toBe('drive/new-notebook');
+    expect(mocked.upstream).not.toHaveBeenCalled();
+  });
+  it('protects existing notebook metadata when its Drive file is missing', async () => {
+    mocked.docs.set('content_notebooks/alice/unused', {});
+    mocked.docs.set('content_notebooks/alice_book', { uid: 'alice', bookId: 'book' });
+    expect((await lookup('notebooks/alice/book.json.gz')).body.code).toBe('drive/legacy-unavailable');
+  });
+  it('rejects another user notebook before returning its existence', async () => {
+    expect((await lookup('notebooks/bob/book.json.gz')).statusCode).toBe(403);
+    expect(mocked.writes).toEqual([]);
   });
 });

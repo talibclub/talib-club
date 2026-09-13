@@ -6,22 +6,19 @@ import { getDownloadURL } from '../lib/driveStorage.js';
 import { getDownloadURL as legacyURL } from 'firebase/storage';
 import { downloadNotebookData } from '../utils/notebookStorage.js';
 beforeEach(() => { vi.resetAllMocks(); vi.stubGlobal('fetch', vi.fn()); });
-it('reads an existing legacy notebook when Drive lookup is unavailable', async () => {
-  getDownloadURL.mockRejectedValue(new Error('Drive unavailable'));
-  legacyURL.mockResolvedValue('https://example.com/legacy');
-  const pages = [{ width: 800, height: 1130, texts: [{ text: 'Saved notes' }] }];
-  fetch.mockResolvedValue(new Response(JSON.stringify(pages)));
-  expect(await downloadNotebookData('user', 'book')).toEqual(pages);
-});
-it('does not treat a Drive outage and legacy 404 as a new notebook', async () => {
-  getDownloadURL.mockRejectedValue(new Error('Drive unavailable'));
-  legacyURL.mockRejectedValue({ code: 'storage/object-not-found' });
-  await expect(downloadNotebookData('user', 'book')).rejects.toMatchObject({ code: 'drive/legacy-unavailable' });
-});
-it('allows a new notebook only when both stores confirm absence', async () => {
-  getDownloadURL.mockRejectedValue({ code: 'storage/object-not-found' });
-  legacyURL.mockRejectedValue({ code: 'storage/object-not-found' });
+it('starts a new notebook only on explicit server confirmation', async () => {
+  getDownloadURL.mockRejectedValue({ code: 'drive/new-notebook' });
   expect(await downloadNotebookData('user', 'book')).toBeNull();
+  expect(legacyURL).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+});
+it('preserves missing, permission and network failures without calling Firebase Storage', async () => {
+  for (const code of ['storage/object-not-found', 'drive/legacy-unavailable', 'drive/error']) {
+    getDownloadURL.mockRejectedValue({ code });
+    await expect(downloadNotebookData('user', 'book')).rejects.toMatchObject({ code });
+  }
+  expect(legacyURL).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
 });
 it('rejects malformed pages instead of allowing a blank overwrite', async () => {
   getDownloadURL.mockResolvedValue('https://example.com/data');

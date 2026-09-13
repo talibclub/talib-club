@@ -90,9 +90,17 @@ export default async function handler(req, res) {
       policy(body.path, user);
       const pathRef = db.doc(`_drivePaths/${pathKey(body.path)}`);
       const current = (await pathRef.get()).data();
-      if (!current) throw fail(404, 'ไม่พบไฟล์ใน Google Drive',
-        body.path.startsWith('notebooks/') && process.env.GOOGLE_DRIVE_LEGACY_NOTEBOOKS_MIGRATED === 'true'
-          ? 'drive/new-notebook' : 'storage/object-not-found');
+      if (!current) {
+        const notebook = /^notebooks\/([^/]+)\/([^/]+)\.json\.gz$/.exec(body.path);
+        if (body.action === 'lookup' && notebook) {
+          // policy() already verified that this path belongs to the signed-in user.
+          // A known old notebook must never silently become a blank new notebook.
+          const metadata = await db.doc(`content_notebooks/${user.uid}_${notebook[2]}`).get();
+          if (metadata.exists) throw fail(409, 'สมุดนี้มีประวัติเดิม แต่ยังไม่มีไฟล์ใน Drive กรุณากู้จากสำเนาในเครื่องหรือสร้างสมุดใหม่', 'drive/legacy-unavailable');
+          throw fail(404, 'สมุดใหม่ยังไม่มีไฟล์', 'drive/new-notebook');
+        }
+        throw fail(404, 'ไม่พบไฟล์ใน Google Drive', 'storage/object-not-found');
+      }
       if (body.action === 'delete') {
         // Remove access first; a failed Drive trash request is safe to retry.
         await db.doc(`_driveFiles/${current.fileId}`).set({ deleted: true }, { merge: true });
