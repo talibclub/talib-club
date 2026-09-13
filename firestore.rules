@@ -133,7 +133,7 @@ service cloud.firestore {
     match /content_notebooks/{docId} {
       allow read: if signedIn() && resource.data.uid == request.auth.uid;
       allow create: if signedIn() && request.resource.data.uid == request.auth.uid
-        && docId == request.auth.uid + '_' + request.resource.data.bookId;
+        && docId == request.auth.uid + '_' + string(request.resource.data.bookId);
       allow update: if ownsExistingDocument() && keepsOwnership()
         && request.resource.data.bookId == resource.data.bookId;
       allow delete: if ownsExistingDocument();
