@@ -1,3 +1,4 @@
+import QuickArticleCover from "./components/QuickArticleCover.jsx"
 import React, { useState, useEffect, useMemo, useRef } from "react"
 import { createPortal } from "react-dom"
 import ReactQuill from "react-quill"
@@ -225,7 +226,18 @@ export default function AdminArticles() {
   const [sortOrder, setSortOrder] = useState("newest")
 
   const [selected, setSelected] = useState([])
-  const [busy, setBusy] = useState(false)
+  const [savingArticle, setBusy] = useState(false)
+  const [coverUploads, setCoverUploads] = useState(0)
+  const busy = savingArticle || coverUploads > 0
+  const coverSaveQueue = useRef(Promise.resolve())
+  const onCoverBusy = value => setCoverUploads(count => Math.max(0, count + (value ? 1 : -1)))
+  const saveQuickCover = (article, coverUrl) => {
+    const pending = coverSaveQueue.current.catch(() => {}).then(() => saveItem({
+      id: article.id, coverUrl, ...(article.createdAt ? { createdAt: article.createdAt } : {}),
+    }))
+    coverSaveQueue.current = pending
+    return pending
+  }
 
   const [bulkType, setBulkType] = useState("")
   const [bulkCategory, setBulkCategory] = useState("")
@@ -644,15 +656,17 @@ export default function AdminArticles() {
         </div>
       )}
 
+      <p style={{ fontSize: 12, color: "var(--t2)", marginBottom: 12 }}>เปลี่ยนปกได้จากรายการนี้: คลิกรูปหรือลากไฟล์มาวาง ระบบบันทึกปกให้อัตโนมัติ แล้วทำรายการถัดไปได้ทันที</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {currentItems.map(article => {
           // หากเป็นบทความซีรีส์ ให้ดึงชื่อซีรีส์มาแสดง
           const seriesInfo = isSeriesType(article.type) && taxonomy.articleSeries?.find(s => s.id === article.seriesId);
 
           return (
-            <div key={article.id} className="card" style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, opacity: busy ? 0.6 : 1 }}>
+            <div key={article.id} className="card" style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, opacity: savingArticle ? 0.6 : 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
                 <input type="checkbox" checked={selected.includes(article.id)} onChange={() => toggleSelect(article.id)} disabled={busy} style={{ width: 18, height: 18, cursor: busy ? "not-allowed" : "pointer", flexShrink: 0 }} />
+                <QuickArticleCover article={article} disabled={savingArticle} saveCover={saveQuickCover} onBusyChange={onCoverBusy} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", gap: 6, marginBottom: 4, flexWrap: "wrap", alignItems: "center" }}>
                     <span className="tag tag-teal">{article.category}</span>
