@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useState, useEffect } from "react";
 import { collection, query, where, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../../lib/firebase.js";
@@ -76,7 +77,7 @@ export default function NotebookGalleryPanel({ authState, setView }) {
   };
 
   if (selectedNotebook) {
-    return (
+    return createPortal(
       <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999, background: '#F3F4F6', display: 'flex', flexDirection: 'column' }}>
         <div style={{ minHeight: 56, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', borderBottom: '1px solid #E5E7EB', flexShrink: 0, gap: 12, flexWrap: 'wrap' }}>
            <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
@@ -104,7 +105,7 @@ export default function NotebookGalleryPanel({ authState, setView }) {
               <i className={`ti ${editing ? 'ti-eye' : 'ti-pencil'}`}></i> {editing ? 'เปลี่ยนเป็นอ่านอย่างเดียว' : 'เข้าสู่โหมดจดโน้ต'}
            </button>
         </div>
-        <div style={{ flex: 1, position: 'relative' }}>
+        <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
            <ProNotebook
              key={editing ? 'edit' : 'view'}
              bookId={selectedNotebook.bookId}
@@ -113,7 +114,7 @@ export default function NotebookGalleryPanel({ authState, setView }) {
              readonly={!editing}
            />
         </div>
-      </div>
+      </div>, document.body
     );
   }
 

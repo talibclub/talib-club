@@ -57,7 +57,7 @@ import PdfWidgetControls from './notebook/PdfWidgetControls.jsx';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
-export default function ProNotebook({ bookId, uid, activeBook, readonly = false, fullView = false, onToggleFullView, onPdfPageCount }) {
+export default function ProNotebook({ bookId, uid, activeBook, readonly: requestedReadonly = false, fullView = false, onToggleFullView, onPdfPageCount }) {
   const leftToolbarScroll = useDragScroll();
   const rightToolbarScroll = useDragScroll();
   const containerRef = useRef(null);
@@ -87,7 +87,9 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
 
   // Initial cloud sync. A full-canvas overlay (spinner + percent bar) replaces the
   // old corner toast, which users never noticed on a tablet.
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [syncProgress, setSyncProgress] = useState(null); // null = indeterminate
 
   // Data-loss guard: every write path (autosave, manual save, unmount flush)
@@ -95,10 +97,12 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
   // don't know what the cloud copy holds — saving is forbidden, so a blank
   // default page can never overwrite a real notebook.
   const loadStateRef = useRef('loading'); // 'loading' | 'ready' | 'failed'
+  const readonly = requestedReadonly || loadStateRef.current !== 'ready';
 
   useEffect(() => {
      let cancelled = false;
      loadStateRef.current = 'loading';
+     setLoadError('');
      setPages([{ id: 'page-default', src: null, width: 800, height: 1130, lines: [], stickers: [], images: [], texts: [], shapes: [], paperType: 'lines', paperColor: 'white' }]);
      // A different book can have fewer pages. Reset before its data arrives so
      // the canvas never tries to render a stale out-of-range page index.
@@ -126,12 +130,15 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
         } catch (e) {
            if (cancelled) return;
            console.error("Cloud load failed", e);
-           const saved = localStorage.getItem(`talib_notebook_${uid || "guest"}_${notebookId}`);
+           let saved;
+           try { saved = localStorage.getItem(`talib_notebook_${uid || "guest"}_${notebookId}`); } catch { /* Storage may be disabled. */ }
            if (saved) {
               try {
-                 const cleaned = dedupePages(JSON.parse(saved));
+                 const backup = JSON.parse(saved);
+                 if (!Array.isArray(backup) || !backup.length) throw new Error('สำเนาในเครื่องไม่สมบูรณ์');
+                 const cleaned = dedupePages(backup);
                  setPages(cleaned.pages);
-                 loadStateRef.current = e.code === 'drive/legacy-unavailable' ? 'failed' : 'ready';
+                 loadStateRef.current = 'offline';
                  toast.error("ออฟไลน์: โหลดจากเครื่องแทน", { id: "cloud-sync" });
                  if (cleaned.removed) {
                  toast(`เคลียร์วัตถุที่ซ้ำกันออกไป ${cleaned.removed} ชิ้นแล้ว`, { icon: '🧹', duration: 5000 });
@@ -144,6 +151,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
               loadStateRef.current = 'failed';
            }
            if (loadStateRef.current === 'failed') {
+              setLoadError(e.message || 'เชื่อมต่อที่เก็บสมุดไม่สำเร็จ');
               toast.error("โหลดสมุดโน้ตไม่สำเร็จ — ปิดการบันทึกไว้ชั่วคราวเพื่อป้องกันข้อมูลเดิมหาย ลองรีเฟรชอีกครั้ง", { id: "cloud-sync", duration: 10000 });
            }
         } finally {
@@ -170,9 +178,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
            } catch { /* ignore */ }
         }
         loadStateRef.current = 'ready';
+        setIsSyncing(false);
      }
      return () => { cancelled = true; };
-  }, [notebookId, uid]);
+  }, [notebookId, uid, loadAttempt]);
   
   const [loadingPdf, setLoadingPdf] = useState(false);
   
@@ -771,7 +780,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
      showExport, setShowExport, exporting,
      exportFormat, setExportFormat, exportScope, setExportScope,
   } = useNotebookExport({
-     stageRef, pagesRef, dimensions,
+     stageRef, pagesRef, dimensions, loadStateRef,
      currentPageIndex, setCurrentPageIndex,
      scale, setScale, position, setPosition,
      selectShape, pages, activeBook,
@@ -2970,6 +2979,20 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly = false,
          </div>
       )}
 
+      {loadStateRef.current === 'offline' && !isSyncing && (
+        <div role="status" style={{ position: 'absolute', top: 8, left: 8, right: 8, zIndex: 90, padding: 12, background: '#fff3cd', color: '#493800', borderRadius: 10 }}>
+          กำลังอ่านสำเนาในเครื่อง ซึ่งอาจไม่ใช่ฉบับล่าสุด — Export ได้ แต่ยังแก้ไขไม่ได้
+          <button className="btn" onClick={() => setLoadAttempt(value => value + 1)}>ลองเชื่อมต่อใหม่</button>
+        </div>
+      )}
+      {loadError && !isSyncing && (
+        <div role="alert" style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24, textAlign: 'center' }}>
+          <strong>ยังเปิดสมุดโน้ตไม่ได้</strong>
+          <p style={{ maxWidth: 460 }}>{loadError}</p>
+          <p>ยังไม่ได้บันทึกทับข้อมูลเดิม</p>
+          <button className="btn btn-teal" onClick={() => setLoadAttempt(value => value + 1)}>ลองโหลดอีกครั้ง</button>
+        </div>
+      )}
       {/* Cloud sync overlay: spinner + percent bar, blocks the canvas until data arrives */}
       {isSyncing && (
          <div style={{ position: 'absolute', inset: 0, zIndex: 90, background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18 }}>

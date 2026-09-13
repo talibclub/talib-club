@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React from 'react';
 import { X, Image as ImageIcon, FileText, FileStack, Columns, Download } from 'lucide-react';
 import { HW } from './theme.js';
@@ -13,9 +14,9 @@ const Choice = ({ selected, onClick, disabled, icon, title, sub }) => (
 // Modal for choosing export format (image / PDF) and scope (this page / all).
 // Presentational: the parent owns the format/scope state and the export action.
 export default function ExportModal({ format, setFormat, scope, setScope, exporting, pageCount, currentIndex, onExport, onClose }) {
-  return (
-    <div onPointerDown={(e) => { if (e.target === e.currentTarget && !exporting) onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ background: 'white', borderRadius: 18, width: '100%', maxWidth: 440, padding: 22, boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+  return createPortal(
+    <div onPointerDown={(e) => { if (e.target === e.currentTarget && !exporting) onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: 20000, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, boxSizing: 'border-box' }}>
+      <div style={{ background: 'white', borderRadius: 18, width: '100%', maxWidth: 440, maxHeight: 'calc(100dvh - 32px)', overflowY: 'auto', overscrollBehavior: 'contain', boxSizing: 'border-box', padding: 22, boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#111827', fontFamily: 'Kanit, sans-serif' }}>ส่งออกสมุดโน้ต</h3>
           <button onClick={() => !exporting && onClose()} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6B7280', display: 'flex' }}><X size={22} /></button>
@@ -40,6 +41,6 @@ export default function ExportModal({ format, setFormat, scope, setScope, export
           <p style={{ fontSize: 11.5, color: '#9CA3AF', textAlign: 'center', marginTop: 10, marginBottom: 0, fontFamily: 'Kanit, sans-serif' }}>* จะดาวน์โหลดแยกเป็นไฟล์รูปทีละหน้า</p>
         )}
       </div>
-    </div>
+    </div>, document.body
   );
 }

@@ -1,7 +1,9 @@
+import { visibleShelf } from '../../utils/bookshelf.js'
+import { BOOKS } from '../../data/books.js'
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { collection, query, where, getCountFromServer } from "firebase/firestore"
 import { db } from "../../lib/firebase.js"
-import { useUserDoc } from "../../lib/contentStore.js"
+import { useContentCollection, useUserDoc } from "../../lib/contentStore.js"
 import DashboardNav from "../DashboardNav.jsx"
 
 // Module-level cache to persist data across unmount/remount when switching tabs in Dashboard
@@ -15,6 +17,11 @@ export default function Overview({ authState, go, setView, onOpenQuran, onOpenSa
   const [lastRead, setLastRead] = useState(null)
 
   const uid = authState?.user?.uid
+  const shelfOptions = useMemo(() => ({ live: true }), [])
+  const bookOptions = useMemo(() => ({ live: false }), [])
+  const { items: shelfItems } = useContentCollection("bookshelf", [], uid, shelfOptions)
+  const { items: books } = useContentCollection("books", BOOKS, null, bookOptions)
+  const resolvedShelf = useMemo(() => visibleShelf(shelfItems, books, uid), [shelfItems, books, uid])
   const { item: remoteLastRead } = useUserDoc("quran_last_read", uid, uid ? `${uid}_last_read` : null)
   const { item: remoteStreak } = useUserDoc("reading_streaks", uid, uid, null)
 
@@ -57,28 +64,17 @@ export default function Overview({ authState, go, setView, onOpenQuran, onOpenSa
     setLoadingCounts(true)
     
     inFlightOverviewPromise = Promise.all([
-      // Counted as total-minus-finished rather than with where("status","!=","finished"),
-      // because a `!=` filter drops documents that have no `status` field at
-      // all — and the reading page counts those as "กำลังอ่าน". The two screens
-      // showed different numbers for the same shelf.
-      getCountFromServer(query(collection(db, "content_bookshelf"), where("uid", "==", userId))),
-      getCountFromServer(query(collection(db, "content_bookshelf"), where("uid", "==", userId), where("status", "==", "finished"))),
       getCountFromServer(query(collection(db, "content_quran_bookmarks"), where("uid", "==", userId))),
       getCountFromServer(query(collection(db, "content_reading_sessions"), where("uid", "==", userId), where("verified", "==", true))),
     ])
     
     try {
       const [
-        allBooksSnap,
-        finishedBooksSnap,
         bookmarkSnap,
         sessionSnap,
       ] = await inFlightOverviewPromise
       
-      const finishedBooks = finishedBooksSnap.data().count
       const newCounts = {
-        activeBooks: Math.max(0, allBooksSnap.data().count - finishedBooks),
-        finishedBooks,
         bookmarkCount: bookmarkSnap.data().count,
         sessionCount: sessionSnap.data().count,
       }
@@ -110,9 +106,9 @@ export default function Overview({ authState, go, setView, onOpenQuran, onOpenSa
   const streakCount = Number(remoteStreak?.streakCount || 0)
   const streakSettings = { streakCount }
   const sessionCount = counts.sessionCount
-  const finishedCount = counts.finishedBooks
+  const finishedCount = resolvedShelf.filter(item => item.status === "finished").length
   const bookmarkCount = counts.bookmarkCount
-  const activeBooksCount = counts.activeBooks
+  const activeBooksCount = resolvedShelf.filter(item => item.status !== "finished").length
   const userSavedVersesCount = counts.bookmarkCount
   const [sharedCount, setSharedCount] = useState(() => Number(localStorage.getItem("talib_shared_articles_count") || 0))
 

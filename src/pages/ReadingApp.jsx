@@ -1,3 +1,4 @@
+import { getShelfBook, visibleShelf } from '../utils/bookshelf.js'
 import { commitReadingSession } from "./reading/utils/readingSession.js"
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { createPortal } from "react-dom"
@@ -92,9 +93,6 @@ function normalizeStreakSettings(settings, uid) {
   }
 }
 
-function getShelfBook(item, books) {
-  return books.find(book => String(book.id) === String(item.bookId)) || item.customBook || null
-}
 
 function getPreviewUrl(url) {
   if (!url) return ""
@@ -206,25 +204,9 @@ export default function ReadingApp({ authState, go, ctx, theme }) {
   const todaySeconds = todaySessions.reduce((sum, item) => sum + Number(item.activeSeconds || 0), 0)
   const goalPercent = Math.min(100, Math.round((todaySeconds / (DAILY_READING_GOAL_MINUTES * 60)) * 100))
 
-  const myActiveBooks = useMemo(() => {
-    return shelfItems
-      .filter(item => item.uid === uid && item.status !== "finished")
-      .map(item => ({
-        ...item,
-        book: getShelfBook(item, books),
-      }))
-      .filter(item => item.book)
-  }, [shelfItems, books, uid])
-
-  const myFinishedBooks = useMemo(() => {
-    return shelfItems
-      .filter(item => item.uid === uid && item.status === "finished")
-      .map(item => ({
-        ...item,
-        book: getShelfBook(item, books),
-      }))
-      .filter(item => item.book)
-  }, [shelfItems, books, uid])
+  const resolvedShelf = useMemo(() => visibleShelf(shelfItems, books, uid), [shelfItems, books, uid])
+  const myActiveBooks = useMemo(() => resolvedShelf.filter(item => item.status !== "finished"), [resolvedShelf])
+  const myFinishedBooks = useMemo(() => resolvedShelf.filter(item => item.status === "finished"), [resolvedShelf])
 
   const stats = useMemo(() => {
     const userShelf = shelfItems.filter(item => item.uid === uid)

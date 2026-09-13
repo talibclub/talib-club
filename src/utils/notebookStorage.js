@@ -67,15 +67,14 @@ export async function downloadNotebookData(uid, notebookId, onProgress) {
     url = await getDownloadURL(storageRef);
   } catch (err) {
     if (err?.code === 'drive/new-notebook') return null;
-    if (err?.code !== 'storage/object-not-found') throw err;
     // An absent Drive mapping does NOT prove that an old Firebase notebook
     // never existed. Only a confirmed legacy 404 permits a blank notebook.
     // During migration, billing/permission failures must remain failures.
     try {
       url = await legacyDownloadURL(legacyRef(storage, `notebooks/${uid}/${notebookId}.json.gz`));
     } catch (legacyError) {
-      if (legacyError?.code === 'storage/object-not-found') return null;
-      throw Object.assign(new Error('ยังตรวจสอบสมุดเดิมใน Firebase ไม่ได้ จึงหยุดซิงก์เพื่อป้องกันข้อมูลหาย กรุณาย้ายสมุดเดิมก่อน'), { code: 'drive/legacy-unavailable' });
+      if (legacyError?.code === 'storage/object-not-found' && err?.code === 'storage/object-not-found') return null;
+      throw Object.assign(new Error('โหลดสมุดจากคลาวด์ไม่ได้ กรุณาลองใหม่ หากยังไม่สำเร็จให้ตรวจสอบการเชื่อมต่อที่เก็บไฟล์'), { code: 'drive/legacy-unavailable', cause: err });
     }
   }
 
@@ -111,7 +110,11 @@ export async function downloadNotebookData(uid, notebookId, onProgress) {
   } else {
     jsonStr = await blob.text();
   }
-  return JSON.parse(jsonStr);
+  const pages = JSON.parse(jsonStr);
+  if (!Array.isArray(pages) || !pages.length || pages.some(page => !page || typeof page !== 'object' || !Number.isFinite(page.width) || !Number.isFinite(page.height) || page.width <= 0 || page.height <= 0)) {
+    throw new Error('ข้อมูลสมุดไม่สมบูรณ์ จึงหยุดโหลดเพื่อป้องกันการบันทึกทับ');
+  }
+  return pages;
 }
 
 /**

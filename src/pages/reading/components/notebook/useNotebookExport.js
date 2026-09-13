@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { downloadDataUrl, preloadImage } from './notebookAssets.js';
 
@@ -33,7 +33,7 @@ async function compositeWithBackground(rawDataUrl, paperColor = 'white') {
 // Getting pages out of the notebook: whole-notebook PDF, and the export sheet
 // that writes the current page or all of them as PNG or PDF.
 export function useNotebookExport({
-  stageRef, pagesRef, dimensions,
+  stageRef, pagesRef, dimensions, loadStateRef,
   currentPageIndex, setCurrentPageIndex,
   scale, setScale, position, setPosition,
   selectShape, pages, activeBook, clearLassoSelection,
@@ -49,6 +49,8 @@ export function useNotebookExport({
      const page = pagesRef.current[index];
      if (!page) return null;
      if (page.src) await preloadImage(page.src);
+     await Promise.all([...(page.images || []), ...(page.pdfs || [])].filter(item => item.src).map(item => preloadImage(item.src)));
+     await document.fonts?.ready;
      setCurrentPageIndex(index);
      setScale(1);
      setPosition({ x: 0, y: 0 });
@@ -57,19 +59,42 @@ export function useNotebookExport({
      const stage = stageRef.current;
      if (!stage) return null;
      const px = Math.max(0, (dimensions.width - page.width) / 2);
-     const rawDataURL = stage.toDataURL({
-       x: px,
-       y: 20,
-       width: page.width,
-       height: page.height,
-       pixelRatio: 2,
-       mimeType: 'image/png'
-     });
-
-     return await compositeWithBackground(rawDataURL, page.paperColor || 'white');
+     let crop = { x: px, y: 20, width: page.width, height: page.height };
+     const layers = stage.getLayers().slice(0, 2);
+     if (!page.src && page.infinite !== false) {
+       // Measure rendered objects, including rotated images and multiline text.
+       // The infinite board's stored size can contain a large amount of empty space.
+       const boxes = layers.flatMap(layer => layer.getChildren().flatMap(group =>
+         group.getChildren().filter(node => node.name() !== 'background' && node.visible())
+           .map(node => node.getClientRect({ relativeTo: stage }))
+       )).filter(box => box.width > 0 && box.height > 0);
+       if (boxes.length) {
+         const x = Math.min(...boxes.map(box => box.x)) - 32;
+         const y = Math.min(...boxes.map(box => box.y)) - 32;
+         crop = { x, y,
+           width: Math.ceil(Math.max(...boxes.map(box => box.x + box.width)) - x + 32),
+           height: Math.ceil(Math.max(...boxes.map(box => box.y + box.height)) - y + 32) };
+       }
+     }
+     // Export layers directly so the viewport cannot clip off-screen content.
+     const pixelRatio = Math.min(2, 8192 / Math.max(crop.width, crop.height));
+     const canvas = document.createElement('canvas');
+     canvas.width = Math.ceil(crop.width * pixelRatio);
+     canvas.height = Math.ceil(crop.height * pixelRatio);
+     const context = canvas.getContext('2d');
+     if (!context) throw new Error('ไม่สามารถสร้างภาพได้');
+     for (const layer of layers) {
+       context.drawImage(layer.toCanvas({ ...crop, pixelRatio }), 0, 0);
+     }
+     const url = await compositeWithBackground(canvas.toDataURL('image/png'), page.paperColor || 'white');
+     return { url, w: crop.width, h: crop.height };
   };
 
   const runExport = async (format, scope) => {
+     if (loadStateRef && !['ready', 'offline'].includes(loadStateRef.current)) {
+       toast.error('ยังโหลดสมุดไม่สำเร็จ กรุณาลองโหลดใหม่ก่อน Export');
+       return;
+     }
      setExporting(true);
      selectShape?.(null);
      clearLassoSelection?.();
@@ -79,9 +104,9 @@ export function useNotebookExport({
         const shots = [];
         for (let k = 0; k < indices.length; k++) {
            toast.loading(`กำลังเตรียมไฟล์ (${k + 1}/${indices.length})...`, { id: 'export' });
-           const page = pagesRef.current[indices[k]];
-           const url = await capturePageDataURL(indices[k]);
-           if (url) shots.push({ url, w: page.width, h: page.height, index: indices[k] });
+           const shot = await capturePageDataURL(indices[k]);
+           if (!shot) throw new Error('ไม่สามารถสร้างภาพหน้าที่ ' + (indices[k] + 1));
+           shots.push({ ...shot, index: indices[k] });
         }
         if (shots.length === 0) { toast.error('ไม่สามารถสร้างไฟล์ได้', { id: 'export' }); return; }
 
@@ -93,7 +118,8 @@ export function useNotebookExport({
         } else {
            const { jsPDF } = await import('jspdf');
            const first = shots[0];
-           const pdf = new jsPDF({ orientation: first.w > first.h ? 'landscape' : 'portrait', unit: 'px', format: [first.w, first.h] });
+           const pdf = new jsPDF({ orientation: first.w > first.h ? 'landscape' : 'portrait', unit: 'px', hotfixes: ['px_scaling'], format: [first.w, first.h] });
+           pdf.setDisplayMode('fullwidth');
            shots.forEach((s, k) => {
               if (k > 0) pdf.addPage([s.w, s.h], s.w > s.h ? 'landscape' : 'portrait');
               pdf.addImage(s.url, 'PNG', 0, 0, s.w, s.h);
