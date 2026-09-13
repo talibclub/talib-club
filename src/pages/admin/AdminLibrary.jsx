@@ -547,7 +547,7 @@ export default function AdminLibrary() {
             </div>
           </div>
 
-          <p style={{ fontSize: 12, marginBottom: 12 }}>ดึงปกจาก PDF, รูปภาพ, EPUB หรือ AnyFlip แล้วบันทึกให้แต่ละเล่มทันที เฉพาะเล่มที่ไม่มีปกหรือรูปปกโหลดไม่ได้ ปกที่แสดงได้จะถูกข้าม รายการที่ไม่สำเร็จจะยังถูกเลือกไว้เพื่อลองใหม่</p>
+          <p style={{ fontSize: 12, marginBottom: 12 }}>ดึงปกจาก PDF, รูปภาพ, EPUB หรือ AnyFlip / Heyzine แล้วบันทึกให้แต่ละเล่มทันที เฉพาะเล่มที่ไม่มีปกหรือรูปปกโหลดไม่ได้ ปกที่แสดงได้จะถูกข้าม รายการที่ไม่สำเร็จจะยังถูกเลือกไว้เพื่อลองใหม่</p>
           <div className="divider" style={{ margin: "0 0 16px" }} />
           
           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>
@@ -767,7 +767,7 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
             />
           </Field>
         )}
-        <Field label="ไฟล์หนังสือ / ลิงก์ Drive หรือ AnyFlip" span>
+        <Field label="ไฟล์หนังสือ / ลิงก์ Drive หรือ AnyFlip / Heyzine" span>
           <input value={item.fileUrl || ""} disabled={uploadingImage} onChange={e => set("fileUrl", e.target.value)} placeholder="https://..." />
           <DriveUploadButton label="อัปโหลด PDF / EPUB / รูปภาพ" prefix="library_files" accept=".pdf,.epub,.jpg,.jpeg,.png,.webp,application/pdf,application/epub+zip,image/jpeg,image/png,image/webp" onUploaded={uploadBookDone} onBusyChange={setUploadingImage} disabled={uploadingImage || busy} />
         </Field>

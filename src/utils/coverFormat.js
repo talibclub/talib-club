@@ -17,3 +17,10 @@ export function isAnyFlipUrl(value) {
     return url.protocol === 'https:' && ['anyflip.com', 'www.anyflip.com', 'online.anyflip.com'].includes(url.hostname);
   } catch { return false; }
 }
+
+export function isHeyzineUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && ['heyzine.com', 'www.heyzine.com'].includes(url.hostname);
+  } catch { return false; }
+}

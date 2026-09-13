@@ -1,6 +1,6 @@
 import { verifyIdToken } from './_firebase-admin.js';
 import { fetchValidated, normalizeDownloadUrl } from './_legacy-pdf.js';
-import { detectCoverFormat, isAnyFlipUrl } from '../src/utils/coverFormat.js';
+import { detectCoverFormat, isAnyFlipUrl, isHeyzineUrl } from '../src/utils/coverFormat.js';
 
 const MAX_ASSET = 4 * 1024 * 1024; // stay below the serverless response limit
 
@@ -20,15 +20,33 @@ export async function readBounded(response, max) {
   return Buffer.concat(chunks);
 }
 
-// Metadata only; never execute scripts from the reader page.
+// Read published metadata or the book's own thumbnail; never execute scripts.
 export function anyFlipCover(html, pageUrl) {
+  const provider = isHeyzineUrl(pageUrl) ? 'heyzine.com' : 'anyflip.com';
+  const allowed = value => {
+    try {
+      const url = new URL(value.replace(/&amp;/g, '&'), pageUrl);
+      return url.protocol === 'https:' && (url.hostname === provider || url.hostname.endsWith(`.${provider}`)) ? url.href : null;
+    } catch { return null; }
+  };
   for (const tag of html.match(/<meta\b[^>]*>/gi) || []) {
     const attrs = Object.fromEntries([...tag.matchAll(/([\w:-]+)\s*=\s*(["'])(.*?)\2/gs)].map(m => [m[1].toLowerCase(), m[3]]));
-    if (!['og:image', 'twitter:image'].includes(attrs.property || attrs.name) || !attrs.content) continue;
-    const url = new URL(attrs.content.replace(/&amp;/g, '&'), pageUrl);
-    if (url.protocol === 'https:' && (url.hostname === 'anyflip.com' || url.hostname.endsWith('.anyflip.com'))) return url.href;
+    if (!['og:image', 'twitter:image', 'twitter:image:src'].includes(attrs.property || attrs.name) || !attrs.content) continue;
+    const url = allowed(attrs.content);
+    if (url) return url;
   }
-  throw new Error('ไม่พบรูปปกสาธารณะของ AnyFlip กรุณาอัปโหลดรูปปกเอง');
+  // AnyFlip's landing pages put the book cover in <img>, not og:image.
+  // Match the selected book's path so an author avatar or recommendation
+  // cannot accidentally become its cover. Do not invent unlisted asset URLs.
+  if (provider === 'anyflip.com') {
+    const bookPath = new URL(pageUrl).pathname.match(/^\/([\w-]+)\/([\w-]+)(?:\/|$)/);
+    for (const tag of html.match(/<img\b[^>]*>/gi) || []) {
+      const src = tag.match(/\bsrc\s*=\s*(["'])(.*?)\1/i)?.[2];
+      const url = src && allowed(src);
+      if (url && bookPath && new URL(url).pathname === `/${bookPath[1]}/${bookPath[2]}/files/shot.jpg`) return url;
+    }
+  }
+  throw new Error(`ไม่พบรูปปกสาธารณะของ ${provider === 'heyzine.com' ? 'Heyzine' : 'AnyFlip'} กรุณาอัปโหลดรูปปกเอง`);
 }
 
 async function upstream(url, range) {
@@ -53,7 +71,7 @@ export default async function handler(req, res) {
   try {
     const url = req.query?.url;
     if (typeof url !== 'string') return res.status(400).json({ error: 'ไม่มีลิงก์ไฟล์' });
-    if (isAnyFlipUrl(url) && req.query.asset !== '1' && !/\.(png|jpe?g|webp)(?:[?#]|$)/i.test(url)) {
+    if ((isAnyFlipUrl(url) || isHeyzineUrl(url)) && req.query.asset !== '1' && !/\.(png|jpe?g|webp)(?:[?#]|$)/i.test(url)) {
       const { response, finalUrl } = await upstream(url);
       const html = (await readBounded(response, 2 * 1024 * 1024)).toString('utf8');
       return res.json({ kind: 'image', url: anyFlipCover(html, finalUrl) });
@@ -94,7 +112,7 @@ export default async function handler(req, res) {
       return res.status(206).end(bytes);
     }
     const kind = detectCoverFormat(bytes, response.headers.get('content-type') || '');
-    if (!kind) return res.status(415).json({ error: 'รองรับ PDF, JPG, PNG, WebP, EPUB และลิงก์ AnyFlip สาธารณะ ลิงก์นี้ไม่ได้ส่งไฟล์ที่รองรับกลับมา' });
+    if (!kind) return res.status(415).json({ error: 'รองรับ PDF, JPG, PNG, WebP, EPUB และลิงก์ AnyFlip/Heyzine สาธารณะ ลิงก์นี้ไม่ได้ส่งไฟล์ที่รองรับกลับมา' });
     if (!asset) {
       const range = response.status === 206;
       const size = Number(range ? response.headers.get('content-range')?.split('/')[1] : response.headers.get('content-length')) || 0;

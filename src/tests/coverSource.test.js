@@ -17,6 +17,15 @@ it('finds public AnyFlip metadata without executing reader scripts', () => {
   expect(anyFlipCover('<meta content="https://online.anyflip.com/a/b/files/thumb/1.jpg?x=1&amp;y=2" property="og:image">', 'https://anyflip.com/a/b')).toContain('x=1&y=2');
   expect(() => anyFlipCover('<meta property="og:image" content="http://127.0.0.1/private">', 'https://anyflip.com/a/b')).toThrow();
 });
+it('reads the selected book thumbnail from an AnyFlip landing page', () => {
+  const html = '<img src="https://online.anyflip.com/danax/accountlogo.jpg"><img src="https://online.anyflip.com/danax/other/files/shot.jpg"><img src="https://online.anyflip.com/danax/fyes/files/shot.jpg">';
+  expect(anyFlipCover(html, 'https://anyflip.com/danax/fyes/')).toBe('https://online.anyflip.com/danax/fyes/files/shot.jpg');
+  expect(() => anyFlipCover(html, 'https://anyflip.com/danax/missing/')).toThrow();
+});
+it('reads Heyzine cover metadata on its own CDN and rejects unrelated hosts', () => {
+  expect(anyFlipCover('<meta property="og:image" content="https://cdnm.heyzine.com/files/uploaded/v2/book.pdf-thumb.jpg">', 'https://heyzine.com/flip-book/book.html')).toContain('cdnm.heyzine.com');
+  expect(() => anyFlipCover('<meta property="og:image" content="https://heyzine.com.attacker.test/x.jpg">', 'https://heyzine.com/flip-book/book.html')).toThrow();
+});
 it('requires authentication and refuses private targets', async () => {
   const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
   const res = response();
