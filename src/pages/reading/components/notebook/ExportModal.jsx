@@ -1,10 +1,10 @@
 import { createPortal } from 'react-dom';
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X, Image as ImageIcon, FileText, FileStack, Columns, Download } from 'lucide-react';
 import { HW } from './theme.js';
 
 const Choice = ({ selected, onClick, disabled, icon, title, sub }) => (
-  <button onClick={onClick} disabled={disabled} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '16px 12px', borderRadius: 14, border: `2px solid ${selected ? HW.accent : 'rgba(0,0,0,0.08)'}`, background: selected ? HW.accentSoft : 'white', cursor: disabled ? 'default' : 'pointer', transition: 'all 0.15s' }}>
+  <button type="button" aria-pressed={selected} onClick={onClick} disabled={disabled} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '16px 12px', borderRadius: 14, border: `2px solid ${selected ? HW.accent : 'rgba(0,0,0,0.08)'}`, background: selected ? HW.accentSoft : 'white', cursor: disabled ? 'default' : 'pointer', transition: 'all 0.15s' }}>
     {icon}
     <span style={{ fontSize: 14, fontWeight: 700, color: selected ? HW.accent : '#111827', fontFamily: 'Kanit, sans-serif' }}>{title}</span>
     {sub && <span style={{ fontSize: 11.5, color: '#9CA3AF', fontFamily: 'Kanit, sans-serif' }}>{sub}</span>}
@@ -14,12 +14,40 @@ const Choice = ({ selected, onClick, disabled, icon, title, sub }) => (
 // Modal for choosing export format (image / PDF) and scope (this page / all).
 // Presentational: the parent owns the format/scope state and the export action.
 export default function ExportModal({ format, setFormat, scope, setScope, exporting, pageCount, currentIndex, onExport, onClose }) {
+  const dialogRef = useRef(null);
+  const latest = useRef({ exporting, onClose });
+  latest.current = { exporting, onClose };
+  useEffect(() => {
+    const previousFocus = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const dialog = dialogRef.current;
+    dialog.focus();
+    const onKey = event => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (!latest.current.exporting) latest.current.onClose();
+      }
+      if (event.key !== 'Tab') return;
+      const buttons = [...dialog.querySelectorAll('button:not(:disabled)')];
+      const first = buttons[0], last = buttons[buttons.length - 1];
+      if (!first) { event.preventDefault(); return; }
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialog)) { event.preventDefault(); first.focus(); }
+    };
+    dialog.addEventListener('keydown', onKey);
+    return () => {
+      dialog.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, []);
   return createPortal(
     <div onPointerDown={(e) => { if (e.target === e.currentTarget && !exporting) onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: 20000, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, boxSizing: 'border-box' }}>
-      <div style={{ background: 'white', borderRadius: 18, width: '100%', maxWidth: 440, maxHeight: 'calc(100dvh - 32px)', overflowY: 'auto', overscrollBehavior: 'contain', boxSizing: 'border-box', padding: 22, boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="notebook-export-title" tabIndex={-1} style={{ background: 'white', borderRadius: 18, width: '100%', maxWidth: 440, maxHeight: 'calc(100dvh - 32px)', overflowY: 'auto', overscrollBehavior: 'contain', boxSizing: 'border-box', padding: 22, boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#111827', fontFamily: 'Kanit, sans-serif' }}>ส่งออกสมุดโน้ต</h3>
-          <button onClick={() => !exporting && onClose()} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6B7280', display: 'flex' }}><X size={22} /></button>
+          <h3 id="notebook-export-title" style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#111827', fontFamily: 'Kanit, sans-serif' }}>ส่งออกสมุดโน้ต</h3>
+          <button type="button" aria-label="ปิดหน้าต่างส่งออก" disabled={exporting} onClick={() => !exporting && onClose()} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6B7280', display: 'flex' }}><X size={22} /></button>
         </div>
 
         <div style={{ fontSize: 13, fontWeight: 600, color: '#6B7280', marginBottom: 8, fontFamily: 'Kanit, sans-serif' }}>รูปแบบไฟล์</div>

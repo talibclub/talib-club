@@ -120,7 +120,7 @@ export async function deleteNotebookData(uid, notebookId) {
     await deleteObject(storageRef);
   } catch (err) {
     if (err?.code === "storage/object-not-found") return; // already removed
-    console.warn("Failed to delete notebook file from storage", err);
+    throw err;
   }
 }
 

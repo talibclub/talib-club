@@ -18,6 +18,10 @@ const COVER_GRADIENTS = {
 
 export default function NotebookGalleryPanel({ authState, setView }) {
   const [notebooks, setNotebooks] = useState([]);
+  const [search, setSearch] = useState('');
+  const [loadError, setLoadError] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const visibleNotebooks = notebooks.filter(nb => (nb.title || 'สมุดโน้ต').toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const [loading, setLoading] = useState(true);
   const [selectedNotebook, setSelectedNotebook] = useState(null);
   const [editing, setEditing] = useState(false);
@@ -25,8 +29,14 @@ export default function NotebookGalleryPanel({ authState, setView }) {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+    setNotebooks([]);
+    setSelectedNotebook(null);
+    setDeletingNotebook(null);
+    setLoadError(false);
+    setLoading(true);
     async function fetchNotebooks() {
-      if (!authState?.user?.uid) return;
+      if (!authState?.user?.uid) { setLoading(false); return; }
       try {
         const q = query(
           collection(db, "content_notebooks"),
@@ -40,25 +50,25 @@ export default function NotebookGalleryPanel({ authState, setView }) {
            const timeB = b.updatedAt?.toMillis ? b.updatedAt.toMillis() : (b.updatedAt || 0);
            return timeB - timeA;
         });
-        setNotebooks(fetched);
+        if (!cancelled) setNotebooks(fetched);
       } catch (err) {
         console.error("Failed to fetch notebooks", err);
-        toast.error("ดึงข้อมูลสมุดโน้ตไม่สำเร็จ");
+        if (!cancelled) setLoadError(true);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     fetchNotebooks();
-  }, [authState?.user?.uid]);
+    return () => { cancelled = true; };
+  }, [authState?.user?.uid, retry]);
 
   const handleDeleteNotebook = async () => {
     if (!deletingNotebook || !authState?.user?.uid) return;
     setIsDeleting(true);
     try {
-      // 1. Delete Firestore metadata doc
-      await deleteDoc(doc(db, "content_notebooks", deletingNotebook.id));
-      // 2. Delete cloud storage file
+      // Keep the gallery entry and local backup if cloud deletion fails.
       await deleteNotebookData(authState.user.uid, deletingNotebook.bookId);
+      await deleteDoc(doc(db, "content_notebooks", deletingNotebook.id));
       // 3. Clear local storage
       try {
         localStorage.removeItem(`talib_notebook_${authState.user.uid}_${deletingNotebook.bookId}`);
@@ -137,7 +147,19 @@ export default function NotebookGalleryPanel({ authState, setView }) {
         </div>
       </div>
 
-      {loading ? (
+      {!loading && !loadError && notebooks.length > 0 && (
+        <label style={{ display: 'block', marginBottom: 24 }}>
+          <span style={{ display: 'block', marginBottom: 8, fontSize: 13, color: 'var(--t2)' }}>ค้นหาสมุดโน้ต ({visibleNotebooks.length} / {notebooks.length} เล่ม)</span>
+          <input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="พิมพ์ชื่อหนังสือหรือสมุด…" style={{ width: '100%', minHeight: 46, padding: '10px 14px', borderRadius: 12, border: '1px solid var(--br)', background: 'var(--card)', color: 'var(--text)', font: 'inherit' }} />
+        </label>
+      )}
+      {loadError ? (
+        <div role="alert" style={{ padding: 32, borderRadius: 16, background: 'var(--card)', border: '1px solid var(--br)', textAlign: 'center' }}>
+          <h3>ยังโหลดคลังสมุดไม่ได้</h3>
+          <p style={{ margin: '12px 0', color: 'var(--t2)' }}>ลองเชื่อมต่ออีกครั้งเพื่อดูสมุดของคุณ</p>
+          <button className="btn btn-teal" onClick={() => setRetry(value => value + 1)}>ลองอีกครั้ง</button>
+        </div>
+      ) : loading ? (
         <div style={{ textAlign: "center", padding: "60px 20px" }}>
           <i className="ti ti-loader-2 spin" style={{ fontSize: 24, color: "var(--teal)", marginBottom: 8 }}></i>
           <p style={{ fontSize: 13, color: "var(--t3)" }}>กำลังโหลดคลังสมุด...</p>
@@ -148,13 +170,18 @@ export default function NotebookGalleryPanel({ authState, setView }) {
           <h3 style={{ fontSize: 18, color: "var(--text)", marginBottom: 8 }}>ยังไม่มีสมุดโน้ต</h3>
           <p style={{ fontSize: 14, color: "var(--t2)" }}>เริ่มอ่านหนังสือและเปิดสมุดโน้ตเพื่อจดบันทึก</p>
         </div>
+      ) : visibleNotebooks.length === 0 ? (
+        <div role="status" style={{ padding: 40, textAlign: 'center', color: 'var(--t2)' }}>
+          <p>ไม่พบสมุดที่ตรงกับคำค้น</p>
+          <button className="btn btn-outline" onClick={() => setSearch('')}>แสดงสมุดทั้งหมด</button>
+        </div>
       ) : (
-        <div style={{ 
+        <div style={{
           display: "grid", 
           gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", 
           gap: 20 
         }}>
-          {notebooks.map(nb => (
+          {visibleNotebooks.map(nb => (
             <div 
               key={nb.id} 
               style={{ 
