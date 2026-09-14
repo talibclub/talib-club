@@ -20,7 +20,7 @@
     "check:undefined": "node ./scripts/check-undefined.mjs"
   },
   "dependencies": {
-    "@vercel/functions": "^3.9.3",
+    "@vercel/functions": "^3.9.7",
     "@xmldom/xmldom": "0.9.12",
     "dompurify": "^3.4.8",
     "dotenv": "^17.4.2",
