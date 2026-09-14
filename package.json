@@ -29,7 +29,7 @@
     "firebase-admin": "13.5.0",
     "iconv-lite": "^0.7.3",
     "jspdf": "^4.2.1",
-    "konva": "^9.3.22",
+    "konva": "^10.5.0",
     "lucide-react": "^1.25.0",
     "papaparse": "^5.4.1",
     "pdfjs-dist": "^6.1.200",
