@@ -1,3 +1,4 @@
+vi.mock('../../api/_safe-fetch.js', () => ({ safeFetch: (...args) => globalThis.fetch(...args) }));
 import { afterEach, expect, it, vi } from 'vitest';
 vi.mock('../../api/_firebase-admin.js', () => ({ verifyIdToken: async () => ({ uid: 'user' }) }));
 import handler, { anyFlipCover } from '../../api/_cover-source.js';

@@ -1,5 +1,6 @@
 import webpush from 'web-push';
 import admin, { verifyIdToken } from './_firebase-admin.js';
+import { selectPushRecipients } from './_push-recipients.js';
 
 const publicKey = process.env.VITE_VAPID_PUBLIC_KEY;
 const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -109,13 +110,22 @@ export default async function handler(req, res) {
     return sendResponse(err.status || 401, { error: err.message || 'Unauthorized: Invalid authentication token' });
   }
 
-  const { subscriptions, payload } = body || {};
+  const { payload, filterOptions = {} } = body || {};
 
-  if (!subscriptions || !Array.isArray(subscriptions) || !payload) {
-    return sendResponse(400, { error: 'Missing subscriptions or payload' });
+  if (body?.subscriptions !== undefined || !payload || typeof payload.title !== 'string' || typeof payload.body !== 'string'
+      || !filterOptions || typeof filterOptions !== 'object' || Array.isArray(filterOptions)
+      || (filterOptions.isStaffOnly !== undefined && typeof filterOptions.isStaffOnly !== 'boolean')) {
+    return sendResponse(400, { error: 'Invalid payload or recipients' });
   }
 
-  const payloadString = JSON.stringify(payload);
+  const payloadString = JSON.stringify({ title: payload.title.slice(0, 200), body: payload.body.slice(0, 1000),
+    url: typeof payload.url === 'string' && /^\/(?!\/)/.test(payload.url) && !payload.url.includes('\\') ? payload.url : '/' });
+  let subscriptions;
+  try {
+    subscriptions = await selectPushRecipients(admin.firestore(), filterOptions);
+  } catch {
+    return sendResponse(503, { error: 'Cannot resolve notification recipients' });
+  }
 
   // M12: Use Promise.allSettled instead of concurrent push to shared array
   const settled = await Promise.allSettled(
@@ -129,9 +139,8 @@ export default async function handler(req, res) {
     if (result.status === 'fulfilled') {
       return result.value;
     }
-    console.error('Error sending push to endpoint:', subscriptions[i]?.endpoint, result.reason);
-    return { endpoint: subscriptions[i]?.endpoint, success: false, error: result.reason?.message };
+    return { success: false };
   });
 
-  return sendResponse(200, { success: true, results });
+  return sendResponse(200, { success: true, count: subscriptions.length, results: results.map(result => ({ success: result.success })) });
 }

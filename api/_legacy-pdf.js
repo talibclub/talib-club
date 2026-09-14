@@ -1,5 +1,6 @@
 import { Readable } from 'node:stream';
 import { verifyIdToken } from './_firebase-admin.js';
+import { safeFetch } from './_safe-fetch.js';
 
 // CORS proxy so pdf.js can read book files cross-origin.
 //
@@ -44,6 +45,7 @@ export function validateTarget(raw) {
   let target;
   try { target = new URL(raw); } catch { return { error: 'Invalid url' }; }
   if (target.protocol !== 'https:') return { error: 'https only' };
+  if (target.username || target.password || (target.port && target.port !== '443')) return { error: 'Host not allowed' };
   if (isPrivateHost(target.hostname)) return { error: 'Host not allowed' };
   return { target };
 }
@@ -54,7 +56,7 @@ export async function fetchValidated(url, range) {
   if (initial.error) return { error: initial.error };
   let current = url;
   for (let i = 0; i <= MAX_REDIRECTS; i++) {
-    const response = await fetch(current, { redirect: 'manual', signal: AbortSignal.timeout(30000), headers: range ? { Range: range, 'Accept-Encoding': 'identity' } : { 'Accept-Encoding': 'identity' } });
+    const response = await safeFetch(current, { headers: range ? { Range: range, 'Accept-Encoding': 'identity' } : { 'Accept-Encoding': 'identity' } });
     if (response.status >= 300 && response.status < 400) {
       const loc = response.headers.get('location');
       await response.body?.cancel();

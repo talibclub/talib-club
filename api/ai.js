@@ -104,7 +104,7 @@ export default async function handler(req, res) {
     if (!(await underDailyQuota(uid))) return send(res, 429, { error: 'daily_quota_exceeded' });
   } catch (e) {
     console.error('ai quota check failed', e);
-    // Fail open on quota bookkeeping errors — auth already gates the endpoint.
+    return send(res, 503, { error: 'quota_unavailable' });
   }
 
   const body = parseBody(req);

@@ -1,4 +1,4 @@
-import { collection, getDocs, query, where, doc, setDoc, deleteDoc } from "firebase/firestore"
+import { getDoc, doc, setDoc, deleteDoc } from "firebase/firestore"
 import { db, auth } from "../lib/firebase.js"
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || '';
@@ -99,7 +99,7 @@ export async function subscribeToPushNotifications(userId = null, isStaff = fals
   const subscriptionJson = subscription.toJSON();
   const subId = await getSubscriptionId(subscription.endpoint);
 
-  const effectiveUid = userId || auth.currentUser?.uid || null;
+  const effectiveUid = auth.currentUser?.uid || null;
   if (!effectiveUid) {
     throw new Error('กรุณาล็อกอินก่อนเปิดรับการแจ้งเตือน');
   }
@@ -108,7 +108,7 @@ export async function subscribeToPushNotifications(userId = null, isStaff = fals
     endpoint: subscription.endpoint,
     uid: effectiveUid,
     userId: effectiveUid,
-    isStaff: !!isStaff,
+    isStaff: ['staff', 'admin', 'owner'].includes((await getDoc(doc(db, 'users', effectiveUid))).data()?.role),
     updatedAt: new Date().toISOString()
   };
 
@@ -155,31 +155,6 @@ export async function unsubscribeFromPushNotifications() {
  */
 export async function triggerPushNotification(title, body, url = '/', filterOptions = {}) {
   try {
-    // 1. Fetch subscriptions from Firestore based on filters
-    const subscriptionsRef = collection(db, "push_subscriptions");
-    let q = query(subscriptionsRef);
-
-    if (filterOptions.isStaffOnly) {
-      q = query(subscriptionsRef, where("isStaff", "==", true));
-    } else if (filterOptions.targetUserId) {
-      q = query(subscriptionsRef, where("userId", "==", filterOptions.targetUserId));
-    }
-
-    const querySnapshot = await getDocs(q);
-    const subscriptions = [];
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data.subscription) {
-        subscriptions.push(data.subscription);
-      }
-    });
-
-    if (subscriptions.length === 0) {
-      if (import.meta.env.DEV) console.log('No subscribers found matching the filters.');
-      return { success: true, count: 0 };
-    }
-
-    // 2. Post to API
     const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
     const headers = { 'Content-Type': 'application/json' };
     if (token) {
@@ -190,14 +165,15 @@ export async function triggerPushNotification(title, body, url = '/', filterOpti
       method: 'POST',
       headers,
       body: JSON.stringify({
-        subscriptions,
+        filterOptions,
         payload: { title, body, url }
       })
     });
 
     const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "ส่งแจ้งเตือนไม่สำเร็จ");
     if (import.meta.env.DEV) console.log('Push trigger response:', result);
-    return { success: result.success, count: subscriptions.length, results: result.results };
+    return { success: result.success, count: result.count || 0, results: result.results };
   } catch (err) {
     console.error('Failed to trigger push notifications:', err);
     return { success: false, error: err.message };

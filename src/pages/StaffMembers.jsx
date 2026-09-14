@@ -41,7 +41,7 @@ export default function StaffMembers({ authState, go }) {
   })
 
   const currentUser = authState?.profile?.displayName || authState?.user?.displayName || ""
-  const isSuperAdmin = profile?.role === "admin" || profile?.role === "owner"
+  const isSuperAdmin = profile?.role === "owner"
 
   // Fetch users on mount
   useEffect(() => {
@@ -198,7 +198,7 @@ export default function StaffMembers({ authState, go }) {
   // Handle promoting/demoting user roles
   const handleRoleChangeConfirm = async () => {
     const { userToChange, targetRole } = confirmRoleChange
-    if (!userToChange) return
+    if (!userToChange || !isSuperAdmin) return
 
     try {
       const userRef = doc(db, "users", userToChange.id)
@@ -334,7 +334,7 @@ export default function StaffMembers({ authState, go }) {
                           style={{ padding: "6px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 4, borderColor: "rgba(224, 85, 85, 0.4)", color: "#e05555" }}
                           disabled={!isSuperAdmin}
                           onClick={() => setConfirmRoleChange({ isOpen: true, userToChange: u, targetRole: "member" })}
-                          title={!isSuperAdmin ? "ต้องใช้สิทธิ์แอดมินในการเปลี่ยนตำแหน่ง" : ""}
+                          title={!isSuperAdmin ? "เฉพาะเจ้าของเว็บไซต์เท่านั้นที่เปลี่ยนตำแหน่งได้" : ""}
                         >
                           <i className="ti ti-user-down"></i> ลดสิทธิ์เป็นสมาชิก
                         </button>
@@ -344,7 +344,7 @@ export default function StaffMembers({ authState, go }) {
                           style={{ padding: "6px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}
                           disabled={!isSuperAdmin}
                           onClick={() => setConfirmRoleChange({ isOpen: true, userToChange: u, targetRole: "staff" })}
-                          title={!isSuperAdmin ? "ต้องใช้สิทธิ์แอดมินในการเปลี่ยนตำแหน่ง" : ""}
+                          title={!isSuperAdmin ? "เฉพาะเจ้าของเว็บไซต์เท่านั้นที่เปลี่ยนตำแหน่งได้" : ""}
                         >
                           <i className="ti ti-user-up"></i> แต่งตั้งเป็นสตาฟ
                         </button>
@@ -357,7 +357,7 @@ export default function StaffMembers({ authState, go }) {
                           style={{ padding: "6px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}
                           disabled={!isSuperAdmin}
                           onClick={() => setConfirmRoleChange({ isOpen: true, userToChange: u, targetRole: "admin" })}
-                          title={!isSuperAdmin ? "ต้องใช้สิทธิ์แอดมินในการเปลี่ยนตำแหน่ง" : ""}
+                          title={!isSuperAdmin ? "เฉพาะเจ้าของเว็บไซต์เท่านั้นที่เปลี่ยนตำแหน่งได้" : ""}
                         >
                           <i className="ti ti-shield-check"></i> เลื่อนเป็นแอดมิน
                         </button>

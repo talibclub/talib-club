@@ -1,3 +1,4 @@
+vi.mock('../../api/_safe-fetch.js', () => ({ safeFetch: (...args) => globalThis.fetch(...args) }));
 import { afterEach, expect, it, vi } from 'vitest';
 import { Writable } from 'node:stream';
 import { once } from 'node:events';

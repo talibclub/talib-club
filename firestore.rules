@@ -49,7 +49,9 @@ service cloud.firestore {
       allow create: if signedIn() 
         && request.auth.uid == userId
         && (!("role" in request.resource.data) || request.resource.data.role == "member");
-      allow update: if isOwnerOrAdmin()
+      allow update: if isOwner()
+        || (isAdmin() && resource.data.get('role', 'member') != 'owner'
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']))
         || (signedIn()
           && request.auth.uid == userId
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])));
@@ -205,12 +207,21 @@ service cloud.firestore {
 
     // --- Push Notification Subscriptions (C3: was missing) ---
     match /push_subscriptions/{docId} {
-      allow read: if isStaff();
-      allow create: if signedIn()
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.keys().hasOnly(["subscription", "endpoint", "uid", "userId", "isStaff", "updatedAt"]);
-      allow update: if ownsExistingDocument() && keepsOwnership();
+      allow read: if ownsExistingDocument();
+      allow create: if validPushSubscription();
+      allow update: if ownsExistingDocument() && validPushSubscription();
       allow delete: if ownsExistingDocument();
+    }
+
+    function validPushSubscription() {
+      return signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.isStaff == isStaff()
+        && request.resource.data.keys().hasOnly(["subscription", "endpoint", "uid", "userId", "isStaff", "updatedAt"])
+        && request.resource.data.endpoint is string
+        && request.resource.data.endpoint.size() < 2048
+        && request.resource.data.subscription.endpoint == request.resource.data.endpoint;
     }
 
     // --- Staff Portal Collections ---
