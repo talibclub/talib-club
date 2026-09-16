@@ -2,6 +2,7 @@ import QuickArticleCover from "./components/QuickArticleCover.jsx"
 import React, { useState, useEffect, useMemo, useRef } from "react"
 import { createPortal } from "react-dom"
 import ReactQuill from "react-quill"
+import DOMPurify from "dompurify"
 import "react-quill/dist/quill.snow.css"
 
 const Quill = ReactQuill.Quill;
@@ -205,17 +206,25 @@ export default function AdminArticles() {
     } catch { return null }
   })
 
+  const [draftStatus, setDraftStatus] = useState("")
+  const saveLocalDraft = () => {
+    try {
+      localStorage.setItem("talib_article_draft", JSON.stringify(editing))
+      setDraftStatus(`เก็บร่างในเครื่องแล้ว ${new Date().toLocaleTimeString("th-TH")}`)
+      return true
+    } catch {
+      setDraftStatus("เก็บร่างไม่สำเร็จ พื้นที่ในเครื่องอาจเต็ม กรุณาคัดลอกเนื้อหาเก็บไว้ก่อนออก")
+      return false
+    }
+  }
+
   // An article with a base64 cover pasted into it can exceed the localStorage
   // quota on its own. setItem then throws, and an uncaught throw inside an
   // effect takes the whole admin page down mid-edit — losing the draft this is
   // meant to protect.
   useEffect(() => {
     if (!editing) return
-    try {
-      localStorage.setItem("talib_article_draft", JSON.stringify(editing))
-    } catch (err) {
-      console.warn("Could not save the article draft locally", err)
-    }
+    saveLocalDraft()
   }, [editing])
 
   const [search, setSearch] = useState("")
@@ -464,7 +473,15 @@ export default function AdminArticles() {
   }
 
   if (editing) {
-    return <ArticleForm item={editing} setItem={setEdit} onSave={save} onCancel={() => { localStorage.removeItem("talib_article_draft"); setEdit(null); }} taxonomy={taxonomy} busy={busy} articlesList={sorted} />
+    return <ArticleForm item={editing} setItem={setEdit} onSave={save}
+      draftStatus={draftStatus} onSaveDraft={() => { if (saveLocalDraft()) notifySuccess("เก็บร่างในเครื่องแล้ว ยังไม่ได้เผยแพร่การแก้ไข") }}
+      onCancel={async () => {
+        if (busy) return
+        const discard = await confirmAction({ title: "ทิ้งร่างที่กำลังแก้ไข?", message: "ร่างในเครื่องจะถูกลบ บทความที่เผยแพร่ไว้แล้วจะไม่เปลี่ยนแปลง", confirmText: "ทิ้งร่าง", danger: true })
+        if (!discard) return
+        try { localStorage.removeItem("talib_article_draft"); setEdit(null) }
+        catch { notifyError("ลบร่างไม่สำเร็จ กรุณาลองอีกครั้ง") }
+      }} taxonomy={taxonomy} busy={busy} articlesList={sorted} />
   }
 
   return (
@@ -876,7 +893,8 @@ const CustomToolbar = React.memo(function CustomToolbar() { return (
   </div>
 ); }, () => true);
 
-function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articlesList }) {
+function ArticleForm({ item, setItem, onSave, onCancel, onSaveDraft, draftStatus, taxonomy, busy, articlesList }) {
+  const [showPreview, setShowPreview] = useState(false)
   const set = (key, value) => setItem(prev => ({ ...prev, [key]: value }))
   const [uploadingImage, setUploadingImage] = useState(false)
   const [showMeta, setShowMeta] = useState(!item.id)
@@ -1134,10 +1152,14 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articles
   return (
     <div style={{ maxWidth: 840, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-        <button className="btn btn-outline" onClick={onCancel}><i className="ti ti-arrow-left" style={{ marginRight: 6 }}></i>กลับ</button>
+        <button className="btn btn-outline" onClick={onCancel} disabled={busy}>ทิ้งร่างและกลับ</button>
         <h2 style={{ margin: 0, fontSize: 20 }}>{item.id ? "แก้ไขบทความ" : "เพิ่มบทความใหม่"}</h2>
       </div>
 
+      <div className="card" style={{ padding: 16, marginBottom: 20 }}>
+        <p role="status" style={{ marginBottom: 6 }}>{draftStatus}</p>
+        <p style={{ fontSize: 12, color: "var(--t2)" }}>ร่างนี้อยู่ในเบราว์เซอร์เครื่องนี้เท่านั้น การแก้ไขจะขึ้นเว็บไซต์เมื่อกด{item.id ? "อัปเดตบทความบนเว็บไซต์" : "เผยแพร่บทความ"}</p>
+      </div>
       <div className="card" style={{ marginBottom: 24, overflow: "hidden" }}>
         <button 
           type="button"
@@ -1324,12 +1346,20 @@ function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articles
           `}</style>
         </div>
 
-      <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-        <button className="btn btn-outline" onClick={onCancel}>ยกเลิก</button>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
+        <button className="btn btn-outline" onClick={onSaveDraft} disabled={busy || uploadingImage}>เก็บร่างในเครื่อง</button>
+        <button className="btn btn-outline" onClick={() => setShowPreview(value => !value)} aria-expanded={showPreview}>{showPreview ? "ปิดตัวอย่าง" : "ดูตัวอย่างเนื้อหา"}</button>
         <button className="btn btn-teal" onClick={onSave} disabled={busy || uploadingImage}>
-          <i className={`ti ${busy ? "ti-loader-2 spin" : "ti-check"}`} style={{ marginRight: 6 }}></i>{busy ? "กำลังบันทึก..." : "บันทึกบทความ"}
+          <i className={`ti ${busy ? "ti-loader-2 spin" : "ti-check"}`} style={{ marginRight: 6 }}></i>{busy ? "กำลังเผยแพร่..." : item.id ? "อัปเดตบทความบนเว็บไซต์" : "เผยแพร่บทความ"}
         </button>
       </div>
+
+      {showPreview && <section className="card" aria-label="ตัวอย่างเนื้อหาบทความ" style={{ padding: 24, marginTop: 20, overflowWrap: "anywhere" }}>
+        <p style={{ color: "var(--t2)", marginBottom: 16 }}>ตัวอย่างเนื้อหา — การจัดรูปแบบอ้างอิงบางส่วนอาจต่างจากหน้าอ่านจริง</p>
+        <h2>{item.title || "ยังไม่ได้ระบุชื่อบทความ"}</h2>
+        <p>{item.author} · {item.date}</p>
+        <div className="ql-editor" style={{ padding: "16px 0" }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.body || "") }} />
+      </section>}
 
       <QuillPromptModal 
         isOpen={!!promptState}

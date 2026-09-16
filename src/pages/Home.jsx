@@ -3,6 +3,7 @@ import { ARTICLES, BOOKS, MEDIA, SITE } from "../data/index.js"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 import { useContentCollection, useSiteSettings, useCollectionCount } from "../lib/contentStore.js"
 import ArticleCard from "../components/ArticleCard.jsx"
+import HomeReadingShortcuts from "../components/HomeReadingShortcuts.jsx"
 import { isJournal } from "../utils/library.js"
 
 const QURAN_DUAS = [
@@ -56,7 +57,7 @@ const SURAH_NAMES = {
   60: "อัล-มุมตะหะนะฮ์"
 }
 
-export default function Home({ go }) {
+export default function Home({ go, authState, readingSessions }) {
   // Matches books and media below: cached, invalidated by the metadata
   // timestamp. This was the only live listener on the landing page, and it made
   // every single visit re-read the six newest articles and hold a socket open.
@@ -211,6 +212,8 @@ export default function Home({ go }) {
           </button>
         </div>
       </header>
+
+      {authState?.user?.uid && <HomeReadingShortcuts key={authState.user.uid} uid={authState.user.uid} go={go} readingSessions={readingSessions} />}
 
       {/* AYAH */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>

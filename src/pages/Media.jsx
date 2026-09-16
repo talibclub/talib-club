@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react"
 import { MEDIA, DEFAULT_TAXONOMY, SITE } from "../data/index.js"
+import { matchesContentSearch } from "../utils/contentSearch.js"
 import { useContentCollection, useTaxonomySettings, useSiteSettings } from "../lib/contentStore.js"
 import { clampPage } from "../utils/pagination.js"
 import PaginationBar from "../components/PaginationBar.jsx"
@@ -101,8 +102,7 @@ export default function Media({ go, ctx }) {
   const filteredPlaylists = useMemo(() => {
     return playlists.filter(pl => {
       const matchType = filter === "all" || String(pl.type).toLowerCase() === String(filter).toLowerCase();
-      const matchSearch = String(pl.name).toLowerCase().includes(searchPlaylist.toLowerCase()) ||
-        String(pl.teacher).toLowerCase().includes(searchPlaylist.toLowerCase());
+      const matchSearch = matchesContentSearch(searchPlaylist, pl.name, pl.teacher);
       return matchType && matchSearch;
     })
   }, [playlists, filter, searchPlaylist])
@@ -128,13 +128,12 @@ export default function Media({ go, ctx }) {
 
   // 3. กรองคลิปเมื่ออยู่ด้านใน Playlist (ค้นหาชื่อคลิป)
   const filteredClips = useMemo(() => {
-    if (!selectedPlaylist) return []
-    const items = [...selectedPlaylist.items]
+    if (!selectedPlaylist && !searchPlaylist.trim()) return []
+    const items = selectedPlaylist ? [...selectedPlaylist.items] : media.filter(item =>
+      filter === "all" || String(item.type || "").toLowerCase() === filter)
 
-    const matched = !searchClip.trim() ? items : items.filter(item =>
-      String(item.title).toLowerCase().includes(searchClip.toLowerCase()) ||
-      String(item.channel).toLowerCase().includes(searchClip.toLowerCase())
-    )
+    const matched = items.filter(item => matchesContentSearch(
+      selectedPlaylist ? searchClip : searchPlaylist, item.title, item.channel, item.series, item.tags))
 
     return matched.sort((a, b) => {
       const parseDateToMs = (dateStr) => {
@@ -163,7 +162,7 @@ export default function Media({ go, ctx }) {
         return String(a.id || "").localeCompare(String(b.id || ""))
       }
     })
-  }, [selectedPlaylist, searchClip, sortOrder])
+  }, [selectedPlaylist, searchClip, searchPlaylist, media, filter, sortOrder])
 
   const totalPages = Math.max(1, Math.ceil(filteredClips.length / ITEMS_PER_PAGE) || 1)
   const currentPage = (loading && filteredClips.length === 0) ? page : clampPage(page, totalPages)
@@ -200,7 +199,9 @@ export default function Media({ go, ctx }) {
               <input
                 value={searchPlaylist}
                 onChange={e => { setSearchPlaylist(e.target.value); updateFilters({ searchPlaylist: e.target.value }) }}
-                placeholder="ค้นหาเพลย์ลิสต์ หรือ ชื่อช่อง..."
+                type="search"
+                aria-label="ค้นหาคลิป เพลย์ลิสต์ หรือชื่อช่อง"
+                placeholder="ค้นหาคลิป เพลย์ลิสต์ หรือชื่อช่อง..."
                 style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "12px 16px 12px 42px", background: "var(--bg2)", border: "1px solid transparent", fontSize: 14, outline: "none", transition: "border 0.2s" }}
                 onFocus={(e) => e.target.style.border = "1px solid var(--teal)"}
                 onBlur={(e) => e.target.style.border = "1px solid transparent"}
@@ -208,6 +209,8 @@ export default function Media({ go, ctx }) {
             </div>
             <button
               onClick={() => setShowAdvanced(!showAdvanced)}
+              aria-label="ตัวกรองสื่อเพิ่มเติม"
+              aria-expanded={showAdvanced}
               style={{ 
                 padding: "0 18px", 
                 borderRadius: 24, 
@@ -225,6 +228,30 @@ export default function Media({ go, ctx }) {
               <i className="ti ti-filter" style={{ fontSize: 18 }}></i>
             </button>
           </div>
+
+          {!loading && searchPlaylist.trim() && (
+            <section aria-label="ผลการค้นหาคลิป" style={{ marginBottom: 28 }}>
+              <p role="status" style={{ marginBottom: 12 }}>พบ {filteredClips.length} คลิป</p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 12 }}>
+                {currentItems.map(item => (
+                  <a key={item.id} className="card" href={detailPath("media-detail", item.id, item.title)}
+                    style={{ padding: 16, color: "var(--text)", textDecoration: "none" }}
+                    onClick={event => {
+                      if (!isPlainLeftClick(event)) return
+                      event.preventDefault()
+                      go("media-detail", { ...item, returnToMedia: { searchPlaylist, filter, sort: sortOrder, page: currentPage } })
+                    }}>
+                    <strong style={{ display: "block", marginBottom: 8 }}>{item.title}</strong>
+                    <span style={{ fontSize: 12, color: "var(--t2)" }}>{item.channel} · {item.series || "วิดีโอทั่วไป"}</span>
+                    <span style={{ display: "block", marginTop: 12, color: "var(--teal)" }}>เปิดคลิป →</span>
+                  </a>
+                ))}
+              </div>
+              {filteredClips.length === 0 && <p>ลองใช้คำสั้นลง หรือเปลี่ยนตัวกรองประเภทสื่อ</p>}
+              <PaginationBar currentPage={currentPage} totalPages={totalPages} onPageChange={p => updateFilters({ page: p })} />
+              <h2 style={{ fontSize: 18, marginTop: 24 }}>เพลย์ลิสต์ที่ตรงกับคำค้น</h2>
+            </section>
+          )}
 
           {/* ━━━ EXPANDABLE FILTERS ━━━ */}
           {showAdvanced && (

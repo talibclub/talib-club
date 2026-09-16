@@ -333,7 +333,7 @@ export default function App() {
         <PageErrorBoundary resetKey={`${page}:${JSON.stringify(ctx || {})}`} go={go}>
           <Suspense fallback={<LoadingState />}>
             <Routes>
-              <Route path="/" element={<Home go={go} />} />
+              <Route path="/" element={<Home go={go} authState={authState} readingSessions={readingSessions} />} />
               <Route path="/articles" element={<Articles go={go} authState={authState} ctx={ctx} />} />
               <Route path="/article" element={<ArticleDetail item={ctx} go={go} authState={authState} />} />
               {/* `/article/:idOrCategory` covers both the current slug URLs and the

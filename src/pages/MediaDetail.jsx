@@ -104,11 +104,11 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
       )}
       {/* ปุ่มย้อนกลับ */}
       <button
-        onClick={() => go("media", initialItem?.playlist ? {
+        onClick={() => go("media", initialItem?.returnToMedia || (initialItem?.playlist ? {
           playlist: initialItem.playlist,
           filter: initialItem.filter,
           page: initialItem.page,
-        } : null)}
+        } : null))}
         className="sec-link"
         style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 20, fontSize: 13, background: "none", border: "none", fontFamily: "'Prompt', sans-serif", cursor: "pointer" }}
       >

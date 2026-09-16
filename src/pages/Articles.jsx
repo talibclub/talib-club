@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react"
 import { ARTICLES, DEFAULT_TAXONOMY } from "../data/index.js"
+import { matchesContentSearch } from "../utils/contentSearch.js"
 import { columnsAt, completeRows } from "./articles/gridFill.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 import { clampPage } from "../utils/pagination.js"
@@ -40,7 +41,7 @@ export default function Articles({ go, authState, ctx }) {
     return articles.filter(a => {
       const matchCat = cat === "all" || String(a.category).toLowerCase() === String(cat).toLowerCase()
       const matchType = type === "all" || String(a.type).toLowerCase() === String(type).toLowerCase()
-      const matchSearch = !search || String(a.title).toLowerCase().includes(search.toLowerCase())
+      const matchSearch = matchesContentSearch(search, a.title, a.author, a.tags, a.excerpt, a.seriesName)
       return matchCat && matchType && matchSearch
     })
   }, [articles, cat, type, search])
@@ -260,7 +261,7 @@ export default function Articles({ go, authState, ctx }) {
                 aria-label="ค้นหาบทความ"
                 value={search}
                 onChange={e => handleSearchChange(e.target.value)}
-                placeholder="ค้นหาบทความ..."
+                placeholder="ค้นหาชื่อเรื่อง ผู้เขียน หรือแท็ก..."
                 style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "12px 16px 12px 42px", background: "var(--bg2)", border: "1px solid transparent", fontSize: 14, outline: "none", transition: "border 0.2s" }}
                 onFocus={(e) => e.target.style.border = "1px solid var(--teal)"}
                 onBlur={(e) => e.target.style.border = "1px solid transparent"}
