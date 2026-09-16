@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { downloadDataUrl, preloadImage } from './notebookAssets.js';
+import { notebookExportLayers } from './exportLayers.js';
 
 // Helper to composite a stage snapshot onto a solid paper background
 // to avoid black transparency bugs in JPEG/PDF export and dark mode image viewers.
@@ -60,7 +61,7 @@ export function useNotebookExport({
      if (!stage) return null;
      const px = Math.max(0, (dimensions.width - page.width) / 2);
      let crop = { x: px, y: 20, width: page.width, height: page.height };
-     const layers = stage.getLayers().slice(0, 2);
+     const layers = notebookExportLayers(stage);
      if (!page.src && page.infinite !== false) {
        // Measure rendered objects, including rotated images and multiline text.
        // The infinite board's stored size can contain a large amount of empty space.

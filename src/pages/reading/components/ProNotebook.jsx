@@ -3063,7 +3063,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly: request
         style={{ cursor: readonly || tool === 'pan' ? 'grab' : DRAW_CURSOR, touchAction: 'none' }}
       >
         {/* Background Layer (Paper + PDF + Images) */}
-        <Layer>
+        <Layer name="notebook-export">
           <Group x={pageX} y={pageY} clipX={isInfiniteCanvas ? undefined : 0} clipY={isInfiniteCanvas ? undefined : 0} clipWidth={isInfiniteCanvas ? undefined : currentPage.width} clipHeight={isInfiniteCanvas ? undefined : currentPage.height}>
             {/* Page Paper Background */}
             <Rect 
@@ -3354,7 +3354,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly: request
         </Layer>
         
         {/* Texts Layer */}
-        <Layer>
+        <Layer name="notebook-export">
           <Group x={pageX} y={pageY}>
             {/* Stickers */}
             {currentPage.stickers && currentPage.stickers.map(st => {
@@ -3713,7 +3713,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly: request
         
         {/* Drawing Layer (Strokes isolated so eraser only erases strokes).
             Clipped to the paper so no ink — old or new — ever shows outside it. */}
-        <Layer>
+        <Layer name="notebook-export">
           <Group x={pageX} y={pageY} clipX={0} clipY={0} clipWidth={currentPage.width} clipHeight={currentPage.height}>
             {/* Strokes */}
             <CommittedStrokes lines={currentPage._visibleLines || currentPage.lines} playbackTime={playbackTime} nowPlayingId={nowPlaying?.id} />
@@ -3721,6 +3721,11 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly: request
                 while drawing. It has to share this layer for the area eraser's
                 destination-out compositing to bite into the ink below it. */}
             {liveStroke && <StrokeShape line={liveStroke} />}
+          </Group>
+        </Layer>
+        {/* Temporary drawing guides must never appear in exported documents. */}
+        <Layer>
+          <Group x={pageX} y={pageY} clipX={0} clipY={0} clipWidth={currentPage.width} clipHeight={currentPage.height}>
             {/* Laser Lines */}
             {laserLines.map((line, i) => {
               const pointPairs = [];
