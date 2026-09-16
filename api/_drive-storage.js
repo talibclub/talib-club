@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { database, driveFetch, identify, sameOrigin, sendError } from './_drive.js';
 import { fail, pathKey, policy, validateUpload } from './_drive-policy.js';
+import { notebookVersions } from './_notebook-versions.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -20,6 +21,7 @@ export default async function handler(req, res) {
       return res.json({ ok: true });
     }
     const db = database();
+    if (['notebook-history', 'restore-notebook'].includes(body.action)) return res.json(await notebookVersions(db, user, body));
     if (body.action === 'init') {
       const { path, size, type } = body;
       const rules = validateUpload(path, user, size, type);

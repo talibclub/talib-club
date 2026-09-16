@@ -256,6 +256,8 @@ export default function Articles({ go, authState, ctx }) {
             <div style={{ flex: 1, position: "relative" }}>
               <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
               <input
+                type="search"
+                aria-label="ค้นหาบทความ"
                 value={search}
                 onChange={e => handleSearchChange(e.target.value)}
                 placeholder="ค้นหาบทความ..."
@@ -266,6 +268,8 @@ export default function Articles({ go, authState, ctx }) {
             </div>
             <button
               onClick={() => setShowAdvanced(!showAdvanced)}
+              aria-label="ตัวกรองบทความเพิ่มเติม"
+              aria-expanded={showAdvanced}
               style={{ 
                 padding: "0 18px", 
                 borderRadius: 24, 

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { paginateA4, A4_MM_PER_PIXEL } from './exportLayout.js';
+import { useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { downloadDataUrl, preloadImage } from './notebookAssets.js';
 import { notebookExportLayers } from './exportLayers.js';
@@ -39,6 +40,7 @@ export function useNotebookExport({
   scale, setScale, position, setPosition,
   selectShape, pages, activeBook, clearLassoSelection,
 }) {
+  const busy = useRef(false);
   const [showExport, setShowExport] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportFormat, setExportFormat] = useState('png'); // 'png' | 'pdf'
@@ -46,7 +48,7 @@ export function useNotebookExport({
 
   // Render one page cleanly (scale 1, no pan) and crop to the paper rectangle,
   // compositing over a solid paper background.
-  const capturePageDataURL = async (index) => {
+  const capturePageDataURL = async (index, layout = "content") => {
      const page = pagesRef.current[index];
      if (!page) return null;
      if (page.src) await preloadImage(page.src);
@@ -62,7 +64,7 @@ export function useNotebookExport({
      const px = Math.max(0, (dimensions.width - page.width) / 2);
      let crop = { x: px, y: 20, width: page.width, height: page.height };
      const layers = notebookExportLayers(stage);
-     if (!page.src && page.infinite !== false) {
+     if (layout !== 'paper' && !page.src && page.infinite !== false) {
        // Measure rendered objects, including rotated images and multiline text.
        // The infinite board's stored size can contain a large amount of empty space.
        const boxes = layers.flatMap(layer => layer.getChildren().flatMap(group =>
@@ -91,26 +93,31 @@ export function useNotebookExport({
      return { url, w: crop.width, h: crop.height };
   };
 
-  const runExport = async (format, scope) => {
+  const runExport = async (format, scope, layout = 'content', prepared = null) => {
+     if (busy.current) return;
+
      if (loadStateRef && !['ready', 'offline'].includes(loadStateRef.current)) {
        toast.error('ยังโหลดสมุดไม่สำเร็จ กรุณาลองโหลดใหม่ก่อน Export');
        return;
      }
+     busy.current = true;
      setExporting(true);
      selectShape?.(null);
      clearLassoSelection?.();
      const savedIndex = currentPageIndex, savedScale = scale, savedPos = position;
      try {
         const indices = scope === 'all' ? pagesRef.current.map((_, i) => i) : [currentPageIndex];
-        const shots = [];
-        for (let k = 0; k < indices.length; k++) {
+        let shots = prepared || [];
+        for (let k = 0; !prepared && k < indices.length; k++) {
            toast.loading(`กำลังเตรียมไฟล์ (${k + 1}/${indices.length})...`, { id: 'export' });
-           const shot = await capturePageDataURL(indices[k]);
+           const shot = await capturePageDataURL(indices[k], layout);
            if (!shot) throw new Error('ไม่สามารถสร้างภาพหน้าที่ ' + (indices[k] + 1));
            shots.push({ ...shot, index: indices[k] });
         }
         if (shots.length === 0) { toast.error('ไม่สามารถสร้างไฟล์ได้', { id: 'export' }); return; }
 
+        if (!prepared && layout === 'a4') shots = await paginateA4(shots);
+        if (format === 'preview') return shots;
         const safeTitle = (activeBook?.book?.title || 'notebook').replace(/[^\w\u0E00-\u0E7F-]+/g, '_').slice(0, 40) || 'notebook';
 
         if (format === 'png') {
@@ -118,6 +125,17 @@ export function useNotebookExport({
            toast.success(shots.length > 1 ? `ดาวน์โหลด ${shots.length} รูปแล้ว` : 'ดาวน์โหลดรูปภาพแล้ว', { id: 'export', icon: '🖼️' });
         } else {
            const { jsPDF } = await import('jspdf');
+           if (layout === 'a4') {
+             const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+             shots.forEach((shot, index) => {
+               if (index) pdf.addPage();
+               pdf.addImage(shot.url, 'PNG', 10, 10, shot.w * A4_MM_PER_PIXEL, shot.h * A4_MM_PER_PIXEL);
+             });
+             pdf.setDisplayMode('fullwidth');
+             pdf.save(safeTitle + '.pdf');
+             toast.success('ดาวน์โหลด PDF เรียบร้อยแล้ว', { id: 'export' });
+             return;
+           }
            const first = shots[0];
            const pdf = new jsPDF({ orientation: first.w > first.h ? 'landscape' : 'portrait', unit: 'px', hotfixes: ['px_scaling'], format: [first.w, first.h] });
            pdf.setDisplayMode('fullwidth');
@@ -135,8 +153,10 @@ export function useNotebookExport({
         setCurrentPageIndex(savedIndex);
         setScale(savedScale);
         setPosition(savedPos);
+        busy.current = false;
         setExporting(false);
-        setShowExport(false);
+        if (format === 'preview') toast.dismiss('export');
+        else setShowExport(false);
      }
   };
 

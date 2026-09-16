@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { db } from '../../../../lib/firebase.js';
@@ -14,6 +14,17 @@ import { pickCoverColor } from './notebookAssets.js';
 export function useNotebookPersistence({
   pages, pagesRef, readonly, uid, notebookId, activeBook, loadStateRef, setIsSaving,
 }) {
+  const lastSavedPages = useRef(null);
+  useEffect(() => { lastSavedPages.current = null; }, [uid, notebookId]);
+  const [saveStatus, setSaveStatus] = useState({ kind: 'pending', at: null });
+  useEffect(() => {
+    if (!readonly && loadStateRef.current === 'ready') {
+      if (!lastSavedPages.current) {
+        lastSavedPages.current = pages;
+        setSaveStatus({ kind: 'loaded', at: null });
+      } else if (lastSavedPages.current !== pages) setSaveStatus(previous => ({ ...previous, kind: 'pending' }));
+    } else if (loadStateRef.current === 'loading') lastSavedPages.current = null;
+  }, [pages, readonly]);
   // Metadata write shared by manual/auto save and the unmount flush, so the
   // gallery's "updated at" always tracks the real content.
   const writeNotebookMeta = () => {
@@ -33,7 +44,7 @@ export function useNotebookPersistence({
 
   const saveInFlightRef = useRef(false);
   const saveNotebook = async (isAuto = false) => {
-     if (readonly) return;
+     if (readonly) return false;
      if (loadStateRef.current !== 'ready') {
         if (!isAuto) toast.error("ยังโหลดสมุดโน้ตไม่สำเร็จ — บันทึกไม่ได้เพื่อป้องกันข้อมูลเดิมหาย");
         return;
@@ -42,11 +53,14 @@ export function useNotebookPersistence({
      // Storage rejects it. We still need the normal autosave path to protect a
      // guest's work locally; previously it returned here and only saved when the
      // tab happened to close.
+     const snapshot = pagesRef.current;
      if (!uid) {
         try {
-          localStorage.setItem(`talib_notebook_${uid || "guest"}_${notebookId}`, JSON.stringify(pages));
+          localStorage.setItem(`talib_notebook_${uid || "guest"}_${notebookId}`, JSON.stringify(snapshot));
+          setSaveStatus({ kind: pagesRef.current === snapshot ? 'local' : 'pending', at: Date.now() });
           if (!isAuto) toast.success('บันทึกไว้ในอุปกรณ์นี้แล้ว', { id: 'local-save', icon: '💾' });
         } catch (e) {
+          setSaveStatus({ kind: 'error', at: null });
           console.warn('Local storage quota exceeded on guest save', e);
           if (!isAuto) toast.error('พื้นที่ในอุปกรณ์เต็ม — ยังบันทึกไม่ได้', { id: 'local-save' });
         }
@@ -57,17 +71,22 @@ export function useNotebookPersistence({
      if (saveInFlightRef.current) return;
      saveInFlightRef.current = true;
      setIsSaving(true);
+     setSaveStatus(previous => ({ ...previous, kind: 'saving' }));
      if (!isAuto) toast.loading("กำลังบันทึกลงคลาวด์...", { id: "cloud-save" });
      try {
-        await uploadNotebookData(uid, notebookId, pages);
+        await uploadNotebookData(uid, notebookId, snapshot);
         await writeNotebookMeta();
+        lastSavedPages.current = snapshot;
+        setSaveStatus({ kind: pagesRef.current === snapshot ? 'cloud' : 'pending', at: Date.now() });
         // Backup locally
-         try { localStorage.setItem(`talib_notebook_${uid || "guest"}_${notebookId}`, JSON.stringify(pages)); } catch (e) { console.warn("Local storage quota exceeded on backup", e); }
+         try { localStorage.setItem(`talib_notebook_${uid || "guest"}_${notebookId}`, JSON.stringify(snapshot)); } catch (e) { console.warn("Local storage quota exceeded on backup", e); }
         if (!isAuto) toast.success("บันทึกคลาวด์เรียบร้อย!", { id: "cloud-save", icon: '💾' });
+        return true;
      } catch (err) {
         console.error(err);
          let localSaved = false;
-         try { localStorage.setItem(`talib_notebook_${uid || "guest"}_${notebookId}`, JSON.stringify(pages)); localSaved = true; } catch (e) { console.warn("Local storage quota exceeded on fallback", e); }
+         try { localStorage.setItem(`talib_notebook_${uid || "guest"}_${notebookId}`, JSON.stringify(snapshot)); localSaved = true; } catch (e) { console.warn("Local storage quota exceeded on fallback", e); }
+         setSaveStatus({ kind: localSaved ? (pagesRef.current === snapshot ? 'local' : 'pending') : 'error', at: localSaved ? Date.now() : null });
          if (localSaved) {
         toast.error("บันทึกคลาวด์ล้มเหลว (เซฟลงเครื่องแล้ว)", { id: "cloud-save" });
          } else {
@@ -75,7 +94,7 @@ export function useNotebookPersistence({
          }
      } finally {
         saveInFlightRef.current = false;
-        setTimeout(() => setIsSaving(false), 1500);
+        setIsSaving(false);
      }
   };
 
@@ -89,7 +108,7 @@ export function useNotebookPersistence({
   const lastAutoSaveRef = useRef(null);
   useEffect(() => {
     if (readonly || !pages || pages.length === 0) return;
-    if (loadStateRef.current !== 'ready') return; // never overwrite before load settles
+    if (loadStateRef.current !== 'ready' || pages === lastSavedPages.current) return; // never overwrite unchanged or unloaded data
 
     if (lastAutoSaveRef.current === null) lastAutoSaveRef.current = Date.now();
 
@@ -109,7 +128,7 @@ export function useNotebookPersistence({
     return () => {
       if (readonly || !uid || !notebookId) return;
       if (loadStateRef.current !== 'ready') return; // load failed/pending → don't clobber the cloud copy
-      if (pagesRef.current && pagesRef.current.length > 0) {
+      if (pagesRef.current && pagesRef.current !== lastSavedPages.current && pagesRef.current.length > 0) {
         if (uid) uploadNotebookData(uid, notebookId, pagesRef.current).catch(console.error);
         writeNotebookMeta().catch(console.error);
         try { localStorage.setItem(`talib_notebook_${uid || "guest"}_${notebookId}`, JSON.stringify(pagesRef.current)); } catch { /* ignore */ }
@@ -130,5 +149,5 @@ export function useNotebookPersistence({
     return () => window.removeEventListener('beforeunload', flush);
   }, [readonly, uid, notebookId]);
 
-  return { saveNotebook, writeNotebookMeta };
+  return { saveNotebook, writeNotebookMeta, saveStatus };
 }

@@ -54,7 +54,7 @@ export function Pills({ options, value, onChange, colorOn = "teal" }) {
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
       {options.map(o => (
-        <button key={o.id} onClick={() => onChange(o.id)} style={{
+        <button key={o.id} aria-pressed={value === o.id} onClick={() => onChange(o.id)} style={{
           fontFamily: "'Prompt',sans-serif", fontSize: 12, fontWeight: 300,
           padding: "5px 12px", borderRadius: 20, border: ".5px solid var(--br)",
           cursor: "pointer", transition: "all .15s",
@@ -77,6 +77,8 @@ export function SearchInput({ placeholder, value, onChange }) {
         transform: "translateY(-50%)", color: "var(--t3)", fontSize: 14
       }}></i>
       <input
+        type="search"
+        aria-label={placeholder || 'ค้นหา'}
         placeholder={placeholder}
         value={value}
         onChange={e => onChange(e.target.value)}

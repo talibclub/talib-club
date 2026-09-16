@@ -13,7 +13,7 @@ import { RecordingsPanel } from '../AudioRecordings.jsx';
 export default function NotebookTopBar({ ui }) {
   const { activeBook, audioPlaying, clearPage, closeOverlays,
     currentPageIndex, deletePage, deleteRecording, exportNotebookPDF,
-    fitToScreen, fullView, handleAddPage, isMobile, isSaving, nowPlaying,
+    fitToScreen, fullView, handleAddPage, isMobile, isSaving, saveStatus, setShowNotebookHistory, uid, nowPlaying,
     onToggleFullView, pages, playRecording, pressureEnabled,
     readonly, recordings, renameRecording, runExport, saveNotebook, scale,
     setBookSnipInitialPage, setCurrentPageIndex, setPressureEnabled, setScale,
@@ -171,15 +171,13 @@ export default function NotebookTopBar({ ui }) {
                    </button>
                  </div>
                )}
-               {isSaving && (
-                  <span title="กำลังบันทึก" style={{ color: '#10B981', display: 'flex', alignItems: 'center' }}>
-                     <Cloud size={16} />
-                  </span>
-               )}
-               {!isSaving && !readonly && (
-                  <button title="บันทึกแล้ว (คลิกเพื่อบังคับบันทึก)" onClick={() => saveNotebook()} className="cute-btn-press" style={{ background: 'transparent', border: 'none', color: HW.accent, display: 'flex', alignItems: 'center', cursor: 'pointer', padding: 0 }}>
-                     <CheckCircle size={17} />
-                  </button>
+               {uid && <button type="button" onClick={() => setShowNotebookHistory(true)} style={{ border: 'none', background: 'transparent', color: HW.accent, cursor: 'pointer', fontSize: 12 }}>ประวัติสมุด</button>}
+               {!readonly && (
+                 <button type="button" onClick={() => saveNotebook()} disabled={isSaving} aria-live="polite" title="คลิกเพื่อบันทึกอีกครั้ง"
+                   style={{ border: 'none', borderRadius: 8, padding: '5px 8px', cursor: 'pointer', background: saveStatus?.kind === 'error' ? '#fef2f2' : 'transparent', color: saveStatus?.kind === 'error' ? '#b91c1c' : HW.accent, fontSize: 11 }}>
+                   {{ saving: 'กำลังบันทึก…', cloud: 'บันทึกบนคลาวด์แล้ว', local: 'บันทึกในเครื่องเท่านั้น', pending: 'รอบันทึก', loaded: 'เปิดสมุดแล้ว', error: 'บันทึกไม่สำเร็จ — ลองใหม่' }[saveStatus?.kind] || 'รอบันทึก'}
+                   {saveStatus?.at && ['cloud', 'local'].includes(saveStatus.kind) && <span style={{ display: 'block' }}>{new Date(saveStatus.at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>}
+                 </button>
                )}
             </div>
             

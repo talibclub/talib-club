@@ -1,3 +1,5 @@
+import NotebookHistoryModal from './notebook/NotebookHistoryModal.jsx';
+import { restoreNotebookVersion } from '../../../lib/driveStorage.js';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Stage, Layer, Path, Group, Circle, Text, Rect, Transformer, RegularPolygon, Line, Star as KonvaStar, Arrow as KonvaArrow } from 'react-konva';
 import { Bookmark, BookOpen, Camera, ChevronLeft, ChevronRight, Cloud, FileText, Image as ImageIcon, Lasso, Link as LinkIcon, Link2, Map as MapIcon, Mic, MonitorPlay, PenTool, Ruler, Search, SquareSquare, Star, Trash2, X } from 'lucide-react';
@@ -67,6 +69,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly: request
   const [pages, setPages] = useState([{ id: 'page-default', src: null, width: 800, height: 1130, lines: [], stickers: [], images: [], texts: [], shapes: [], paperType: 'lines', paperColor: 'white' }]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  const [showNotebookHistory, setShowNotebookHistory] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -789,7 +792,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly: request
 
   // Saving: cloud upload, the gallery metadata row, the autosave timer and the
   // unmount/tab-close flushes.
-  const { saveNotebook, writeNotebookMeta } = useNotebookPersistence({
+  const { saveNotebook, writeNotebookMeta, saveStatus } = useNotebookPersistence({
      pages, pagesRef, readonly, uid, notebookId, activeBook, loadStateRef, setIsSaving,
   });
 
@@ -2633,7 +2636,7 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly: request
     connectorHasArrow, currentPageIndex, customColors, deletePage, deleteRecording,
     deleteSelected, editingTextId, eraserSettings, exportNotebookPDF,
     fitToScreen, fullView, handleAddPage, handleToolsScroll, insertEmoji, insertIcon, insertSticky, insertMindmapTemplate,
-    isCoarse, isMobile, isRecording, isSaving, laserColor, lassoFilter,
+    isCoarse, isMobile, isRecording, isSaving, saveStatus, setShowNotebookHistory, uid, laserColor, lassoFilter,
     leftToolbarScroll, nowPlaying, onToggleFullView, pages, penColor,
     penOpacity, penSize, playRecording, position, pressureEnabled,
     protractor, protractorOn, readonly, recordings, rememberCustomColor,
@@ -4382,6 +4385,16 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly: request
         />
       )}
 
+      {showNotebookHistory && uid && <NotebookHistoryModal uid={uid} notebookId={notebookId} readonly={readonly}
+        onClose={() => setShowNotebookHistory(false)}
+        onRestore={async (fileId, expectedFileId) => {
+          if (isSaving || readonly) throw new Error('กรุณารอการบันทึกให้เสร็จก่อนย้อนคืน');
+          loadStateRef.current = 'loading';
+          try {
+            await restoreNotebookVersion(uid, notebookId, fileId, expectedFileId);
+            setLoadAttempt(value => value + 1);
+          } catch (error) { loadStateRef.current = 'ready'; throw error; }
+        }} />}
       {/* Export modal — choose format (image / PDF) and scope (this page / all) */}
       {showExport && (
         <ExportModal

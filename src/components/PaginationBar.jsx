@@ -11,7 +11,7 @@ export default function PaginationBar({ currentPage, totalPages, onPageChange, s
   }
 
   return (
-    <div className="pagination-container">
+    <nav className="pagination-container" aria-label="เปลี่ยนหน้ารายการ">
       <button
         type="button"
         className={`pagination-btn ${currentPage === 1 ? "disabled" : ""}`}
@@ -28,6 +28,8 @@ export default function PaginationBar({ currentPage, totalPages, onPageChange, s
             {showGap && <span className="pagination-ellipsis" aria-hidden>…</span>}
             <button
               type="button"
+              aria-label={`หน้า ${p}`}
+              aria-current={currentPage === p ? 'page' : undefined}
               className={`pagination-btn pagination-num ${currentPage === p ? "active" : ""}`}
               onClick={() => go(p)}
             >
@@ -44,6 +46,6 @@ export default function PaginationBar({ currentPage, totalPages, onPageChange, s
       >
         ถัดไป
       </button>
-    </div>
+    </nav>
   )
 }

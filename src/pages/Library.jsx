@@ -195,6 +195,8 @@ export default function Library({ go, authState, ctx }) {
         <div style={{ flex: 1, position: "relative" }}>
           <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
           <input
+            type="search"
+            aria-label="ค้นหาหนังสือ ผู้เขียน หรือเนื้อหา"
             value={search}
             onChange={e => handleSearchChange(e.target.value)}
             placeholder="ค้นหาชื่อหนังสือ, ผู้เขียน, หรือเนื้อหา..."
@@ -205,6 +207,8 @@ export default function Library({ go, authState, ctx }) {
         </div>
         <button
           onClick={() => updateFilters({ showAdv: !showAdvancedFilters ? "true" : "false" })}
+          aria-label="ตัวกรองเพิ่มเติม"
+          aria-expanded={showAdvancedFilters}
           style={{ 
             padding: "0 18px", 
             borderRadius: 24, 

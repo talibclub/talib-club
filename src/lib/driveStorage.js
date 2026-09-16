@@ -5,6 +5,14 @@ import { auth } from './firebase.js';
 export const getStorage = () => ({ provider: 'drive' });
 export const ref = (_storage, fullPath) => ({ fullPath });
 
+export function getNotebookHistory(uid, notebookId) {
+  return request('notebook-history', { path: `notebooks/${uid}/${notebookId}.json.gz` });
+}
+
+export function restoreNotebookVersion(uid, notebookId, fileId, expectedFileId) {
+  return request('restore-notebook', { path: `notebooks/${uid}/${notebookId}.json.gz`, fileId, expectedFileId });
+}
+
 async function request(action, data = {}) {
   const user = auth.currentUser;
   if (!user) throw new Error('กรุณาเข้าสู่ระบบก่อนใช้ Google Drive');
