@@ -8,12 +8,17 @@ export default function OpenHouse({ go }) {
   const [platforms, setPlatforms] = useState([])
   const [booths, setBooths] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [retry, setRetry] = useState(0)
 
   // Current view state: 'zones' (Main Hall), 'booths' (Platform selected)
   const [view, setView] = useState("zones")
   const [selectedPlatform, setSelectedPlatform] = useState(null)
 
   useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(false)
     // Scroll to top when entering
     window.scrollTo(0, 0)
     
@@ -22,6 +27,7 @@ export default function OpenHouse({ go }) {
       try {
         const q = query(collection(db, "openhouse_booths"), orderBy("order", "asc"))
         const snap = await getDocs(q)
+        if (cancelled) return
         const allBooths = snap.docs.map(d => ({ ...d.data(), id: d.id }))
         
         setBooths(allBooths)
@@ -56,12 +62,15 @@ export default function OpenHouse({ go }) {
         setLoading(false)
       } catch (err) {
         console.error("Error fetching open house data", err)
+        if (cancelled) return
+        setError(true)
         setLoading(false)
       }
     }
     
     fetchBooths()
-  }, [])
+    return () => { cancelled = true }
+  }, [retry])
 
   const enterPlatform = (platform) => {
     setSelectedPlatform(platform)
@@ -99,6 +108,11 @@ export default function OpenHouse({ go }) {
           <div className="openhouse-loading">
             <i className="ti ti-loader-2 spin"></i> กำลังรวบรวมแหล่งเรียนรู้...
           </div>
+        ) : error ? (
+          <div className="empty-state" role="alert">
+            <p>โหลดแหล่งเรียนรู้ไม่สำเร็จ กรุณาตรวจการเชื่อมต่อแล้วลองอีกครั้ง</p>
+            <button className="btn btn-teal" onClick={() => setRetry(value => value + 1)}>ลองใหม่</button>
+          </div>
         ) : (
           <div className="openhouse-content">
             {view === "zones" && (
@@ -108,7 +122,8 @@ export default function OpenHouse({ go }) {
                   {platforms.length === 0 ? (
                     <div className="empty-state">ยังไม่มีแหล่งเรียนรู้ในระบบ</div>
                   ) : platforms.map(p => (
-                    <div key={p.id} className="zone-card" onClick={() => enterPlatform(p)}>
+                    <div key={p.id} className="zone-card" role="button" tabIndex={0} onClick={() => enterPlatform(p)}
+                      onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); enterPlatform(p) } }}>
                       <div className="zone-icon"><i className={`ti ${p.icon}`}></i></div>
                       <h3 className="zone-name">{p.title}</h3>
                       <div className="zone-meta">{p.count} แหล่งเรียนรู้</div>
@@ -136,7 +151,8 @@ export default function OpenHouse({ go }) {
                     const plats = b.platforms || (b.platform ? [b.platform] : [])
                     return plats.includes(selectedPlatform.id)
                   }).map(booth => (
-                    <div key={booth.id} className="booth-card" onClick={() => enterBooth(booth)}>
+                    <div key={booth.id} className="booth-card" role="button" tabIndex={0} onClick={() => enterBooth(booth)}
+                      onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); enterBooth(booth) } }}>
                       <div className="booth-color-top" style={{ background: booth.themeColor || "var(--teal)" }}></div>
                       <div className="booth-logo-wrapper">
                         {booth.logoUrl ? (

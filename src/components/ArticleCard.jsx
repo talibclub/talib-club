@@ -10,7 +10,7 @@ import { isPlainLeftClick } from "../utils/linkNavigation.js"
 export default function ArticleCard({ article: a, onClick, coverHeight = 160 }) {
   return (
     <a
-      className="card"
+      className="card article-card"
       href={detailPath("article", a.id, a.title)}
       aria-label={a.title}
       style={{

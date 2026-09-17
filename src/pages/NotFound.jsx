@@ -1,4 +1,5 @@
 import SEOHead from "../components/SEOHead.jsx"
+import { isPlainLeftClick } from "../utils/linkNavigation.js"
 
 // The route catch-all used to `<Navigate to="/" replace />`, which turned every
 // unknown or retired URL into a client-side redirect to the homepage. Google
@@ -8,7 +9,7 @@ import SEOHead from "../components/SEOHead.jsx"
 // leaves the visitor somewhere they can navigate from.
 export default function NotFound({ go }) {
   const open = (page) => (event) => {
-    if (!go) return
+    if (!go || !isPlainLeftClick(event)) return
     event.preventDefault()
     go(page)
   }

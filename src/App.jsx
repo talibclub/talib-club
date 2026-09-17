@@ -63,6 +63,7 @@ import { Toaster } from "react-hot-toast"
 import PWAInstallBanner from "./components/PWAInstallBanner.jsx"
 import "./styles/global.css"
 import "./styles/dashboard.css"
+import "./styles/motion.css"
 import { useContentCollection } from "./lib/contentStore.js"
 import { syncServerTime, safeDateNow } from "./utils/time.js"
 
@@ -329,7 +330,7 @@ export default function App() {
           <i className="ti ti-chevron-right" style={{ fontSize: 14, opacity: 0.7 }} />
         </div>
       )}
-      <main className={`${WIDE_PAGES.has(page) ? "wide" : GALLERY_PAGES.has(page) ? "gallery" : ""} fade-in-active`}>
+      <main className={`${WIDE_PAGES.has(page) ? "wide" : GALLERY_PAGES.has(page) ? "gallery" : ""} ${["home", "articles", "library", "media", "scholars", "openhouse", "books", "donate"].includes(page) ? "public-motion" : ""}`}>
         <PageErrorBoundary resetKey={`${page}:${JSON.stringify(ctx || {})}`} go={go}>
           <Suspense fallback={<LoadingState />}>
             <Routes>

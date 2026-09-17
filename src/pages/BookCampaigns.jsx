@@ -4,10 +4,15 @@ import { db } from "../lib/firebase.js"
 export default function BookCampaigns({ go }) {
   const [campaigns, setCampaigns] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [retry, setRetry] = useState(0)
   const [activeImageIdx, setActiveImageIdx] = useState({})
   const [quotas, setQuotas] = useState({})
 
   useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(false)
     window.scrollTo(0, 0)
     const fetchCampaigns = async () => {
       try {
@@ -16,13 +21,15 @@ export default function BookCampaigns({ go }) {
           where("status", "==", "active")
         )
         const snap = await getDocs(q)
+        if (cancelled) return
         const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
         data.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
         setCampaigns(data)
       } catch (err) {
         console.error(err)
+        if (!cancelled) setError(true)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
     fetchCampaigns()
@@ -30,9 +37,10 @@ export default function BookCampaigns({ go }) {
     // Fetch quotas
     fetch("/api/get-campaign-quotas")
       .then(res => res.json())
-      .then(data => setQuotas(data))
+      .then(data => { if (!cancelled) setQuotas(data) })
       .catch(console.error)
-  }, [])
+    return () => { cancelled = true }
+  }, [retry])
 
   return (
     <div className="campaigns-container">
@@ -153,6 +161,11 @@ export default function BookCampaigns({ go }) {
         <div style={{ textAlign: "center", padding: 60 }}>
           <i className="ti ti-loader-2 spin" style={{ fontSize: 32, color: "var(--teal)" }}></i>
           <p style={{ marginTop: 16, color: "var(--t2)", fontWeight: 500 }}>กำลังโหลดแคมเปญล่าสุด...</p>
+        </div>
+      ) : error ? (
+        <div className="empty" role="alert">
+          <p>โหลดรายการแจกหนังสือไม่สำเร็จ กรุณาตรวจการเชื่อมต่อแล้วลองอีกครั้ง</p>
+          <button className="btn btn-teal" onClick={() => setRetry(value => value + 1)}>ลองใหม่</button>
         </div>
       ) : campaigns.length === 0 ? (
         <div className="card" style={{ textAlign: "center", padding: 80, color: "var(--t3)", borderRadius: 24, border: "1px dashed var(--br)" }}>

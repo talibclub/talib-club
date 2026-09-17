@@ -58,7 +58,7 @@ export default function Donation() {
         <p style={{ color: "var(--t2)", fontSize: 16 }}>เป็นส่วนหนึ่งในการทำงานดะวะฮฺของกลุ่มฏอลิบ</p>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 30, padding: "0 20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", gap: 30, padding: "0 20px" }}>
         
         {/* ฝั่งซ้าย: บัญชีธนาคาร และ วัตถุประสงค์ */}
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -92,8 +92,8 @@ export default function Donation() {
               </div>
 
               {/* ส่วนแสดงข้อมูลบัญชี */}
-              <div style={{ flex: 1, minWidth: 200 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <div style={{ flex: "1 1 200px", minWidth: 0, overflowWrap: "anywhere" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 8 }}>
                   <img src={acc.logo} alt={acc.bankName} style={{ width: 32, height: 32, objectFit: "contain" }} />
                   <h3 style={{ margin: 0, fontSize: 16, color: "var(--text)" }}>{acc.bankName}</h3>
                   <span style={{ fontSize: 12, background: "var(--teal-bg)", color: "var(--teal)", padding: "2px 8px", borderRadius: 12 }}>{acc.tag}</span>
