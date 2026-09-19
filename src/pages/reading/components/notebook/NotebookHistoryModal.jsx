@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getNotebookHistory } from '../../../../lib/driveStorage.js';
+import { History, X, RefreshCw, RotateCcw, Check, Clock3, AlertCircle } from 'lucide-react';
+import './notebookHistory.css';
 
 export default function NotebookHistoryModal({ uid, notebookId, onRestore, onClose, readonly }) {
   const [data, setData] = useState(null);
@@ -33,7 +35,7 @@ export default function NotebookHistoryModal({ uid, notebookId, onRestore, onClo
     finally { setBusy(false); }
   };
   return createPortal(
-    <div style={{ position: 'fixed', inset: 0, zIndex: 20000, background: 'rgba(0,0,0,.5)', display: 'grid', placeItems: 'center', padding: 16 }}>
+    <div className="nb-history-backdrop">
       <section ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="notebook-history-title"
         onKeyDown={e => {
           if (e.key === 'Escape' && !busy) onClose();
@@ -44,24 +46,28 @@ export default function NotebookHistoryModal({ uid, notebookId, onRestore, onClo
             else if (e.shiftKey && [first, panel.current].includes(document.activeElement)) { e.preventDefault(); last.focus(); }
             else if (!e.shiftKey && [last, panel.current].includes(document.activeElement)) { e.preventDefault(); first.focus(); }
           }
-        }} style={{ background: 'white', color: '#111827', borderRadius: 18, padding: 24, width: '100%', maxWidth: 500, maxHeight: '90dvh', overflowY: 'auto' }}>
-        <h3 id="notebook-history-title">ประวัติสมุดบนคลาวด์</h3>
-        <p style={{ margin: '12px 0', color: '#4b5563' }}>เก็บฉบับล่าสุดและก่อนหน้า 1 รุ่น การบันทึกครั้งถัดไปจะเปลี่ยนรุ่นที่ย้อนคืนได้</p>
-        {!data && !error && <p role="status">กำลังโหลดประวัติ…</p>}
-        {error && <p role="alert" style={{ color: '#b91c1c' }}>{error}</p>}
-        {data?.versions.map(version => <div key={version.id} style={{ border: '1px solid #d1d5db', padding: 14, borderRadius: 10, margin: '10px 0' }}>
-          <strong>{version.current ? 'ฉบับปัจจุบัน' : 'ฉบับก่อนหน้า'}</strong>
-          <p>{version.at ? new Date(version.at).toLocaleString('th-TH') : 'ไม่ทราบเวลาบันทึก'}</p>
-          {!version.current && !readonly && <button disabled={busy} onClick={() => setSelected(version.id)}>เลือกรุ่นนี้เพื่อย้อนคืน</button>}
+        }} className="nb-history-panel">
+        <header className="nb-history-heading">
+          <span className="nb-history-icon"><History size={22} /></span>
+          <div><h3 id="notebook-history-title">ประวัติสมุด</h3><span className="nb-history-muted">ฉบับที่บันทึกบนคลาวด์</span></div>
+          <button className="nb-history-close" disabled={busy} onClick={onClose} aria-label="ปิดประวัติสมุด"><X size={19} /></button>
+        </header>
+        <p className="nb-history-description">เก็บฉบับปัจจุบันและฉบับก่อนหน้า 1 รุ่น<br />เมื่อบันทึกใหม่ ฉบับที่ย้อนคืนได้จะเปลี่ยนตาม</p>
+        {!data && !error && <p className="nb-history-message" role="status"><RefreshCw size={18} />กำลังโหลดประวัติ…</p>}
+        {error && <p role="alert" className="nb-history-error"><AlertCircle size={18} />{error}</p>}
+        {data?.versions.map(version => <div key={version.id} className={`nb-history-version${version.current ? ' is-current' : ''}${selected === version.id ? ' is-selected' : ''}`}>
+          <div className="nb-history-version-title"><strong>{version.current ? 'ฉบับปัจจุบัน' : 'ฉบับก่อนหน้า'}</strong>{version.current && <span className="nb-history-badge"><Check size={13} />ล่าสุด</span>}</div>
+          <p className="nb-history-date"><Clock3 size={14} />{version.at ? new Date(version.at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : 'ไม่ทราบเวลาบันทึก'}</p>
+          {!version.current && !readonly && <button className="nb-history-restore" disabled={busy} aria-pressed={selected === version.id} onClick={() => setSelected(version.id)}><RotateCcw size={15} />{selected === version.id ? 'เลือกฉบับนี้แล้ว' : 'ย้อนคืนฉบับนี้'}</button>}
         </div>)}
-        {data && data.versions.length < 2 && <p>ยังไม่มีฉบับก่อนหน้าให้ย้อนคืน</p>}
-        {selected && <div style={{ background: '#fff7ed', padding: 12, borderRadius: 10, marginTop: 12 }}>
+        {data && data.versions.length < 2 && <p className="nb-history-muted">ยังไม่มีฉบับก่อนหน้าให้ย้อนคืน</p>}
+        {selected && <div className="nb-history-confirm">
           <p>เปิดฉบับก่อนหน้าแทนเนื้อหาที่กำลังแสดงอยู่? ฉบับล่าสุดบนคลาวด์จะเก็บไว้ให้ย้อนกลับได้ งานที่ยังไม่ได้บันทึกจะไม่รวมอยู่ด้วย</p>
-          <button disabled={busy} onClick={restore}>{busy ? 'กำลังย้อนคืน…' : 'ยืนยันย้อนคืน'}</button>
+          <div className="nb-history-confirm-actions"><button disabled={busy} onClick={() => setSelected(null)}>ยกเลิก</button><button className="nb-history-primary" disabled={busy} onClick={restore}>{busy ? 'กำลังย้อนคืน…' : 'ยืนยันย้อนคืน'}</button></div>
         </div>}
-        <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
-          <button disabled={busy} onClick={() => { setSelected(null); setRetry(value => value + 1); }}>รีเฟรชประวัติ</button>
-          <button disabled={busy} onClick={onClose}>ปิด</button>
+        <div className="nb-history-footer">
+          <button disabled={busy || (!data && !error)} onClick={() => { setSelected(null); setRetry(value => value + 1); }}><RefreshCw size={15} />รีเฟรชประวัติ</button>
+          <button className="nb-history-primary" disabled={busy} onClick={onClose}>เสร็จสิ้น</button>
         </div>
       </section>
     </div>, document.body

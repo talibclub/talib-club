@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Cloud, CheckCircle, Zap, Eraser, ChevronLeft, ChevronRight, Download, Bookmark, Settings, FilePlus, Maximize2, Search, Columns, LayoutGrid, ListMusic, Camera, FileText, BookOpen, PanelLeftClose, PanelLeftOpen, Image as ImageIcon, PenTool, Plus, Minus, Check, Wand2 } from 'lucide-react';
 import { HW } from './theme.js';
+import { History, CloudCheck, CloudOff, LoaderCircle, AlertCircle } from 'lucide-react';
+import './notebookTopBar.css';
 import { RecordingsPanel } from '../AudioRecordings.jsx';
 
 // The notebook's top application bar — page navigation, zoom, save state, and
@@ -25,6 +27,9 @@ export default function NotebookTopBar({ ui }) {
   } = ui;
   const pageTitle = pages[currentPageIndex]?.name || `หน้า ${currentPageIndex + 1}`;
   const notebookTitle = activeBook?.book?.title || 'สมุดโน้ตของฉัน';
+  const statusLabel = { saving: 'กำลังบันทึก…', cloud: 'บันทึกบนคลาวด์แล้ว', local: 'บันทึกในเครื่องเท่านั้น', pending: 'รอบันทึก', loaded: 'เปิดสมุดแล้ว', error: 'บันทึกไม่สำเร็จ — ลองใหม่' }[saveStatus?.kind] || 'รอบันทึก';
+  const StatusIcon = isSaving ? LoaderCircle : saveStatus?.kind === 'cloud' ? CloudCheck : saveStatus?.kind === 'error' ? AlertCircle : saveStatus?.kind === 'local' ? CloudOff : Cloud;
+  const savedTime = saveStatus?.at && ['cloud', 'local'].includes(saveStatus.kind) ? new Date(saveStatus.at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '';
 
   // The header overflows on a narrow pane — the notebook is normally half a
   // split view — and there was no way to reach what fell off the right edge. It
@@ -67,7 +72,7 @@ export default function NotebookTopBar({ ui }) {
   return (
     <>
       {/* Huawei Notes Top Navigation Bar (Fixed App Header) */}
-       <div style={{ position: 'relative', flexShrink: 0, width: '100%', zIndex: 50 }}>
+       <div className="nb-topbar" style={{ position: 'relative', flexShrink: 0, width: '100%', zIndex: 50 }}>
          {moreLeft && (
            <div style={{ position: 'absolute', left: 0, top: 0, bottom: 1, width: 22, zIndex: 2, pointerEvents: 'none', background: `linear-gradient(to right, ${HW.surfaceStrong}, transparent)` }} />
          )}
@@ -78,7 +83,7 @@ export default function NotebookTopBar({ ui }) {
          )}
          <div
            ref={railRef}
-           className="hide-scroll"
+           className="hide-scroll nb-topbar-rail"
            onScroll={syncHints}
            onWheel={(e) => {
              const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
@@ -149,7 +154,7 @@ export default function NotebookTopBar({ ui }) {
                  </div>
                )}
                {!isMobile && (
-                 <div title={`${notebookTitle} · ${pageTitle}`} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: fullView ? 240 : 140, padding: '4px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.85)', border: `1px solid rgba(15,110,86,0.12)`, boxShadow: '0 2px 6px rgba(15,110,86,0.06)' }}>
+                 <div className="nb-topbar-title" title={`${notebookTitle} · ${pageTitle}`} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: fullView ? 240 : 140, padding: '4px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.85)', border: `1px solid rgba(15,110,86,0.12)`, boxShadow: '0 2px 6px rgba(15,110,86,0.06)' }}>
                    <span style={{ width: 22, height: 22, borderRadius: '50%', background: HW.accentSoft, color: HW.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><BookOpen size={13} strokeWidth={2} /></span>
                    <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11.5, fontWeight: 700, color: HW.text }}>{notebookTitle}</span>
@@ -171,12 +176,11 @@ export default function NotebookTopBar({ ui }) {
                    </button>
                  </div>
                )}
-               {uid && <button type="button" onClick={() => setShowNotebookHistory(true)} style={{ border: 'none', background: 'transparent', color: HW.accent, cursor: 'pointer', fontSize: 12 }}>ประวัติสมุด</button>}
+               {uid && <button className="nb-topbar-history" type="button" title="ประวัติสมุดบนคลาวด์" aria-label="ประวัติสมุดบนคลาวด์" onClick={() => setShowNotebookHistory(true)}><History size={16} /><span>ประวัติสมุด</span></button>}
                {!readonly && (
-                 <button type="button" onClick={() => saveNotebook()} disabled={isSaving} aria-live="polite" title="คลิกเพื่อบันทึกอีกครั้ง"
-                   style={{ border: 'none', borderRadius: 8, padding: '5px 8px', cursor: 'pointer', background: saveStatus?.kind === 'error' ? '#fef2f2' : 'transparent', color: saveStatus?.kind === 'error' ? '#b91c1c' : HW.accent, fontSize: 11 }}>
-                   {{ saving: 'กำลังบันทึก…', cloud: 'บันทึกบนคลาวด์แล้ว', local: 'บันทึกในเครื่องเท่านั้น', pending: 'รอบันทึก', loaded: 'เปิดสมุดแล้ว', error: 'บันทึกไม่สำเร็จ — ลองใหม่' }[saveStatus?.kind] || 'รอบันทึก'}
-                   {saveStatus?.at && ['cloud', 'local'].includes(saveStatus.kind) && <span style={{ display: 'block' }}>{new Date(saveStatus.at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>}
+                 <button className={`nb-topbar-save ${saveStatus?.kind || 'pending'}`} type="button" onClick={() => saveNotebook()} disabled={isSaving} aria-live="polite" aria-label={statusLabel} title={`${statusLabel}${savedTime ? ` · ${savedTime}` : ''} · คลิกเพื่อบันทึกอีกครั้ง`}>
+                   <StatusIcon size={17} /><span className="nb-topbar-save-label">{statusLabel}</span>
+                   {savedTime && <span className="nb-topbar-save-time">{savedTime}</span>}
                  </button>
                )}
             </div>

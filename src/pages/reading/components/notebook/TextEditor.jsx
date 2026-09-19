@@ -6,6 +6,7 @@ import { matchAutoformat, matchLineTrigger, matchInlineWrap } from './textAutofo
 import { filterSlashCommands, matchSlashCommand } from './slashCommands.js';
 import { filterPages, matchWikiLink } from './wikiLinks.js';
 import SlashMenu from './SlashMenu.jsx';
+import { formatShortcut, textRowHeight } from './textLayout.js';
 
 // WYSIWYG in-place editor for a text object with PER-LINE formatting.
 //
@@ -100,7 +101,7 @@ const FormatBtn = ({ icon, active, onClick }) => (
   </button>
 );
 
-export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLinesChange, onFont, onSize, onColor, onCommit, boxWidth, pages, currentPageIndex, onCreateLinkedPage }) {
+export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLinesChange, onFont, onSize, onColor, onCommit, boxWidth, pages, currentPageIndex, onCreateLinkedPage, ruled = false }) {
   // The format bar is anchored to the text box's left edge with
   // `width: max-content` and `maxWidth: calc(100vw - 32px)`. Two problems: a box
   // near the right of the notebook pushed the bar off the edge, and the clamp
@@ -171,6 +172,7 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
     const lines = lineEls(el).map((d) => makeLine(textOfEl(d), readFmt(d)));
     onChange?.(lines.map((l) => l.text).join('\n'));
     onLinesChange?.(lines);
+    return lines;
   }, [edRef, onChange, onLinesChange]);
 
   // Re-apply styles to any line the browser created for us (Enter, paste) and
@@ -208,6 +210,7 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
       // which is module scope and has no idea what the board zoom is.
       const lf = readFmt(d);
       d.style.fontSize = lf.size ? `${lf.size * scale}px` : '';
+      d.style.lineHeight = `${textRowHeight(lf.size || size, ruled) * scale}px`;
     });
 
     const prefixes = listPrefixes(els.map((d) => makeLine(textOfEl(d), readFmt(d))));
@@ -221,7 +224,9 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
     // flag instead of a CSS pseudo-class.
     if (els.length === 1 && !textOfEl(els[0])) el.dataset.empty = '1';
     else delete el.dataset.empty;
-  }, [edRef, active, scale]);
+  }, [edRef, active, scale, size, ruled]);
+
+  useLayoutEffect(() => { if (!composing.current) reflow(); }, [reflow]);
 
   // --- selection ----------------------------------------------------------
   const rememberSelection = useCallback(() => {
@@ -516,6 +521,13 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
   };
 
   const handleKeyDown = (e) => {
+    const flag = formatShortcut(e);
+    if (flag && !composing.current) {
+      e.preventDefault();
+      rememberSelection();
+      toggleFlag(flag);
+      return;
+    }
     // While the "/" menu is open it owns the arrows, Enter and Escape. Anything
     // else falls through, so typing keeps filtering and the editor behaves
     // normally the moment the menu closes.
@@ -566,7 +578,7 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
 
 
   return (
-    <div data-text-editor style={{ position: 'absolute', top: y, left: x, zIndex: 3000, isolation: 'isolate' }}>
+    <div data-text-editor onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} style={{ position: 'absolute', top: y, left: x, zIndex: 3000, isolation: 'isolate' }}>
       <style>{`
         [data-text-editor], [data-text-editor] * {
           -webkit-user-select: text !important;
@@ -685,7 +697,7 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
             { id: 'underline', label: <Underline size={15} /> },
             { id: 'strikethrough', label: <Strikethrough size={15} /> },
           ].map((b) => (
-            <button key={b.id} {...noFocusSteal} onClick={(e) => { e.stopPropagation(); toggleFlag(b.id); }} style={{...toolBtn(active[b.id]), width: 26, height: 26}}>{b.label}</button>
+            <button key={b.id} {...noFocusSteal} aria-label={b.id} aria-pressed={!!active[b.id]} onClick={(e) => { e.stopPropagation(); toggleFlag(b.id); }} style={{...toolBtn(active[b.id]), width: 26, height: 26}}>{b.label}</button>
           ))}
         </div>
         
@@ -731,11 +743,11 @@ export default function TextEditor({ x, y, scale, t, textareaRef, onChange, onLi
           // Stay open when focus moves to one of our own controls.
           const editor = e.currentTarget.closest('[data-text-editor]');
           if (editor && e.relatedTarget && editor.contains(e.relatedTarget)) return;
-          onCommit();
+          onCommit(emit());
         }}
         style={{
           margin: 0,
-          padding: '2px 0',
+          padding: 0,
           // No border, no ring, no fill.
           //
           // This surface has been complained about three times, and each attempt

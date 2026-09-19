@@ -2,6 +2,7 @@ import React from 'react';
 import { Image as KonvaImage, Path, Group, Circle } from 'react-konva';
 import useImage from 'use-image';
 import getStroke from 'perfect-freehand';
+import { PAPER_GAP } from './pageGrowth.js';
 
 // One PDF/raster page drawn onto the Konva stage.
 export const PDFPageImage = ({ src, width, height }) => {
@@ -11,7 +12,7 @@ export const PDFPageImage = ({ src, width, height }) => {
 
 // Ruled / grid / dotted paper background.
 export const PaperPattern = ({ width, height, type, color }) => {
-  const lineGap = 40;
+  const lineGap = PAPER_GAP;
   const isDark = color === 'dark';
   const strokeColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
 

@@ -35,6 +35,7 @@ import { boardPaperStyle, grownPageSize, pageContentBounds } from './notebook/pa
 import { branchColorFor, branchCurvePoints, branchAngledPoints, branchStraightPoints, childIdsOf, childPlacement, makeBranchConnector, parentIdOf, revealOffset, siblingPlacement, MINDMAP_STYLES, DEFAULT_MINDMAP_STYLE } from './notebook/mindmap.js';
 import KonvaIcon from './notebook/KonvaIcon.jsx';
 import TextEditor from './notebook/TextEditor.jsx';
+import { textRowHeight, textTop, usesPaperLines } from './notebook/textLayout.js';
 import PaperTemplateModal from './notebook/PaperTemplateModal.jsx';
 import ExportModal from './notebook/ExportModal.jsx';
 import AiAssistantPanel from './notebook/AiAssistantPanel.jsx';
@@ -3633,10 +3634,13 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly: request
                   // <Text> exactly as before; a box with per-line formatting
                   // (created by the phase-2 editor) renders one <Text> per line.
                   const tt = migrateText(t);
+                  const ruled = usesPaperLines(currentPage, t);
+                  const offsetY = textTop(t.y, ruled) - t.y;
                   if (isUniformText(tt)) {
                     const f = uniformFormatOf(tt);
                     return (
                       <Text
+                        y={offsetY}
                         text={applyListPrefix(textOf(tt), f.list)}
                         fontSize={tt.lines[0]?.size || t.size}
                         fill={t.color}
@@ -3645,8 +3649,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly: request
                         textDecoration={textDecorationOf(f)}
                         align={f.align || 'left'}
                         width={f.align && f.align !== 'left' ? (t.width || TEXT_BOX_WIDTH) : undefined}
-                        lineHeight={LINE_HEIGHT}
-                        padding={4}
+                        lineHeight={textRowHeight(tt.lines[0]?.size || t.size, ruled) / (tt.lines[0]?.size || t.size || 24)}
+                        padding={0}
                       />
                     );
                   }
@@ -3654,19 +3658,20 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly: request
                   // Lines can differ in size now (a heading above body text), so
                   // each one starts where the last ended instead of sitting on a
                   // fixed grid.
-                  let cursorY = 4;
+                  let cursorY = offsetY;
                   const tops = tt.lines.map((l) => {
                     const top = cursorY;
-                    cursorY += (l.size || t.size) * LINE_HEIGHT;
+                    cursorY += textRowHeight(l.size || t.size, ruled);
                     return top;
                   });
                   return tt.lines.map((l, i) => (
                     <React.Fragment key={i}>
                       <Text
-                        x={4}
+                        x={0}
                         y={tops[i]}
                         text={(prefixes[i] || '') + l.text}
                         fontSize={l.size || t.size}
+                        lineHeight={textRowHeight(l.size || t.size, ruled) / (l.size || t.size || 24)}
                         // A "[[" link is drawn in the accent colour, underlined.
                         fill={l.link ? HW.accent : t.color}
                         fontFamily={t.fontFamily || 'Kanit'}
@@ -3683,10 +3688,10 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly: request
                           line is what a finger is actually aiming at. */}
                       {l.link && (
                         <Rect
-                          x={4}
+                          x={0}
                           y={tops[i]}
                           width={t.width || TEXT_BOX_WIDTH}
-                          height={(l.size || t.size) * LINE_HEIGHT}
+                          height={textRowHeight(l.size || t.size, ruled)}
                           fill="transparent"
                           onClick={(e) => { e.cancelBubble = true; goToLinkedPage(l.link); }}
                           onTap={(e) => { e.cancelBubble = true; goToLinkedPage(l.link); }}
@@ -4094,7 +4099,8 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly: request
            <TextEditor
              key={editingTextId}
              x={(t.x + pageX) * scale + position.x}
-             y={(t.y + pageY) * scale + position.y}
+             y={(textTop(t.y, usesPaperLines(currentPage, t)) + pageY) * scale + position.y}
+             ruled={usesPaperLines(currentPage, t)}
              scale={scale}
              t={t}
              pages={pages}
@@ -4106,11 +4112,15 @@ export default function ProNotebook({ bookId, uid, activeBook, readonly: request
              onFont={(font) => { setTextStyle(s => ({ ...s, fontFamily: font })); upd(txt => { txt.fontFamily = font; }); }}
              onSize={(n) => { setTextStyle(s => ({ ...s, fontSize: n })); upd(txt => { txt.size = n; }); }}
              onColor={(c) => upd(txt => { txt.color = c; })}
-             onCommit={() => {
+             onCommit={(lines) => {
                 if (!isEditingText.current) return;
                 isEditingText.current = false;
                  updatePage(currentPageIndex, (page) => {
                     const txt = (page.texts || []).find(tx => tx.id === editingTextId);
+                    if (txt && lines) {
+                       txt.lines = lines;
+                       txt.text = lines.map(l => l.text).join('\n');
+                    }
                     const hasText = txt && ((txt.text || '').trim().length > 0 || (txt.lines || []).some(l => (l.text || '').trim().length > 0));
                     if (!hasText) {
                        page.texts = (page.texts || []).filter(tx => tx.id !== editingTextId);
