@@ -1,4 +1,6 @@
 import { useState, useMemo } from "react"
+import { useSearchParams } from "react-router-dom"
+import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
 import { DEFAULT_TAXONOMY, SCHOLARS } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
@@ -32,16 +34,29 @@ const mapEraValue = (val) => {
 
 export default function Scholars() {
   const scholarsQueryOptions = useMemo(() => ({ live: false }), [])
-  const { items: scholars, loading } = useContentCollection("scholars", SCHOLARS, null, scholarsQueryOptions)
+  const { items: scholars, loading, error, isUsingFallback } = useContentCollection("scholars", SCHOLARS, null, scholarsQueryOptions)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
-  const [search, setSearch] = useState("")
-  const [showAdvanced, setShowAdvanced] = useState(false)
-  const [era, setEra] = useState("0")
-  const [field, setField] = useState("all")
-
-  const [aqFilter, setAqFilter] = useState("")
-  const [mhFilter, setMhFilter] = useState("")
-  const [mzFilter, setMzFilter] = useState("")
+  const [params, setParams] = useSearchParams()
+  const search = params.get("search") || ""
+  const era = params.get("era") || "0"
+  const field = params.get("field") || "all"
+  const aqFilter = params.get("aq") || ""
+  const mhFilter = params.get("mh") || ""
+  const mzFilter = params.get("mz") || ""
+  const showAdvanced = params.get("filters") === "open"
+  const setFilter = (key, value, fallback = "") => setParams(previous => {
+    const next = new URLSearchParams(previous)
+    if (!value || value === fallback) next.delete(key)
+    else next.set(key, value)
+    return next
+  }, { replace: true })
+  const setSearch = value => setFilter("search", value)
+  const setEra = value => setFilter("era", value, "0")
+  const setField = value => setFilter("field", value, "all")
+  const setAqFilter = value => setFilter("aq", value)
+  const setMhFilter = value => setFilter("mh", value)
+  const setMzFilter = value => setFilter("mz", value)
+  const setShowAdvanced = value => setFilter("filters", value ? "open" : "")
 
   // Keyed by whatever era ids the taxonomy actually has. It used to be seeded
   // with salaf/classical/revival/modern, which are the colour keys and not the
@@ -123,7 +138,7 @@ export default function Scholars() {
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ marginBottom: 8 }}>ทำเนียบบุคคลในอิสลาม</h1>
         <p style={{ color: "var(--t2)" }}>รวบรวมบุคคลและปราชญ์ในประวัติศาสตร์อิสลามแบ่งตามยุคสมัย พร้อมข้อมูลวิชาการ</p>
-        {loading && <p style={{ marginTop: 8, fontSize: 12 }}>กำลังโหลดรายชื่อใหม่ล่าสุด...</p>}
+        <ContentStatusBanner loading={loading} error={error} isUsingFallback={isUsingFallback} />
       </div>
 
       {/* DISCLAIMER BANNER */}
@@ -150,6 +165,8 @@ export default function Scholars() {
         <div style={{ flex: 1, position: "relative" }}>
           <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
           <input
+            type="search"
+            aria-label="ค้นหาบุคคล"
             value={search}
             onChange={e => { setSearch(e.target.value); resetVisible(); }}
             placeholder="ค้นหาชื่ออุลามาอ์ (ไทย/English/ประวัติ)..."
@@ -160,6 +177,8 @@ export default function Scholars() {
         </div>
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
+          aria-label="ตัวกรองบุคคลเพิ่มเติม"
+          aria-expanded={showAdvanced}
           style={{
             padding: "0 18px",
             borderRadius: 24,
@@ -238,6 +257,19 @@ export default function Scholars() {
         </div>
       )}
 
+      {(search || era !== "0" || field !== "all" || aqFilter || mhFilter || mzFilter) && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 20 }}>
+          <span role="status">พบ {filtered.length} ท่าน</span>
+          <button className="btn btn-outline" onClick={() => {
+            setParams(previous => {
+              const next = new URLSearchParams(previous)
+              for (const key of ["search", "era", "field", "aq", "mh", "mz"]) next.delete(key)
+              return next
+            }, { replace: true })
+            resetVisible()
+          }}>ล้างคำค้นและตัวกรอง</button>
+        </div>
+      )}
       {/* TIMELINE */}
       {loading ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>

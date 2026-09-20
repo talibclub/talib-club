@@ -1,3 +1,5 @@
+import { isPlainLeftClick } from "../utils/linkNavigation.js"
+import { detailPath } from "../utils/slug.js"
 import { useState, useEffect, useMemo } from "react"
 import { ARTICLES, BOOKS, MEDIA, SITE } from "../data/index.js"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
@@ -314,10 +316,8 @@ export default function Home({ go, authState, readingSessions }) {
           ) : (
             <div className="flex-col">
               {recentMedia.slice(0, 3).map(m => (
-                <div key={m.id} className="card" role="button" tabIndex={0} aria-label={m.title}
-                  style={{ padding:"11px 14px", display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go("media") } }}
-                  onClick={() => go("media")}>
+                <a key={m.id} className="card" href={detailPath("media-detail", m.id, m.title)} onClick={e => { if (isPlainLeftClick(e)) { e.preventDefault(); go("media-detail", m) } }} aria-label={m.title}
+                  style={{ padding:"11px 14px", display:"flex", alignItems:"center", gap:10, cursor:"pointer", color:"inherit", textDecoration:"none" }}>
                   <div style={{
                     width:32, height:32, borderRadius:"50%", background:"var(--acc2)",
                     border:".5px solid var(--acc-br)", display:"flex", alignItems:"center",
@@ -338,7 +338,7 @@ export default function Home({ go, authState, readingSessions }) {
                       {m.series || m.channel}{m.duration ? ` · ${m.duration}` : ""}
                     </div>
                   </div>
-                </div>
+                </a>
               ))}
             </div>
           )}
@@ -365,11 +365,10 @@ export default function Home({ go, authState, readingSessions }) {
           ) : (
             <div className="flex-col">
               {newBooks.map(b => (
-                <div key={b.id} className="card" role="button" tabIndex={0} aria-label={b.title} style={{
+                <a key={b.id} className="card" href={detailPath("library-detail", b.id, b.title)} onClick={e => { if (isPlainLeftClick(e)) { e.preventDefault(); go("library-detail", b) } }} aria-label={b.title} style={{
                   padding:"11px 14px", display:"flex", alignItems:"center",
-                  justifyContent:"space-between", gap:10, cursor:"pointer"
-                }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go("library") } }}
-                  onClick={() => go("library")}>
+                  justifyContent:"space-between", gap:10, cursor:"pointer", color:"inherit", textDecoration:"none"
+                }}>
                   <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                     <i className={`ti ${isJournal(b.type) ? "ti-news" : b.type==="PDF" ? "ti-file-text" : "ti-book"}`}
                       style={{ fontSize:16, color:"var(--teal)", flexShrink:0 }}></i>
@@ -379,7 +378,7 @@ export default function Home({ go, authState, readingSessions }) {
                     </div>
                   </div>
                   {b.isNew && <span className="tag tag-new" style={{ flexShrink:0 }}>ใหม่</span>}
-                </div>
+                </a>
               ))}
             </div>
           )}

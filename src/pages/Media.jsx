@@ -229,6 +229,28 @@ export default function Media({ go, ctx }) {
             </button>
           </div>
 
+          {/* ━━━ EXPANDABLE FILTERS ━━━ */}
+          {showAdvanced && (
+            <div style={{ background: "var(--bg2)", padding: "16px", borderRadius: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+              <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>แพลตฟอร์ม</span>
+                <select value={filter} onChange={e => updateFilters({ filter: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+                  {filters.map(item => (
+                    <option key={item.id} value={item.id}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>เรียงลำดับ</span>
+                <select value={sortOrder} onChange={e => updateFilters({ sort: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+                  <option value="newest">ใหม่ไปเก่า</option>
+                  <option value="oldest">เก่าไปใหม่</option>
+                </select>
+              </label>
+            </div>
+          )}
+
           {!loading && searchPlaylist.trim() && (
             <section aria-label="ผลการค้นหาคลิป" style={{ marginBottom: 28 }}>
               <p role="status" style={{ marginBottom: 12 }}>พบ {filteredClips.length} คลิป</p>
@@ -251,28 +273,6 @@ export default function Media({ go, ctx }) {
               <PaginationBar currentPage={currentPage} totalPages={totalPages} onPageChange={p => updateFilters({ page: p })} />
               <h2 style={{ fontSize: 18, marginTop: 24 }}>เพลย์ลิสต์ที่ตรงกับคำค้น</h2>
             </section>
-          )}
-
-          {/* ━━━ EXPANDABLE FILTERS ━━━ */}
-          {showAdvanced && (
-            <div style={{ background: "var(--bg2)", padding: "16px", borderRadius: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
-              <label style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>แพลตฟอร์ม</span>
-                <select value={filter} onChange={e => updateFilters({ filter: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
-                  {filters.map(item => (
-                    <option key={item.id} value={item.id}>{item.label}</option>
-                  ))}
-                </select>
-              </label>
-
-              <label style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>เรียงลำดับ</span>
-                <select value={sortOrder} onChange={e => updateFilters({ sort: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
-                  <option value="newest">ใหม่ไปเก่า</option>
-                  <option value="oldest">เก่าไปใหม่</option>
-                </select>
-              </label>
-            </div>
           )}
 
           {loading ? (
