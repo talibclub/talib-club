@@ -514,6 +514,14 @@ input[type="range"] {
   line-height: inherit
 }
 
+/* Pasted articles can carry near-black inline text colors from their source. */
+.app.dark .article-body [style*="color: rgb(8, 8, 9)"],
+.app.dark .article-body [style*="color: rgb(0, 0, 0)"],
+.app.dark .article-body [style*="color: black"],
+.app.dark .article-body [style*="color: #000"] {
+  color: inherit !important;
+}
+
 .article-body strong, .article-body b, .ql-editor strong, .ql-editor b {
   font-weight: 700 !important;
   color: var(--text);
