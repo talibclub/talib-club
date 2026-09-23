@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
+import SEOHead, { BASE_URL } from "../components/SEOHead.jsx"
 
 function readAfterLogin() {
   try {
     const stored = window.sessionStorage.getItem("talibAfterLogin")
-    if (stored) window.sessionStorage.removeItem("talibAfterLogin")
     // Only ever an in-app path, never an absolute URL from somewhere else.
     return stored && stored.startsWith("/") && !stored.startsWith("//") ? stored : null
   } catch (e) {
@@ -19,10 +19,11 @@ export default function Auth({ authState, go }) {
   // A Google redirect sign-in reloads the app, so location.state is empty when
   // the user comes back. loginWithGoogle() parks the destination in
   // sessionStorage for exactly that trip.
-  const redirectTarget = location.state?.from || readAfterLogin() || "/member"
+  const [redirectTarget] = useState(() => location.state?.from || readAfterLogin() || "/member")
 
   useEffect(() => {
     if (authState?.user) {
+      try { window.sessionStorage.removeItem("talibAfterLogin") } catch { /* Storage may be unavailable. */ }
       navigate(redirectTarget, { replace: true })
     }
   }, [authState?.user, redirectTarget, navigate])
@@ -31,13 +32,22 @@ export default function Auth({ authState, go }) {
   const [displayName, setDisplayName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const [status, setStatus] = useState("")
 
+  function changeMode(nextMode) {
+    setMode(nextMode)
+    setError("")
+    setStatus("")
+    setShowPassword(false)
+  }
+
   function validateForm() {
     if (mode === "register" && !displayName.trim()) return "กรุณากรอกชื่อที่แสดงในบัญชี"
     if (!email.trim()) return "กรุณากรอกอีเมลก่อนครับ"
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return "กรุณากรอกอีเมลให้ถูกต้อง เช่น name@example.com"
     if (!password) return "กรุณากรอกรหัสผ่านก่อนครับ"
     if (password.length < 6) return "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษรครับ"
     return ""
@@ -114,19 +124,20 @@ export default function Auth({ authState, go }) {
 
   return (
     <div className="auth-page">
+      <SEOHead title={`${mode === "register" ? "สมัครสมาชิก" : "เข้าสู่ระบบ"} | Talib Club`} canonical={`${BASE_URL}/auth`} noIndex />
       <div className="auth-intro">
         <button className="btn btn-outline" onClick={() => go("home")} style={{ marginBottom: 18 }}>
           <i className="ti ti-arrow-left" style={{ marginRight: 6 }}></i>กลับหน้าเว็บ
         </button>
-        <h1>เข้าสู่ระบบ Talib Club</h1>
+        <h1>{mode === "register" ? "สมัครสมาชิก" : "เข้าสู่ระบบ"} Talib Club</h1>
       </div>
 
       <form onSubmit={submit} className="card auth-card" noValidate>
         <div className="auth-tabs" aria-label="เลือกโหมดบัญชี">
-          <button type="button" className={`pill ${mode === "login" ? "on" : ""}`} onClick={() => setMode("login")}>
+          <button type="button" disabled={busy} aria-pressed={mode === "login"} className={`pill ${mode === "login" ? "on" : ""}`} onClick={() => changeMode("login")}>
             เข้าสู่ระบบ
           </button>
-          <button type="button" className={`pill ${mode === "register" ? "on" : ""}`} onClick={() => setMode("register")}>
+          <button type="button" disabled={busy} aria-pressed={mode === "register"} className={`pill ${mode === "register" ? "on" : ""}`} onClick={() => changeMode("register")}>
             สมัครสมาชิก
           </button>
         </div>
@@ -134,19 +145,21 @@ export default function Auth({ authState, go }) {
         {mode === "register" && (
           <label>
             <span style={labelStyle}>ชื่อที่แสดง</span>
-            <input value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="เช่น Ahmad Talib" />
+            <input autoComplete="nickname" disabled={busy} value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="เช่น Ahmad Talib" />
           </label>
         )}
 
         <label>
           <span style={labelStyle}>อีเมลบัญชี</span>
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" />
+          <input autoComplete="email" inputMode="email" disabled={busy} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" />
         </label>
 
         <label>
           <span style={labelStyle}>รหัสผ่าน</span>
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="อย่างน้อย 6 ตัวอักษร" />
+          <input autoComplete={mode === "register" ? "new-password" : "current-password"} disabled={busy} type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} placeholder="อย่างน้อย 6 ตัวอักษร" />
         </label>
+
+        <button type="button" className="btn btn-outline" aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}>{showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}</button>
 
         {mode === "login" && (
           <button type="button" onClick={forgotPassword} disabled={busy} style={{
@@ -157,8 +170,8 @@ export default function Auth({ authState, go }) {
           </button>
         )}
 
-        {status && <div className="auth-info">{status}</div>}
-        {error && <div className="auth-error">{error}</div>}
+        {status && <div className="auth-info" role="status">{status}</div>}
+        {error && <div className="auth-error" role="alert">{error}</div>}
 
         <button className="btn btn-main auth-submit" disabled={busy} type="submit">
           {busy ? "กำลังดำเนินการ..." : mode === "login" ? "เข้าสู่ระบบ" : "สร้างบัญชีสมาชิก"}

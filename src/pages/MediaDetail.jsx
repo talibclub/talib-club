@@ -133,7 +133,7 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
       )}
       {item.type === "youtube" && !item.embedId && (
         <div className="empty card" style={{ marginBottom: 24, padding: 20 }}>
-          ยังไม่ได้ตั้งค่า YouTube Video ID
+          ไม่สามารถแสดงวิดีโอบนหน้านี้ได้
           {item.url && (
             <a href={item.url} target="_blank" rel="noreferrer" className="btn btn-teal" style={{ marginTop: 12, display: "inline-block" }}>
               เปิดใน YouTube
@@ -155,7 +155,7 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
               allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
               loading="lazy" title={item.title} />
           ) : (
-            <div className="empty">ยังไม่ได้ใส่ Spotify URL</div>
+            <div className="empty">ยังไม่มีไฟล์เสียงสำหรับรายการนี้</div>
           )}
         </div>
       )}
