@@ -2,6 +2,15 @@
 
 import { DETAIL_ROUTES, detailPath } from "./slug.js";
 
+export function getNavigationState(page, data, location, options = {}) {
+  const state = { ctx: data };
+  if (page === "auth") {
+    const currentPath = location.pathname + location.search + location.hash;
+    state.from = options.returnTo || (location.pathname !== "/auth" && location.pathname !== "/" ? currentPath : "/member");
+  }
+  return state;
+}
+
 export function getPagePath(id, data = null) {
   if (id === "home" || id === "") return "/";
   if (id === "tracking") return "/tracking-system";

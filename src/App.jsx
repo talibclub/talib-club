@@ -8,7 +8,7 @@ import Nav from "./components/Nav.jsx"
 // went missing, which is the worst moment to need one more chunk to load.
 import NotFound from "./pages/NotFound.jsx"
 import { useAudio } from "./context/AudioContext.jsx"
-import { getPagePath } from "./utils/url.js"
+import { getPagePath, getNavigationState } from "./utils/url.js"
 
 const lazyWithRetry = (componentImport) => {
   return lazy(() =>
@@ -275,16 +275,17 @@ export default function App() {
   // tree re-rendered on every unrelated App state change.
   const go = useCallback((p, data = null, options = {}) => {
     const urlPath = getPagePath(p, data);
+    const state = getNavigationState(p, data, location, options);
     
     if (options.replace) {
-      navigate(urlPath, { replace: true, state: { ctx: data } });
+      navigate(urlPath, { replace: true, state });
     } else {
-      navigate(urlPath, { state: { ctx: data } });
+      navigate(urlPath, { state });
     }
     if (!options.noScroll) {
       window.scrollTo(0, 0)
     }
-  }, [navigate])
+  }, [navigate, location.pathname, location.search, location.hash])
 
   // Public pages (home, articles, library, media, scholars, donate) render
   // immediately — they don't depend on auth. Blocking the whole app on Firebase

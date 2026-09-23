@@ -11,6 +11,7 @@ import ImageWithFallback from "../components/ImageWithFallback.jsx"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 import { isJournal, getTimestampMs } from "../utils/library.js"
 import { isDriveStorageUrl } from '../lib/driveStorage.js'
+import { detailPath } from "../utils/slug.js"
 
 // ฟังก์ชันดึงรูปปก
 
@@ -318,13 +319,8 @@ export default function Library({ go, authState, ctx }) {
                 tabIndex={0}
                 aria-label={b.title}
                 style={{ padding: 16, display: "flex", gap: 16, cursor: "pointer" }}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click() } }}
+                onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); e.currentTarget.click() } }}
                 onClick={() => {
-                  if (!authState?.user) {
-                    toast.error("กรุณาเข้าสู่ระบบก่อนดาวน์โหลดหรือดูหนังสือ")
-                    go("auth")
-                    return
-                  }
                   go("library-detail", b)
                 }}
               >
@@ -371,7 +367,7 @@ export default function Library({ go, authState, ctx }) {
                         onClick={(e) => {
                           e.stopPropagation()
                           toast.error("กรุณาเข้าสู่ระบบก่อนดาวน์โหลดหรือดูหนังสือ")
-                          go("auth")
+                          go("auth", null, { returnTo: detailPath("library-detail", b.id, b.title) })
                         }}
                         style={{
                           width: "100%",

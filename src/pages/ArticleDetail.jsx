@@ -211,8 +211,11 @@ export default function ArticleDetail({ item, go, authState }) {
   }, [bookmarks, uid])
 
   const isSaved = displayItem ? savedList.includes(String(displayItem.id)) : false;
+  const [savingBookmark, setSavingBookmark] = useState(false);
+  const bookmarkBusy = useRef(false);
 
   const toggleSave = async () => {
+    if (bookmarkBusy.current || !displayItem) return;
     if (!uid) {
       toast.error("กรุณาเข้าสู่ระบบก่อนบันทึกบทความ");
       go("auth");
@@ -221,13 +224,14 @@ export default function ArticleDetail({ item, go, authState }) {
 
     // สร้าง ID เฉพาะ: uid + articleId
     const bookmarkId = `${uid}_${displayItem.id}`;
-
+    bookmarkBusy.current = true;
+    setSavingBookmark(true);
     try {
       if (isSaved) {
-        deleteBookmark(bookmarkId);
+        await deleteBookmark(bookmarkId);
         toast.success("ยกเลิกการบันทึกแล้ว");
       } else {
-        saveBookmark({
+        await saveBookmark({
           id: bookmarkId,
           uid: uid,
           articleId: String(displayItem.id),
@@ -238,6 +242,9 @@ export default function ArticleDetail({ item, go, authState }) {
     } catch (err) {
       console.error("Save bookmark failed:", err);
       toast.error("บันทึกไม่สำเร็จ");
+    } finally {
+      bookmarkBusy.current = false;
+      setSavingBookmark(false);
     }
   }
 
@@ -623,9 +630,9 @@ export default function ArticleDetail({ item, go, authState }) {
         <button onClick={handlePrint} className="btn btn-outline hover-wiggle" style={{ fontSize: 12, flex: "1 1 100px", padding: "8px 0" }}>
           <i className="ti ti-printer" style={{ marginRight: 6, fontSize: 14 }}></i> ปริ้น / PDF
         </button>
-        <button onClick={toggleSave} className={`btn ${isSaved ? "btn-teal" : "btn-outline"} hover-wiggle`} style={{ fontSize: 12, flex: "1 1 100px", padding: "8px 0" }}>
+        <button onClick={toggleSave} disabled={savingBookmark} aria-busy={savingBookmark} className={`btn ${isSaved ? "btn-teal" : "btn-outline"} hover-wiggle`} style={{ fontSize: 12, flex: "1 1 100px", padding: "8px 0" }}>
           <i className={`ti ${isSaved ? "ti-bookmark-filled animate-pulse-cute" : "ti-bookmark"}`} style={{ marginRight: 6, fontSize: 14 }}></i>
-          {isSaved ? "บันทึกแล้ว" : "บันทึกไว้อ่าน"}
+          {savingBookmark ? "กำลังดำเนินการ..." : isSaved ? "บันทึกแล้ว" : "บันทึกไว้อ่าน"}
         </button>
       </div>
 
