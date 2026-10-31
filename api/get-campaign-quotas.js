@@ -7,6 +7,7 @@ function send(res, status, data) {
     res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
     res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Cache-Control", "no-store, max-age=0");
   }
   if (typeof res.status === "function") return res.status(status).json(data);
   return {
@@ -15,6 +16,7 @@ function send(res, status, data) {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
       "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Cache-Control": "no-store, max-age=0",
     },
     body: JSON.stringify(data),
   };

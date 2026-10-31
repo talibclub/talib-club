@@ -109,7 +109,11 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
     if (!confirmed) return
     const toastId = toast.loading("กำลังลบรายชื่อ...")
     try {
-      await deleteDoc(doc(db, "book_registrations", reg.id))
+      const uid = reg.uid || reg.id.slice(`${campaign.id}_`.length)
+      const batch = writeBatch(db)
+      batch.delete(doc(db, "book_registrations", reg.id))
+      if (uid && uid !== reg.id) batch.delete(doc(db, "book_campaigns", campaign.id, "holds", uid))
+      await batch.commit()
       await Promise.all([
         deleteDoc(doc(trackingDb, "recipients", `reg_${reg.id}`)),
         deleteDoc(doc(trackingDb, "records", `reg_${reg.id}`))

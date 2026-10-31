@@ -52,6 +52,7 @@ export default async function handler(req, res) {
     const db = admin.firestore();
     const campaignRef = db.doc(`book_campaigns/${campaignId}`);
     const holdRef = campaignRef.collection("holds").doc(token.uid);
+    const registrationRef = db.doc(`book_registrations/${campaignId}_${token.uid}`);
     const hold = await db.runTransaction(async (tx) => {
       const campaignSnap = await tx.get(campaignRef);
       if (!campaignSnap.exists) throw new Error("Campaign not found");
@@ -62,10 +63,12 @@ export default async function handler(req, res) {
       const timeLimit = Number(campaign.timeLimit || 15);
       if (!Number.isFinite(quota) || quota <= 0 || !Number.isFinite(timeLimit) || timeLimit <= 0) throw new Error("Campaign settings are invalid");
 
-      const existingHold = await tx.get(holdRef);
+      const [existingHold, registrationSnap] = await Promise.all([tx.get(holdRef), tx.get(registrationRef)]);
       if (existingHold.exists) {
         const data = existingHold.data() || {};
-        if (data.status === "completed") return { status: "completed" };
+        // A completed hold without its registration is stale (for example, a
+        // registration removed by an older admin flow). Let this user reserve again.
+        if (data.status === "completed" && registrationSnap.exists) return { status: "completed" };
         const expiry = data.expiresAt?.toDate?.();
         if (data.status === "reserved" && expiry && expiry > new Date()) {
           return { status: "reserved", expiresAt: expiry.toISOString() };
@@ -85,7 +88,8 @@ export default async function handler(req, res) {
       });
       
       const completedHoldsSnap = await tx.get(campaignRef.collection("holds").where("status", "==", "completed"));
-      if (activeCount + completedHoldsSnap.size >= quota) throw new Error("Campaign quota is full");
+      const staleOwnCompletion = existingHold.exists && existingHold.data()?.status === "completed" && !registrationSnap.exists ? 1 : 0;
+      if (activeCount + completedHoldsSnap.size - staleOwnCompletion >= quota) throw new Error("Campaign quota is full");
 
       const expiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + timeLimit * 60 * 1000);
       tx.set(holdRef, {
