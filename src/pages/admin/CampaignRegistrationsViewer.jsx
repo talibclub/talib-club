@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { collection, query, where, getDocs, updateDoc, doc, serverTimestamp, setDoc, writeBatch, onSnapshot } from "firebase/firestore"
+import { collection, query, where, getDocs, updateDoc, doc, serverTimestamp, setDoc, writeBatch, onSnapshot, deleteDoc } from "firebase/firestore"
 import { db } from "../../lib/firebase.js"
 import { trackingDb } from "../../lib/trackingFirebase.js"
 import toast from "react-hot-toast"
@@ -12,6 +12,8 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState([])
   const [holds, setHolds] = useState([])
+  const [editing, setEditing] = useState(null)
+  const [editForm, setEditForm] = useState({})
   // The "minutes left" figure was computed with a bare Date.now() during render,
   // so it only moved when something else re-rendered the page. Tick it.
   const [nowMs, setNowMs] = useState(() => Date.now())
@@ -71,6 +73,53 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
     } catch (err) {
       console.error(err)
       toast.error("เกิดข้อผิดพลาด", { id: toastId })
+    }
+  }
+
+  const startEdit = (reg) => {
+    setEditing(reg)
+    setEditForm({ name: reg.name || "", phone: reg.phone || "", address: reg.address || "", zipcode: reg.zipcode || "", contact: reg.contact || "" })
+  }
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault()
+    if (!editing) return
+    const values = Object.fromEntries(Object.entries(editForm).map(([key, value]) => [key, value.trim()]))
+    if (!values.name || !values.phone || !values.address || !values.zipcode) return toast.error("กรุณากรอกชื่อ เบอร์โทร ที่อยู่ และรหัสไปรษณีย์")
+    const toastId = toast.loading("กำลังบันทึกข้อมูล...")
+    try {
+      await updateDoc(doc(db, "book_registrations", editing.id), { ...values, updatedAt: serverTimestamp() })
+      if (editing.syncedToTracking) {
+        await setDoc(doc(trackingDb, "recipients", `reg_${editing.id}`), { fullName: values.name, phone: values.phone, address: values.address, postalCode: values.zipcode, bonusNote: `แคมเปญ: ${campaign.title}`, sourceRegId: editing.id }, { merge: true })
+      }
+      if (editing.status === "shipped" || editing.trackingNumber) {
+        await setDoc(doc(trackingDb, "records", `reg_${editing.id}`), { fullName: values.name, phone: values.phone, address: values.address, postalCode: values.zipcode, sourceRegId: editing.id }, { merge: true })
+      }
+      toast.success("แก้ไขข้อมูลสำเร็จ", { id: toastId })
+      setEditing(null)
+      fetchRegistrations()
+    } catch (err) {
+      console.error(err)
+      toast.error("แก้ไขข้อมูลไม่สำเร็จ", { id: toastId })
+    }
+  }
+
+  const handleDelete = async (reg) => {
+    const confirmed = await confirmAction(`ลบรายชื่อ ${reg.name} (${reg.phone}) ออกจากแคมเปญนี้ใช่หรือไม่? การลบไม่สามารถย้อนกลับได้`)
+    if (!confirmed) return
+    const toastId = toast.loading("กำลังลบรายชื่อ...")
+    try {
+      await deleteDoc(doc(db, "book_registrations", reg.id))
+      await Promise.all([
+        deleteDoc(doc(trackingDb, "recipients", `reg_${reg.id}`)),
+        deleteDoc(doc(trackingDb, "records", `reg_${reg.id}`))
+      ])
+      setSelected(prev => prev.filter(id => id !== reg.id))
+      toast.success("ลบรายชื่อสำเร็จ", { id: toastId })
+      fetchRegistrations()
+    } catch (err) {
+      console.error(err)
+      toast.error("ลบรายชื่อไม่สำเร็จ กรุณาตรวจสอบสิทธิ์หรือระบบ Tracking", { id: toastId })
     }
   }
 
@@ -393,6 +442,12 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
                             <i className="ti ti-edit"></i> แก้ไขเลขพัสดุ
                           </button>
                         )}
+                        <button className="btn btn-outline" onClick={() => startEdit(reg)} style={{ padding: "4px 8px", fontSize: 12 }}>
+                          <i className="ti ti-edit"></i> แก้ไขข้อมูล
+                        </button>
+                        <button className="btn btn-outline" onClick={() => handleDelete(reg)} style={{ padding: "4px 8px", fontSize: 12, color: "var(--red)", borderColor: "rgba(239, 68, 68, 0.2)" }}>
+                          <i className="ti ti-trash"></i> ลบ
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -402,6 +457,20 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
           </table>
         </div>
       </div>
+      {editing && (
+        <div role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setEditing(null) }} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,.45)", display: "grid", placeItems: "center", padding: 16 }}>
+          <form onSubmit={handleSaveEdit} className="card" style={{ width: "min(520px, 100%)", padding: 24, display: "grid", gap: 12 }}>
+            <h3 style={{ margin: 0 }}>แก้ไขข้อมูลผู้ลงทะเบียน</h3>
+            {[["name", "ชื่อ-นามสกุล"], ["phone", "เบอร์โทร"], ["address", "ที่อยู่จัดส่ง"], ["zipcode", "รหัสไปรษณีย์"], ["contact", "ช่องทางติดต่อ"]].map(([key, label]) => (
+              <label key={key} style={{ display: "grid", gap: 5 }}>{label}<input className="inp" value={editForm[key]} onChange={e => setEditForm(prev => ({ ...prev, [key]: e.target.value }))} required={key !== "contact"} /></label>
+            ))}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button type="button" className="btn btn-outline" onClick={() => setEditing(null)}>ยกเลิก</button>
+              <button type="submit" className="btn btn-teal">บันทึก</button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   )
 }
