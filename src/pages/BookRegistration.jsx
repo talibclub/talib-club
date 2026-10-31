@@ -213,6 +213,22 @@ export default function BookRegistration({ authState, go, ctx }) {
     }
   }
 
+  const handleCopyAccountNumber = async () => {
+    const accountLine = String(campaign?.bankAccount || "").split("\n").find(line => /เลขที่บัญชี|เลขบัญชี/i.test(line))
+    const accountNumber = accountLine?.match(/(?:เลขที่บัญชี|เลขบัญชี)\s*[:：]?\s*([\d -]+)/i)?.[1]?.trim()
+    if (!accountNumber) {
+      toast.error("ไม่พบเลขบัญชี กรุณาตรวจสอบข้อมูลบัญชีที่แสดง")
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(accountNumber)
+      toast.success("คัดลอกเลขบัญชีแล้ว")
+    } catch (err) {
+      console.error("Failed to copy bank account number:", err)
+      toast.error("คัดลอกไม่สำเร็จ กรุณาคัดลอกเลขบัญชีด้วยตนเอง")
+    }
+  }
+
   const formatTime = (ms) => {
     const totalSeconds = Math.floor(ms / 1000)
     const minutes = Math.floor(totalSeconds / 60)
@@ -361,6 +377,9 @@ export default function BookRegistration({ authState, go, ctx }) {
               )}
               <div style={{ fontSize: 14, color: "var(--t2)", marginBottom: 4 }}>โอนเงินเข้าบัญชี:</div>
               <div style={{ fontSize: 18, fontWeight: 500, whiteSpace: "pre-wrap" }}>{campaign.bankAccount}</div>
+              <button type="button" className="btn btn-outline" onClick={handleCopyAccountNumber} style={{ marginTop: 12, padding: "6px 10px", fontSize: 13 }}>
+                <i className="ti ti-copy"></i> คัดลอกเลขบัญชี
+              </button>
             </div>
           </div>
 
