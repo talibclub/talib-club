@@ -378,9 +378,13 @@ export default function Tracking({ authState }) {
     }
     
     const { name: sName, phone: sPhone, addr: sAddr, size } = labelSettings;
+    const labelsPerSheet = Number(size.match(/^a4-(1|2|4)$/)?.[1] || 0);
     const cssMap = {
       'therm-150x100': `@page{size:150mm 100mm;margin:0}body{margin:0;width:150mm;font-family:'Prompt',sans-serif;}.plabel{width:150mm;height:99mm;box-sizing:border-box;padding:4mm;page-break-after:always;display:flex;flex-direction:column}.l-inner{border:2px solid #000;flex:1;display:flex;flex-direction:column;padding:3mm;border-radius:4px}.l-sender{padding-bottom:3mm;border-bottom:1px dashed #000;font-size:11pt;line-height:1.4}.l-recv{flex:1;padding:4mm 2mm}.l-recv-name{font-size:24pt;font-weight:700;line-height:1.2;margin-bottom:2mm}.l-recv-phone{font-size:16pt;font-weight:600;margin-bottom:2mm}.l-recv-addr{font-size:14pt;line-height:1.5}.l-foot{display:flex;border-top:1px solid #000;height:22mm;align-items:center}.l-note{flex:1;font-size:14pt;font-weight:600;padding-left:2mm;color:#b45309}.l-zip{font-size:36pt;font-weight:700;letter-spacing:2px;padding-right:2mm}`,
-      'therm-100x150': `@page{size:100mm 150mm;margin:0}body{margin:0;width:100mm;font-family:'Prompt',sans-serif;}.plabel{width:100mm;height:149mm;box-sizing:border-box;padding:2mm;page-break-after:always;display:flex;flex-direction:column}.l-inner{border:2px solid #000;flex:1;display:flex;flex-direction:column;padding:3mm;border-radius:4px}.l-sender{padding-bottom:3mm;border-bottom:1px dashed #000;font-size:10pt;line-height:1.4}.l-recv{flex:1;padding:4mm 2mm}.l-recv-name{font-size:20pt;font-weight:700;line-height:1.2;margin-bottom:2mm}.l-recv-phone{font-size:14pt;font-weight:600;margin-bottom:2mm}.l-recv-addr{font-size:13pt;line-height:1.5}.l-foot{display:flex;border-top:1px solid #000;height:24mm;align-items:center}.l-note{flex:1;font-size:12pt;font-weight:600;padding-left:2mm;color:#b45309}.l-zip{font-size:32pt;font-weight:700;letter-spacing:1px;padding-right:2mm}`
+      'therm-100x150': `@page{size:100mm 150mm;margin:0}body{margin:0;width:100mm;font-family:'Prompt',sans-serif;}.plabel{width:100mm;height:149mm;box-sizing:border-box;padding:2mm;page-break-after:always;display:flex;flex-direction:column}.l-inner{border:2px solid #000;flex:1;display:flex;flex-direction:column;padding:3mm;border-radius:4px}.l-sender{padding-bottom:3mm;border-bottom:1px dashed #000;font-size:10pt;line-height:1.4}.l-recv{flex:1;padding:4mm 2mm}.l-recv-name{font-size:20pt;font-weight:700;line-height:1.2;margin-bottom:2mm}.l-recv-phone{font-size:14pt;font-weight:600;margin-bottom:2mm}.l-recv-addr{font-size:13pt;line-height:1.5}.l-foot{display:flex;border-top:1px solid #000;height:24mm;align-items:center}.l-note{flex:1;font-size:12pt;font-weight:600;padding-left:2mm;color:#b45309}.l-zip{font-size:32pt;font-weight:700;letter-spacing:1px;padding-right:2mm}`,
+      'a4-1': `@page{size:A4 portrait;margin:4mm}html,body{margin:0;font-family:'Prompt',sans-serif}.sheet{width:202mm;height:289mm;box-sizing:border-box;page-break-after:always;display:grid;grid-template-columns:1fr;grid-template-rows:1fr;gap:3mm}.plabel{min-width:0;min-height:0;box-sizing:border-box;padding:3mm;display:flex}.l-inner{border:2px solid #000;border-radius:3mm;flex:1;min-width:0;display:flex;flex-direction:column;padding:5mm}.l-sender{padding-bottom:4mm;border-bottom:1px dashed #000;font-size:11pt;line-height:1.45}.l-recv{flex:1;padding:7mm 3mm}.l-recv-name{font-size:24pt;font-weight:700;line-height:1.2;margin-bottom:3mm}.l-recv-phone{font-size:16pt;font-weight:600;margin-bottom:3mm}.l-recv-addr{font-size:14pt;line-height:1.5;overflow-wrap:anywhere}.l-foot{display:flex;border-top:1px solid #000;min-height:25mm;align-items:center}.l-note{flex:1;font-size:13pt;font-weight:600;padding-left:2mm;color:#b45309}.l-zip{font-size:34pt;font-weight:700;letter-spacing:1px;padding-right:2mm}`,
+      'a4-2': `@page{size:A4 portrait;margin:4mm}html,body{margin:0;font-family:'Prompt',sans-serif}.sheet{width:202mm;height:289mm;box-sizing:border-box;page-break-after:always;display:grid;grid-template-columns:1fr;grid-template-rows:repeat(2,minmax(0,1fr));gap:3mm}.plabel{min-width:0;min-height:0;box-sizing:border-box;padding:2mm;display:flex}.l-inner{border:2px solid #000;border-radius:2mm;flex:1;min-width:0;display:flex;flex-direction:column;padding:3mm}.l-sender{padding-bottom:2mm;border-bottom:1px dashed #000;font-size:8pt;line-height:1.3}.l-recv{flex:1;padding:3mm 2mm}.l-recv-name{font-size:18pt;font-weight:700;line-height:1.2;margin-bottom:2mm}.l-recv-phone{font-size:12pt;font-weight:600;margin-bottom:2mm}.l-recv-addr{font-size:11pt;line-height:1.4;overflow-wrap:anywhere}.l-foot{display:flex;border-top:1px solid #000;min-height:18mm;align-items:center}.l-note{flex:1;font-size:10pt;font-weight:600;padding-left:2mm;color:#b45309}.l-zip{font-size:25pt;font-weight:700;letter-spacing:1px;padding-right:2mm}`,
+      'a4-4': `@page{size:A4 portrait;margin:4mm}html,body{margin:0;font-family:'Prompt',sans-serif}.sheet{width:202mm;height:289mm;box-sizing:border-box;page-break-after:always;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:3mm}.plabel{min-width:0;min-height:0;box-sizing:border-box;padding:1mm;display:flex}.l-inner{border:1.5px solid #000;border-radius:1mm;flex:1;min-width:0;display:flex;flex-direction:column;padding:2mm}.l-sender{padding-bottom:1mm;border-bottom:1px dashed #000;font-size:6pt;line-height:1.2;overflow-wrap:anywhere}.l-recv{flex:1;padding:2mm 1mm}.l-recv-name{font-size:12pt;font-weight:700;line-height:1.15;margin-bottom:1mm;overflow-wrap:anywhere}.l-recv-phone{font-size:9pt;font-weight:600;margin-bottom:1mm}.l-recv-addr{font-size:8pt;line-height:1.25;overflow-wrap:anywhere}.l-foot{display:flex;border-top:1px solid #000;min-height:12mm;align-items:center}.l-note{flex:1;font-size:7pt;font-weight:600;padding-left:1mm;color:#000;overflow-wrap:anywhere}.l-zip{font-size:17pt;font-weight:700;padding-right:1mm}`
     };
 
     const escapeHTML = (str) => {
@@ -391,7 +395,7 @@ export default function Tracking({ authState }) {
       });
     };
 
-    const labelsHtml = listToPrint.map(r => `
+    const renderLabel = r => `
       <div class="plabel"><div class="l-inner">
         <div class="l-sender"><strong>ผู้ส่ง: ${escapeHTML(sName)}</strong> ${sPhone ? `📞 ${escapeHTML(sPhone)}` : ''}<br/>${escapeHTML(sAddr)}</div>
         <div class="l-recv">
@@ -405,7 +409,13 @@ export default function Tracking({ authState }) {
           <div class="l-zip">${escapeHTML(r.postalCode || '')}</div>
         </div>
       </div></div>
-    `).join('');
+    `;
+    const labelsHtml = labelsPerSheet
+      ? Array.from({ length: Math.ceil(listToPrint.length / labelsPerSheet) }, (_, page) => {
+        const pageLabels = listToPrint.slice(page * labelsPerSheet, (page + 1) * labelsPerSheet).map(renderLabel).join('');
+        return `<section class="sheet">${pageLabels}</section>`;
+      }).join('')
+      : listToPrint.map(renderLabel).join('');
 
     const iframe = document.createElement("iframe");
     iframe.style.display = "none";
@@ -843,6 +853,16 @@ export default function Tracking({ authState }) {
                      <input type="radio" name="size" value="therm-100x150" checked={labelSettings.size === 'therm-100x150'} onChange={e => setLabelSettings({...labelSettings, size: e.target.value})} style={{ width: "auto", accentColor: "var(--teal)" }} />
                      <div><div style={{ fontWeight: "700", color: "var(--teal)" }}>100×150 มม. (แนวตั้ง)</div><div style={{ fontSize: "12px", color: "var(--t2)" }}>มาตรฐานเครื่องพิมพ์ความร้อน</div></div>
                    </label>
+                   {[
+                     ["a4-1", "A4 · 1 ใบต่อแผ่น", "ฉลากขนาดใหญ่ อ่านง่าย เหมาะกับที่อยู่ยาว"],
+                     ["a4-2", "A4 · 2 ใบต่อแผ่น", "ฉลากขนาดกลาง พิมพ์แนวตั้ง 2 แถว"],
+                     ["a4-4", "A4 · 4 ใบต่อแผ่น", "ฉลากขนาดกะทัดรัด จัดวาง 2 × 2"]
+                   ].map(([value, title, description]) => (
+                     <label key={value} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", border: `1px solid ${labelSettings.size === value ? "var(--teal)" : "var(--br)"}`, borderRadius: "8px", cursor: "pointer", background: labelSettings.size === value ? "var(--teal-bg)" : "var(--bg2)" }}>
+                       <input type="radio" name="size" value={value} checked={labelSettings.size === value} onChange={e => setLabelSettings({ ...labelSettings, size: e.target.value })} style={{ width: "auto", accentColor: "var(--teal)" }} />
+                       <div><div style={{ fontWeight: "700", color: "var(--teal)" }}>{title}</div><div style={{ fontSize: "12px", color: "var(--t2)" }}>{description}</div></div>
+                     </label>
+                   ))}
                  </div>
                </div>
              </div>
