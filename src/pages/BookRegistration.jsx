@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { doc, getDoc } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "../lib/driveStorage.js"
 import { db, storage } from "../lib/firebase.js"
@@ -32,6 +32,7 @@ export default function BookRegistration({ authState, go, ctx }) {
   // Slip upload
   const [slipFile, setSlipFile] = useState(null)
   const [uploading, setUploading] = useState(false)
+  const uploadInProgressRef = useRef(false)
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -156,6 +157,7 @@ export default function BookRegistration({ authState, go, ctx }) {
 
   const handleUploadAndSubmit = async (e) => {
     e.preventDefault()
+    if (uploadInProgressRef.current) return
     if (!slipFile) {
       toast.error("กรุณาแนบสลิปโอนเงิน")
       return
@@ -173,6 +175,7 @@ export default function BookRegistration({ authState, go, ctx }) {
       return
     }
 
+    uploadInProgressRef.current = true
     setUploading(true)
     try {
       // Upload slip
@@ -209,6 +212,7 @@ export default function BookRegistration({ authState, go, ctx }) {
       console.error(err)
       toast.error(err instanceof Error && err.message ? err.message : "เกิดข้อผิดพลาดในการบันทึกข้อมูล")
     } finally {
+      uploadInProgressRef.current = false
       setUploading(false)
     }
   }
@@ -385,12 +389,22 @@ export default function BookRegistration({ authState, go, ctx }) {
 
           <label style={{ display: "block", marginBottom: 24 }}>
             <span className="label-text">แนบหลักฐานการโอนเงิน (สลิป) *</span>
-            <input type="file" required accept="image/*" onChange={e => setSlipFile(e.target.files[0])} style={{ width: "100%", padding: 12, background: "var(--bg2)", border: "1px dashed var(--br)", borderRadius: 8 }} />
+            <input type="file" required accept="image/*" disabled={uploading} onChange={e => setSlipFile(e.target.files[0])} style={{ width: "100%", padding: 12, background: "var(--bg2)", border: "1px dashed var(--br)", borderRadius: 8 }} />
           </label>
+
+          {uploading && (
+            <div role="status" aria-live="polite" style={{ display: "flex", alignItems: "center", gap: 12, padding: 16, marginBottom: 20, borderRadius: 10, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)" }}>
+              <i className="ti ti-loader-2 spin" style={{ fontSize: 24, flexShrink: 0 }}></i>
+              <div>
+                <strong style={{ display: "block" }}>กำลังอัปโหลดสลิปและบันทึกข้อมูล</strong>
+                <span style={{ fontSize: 13 }}>กรุณารอสักครู่ อย่าปิดหน้านี้หรือกดส่งซ้ำ</span>
+              </div>
+            </div>
+          )}
 
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <button type="submit" className="btn btn-teal" disabled={uploading}>
-              {uploading ? "กำลังอัปโหลด..." : "ยืนยันการชำระเงิน"} <i className="ti ti-check"></i>
+              {uploading ? <><i className="ti ti-loader-2 spin"></i> กำลังอัปโหลด...</> : <>ยืนยันการชำระเงิน <i className="ti ti-check"></i></>}
             </button>
           </div>
         </form>
@@ -407,12 +421,20 @@ export default function BookRegistration({ authState, go, ctx }) {
           <div style={{ background: "rgba(18, 184, 134, 0.1)", color: "var(--teal)", padding: "12px 16px", borderRadius: 8, marginTop: 16, fontSize: 14, border: "1px solid rgba(18, 184, 134, 0.2)" }}>
             <i className="ti ti-info-circle"></i> ทางเราจะประกาศรายชื่อเมื่อมีการปิดรับลงทะเบียนเรียบร้อยแล้ว
           </div>
-          <p style={{ color: "var(--t2)", marginTop: 16, fontSize: 14 }}>
-            หากกรอกข้อมูลลงทะเบียนผิดและต้องการแก้ไข กรุณาติดต่อทีมงานทางเพจเฟซบุ๊ก{" "}
-            <a href={SITE.social.facebook} target="_blank" rel="noreferrer" style={{ color: "var(--teal)", fontWeight: 600, textDecoration: "underline" }}>
-              Talib Club คลิกที่นี่เพื่อติดต่อทีมงาน
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", textAlign: "left", marginTop: 18, padding: "16px 18px", border: "1px solid var(--br)", borderRadius: 12, background: "var(--bg2)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flex: "1 1 260px" }}>
+              <span style={{ width: 40, height: 40, flexShrink: 0, display: "grid", placeItems: "center", borderRadius: "50%", background: "rgba(24, 119, 242, 0.1)", color: "#1877f2" }}>
+                <i className="ti ti-help-circle" style={{ fontSize: 20 }}></i>
+              </span>
+              <div>
+                <strong style={{ display: "block", color: "var(--text)", fontSize: 14 }}>กรอกข้อมูลผิดใช่ไหม?</strong>
+                <span style={{ color: "var(--t2)", fontSize: 13 }}>ติดต่อทีมงานทางเพจ Facebook เพื่อขอแก้ไขข้อมูล</span>
+              </div>
+            </div>
+            <a href={SITE.social.facebook} target="_blank" rel="noreferrer" className="btn btn-outline" style={{ color: "#1877f2", borderColor: "rgba(24, 119, 242, 0.25)", whiteSpace: "nowrap", textDecoration: "none", padding: "9px 14px", fontSize: 13 }}>
+              <i className="ti ti-brand-facebook"></i> ติดต่อทีมงาน
             </a>
-          </p>
+          </div>
           <div style={{ marginTop: 32, display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
             <button className="btn btn-teal" onClick={() => go("tracking-system")} style={{ padding: "12px 24px", fontSize: 16, fontWeight: 600 }}>
               <i className="ti ti-list-search" style={{ marginRight: 8 }}></i> เช็ครายชื่อและสถานะ
