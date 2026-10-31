@@ -6,6 +6,7 @@ import { trackingDb as db } from "../lib/trackingFirebase.js";
 import { auth } from "../lib/firebase.js";
 import { formatFirebaseDate } from "../utils/format.js";
 import { exportCSV } from "../utils/csvTracking.js";
+import { SITE } from "../data/site.js";
 
 const MANUAL_LABELS_STORAGE_KEY = "talib_tracking_manual_labels_v1";
 
@@ -216,6 +217,7 @@ export default function Tracking({ authState }) {
     }
     setIsLoading(false);
   };
+
 
   // ==========================================
   // ★ TAB 1 & 3: CSV UPLOADING
@@ -662,9 +664,9 @@ export default function Tracking({ authState }) {
 
           <div className="card" style={{ padding: "clamp(12px, 3vw, 24px)", marginBottom: "32px" }}>
             <form onSubmit={(e) => handlePublicSearch(e, view === "user-recipient" ? "recipient" : "track")} style={{ display: "flex", gap: "12px", flexDirection: "column", sm: { flexDirection: "row"} }}>
-              <label style={{ fontSize: "13px", color: "var(--t2)", fontWeight: "500" }}>ค้นหาด้วย ชื่อ-นามสกุล หรือ เบอร์โทรศัพท์</label>
+              <label style={{ fontSize: "13px", color: "var(--t2)", fontWeight: "500" }}>ค้นด้วยชื่อเพื่อดูชื่อและเบอร์โทร หรือค้นด้วยเบอร์โทรเพื่อดูที่อยู่จัดส่ง</label>
               <div style={{ display: "flex", gap: "12px" }}>
-                <input type="text" className="inp" placeholder="พิมพ์ข้อมูลที่นี่..." value={userQuery} onChange={(e) => setUserQuery(e.target.value)} style={{ flex: 1, padding: "12px 16px" }} />
+                <input type="text" className="inp" placeholder={view === "user-recipient" ? "ชื่อ-นามสกุล หรือเบอร์โทร 10 หลัก" : "ชื่อ เบอร์โทร หรือเลข Tracking"} value={userQuery} onChange={(e) => setUserQuery(e.target.value)} style={{ flex: 1, padding: "12px 16px" }} />
                 <button type="submit" className="btn btn-teal" disabled={isLoading} style={{ padding: "0 24px" }}>{isLoading ? "⏳" : "ค้นหา"}</button>
               </div>
             </form>
@@ -689,6 +691,17 @@ export default function Tracking({ authState }) {
                  </div>
                  {item.phone && (
                    <div><div style={{ color: "var(--t2)", fontSize: "12px", marginBottom: "4px" }}>เบอร์โทรศัพท์</div><div style={{ fontSize: "15px" }}>{item.phone}</div></div>
+                 )}
+                 {item.address && (
+                   <div style={{ background: "var(--bg2)", border: "1px solid var(--br2)", borderRadius: 10, padding: 16 }}>
+                     <div style={{ color: "var(--t2)", fontSize: "12px", marginBottom: 6 }}>ที่อยู่จัดส่งที่ลงทะเบียนไว้</div>
+                     <div style={{ fontSize: 15, lineHeight: 1.7, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                       {item.address}{item.postalCode ? ` ${item.postalCode}` : ""}
+                     </div>
+                     <a href={SITE.social.facebook} target="_blank" rel="noreferrer" className="btn btn-outline btn-sm" style={{ marginTop: 12, textDecoration: "none" }}>
+                       <i className="ti ti-message-circle"></i> ที่อยู่ไม่ถูกต้อง? แจ้งทีมงาน
+                     </a>
+                   </div>
                  )}
                  {item.trackingNumber ? (
                    <div style={{ marginTop: "8px", paddingTop: "16px", borderTop: "1px dashed var(--br2)" }}>
