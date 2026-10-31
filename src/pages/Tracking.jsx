@@ -420,9 +420,9 @@ export default function Tracking({ authState }) {
 
     const renderLabel = r => `
       <div class="plabel"><div class="l-inner">
-        <div class="l-sender"><strong>ผู้ส่ง: ${escapeHTML(sName)}</strong> ${sPhone ? `📞 ${escapeHTML(sPhone)}` : ''}<br/>${escapeHTML(sAddr)}</div>
+        <div class="l-sender"><div class="l-sender-title">ผู้ส่ง / SENDER</div><div><strong>${escapeHTML(sName)}</strong> ${sPhone ? `📞 ${escapeHTML(sPhone)}` : ''}</div><div>${escapeHTML(sAddr)}</div></div>
         <div class="l-recv">
-          <div style="font-size:10pt;font-weight:700;margin-bottom:4px">ผู้รับ:</div>
+          <div class="l-recv-title">ผู้รับ / RECEIVER</div>
           <div class="l-recv-name">${escapeHTML(r.fullName)}</div>
           ${r.phone ? `<div class="l-recv-phone">📞 ${escapeHTML(r.phone)}</div>` : ''}
           <div class="l-recv-addr">${escapeHTML(r.address)}</div>
@@ -445,7 +445,8 @@ export default function Tracking({ authState }) {
     document.body.appendChild(iframe);
     const doc = iframe.contentWindow.document;
     doc.open();
-    doc.write(`<html><head><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet"><style>${cssMap[size] || cssMap['therm-150x100']}</style></head><body>${labelsHtml}</body></html>`);
+    const labelTheme = `.l-sender{background:#111318;color:#fff!important;border:0!important;border-radius:1mm;padding:2mm!important;margin-bottom:2mm}.l-sender strong,.l-sender-title{color:#fff!important}.l-sender-title{font-weight:700;font-size:.9em;letter-spacing:.02em;margin-bottom:1mm}.l-recv-title{font-size:10pt;font-weight:700;margin-bottom:4px;color:#111318}.l-foot{border-top:1px solid #111318}.l-note{color:#8a5200!important}`;
+    doc.write(`<html><head><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet"><style>${cssMap[size] || cssMap['therm-150x100']}${labelTheme}</style></head><body>${labelsHtml}</body></html>`);
     doc.close();
     setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => document.body.removeChild(iframe), 1000); }, 500);
   };
@@ -865,25 +866,25 @@ export default function Tracking({ authState }) {
                  <textarea className="inp" placeholder="ที่อยู่ผู้ส่ง..." rows="2" value={labelSettings.addr} onChange={e => setLabelSettings({...labelSettings, addr: e.target.value})}></textarea>
                </div>
 
-               <div style={{ marginBottom: "24px", background: "var(--bg)", padding: "16px", borderRadius: "8px", border: "1px solid var(--br2)" }}>
+               <div style={{ marginBottom: "24px", background: "#111318", color: "#f5f5f5", padding: "16px", borderRadius: "10px", border: "1px solid #2b2d36" }}>
                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-                   <div style={{ fontSize: "13px", fontWeight: "700", color: "var(--teal)" }}>✍️ เพิ่มลาเบลเอง</div>
-                   <span style={{ fontSize: 12, color: "var(--t2)" }}>เพิ่มผู้รับที่ไม่มีในรายชื่อ Tracking · {manualLabels.length} รายการ</span>
+                   <div style={{ fontSize: "13px", fontWeight: "700", color: "#65d6b3" }}>✍️ เพิ่มลาเบลเอง</div>
+                   <span style={{ fontSize: 12, color: "#a1a1aa" }}>เพิ่มผู้รับที่ไม่มีในรายชื่อ Tracking · {manualLabels.length} รายการ</span>
                  </div>
                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
-                   <input className="inp" placeholder="ชื่อผู้รับ *" value={manualLabelDraft.fullName} onChange={e => setManualLabelDraft({ ...manualLabelDraft, fullName: e.target.value })} />
-                   <input className="inp" placeholder="เบอร์โทร (ถ้ามี)" value={manualLabelDraft.phone} onChange={e => setManualLabelDraft({ ...manualLabelDraft, phone: e.target.value })} />
-                   <input className="inp" placeholder="รหัสไปรษณีย์ *" value={manualLabelDraft.postalCode} onChange={e => setManualLabelDraft({ ...manualLabelDraft, postalCode: e.target.value })} />
-                   <input className="inp" placeholder="หมายเหตุ (ถ้ามี)" value={manualLabelDraft.bonusNote} onChange={e => setManualLabelDraft({ ...manualLabelDraft, bonusNote: e.target.value })} />
-                   <textarea className="inp" placeholder="ที่อยู่ผู้รับ *" rows="2" value={manualLabelDraft.address} onChange={e => setManualLabelDraft({ ...manualLabelDraft, address: e.target.value })} style={{ gridColumn: "1 / -1" }} />
+                   <input className="inp" placeholder="ชื่อผู้รับ *" value={manualLabelDraft.fullName} onChange={e => setManualLabelDraft({ ...manualLabelDraft, fullName: e.target.value })} style={{ background: "#1b1d25", color: "#f5f5f5", borderColor: "#343741" }} />
+                   <input className="inp" placeholder="เบอร์โทร (ถ้ามี)" value={manualLabelDraft.phone} onChange={e => setManualLabelDraft({ ...manualLabelDraft, phone: e.target.value })} style={{ background: "#1b1d25", color: "#f5f5f5", borderColor: "#343741" }} />
+                   <input className="inp" placeholder="รหัสไปรษณีย์ *" value={manualLabelDraft.postalCode} onChange={e => setManualLabelDraft({ ...manualLabelDraft, postalCode: e.target.value })} style={{ background: "#1b1d25", color: "#f5f5f5", borderColor: "#343741" }} />
+                   <input className="inp" placeholder="หมายเหตุ (ถ้ามี)" value={manualLabelDraft.bonusNote} onChange={e => setManualLabelDraft({ ...manualLabelDraft, bonusNote: e.target.value })} style={{ background: "#1b1d25", color: "#f5f5f5", borderColor: "#343741" }} />
+                   <textarea className="inp" placeholder="ที่อยู่ผู้รับ *" rows="2" value={manualLabelDraft.address} onChange={e => setManualLabelDraft({ ...manualLabelDraft, address: e.target.value })} style={{ gridColumn: "1 / -1", background: "#1b1d25", color: "#f5f5f5", borderColor: "#343741" }} />
                  </div>
-                 <button type="button" className="btn btn-outline" onClick={addManualLabel} style={{ marginTop: 10, color: "var(--teal)", borderColor: "var(--teal)" }}>
+                 <button type="button" className="btn btn-outline" onClick={addManualLabel} style={{ marginTop: 10, color: "#65d6b3", borderColor: "#3b9f84", background: "#17221f" }}>
                    <i className="ti ti-plus"></i> เพิ่มลงรายการพิมพ์
                  </button>
                  {manualLabels.length > 0 && (
                    <div style={{ display: "grid", gap: 6, marginTop: 12 }}>
                      {manualLabels.map((label, index) => (
-                       <div key={label.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 6, background: "var(--bg2)", fontSize: 12 }}>
+                       <div key={label.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 6, background: "#1b1d25", color: "#e4e4e7", border: "1px solid #2b2d36", fontSize: 12 }}>
                          <span><strong>{index + 1}. {label.fullName}</strong> · {label.postalCode}{label.address ? ` · ${label.address}` : ""}</span>
                          <button type="button" aria-label={`ลบลาเบล ${label.fullName}`} className="btn btn-outline" onClick={() => setManualLabels(prev => prev.filter(item => item.id !== label.id))} style={{ padding: "4px 8px", color: "var(--red)", flexShrink: 0 }}>
                            <i className="ti ti-trash"></i>
