@@ -14,6 +14,9 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
   const [holds, setHolds] = useState([])
   const [editing, setEditing] = useState(null)
   const [editForm, setEditForm] = useState({})
+  const [adding, setAdding] = useState(false)
+  const [addForm, setAddForm] = useState({ name: "", phone: "", address: "", zipcode: "", contact: "" })
+  const [syncingAll, setSyncingAll] = useState(false)
   // The "minutes left" figure was computed with a bare Date.now() during render,
   // so it only moved when something else re-rendered the page. Tick it.
   const [nowMs, setNowMs] = useState(() => Date.now())
@@ -160,6 +163,76 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
     } catch (err) {
       console.error(err)
       toast.error("เกิดข้อผิดพลาดในการซิงค์ข้อมูล", { id: toastId })
+    }
+  }
+
+  const handleSyncAllToTracking = async () => {
+    const unsynced = registrations.filter(reg => !reg.syncedToTracking)
+    if (!unsynced.length) return toast.success("รายชื่อทั้งหมดถูกส่งเข้า Tracking แล้ว")
+    const confirmed = await confirmAction(`ส่งรายชื่อที่ยังไม่เข้า Tracking จำนวน ${unsynced.length} รายชื่อใช่หรือไม่?`)
+    if (!confirmed) return
+
+    setSyncingAll(true)
+    const toastId = toast.loading(`กำลังส่ง ${unsynced.length} รายชื่อเข้า Tracking...`)
+    try {
+      // Use deterministic document IDs so retrying after a partial failure won't create duplicates.
+      for (let offset = 0; offset < unsynced.length; offset += 400) {
+        const chunk = unsynced.slice(offset, offset + 400)
+        const trackingBatch = writeBatch(trackingDb)
+        chunk.forEach(reg => trackingBatch.set(doc(trackingDb, "recipients", `reg_${reg.id}`), {
+          fullName: reg.name,
+          phone: reg.phone,
+          address: reg.address,
+          postalCode: reg.zipcode,
+          bonusNote: `แคมเปญ: ${campaign.title}`,
+          createdAt: serverTimestamp(),
+          sourceRegId: reg.id
+        }, { merge: true }))
+        await trackingBatch.commit()
+
+        const registrationsBatch = writeBatch(db)
+        chunk.forEach(reg => registrationsBatch.update(doc(db, "book_registrations", reg.id), {
+          syncedToTracking: true,
+          updatedAt: serverTimestamp()
+        }))
+        await registrationsBatch.commit()
+      }
+      setSelected([])
+      toast.success(`ส่ง ${unsynced.length} รายชื่อเข้า Tracking แล้ว`, { id: toastId })
+      fetchRegistrations()
+    } catch (err) {
+      console.error(err)
+      toast.error("ส่งรายชื่อไม่ครบ ลองอีกครั้งได้ โดยรายชื่อที่ส่งแล้วจะไม่ซ้ำ", { id: toastId })
+      fetchRegistrations()
+    } finally {
+      setSyncingAll(false)
+    }
+  }
+
+  const handleAddRegistration = async (e) => {
+    e.preventDefault()
+    const values = Object.fromEntries(Object.entries(addForm).map(([key, value]) => [key, value.trim()]))
+    if (!values.name || !values.phone || !values.address || !values.zipcode) return toast.error("กรุณากรอกชื่อ เบอร์โทร ที่อยู่ และรหัสไปรษณีย์")
+    const toastId = toast.loading("กำลังบันทึกรายชื่อ...")
+    try {
+      const id = `${campaign.id}_manual_${globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`}`
+      await setDoc(doc(db, "book_registrations", id), {
+        ...values,
+        campaignId: campaign.id,
+        uid: id,
+        status: "approved",
+        syncedToTracking: false,
+        adminAdded: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      })
+      setAddForm({ name: "", phone: "", address: "", zipcode: "", contact: "" })
+      setAdding(false)
+      toast.success("เพิ่มรายชื่อแล้ว", { id: toastId })
+      fetchRegistrations()
+    } catch (err) {
+      console.error(err)
+      toast.error("เพิ่มรายชื่อไม่สำเร็จ", { id: toastId })
     }
   }
 
@@ -345,6 +418,12 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
             />
           </div>
           <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn btn-outline" onClick={() => setAdding(true)} style={{ padding: "8px 16px" }}>
+              <i className="ti ti-user-plus"></i> เพิ่มรายชื่อ
+            </button>
+            <button className="btn btn-teal" onClick={handleSyncAllToTracking} disabled={syncingAll || registrations.every(reg => reg.syncedToTracking)} style={{ padding: "8px 16px" }}>
+              <i className="ti ti-database-export"></i> {syncingAll ? "กำลังส่ง..." : `ส่งทั้งหมดเข้า Tracking (${registrations.filter(reg => !reg.syncedToTracking).length})`}
+            </button>
             {selected.length > 0 && (
               <button className="btn btn-teal" onClick={handleBulkApprove} style={{ padding: "8px 16px" }}>
                 <i className="ti ti-check"></i> อนุมัติ ({selected.length})
@@ -475,6 +554,21 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button type="button" className="btn btn-outline" onClick={() => setEditing(null)}>ยกเลิก</button>
               <button type="submit" className="btn btn-teal">บันทึก</button>
+            </div>
+          </form>
+        </div>
+      )}
+      {adding && (
+        <div role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setAdding(false) }} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,.45)", display: "grid", placeItems: "center", padding: 16 }}>
+          <form onSubmit={handleAddRegistration} className="card" style={{ width: "min(520px, 100%)", padding: 24, display: "grid", gap: 12 }}>
+            <h3 style={{ margin: 0 }}>เพิ่มรายชื่อด้วยตนเอง</h3>
+            {[ ["name", "ชื่อ-นามสกุล"], ["phone", "เบอร์โทรศัพท์"], ["address", "ที่อยู่จัดส่ง"], ["zipcode", "รหัสไปรษณีย์"], ["contact", "ช่องทางติดต่อ (ไม่บังคับ)"] ].map(([key, label]) => (
+              <label key={key} style={{ display: "grid", gap: 5 }}>{label}<input className="inp" value={addForm[key]} onChange={e => setAddForm(prev => ({ ...prev, [key]: e.target.value }))} required={key !== "contact"} /></label>
+            ))}
+            <p style={{ margin: 0, color: "var(--t2)", fontSize: 12 }}>รายชื่อที่เพิ่มเองจะถูกตั้งสถานะอนุมัติ และส่งเข้า Tracking ได้ด้วยปุ่มด้านบน</p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button type="button" className="btn btn-outline" onClick={() => setAdding(false)}>ยกเลิก</button>
+              <button type="submit" className="btn btn-teal">บันทึกรายชื่อ</button>
             </div>
           </form>
         </div>
