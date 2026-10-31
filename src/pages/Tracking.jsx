@@ -9,6 +9,23 @@ import { exportCSV } from "../utils/csvTracking.js";
 
 const MANUAL_LABELS_STORAGE_KEY = "talib_tracking_manual_labels_v1";
 
+function calculateA4LabelLayout(widthMm, heightMm) {
+  if (![widthMm, heightMm].every(value => Number.isFinite(value) && value > 0)) return null;
+  const gapMm = 2;
+  const candidates = [
+    { orientation: "portrait", pageWidth: 202, pageHeight: 289, rotated: false, labelWidth: widthMm, labelHeight: heightMm },
+    { orientation: "portrait", pageWidth: 202, pageHeight: 289, rotated: true, labelWidth: heightMm, labelHeight: widthMm },
+    { orientation: "landscape", pageWidth: 289, pageHeight: 202, rotated: false, labelWidth: widthMm, labelHeight: heightMm },
+    { orientation: "landscape", pageWidth: 289, pageHeight: 202, rotated: true, labelWidth: heightMm, labelHeight: widthMm },
+  ].map(candidate => {
+    const cols = Math.floor((candidate.pageWidth + gapMm) / (candidate.labelWidth + gapMm));
+    const rows = Math.floor((candidate.pageHeight + gapMm) / (candidate.labelHeight + gapMm));
+    return { ...candidate, cols, rows, capacity: cols * rows };
+  }).filter(candidate => candidate.capacity > 0);
+
+  return candidates.sort((a, b) => b.capacity - a.capacity || Number(a.rotated) - Number(b.rotated) || (a.orientation === b.orientation ? 0 : a.orientation === "portrait" ? -1 : 1))[0];
+}
+
 export default function Tracking({ authState }) {
   // --- View & Routing State ---
   const [view, setView] = useState("home");
@@ -35,7 +52,7 @@ export default function Tracking({ authState }) {
   // --- Modals State ---
   const [activeModal, setActiveModal] = useState(null); // 'edit-recipient', 'edit-record', 'label'
   const [editData, setEditData] = useState({});
-  const [labelSettings, setLabelSettings] = useState({ name: "สมาคม Talib Club", phone: "", addr: "", size: "therm-150x100", customWidth: 100, customHeight: 75, a4Rows: 3, a4Cols: 2, a4Orientation: "portrait" });
+  const [labelSettings, setLabelSettings] = useState({ name: "สมาคม Talib Club", phone: "", addr: "", size: "therm-150x100", customWidth: 100, customHeight: 75, a4LabelWidth: 100, a4LabelHeight: 75, a4Rows: 3, a4Cols: 2, a4Orientation: "portrait" });
   const [manualLabels, setManualLabels] = useState(() => {
     try {
       const saved = sessionStorage.getItem(MANUAL_LABELS_STORAGE_KEY);
@@ -492,13 +509,18 @@ export default function Tracking({ authState }) {
       await myAlert("จำนวนแถวและคอลัมน์ต้องเป็นจำนวนเต็มระหว่าง 1–4");
       return;
     }
+    if (labelSettings.size === "a4-fit" && ![labelSettings.a4LabelWidth, labelSettings.a4LabelHeight].every(value => Number.isFinite(Number(value)) && Number(value) >= 50 && Number(value) <= 200)) {
+      await myAlert("ขนาดฉลาก A4 ต้องอยู่ระหว่าง 50–200 มม. ทั้งด้านกว้างและด้านสูง");
+      return;
+    }
     
     const { name: sName, phone: sPhone, addr: sAddr, size } = labelSettings;
     const a4PresetMatch = size.match(/^a4-grid-(\d)x(\d)-(portrait|landscape)$/);
     const a4Cols = size === "a4-grid-custom" ? Number(labelSettings.a4Cols) : Number(a4PresetMatch?.[1] || 0);
     const a4Rows = size === "a4-grid-custom" ? Number(labelSettings.a4Rows) : Number(a4PresetMatch?.[2] || 0);
     const a4Orientation = size === "a4-grid-custom" ? labelSettings.a4Orientation : a4PresetMatch?.[3];
-    const labelsPerSheet = Number(size.match(/^a4-(1|2|4)$/)?.[1] || 0) || (a4Rows * a4Cols);
+    const a4FitLayout = size === "a4-fit" ? calculateA4LabelLayout(Number(labelSettings.a4LabelWidth), Number(labelSettings.a4LabelHeight)) : null;
+    const labelsPerSheet = Number(size.match(/^a4-(1|2|4)$/)?.[1] || 0) || (a4FitLayout?.capacity || (a4Rows * a4Cols));
     const cssMap = {
       'therm-150x100': `@page{size:150mm 100mm;margin:0}body{margin:0;width:150mm;font-family:'Prompt',sans-serif;}.plabel{width:150mm;height:99mm;box-sizing:border-box;padding:4mm;page-break-after:always;display:flex;flex-direction:column}.l-inner{border:2px solid #000;flex:1;display:flex;flex-direction:column;padding:3mm;border-radius:4px}.l-sender{padding-bottom:3mm;border-bottom:1px dashed #000;font-size:11pt;line-height:1.4}.l-recv{flex:1;padding:4mm 2mm}.l-recv-name{font-size:24pt;font-weight:700;line-height:1.2;margin-bottom:2mm}.l-recv-phone{font-size:16pt;font-weight:600;margin-bottom:2mm}.l-recv-addr{font-size:14pt;line-height:1.5}.l-foot{display:flex;border-top:1px solid #000;height:22mm;align-items:center}.l-note{flex:1;font-size:14pt;font-weight:600;padding-left:2mm;color:#b45309}.l-zip{font-size:36pt;font-weight:700;letter-spacing:2px;padding-right:2mm}`,
       'therm-100x150': `@page{size:100mm 150mm;margin:0}body{margin:0;width:100mm;font-family:'Prompt',sans-serif;}.plabel{width:100mm;height:149mm;box-sizing:border-box;padding:2mm;page-break-after:always;display:flex;flex-direction:column}.l-inner{border:2px solid #000;flex:1;display:flex;flex-direction:column;padding:3mm;border-radius:4px}.l-sender{padding-bottom:3mm;border-bottom:1px dashed #000;font-size:10pt;line-height:1.4}.l-recv{flex:1;padding:4mm 2mm}.l-recv-name{font-size:20pt;font-weight:700;line-height:1.2;margin-bottom:2mm}.l-recv-phone{font-size:14pt;font-weight:600;margin-bottom:2mm}.l-recv-addr{font-size:13pt;line-height:1.5}.l-foot{display:flex;border-top:1px solid #000;height:24mm;align-items:center}.l-note{flex:1;font-size:12pt;font-weight:600;padding-left:2mm;color:#b45309}.l-zip{font-size:32pt;font-weight:700;letter-spacing:1px;padding-right:2mm}`,
@@ -522,6 +544,11 @@ export default function Tracking({ authState }) {
       const scale = Math.min(labelWidthMm / 150, labelHeightMm / 100);
       const gridLayoutCss = `@page{size:A4 ${a4Orientation};margin:4mm}html,body{margin:0;font-family:'Prompt',sans-serif;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.sheet{width:${pageWidthMm}mm;height:${pageHeightMm}mm;box-sizing:border-box;page-break-after:always;display:grid;grid-template-columns:repeat(${a4Cols},minmax(0,1fr));grid-template-rows:repeat(${a4Rows},minmax(0,1fr));gap:3mm}.plabel{min-width:0;min-height:0;box-sizing:border-box;padding:1mm;display:flex}.l-inner{border:1.5px solid #000;border-radius:1mm;flex:1;min-width:0;display:flex;flex-direction:column;padding:2mm}.l-sender{font-size:${Math.max(8, Math.min(15, 13 * scale))}pt;line-height:1.25;overflow-wrap:anywhere}.l-recv{flex:1;padding:2mm 1mm}.l-recv-name{font-size:${Math.max(10, Math.min(25, 22 * scale))}pt;font-weight:700;line-height:1.15;margin-bottom:1mm;overflow-wrap:anywhere}.l-recv-phone{font-size:${Math.max(8, Math.min(17, 15 * scale))}pt;font-weight:600;margin-bottom:1mm}.l-recv-addr{font-size:${Math.max(7, Math.min(14, 12 * scale))}pt;line-height:1.25;overflow-wrap:anywhere}.l-foot{display:flex;border-top:1px solid #000;min-height:${Math.max(9, Math.min(18, 15 * scale))}mm;align-items:center}.l-note{flex:1;font-size:${Math.max(7, Math.min(12, 10 * scale))}pt;font-weight:600;padding-left:1mm;color:#000;overflow-wrap:anywhere}.l-zip{font-size:${Math.max(12, Math.min(34, 30 * scale))}pt;font-weight:700;padding-right:1mm}`;
       layoutCss = size === "a4-grid-custom" || a4PresetMatch ? gridLayoutCss : layoutCss;
+    }
+    if (size === "a4-fit" && a4FitLayout) {
+      const { orientation, pageWidth, pageHeight, labelWidth, labelHeight, cols, rows } = a4FitLayout;
+      const scale = Math.min(labelWidth / 150, labelHeight / 100);
+      layoutCss = `@page{size:A4 ${orientation};margin:4mm}html,body{margin:0;font-family:'Prompt',sans-serif;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.sheet{width:${pageWidth}mm;height:${pageHeight}mm;box-sizing:border-box;page-break-after:always;display:grid;grid-template-columns:repeat(${cols},${labelWidth}mm);grid-template-rows:repeat(${rows},${labelHeight}mm);gap:2mm;justify-content:center;align-content:center}.plabel{width:${labelWidth}mm;height:${labelHeight}mm;box-sizing:border-box;padding:1mm;display:flex}.l-inner{border:1.5px solid #000;border-radius:1mm;flex:1;min-width:0;display:flex;flex-direction:column;padding:2mm}.l-sender{font-size:${Math.max(8, Math.min(15, 13 * scale))}pt;line-height:1.25;overflow-wrap:anywhere}.l-recv{flex:1;padding:2mm 1mm}.l-recv-name{font-size:${Math.max(10, Math.min(25, 22 * scale))}pt;font-weight:700;line-height:1.15;margin-bottom:1mm;overflow-wrap:anywhere}.l-recv-phone{font-size:${Math.max(8, Math.min(17, 15 * scale))}pt;font-weight:600;margin-bottom:1mm}.l-recv-addr{font-size:${Math.max(7, Math.min(14, 12 * scale))}pt;line-height:1.25;overflow-wrap:anywhere}.l-foot{display:flex;border-top:1px solid #000;min-height:${Math.max(9, Math.min(18, 15 * scale))}mm;align-items:center}.l-note{flex:1;font-size:${Math.max(7, Math.min(12, 10 * scale))}pt;font-weight:600;padding-left:1mm;color:#000;overflow-wrap:anywhere}.l-zip{font-size:${Math.max(12, Math.min(34, 30 * scale))}pt;font-weight:700;padding-right:1mm}`;
     }
 
     const escapeHTML = (str) => {
@@ -556,7 +583,7 @@ export default function Tracking({ authState }) {
 
     const labelTheme = `.l-sender{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#111318!important;color:#fff!important;border:0!important;border-radius:1mm;padding:2mm!important;margin-bottom:2mm}.l-sender strong,.l-sender-title{color:#fff!important}.l-sender-title{font-weight:700;font-size:.95em;letter-spacing:.02em;margin-bottom:1mm}.l-sender>div:not(.l-sender-title){font-weight:600}.l-recv-title{font-size:10pt;font-weight:700;margin-bottom:4px;color:#111318}.l-foot{border-top:1px solid #111318}.l-note{color:#8a5200!important}`;
     const documentHtml = `<html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet"><style>${layoutCss}${labelTheme}</style></head><body>${labelsHtml}</body></html>`;
-    setLabelPreview({ documentHtml, count: listToPrint.length, size, labelsPerSheet, a4Rows, a4Cols, a4Orientation, customWidth: labelSettings.customWidth, customHeight: labelSettings.customHeight });
+    setLabelPreview({ documentHtml, count: listToPrint.length, size, labelsPerSheet, a4Rows, a4Cols, a4Orientation, a4FitLayout, customWidth: labelSettings.customWidth, customHeight: labelSettings.customHeight });
   };
 
   const printPreviewLabels = () => {
@@ -587,6 +614,7 @@ export default function Tracking({ authState }) {
   const filteredRecords = records.filter(r => searchQ === "" || r.fullName.includes(searchQ) || (r.trackingNumber||"").includes(searchQ) || (r.phone||"").includes(searchQ));
   const allFilteredRecipientsSelected = filteredRecipients.length > 0 && filteredRecipients.every(r => selectedRecipients.includes(r.id));
   const allFilteredRecordsSelected = filteredRecords.length > 0 && filteredRecords.every(r => selectedRecords.includes(r.id));
+  const a4FitPreview = calculateA4LabelLayout(Number(labelSettings.a4LabelWidth), Number(labelSettings.a4LabelHeight));
 
   return (
     <div className="tracking-wrapper animate-fade-in" style={{ color: "var(--text)" }}>
@@ -1031,6 +1059,7 @@ export default function Tracking({ authState }) {
                      </div>
                    )}
                    {[
+                     ["a4-fit", "A4 · จัดวางอัตโนมัติตามขนาดฉลาก", "เลือกแนวกระดาษและจำนวนต่อแผ่นให้พอดี ใช้กระดาษคุ้มที่สุด"],
                      ["a4-1", "A4 · 1 ใบต่อแผ่น", "ฉลากขนาดใหญ่ อ่านง่าย เหมาะกับที่อยู่ยาว"],
                      ["a4-2", "A4 · 2 ใบต่อแผ่น", "ฉลากขนาดกลาง พิมพ์แนวตั้ง 2 แถว"],
                      ["a4-4", "A4 · 4 ใบต่อแผ่น", "ฉลากแนวนอนใกล้เคียง 150 × 100 มม. จัดวาง 2 × 2"],
@@ -1044,6 +1073,13 @@ export default function Tracking({ authState }) {
                        <div><div style={{ fontWeight: "700", color: "var(--teal)" }}>{title}</div><div style={{ fontSize: "12px", color: "var(--t2)" }}>{description}</div></div>
                      </label>
                    ))}
+                   {labelSettings.size === "a4-fit" && (
+                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: 12, borderRadius: 8, background: "var(--bg2)" }}>
+                       <label style={{ display: "grid", gap: 5, fontSize: 12 }}>กว้างฉลาก (มม.)<input className="inp" type="number" min="50" max="200" value={labelSettings.a4LabelWidth} onChange={e => setLabelSettings({ ...labelSettings, a4LabelWidth: e.target.value })} /></label>
+                       <label style={{ display: "grid", gap: 5, fontSize: 12 }}>สูงฉลาก (มม.)<input className="inp" type="number" min="50" max="200" value={labelSettings.a4LabelHeight} onChange={e => setLabelSettings({ ...labelSettings, a4LabelHeight: e.target.value })} /></label>
+                       {a4FitPreview && <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--teal)" }}>แนะนำ: A4 แนว{a4FitPreview.orientation === "landscape" ? "นอน" : "ตั้ง"} · {a4FitPreview.cols} คอลัมน์ × {a4FitPreview.rows} แถว · {a4FitPreview.capacity} ใบต่อแผ่น{a4FitPreview.rotated ? " (หมุนแนวฉลาก 90°)" : ""}</div>}
+                     </div>
+                   )}
                    {labelSettings.size === "a4-grid-custom" && (
                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, padding: 12, borderRadius: 8, background: "var(--bg2)" }}>
                        <label style={{ display: "grid", gap: 5, fontSize: 12 }}>คอลัมน์ (1–4)<input className="inp" type="number" min="1" max="4" value={labelSettings.a4Cols} onChange={e => setLabelSettings({ ...labelSettings, a4Cols: e.target.value })} /></label>
@@ -1145,7 +1181,9 @@ export default function Tracking({ authState }) {
               <div>
                 <strong style={{ display: "block", color: "var(--teal)" }}>ตัวอย่างลาเบลก่อนพิมพ์</strong>
                 <span style={{ fontSize: 12, color: "var(--t2)" }}>
-                  {labelPreview.count} ใบ · {labelPreview.size.startsWith("a4-grid")
+                  {labelPreview.count} ใบ · {labelPreview.size === "a4-fit" && labelPreview.a4FitLayout
+                    ? `A4 แนว${labelPreview.a4FitLayout.orientation === "landscape" ? "นอน" : "ตั้ง"} · ${labelPreview.a4FitLayout.cols} × ${labelPreview.a4FitLayout.rows} ช่อง · ${labelPreview.a4FitLayout.capacity} ใบ/แผ่น · ฉลาก ${labelPreview.a4FitLayout.labelWidth} × ${labelPreview.a4FitLayout.labelHeight} มม.${labelPreview.a4FitLayout.rotated ? " (หมุน 90°)" : ""}`
+                    : labelPreview.size.startsWith("a4-grid")
                     ? `A4 ${labelPreview.a4Orientation === "landscape" ? "แนวนอน" : "แนวตั้ง"} · ${labelPreview.a4Cols} × ${labelPreview.a4Rows} ช่อง · ประมาณ ${Math.floor(((labelPreview.a4Orientation === "landscape" ? 289 : 202) - (labelPreview.a4Cols - 1) * 3) / labelPreview.a4Cols)} × ${Math.floor(((labelPreview.a4Orientation === "landscape" ? 202 : 289) - (labelPreview.a4Rows - 1) * 3) / labelPreview.a4Rows)} มม./ใบ`
                     : labelPreview.size === "therm-custom"
                       ? `กำหนดเอง ${labelPreview.customWidth} × ${labelPreview.customHeight} มม.`
