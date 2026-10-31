@@ -3,6 +3,7 @@ import { doc, getDoc } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "../lib/driveStorage.js"
 import { db, storage } from "../lib/firebase.js"
 import toast from "react-hot-toast"
+import { SITE } from "../data/site.js"
 
 export default function BookRegistration({ authState, go, ctx }) {
   // See StaffTranslation: this used its own useAuth() instance, duplicating
@@ -387,6 +388,12 @@ export default function BookRegistration({ authState, go, ctx }) {
           <div style={{ background: "rgba(18, 184, 134, 0.1)", color: "var(--teal)", padding: "12px 16px", borderRadius: 8, marginTop: 16, fontSize: 14, border: "1px solid rgba(18, 184, 134, 0.2)" }}>
             <i className="ti ti-info-circle"></i> ทางเราจะประกาศรายชื่อเมื่อมีการปิดรับลงทะเบียนเรียบร้อยแล้ว
           </div>
+          <p style={{ color: "var(--t2)", marginTop: 16, fontSize: 14 }}>
+            หากกรอกข้อมูลลงทะเบียนผิดและต้องการแก้ไข กรุณาติดต่อทีมงานทางเพจเฟซบุ๊ก{" "}
+            <a href={SITE.social.facebook} target="_blank" rel="noreferrer" style={{ color: "var(--teal)", fontWeight: 600, textDecoration: "underline" }}>
+              Talib Club คลิกที่นี่เพื่อติดต่อทีมงาน
+            </a>
+          </p>
           <div style={{ marginTop: 32, display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
             <button className="btn btn-teal" onClick={() => go("tracking-system")} style={{ padding: "12px 24px", fontSize: 16, fontWeight: 600 }}>
               <i className="ti ti-list-search" style={{ marginRight: 8 }}></i> เช็ครายชื่อและสถานะ
