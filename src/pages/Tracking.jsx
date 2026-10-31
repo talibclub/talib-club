@@ -999,29 +999,29 @@ export default function Tracking({ authState }) {
                  </div>
                </div>
 
-               <div style={{ marginTop: 24, background: "#111318", color: "#f5f5f5", padding: 16, borderRadius: 10, border: "1px solid #2b2d36" }}>
+               <div style={{ marginTop: 24, background: "var(--bg)", color: "var(--text)", padding: 16, borderRadius: 10, border: "1px solid var(--br2)" }}>
                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: manualLabels.length ? 12 : 0 }}>
                    <div>
-                     <strong style={{ display: "block", color: "#65d6b3", fontSize: 13 }}>📋 รายการลาเบล</strong>
-                     <span style={{ fontSize: 12, color: "#a1a1aa" }}>ลาเบลเพิ่มเอง {manualLabels.length} รายการ · ร่างเก็บไว้ในแท็บนี้</span>
+                     <strong style={{ display: "block", color: "var(--teal)", fontSize: 13 }}>📋 รายการลาเบล</strong>
+                     <span style={{ fontSize: 12, color: "var(--t2)" }}>ลาเบลเพิ่มเอง {manualLabels.length} รายการ · ร่างเก็บไว้ในแท็บนี้</span>
                    </div>
                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                     {manualLabels.length > 0 && <button type="button" className="btn btn-outline" onClick={async () => { if (await myConfirm(`ล้างลาเบลที่เพิ่มเอง ${manualLabels.length} รายการใช่หรือไม่?`)) setManualLabels([]); }} style={{ padding: "7px 10px", color: "#fca5a5", borderColor: "#6b343b", background: "#2a191d", fontSize: 12 }}>ล้างรายการ</button>}
-                     <button type="button" className="btn btn-outline" onClick={() => openManualLabelModal()} style={{ padding: "7px 12px", color: "#65d6b3", borderColor: "#3b9f84", background: "#17221f" }}>
+                     {manualLabels.length > 0 && <button type="button" className="btn btn-outline" onClick={async () => { if (await myConfirm(`ล้างลาเบลที่เพิ่มเอง ${manualLabels.length} รายการใช่หรือไม่?`)) setManualLabels([]); }} style={{ padding: "7px 10px", color: "var(--red)", borderColor: "var(--red2)", background: "var(--bg2)", fontSize: 12 }}>ล้างรายการ</button>}
+                     <button type="button" className="btn btn-outline" onClick={() => openManualLabelModal()} style={{ padding: "7px 12px", color: "var(--teal)", borderColor: "var(--teal)", background: "var(--teal-bg)" }}>
                        <i className="ti ti-plus"></i> เพิ่มลาเบลเอง
                      </button>
                    </div>
                  </div>
                  {manualLabels.length > 0 && <div style={{ display: "grid", gap: 8 }}>
                    {manualLabels.map((label, index) => (
-                     <div key={label.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 8, background: "#1b1d25", color: "#e4e4e7", border: "1px solid #2b2d36" }}>
+                     <div key={label.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 8, background: "var(--bg2)", color: "var(--text)", border: "1px solid var(--br)" }}>
                        <div style={{ minWidth: 0, fontSize: 12 }}>
-                         <strong style={{ color: "#f4f4f5" }}>{index + 1}. {label.fullName}</strong>
-                         <div style={{ color: "#a1a1aa", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label.phone ? `${label.phone} · ` : ""}{label.address} {label.postalCode}</div>
+                         <strong style={{ color: "var(--text)" }}>{index + 1}. {label.fullName}</strong>
+                         <div style={{ color: "var(--t2)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label.phone ? `${label.phone} · ` : ""}{label.address} {label.postalCode}</div>
                        </div>
                        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                         <button type="button" className="btn btn-outline" aria-label={`แก้ไขลาเบล ${label.fullName}`} onClick={() => openManualLabelModal(label)} style={{ padding: "5px 8px", color: "#d4d4d8", borderColor: "#454752" }}><i className="ti ti-edit"></i></button>
-                         <button type="button" className="btn btn-outline" aria-label={`ลบลาเบล ${label.fullName}`} onClick={() => setManualLabels(prev => prev.filter(item => item.id !== label.id))} style={{ padding: "5px 8px", color: "#fca5a5", borderColor: "#6b343b" }}><i className="ti ti-trash"></i></button>
+                         <button type="button" className="btn btn-outline" aria-label={`แก้ไขลาเบล ${label.fullName}`} onClick={() => openManualLabelModal(label)} style={{ padding: "5px 8px", color: "var(--t2)", borderColor: "var(--br)" }}><i className="ti ti-edit"></i></button>
+                         <button type="button" className="btn btn-outline" aria-label={`ลบลาเบล ${label.fullName}`} onClick={() => setManualLabels(prev => prev.filter(item => item.id !== label.id))} style={{ padding: "5px 8px", color: "var(--red)", borderColor: "var(--red2)" }}><i className="ti ti-trash"></i></button>
                        </div>
                      </div>
                    ))}
@@ -1049,31 +1049,31 @@ export default function Tracking({ authState }) {
 
       {manualLabelModalOpen && createPortal(
         <div role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setManualLabelModalOpen(false); }} style={{ position: "fixed", inset: 0, zIndex: 1150, background: "rgba(0,0,0,.72)", display: "grid", placeItems: "center", padding: 16 }}>
-          <form role="dialog" aria-modal="true" aria-labelledby="manual-label-title" onSubmit={e => { e.preventDefault(); saveManualLabel(); }} className="card" style={{ width: "min(520px, 100%)", maxHeight: "90vh", overflowY: "auto", padding: 0, background: "#111318", color: "#f5f5f5", border: "1px solid #343741", borderRadius: 12, boxShadow: "0 24px 70px rgba(0,0,0,.55)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", borderBottom: "1px solid #2b2d36" }}>
-              <h3 id="manual-label-title" style={{ margin: 0, color: "#f4f4f5", fontSize: 15 }}><i className="ti ti-plus" style={{ color: "#65d6b3", marginRight: 8 }}></i>{editingManualLabelId ? "แก้ไขลาเบล" : "เพิ่มลาเบลพิเศษ"}</h3>
-              <button type="button" className="btn btn-outline" aria-label="ปิดหน้าต่างเพิ่มลาเบล" onClick={() => setManualLabelModalOpen(false)} style={{ padding: "4px 8px", color: "#a1a1aa", borderColor: "#343741", background: "transparent" }}>✕</button>
+          <form role="dialog" aria-modal="true" aria-labelledby="manual-label-title" onSubmit={e => { e.preventDefault(); saveManualLabel(); }} className="card" style={{ width: "min(520px, 100%)", maxHeight: "90vh", overflowY: "auto", padding: 0, background: "var(--card)", color: "var(--text)", border: "1px solid var(--br)", borderRadius: 12, boxShadow: "0 24px 70px rgba(0,0,0,.3)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", borderBottom: "1px solid var(--br)" }}>
+              <h3 id="manual-label-title" style={{ margin: 0, color: "var(--text)", fontSize: 15 }}><i className="ti ti-plus" style={{ color: "var(--teal)", marginRight: 8 }}></i>{editingManualLabelId ? "แก้ไขลาเบล" : "เพิ่มลาเบลพิเศษ"}</h3>
+              <button type="button" className="btn btn-outline" aria-label="ปิดหน้าต่างเพิ่มลาเบล" onClick={() => setManualLabelModalOpen(false)} style={{ padding: "4px 8px", color: "var(--t2)", borderColor: "var(--br)" }}>✕</button>
             </div>
             <div style={{ display: "grid", gap: 12, padding: 16 }}>
-              <label style={{ display: "grid", gap: 6, fontSize: 12, color: "#c4c4cc", fontWeight: 600 }}>
+              <label style={{ display: "grid", gap: 6, fontSize: 12, color: "var(--t2)", fontWeight: 600 }}>
                 ชื่อ-นามสกุล *
-                <input autoFocus required className="inp" placeholder="เช่น นาย สมชาย ใจดี" value={manualLabelDraft.fullName} onChange={e => setManualLabelDraft(prev => ({ ...prev, fullName: e.target.value }))} style={{ background: "#1b1d25", color: "#f5f5f5", borderColor: "#343741" }} />
+                <input autoFocus required className="inp" placeholder="เช่น นาย สมชาย ใจดี" value={manualLabelDraft.fullName} onChange={e => setManualLabelDraft(prev => ({ ...prev, fullName: e.target.value }))} />
               </label>
-              <label style={{ display: "grid", gap: 6, fontSize: 12, color: "#c4c4cc", fontWeight: 600 }}>
+              <label style={{ display: "grid", gap: 6, fontSize: 12, color: "var(--t2)", fontWeight: 600 }}>
                 เบอร์โทร
-                <input className="inp" placeholder="0xx-xxx-xxxx" value={manualLabelDraft.phone} onChange={e => setManualLabelDraft(prev => ({ ...prev, phone: e.target.value }))} style={{ background: "#1b1d25", color: "#f5f5f5", borderColor: "#343741" }} />
+                <input className="inp" placeholder="0xx-xxx-xxxx" value={manualLabelDraft.phone} onChange={e => setManualLabelDraft(prev => ({ ...prev, phone: e.target.value }))} />
               </label>
-              <label style={{ display: "grid", gap: 6, fontSize: 12, color: "#c4c4cc", fontWeight: 600 }}>
+              <label style={{ display: "grid", gap: 6, fontSize: 12, color: "var(--t2)", fontWeight: 600 }}>
                 ที่อยู่แบบเต็ม *
-                <textarea required rows={3} className="inp" placeholder="บ้านเลขที่ ซอย ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด รหัสไปรษณีย์" value={manualLabelDraft.address} onChange={e => setManualLabelDraft(prev => ({ ...prev, address: e.target.value }))} style={{ background: "#1b1d25", color: "#f5f5f5", borderColor: "#343741", resize: "vertical" }} />
+                <textarea required rows={3} className="inp" placeholder="บ้านเลขที่ ซอย ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด รหัสไปรษณีย์" value={manualLabelDraft.address} onChange={e => setManualLabelDraft(prev => ({ ...prev, address: e.target.value }))} style={{ resize: "vertical" }} />
               </label>
-              <label style={{ display: "grid", gap: 6, fontSize: 12, color: "#c4c4cc", fontWeight: 600 }}>
+              <label style={{ display: "grid", gap: 6, fontSize: 12, color: "var(--t2)", fontWeight: 600 }}>
                 หมายเหตุบนลาเบล
-                <input className="inp" placeholder="เช่น ประธาน / ด่วน" value={manualLabelDraft.bonusNote} onChange={e => setManualLabelDraft(prev => ({ ...prev, bonusNote: e.target.value }))} style={{ background: "#1b1d25", color: "#f5f5f5", borderColor: "#343741" }} />
+                <input className="inp" placeholder="เช่น ประธาน / ด่วน" value={manualLabelDraft.bonusNote} onChange={e => setManualLabelDraft(prev => ({ ...prev, bonusNote: e.target.value }))} />
               </label>
             </div>
             <div style={{ padding: "0 16px 16px" }}>
-              <button type="submit" className="btn" style={{ width: "100%", justifyContent: "center", background: "#24252d", color: "#f4f4f5", border: "1px solid #41434c" }}>
+              <button type="submit" className="btn btn-teal" style={{ width: "100%", justifyContent: "center" }}>
                 <i className={editingManualLabelId ? "ti ti-device-floppy" : "ti ti-plus"}></i> {editingManualLabelId ? "บันทึกการแก้ไข" : "เพิ่มลาเบลนี้"}
               </button>
             </div>
