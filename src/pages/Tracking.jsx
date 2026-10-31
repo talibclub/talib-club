@@ -35,7 +35,7 @@ export default function Tracking({ authState }) {
   // --- Modals State ---
   const [activeModal, setActiveModal] = useState(null); // 'edit-recipient', 'edit-record', 'label'
   const [editData, setEditData] = useState({});
-  const [labelSettings, setLabelSettings] = useState({ name: "สมาคม Talib Club", phone: "", addr: "", size: "therm-150x100" });
+  const [labelSettings, setLabelSettings] = useState({ name: "สมาคม Talib Club", phone: "", addr: "", size: "therm-150x100", customWidth: 100, customHeight: 75, a4Rows: 3, a4Cols: 2, a4Orientation: "portrait" });
   const [manualLabels, setManualLabels] = useState(() => {
     try {
       const saved = sessionStorage.getItem(MANUAL_LABELS_STORAGE_KEY);
@@ -484,16 +484,45 @@ export default function Tracking({ authState }) {
       await myAlert("ไม่มีรายชื่อให้พิมพ์ กรุณาเลือกรายชื่อหรือเพิ่มลาเบลเองก่อน");
       return;
     }
+    if (labelSettings.size === "therm-custom" && (![labelSettings.customWidth, labelSettings.customHeight].every(value => Number.isFinite(Number(value)) && Number(value) >= 50 && Number(value) <= 300))) {
+      await myAlert("ขนาดฉลากต้องอยู่ระหว่าง 50–300 มม. ทั้งด้านกว้างและด้านสูง");
+      return;
+    }
+    if (labelSettings.size === "a4-grid-custom" && ![labelSettings.a4Rows, labelSettings.a4Cols].every(value => Number.isInteger(Number(value)) && Number(value) >= 1 && Number(value) <= 4)) {
+      await myAlert("จำนวนแถวและคอลัมน์ต้องเป็นจำนวนเต็มระหว่าง 1–4");
+      return;
+    }
     
     const { name: sName, phone: sPhone, addr: sAddr, size } = labelSettings;
-    const labelsPerSheet = Number(size.match(/^a4-(1|2|4)$/)?.[1] || 0);
+    const a4PresetMatch = size.match(/^a4-grid-(\d)x(\d)-(portrait|landscape)$/);
+    const a4Cols = size === "a4-grid-custom" ? Number(labelSettings.a4Cols) : Number(a4PresetMatch?.[1] || 0);
+    const a4Rows = size === "a4-grid-custom" ? Number(labelSettings.a4Rows) : Number(a4PresetMatch?.[2] || 0);
+    const a4Orientation = size === "a4-grid-custom" ? labelSettings.a4Orientation : a4PresetMatch?.[3];
+    const labelsPerSheet = Number(size.match(/^a4-(1|2|4)$/)?.[1] || 0) || (a4Rows * a4Cols);
     const cssMap = {
       'therm-150x100': `@page{size:150mm 100mm;margin:0}body{margin:0;width:150mm;font-family:'Prompt',sans-serif;}.plabel{width:150mm;height:99mm;box-sizing:border-box;padding:4mm;page-break-after:always;display:flex;flex-direction:column}.l-inner{border:2px solid #000;flex:1;display:flex;flex-direction:column;padding:3mm;border-radius:4px}.l-sender{padding-bottom:3mm;border-bottom:1px dashed #000;font-size:11pt;line-height:1.4}.l-recv{flex:1;padding:4mm 2mm}.l-recv-name{font-size:24pt;font-weight:700;line-height:1.2;margin-bottom:2mm}.l-recv-phone{font-size:16pt;font-weight:600;margin-bottom:2mm}.l-recv-addr{font-size:14pt;line-height:1.5}.l-foot{display:flex;border-top:1px solid #000;height:22mm;align-items:center}.l-note{flex:1;font-size:14pt;font-weight:600;padding-left:2mm;color:#b45309}.l-zip{font-size:36pt;font-weight:700;letter-spacing:2px;padding-right:2mm}`,
       'therm-100x150': `@page{size:100mm 150mm;margin:0}body{margin:0;width:100mm;font-family:'Prompt',sans-serif;}.plabel{width:100mm;height:149mm;box-sizing:border-box;padding:2mm;page-break-after:always;display:flex;flex-direction:column}.l-inner{border:2px solid #000;flex:1;display:flex;flex-direction:column;padding:3mm;border-radius:4px}.l-sender{padding-bottom:3mm;border-bottom:1px dashed #000;font-size:10pt;line-height:1.4}.l-recv{flex:1;padding:4mm 2mm}.l-recv-name{font-size:20pt;font-weight:700;line-height:1.2;margin-bottom:2mm}.l-recv-phone{font-size:14pt;font-weight:600;margin-bottom:2mm}.l-recv-addr{font-size:13pt;line-height:1.5}.l-foot{display:flex;border-top:1px solid #000;height:24mm;align-items:center}.l-note{flex:1;font-size:12pt;font-weight:600;padding-left:2mm;color:#b45309}.l-zip{font-size:32pt;font-weight:700;letter-spacing:1px;padding-right:2mm}`,
       'a4-1': `@page{size:A4 portrait;margin:4mm}html,body{margin:0;font-family:'Prompt',sans-serif}.sheet{width:202mm;height:289mm;box-sizing:border-box;page-break-after:always;display:grid;grid-template-columns:1fr;grid-template-rows:1fr;gap:3mm}.plabel{min-width:0;min-height:0;box-sizing:border-box;padding:3mm;display:flex}.l-inner{border:2px solid #000;border-radius:3mm;flex:1;min-width:0;display:flex;flex-direction:column;padding:5mm}.l-sender{padding-bottom:4mm;border-bottom:1px dashed #000;font-size:11pt;line-height:1.45}.l-recv{flex:1;padding:7mm 3mm}.l-recv-name{font-size:24pt;font-weight:700;line-height:1.2;margin-bottom:3mm}.l-recv-phone{font-size:16pt;font-weight:600;margin-bottom:3mm}.l-recv-addr{font-size:14pt;line-height:1.5;overflow-wrap:anywhere}.l-foot{display:flex;border-top:1px solid #000;min-height:25mm;align-items:center}.l-note{flex:1;font-size:13pt;font-weight:600;padding-left:2mm;color:#b45309}.l-zip{font-size:34pt;font-weight:700;letter-spacing:1px;padding-right:2mm}`,
       'a4-2': `@page{size:A4 portrait;margin:4mm}html,body{margin:0;font-family:'Prompt',sans-serif}.sheet{width:202mm;height:289mm;box-sizing:border-box;page-break-after:always;display:grid;grid-template-columns:1fr;grid-template-rows:repeat(2,minmax(0,1fr));gap:3mm}.plabel{min-width:0;min-height:0;box-sizing:border-box;padding:2mm;display:flex}.l-inner{border:2px solid #000;border-radius:2mm;flex:1;min-width:0;display:flex;flex-direction:column;padding:3mm}.l-sender{padding-bottom:2mm;border-bottom:1px dashed #000;font-size:8pt;line-height:1.3}.l-recv{flex:1;padding:3mm 2mm}.l-recv-name{font-size:18pt;font-weight:700;line-height:1.2;margin-bottom:2mm}.l-recv-phone{font-size:12pt;font-weight:600;margin-bottom:2mm}.l-recv-addr{font-size:11pt;line-height:1.4;overflow-wrap:anywhere}.l-foot{display:flex;border-top:1px solid #000;min-height:18mm;align-items:center}.l-note{flex:1;font-size:10pt;font-weight:600;padding-left:2mm;color:#b45309}.l-zip{font-size:25pt;font-weight:700;letter-spacing:1px;padding-right:2mm}`,
-      'a4-4': `@page{size:A4 landscape;margin:4mm}html,body{margin:0;font-family:'Prompt',sans-serif}.sheet{width:289mm;height:202mm;box-sizing:border-box;page-break-after:always;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:3mm}.plabel{min-width:0;min-height:0;box-sizing:border-box;padding:1mm;display:flex}.l-inner{border:1.5px solid #000;border-radius:1mm;flex:1;min-width:0;display:flex;flex-direction:column;padding:2mm}.l-sender{padding-bottom:1mm;border-bottom:1px dashed #000;font-size:11pt;line-height:1.25;overflow-wrap:anywhere}.l-recv{flex:1;padding:2mm 1mm}.l-recv-name{font-size:22pt;font-weight:700;line-height:1.15;margin-bottom:1mm;overflow-wrap:anywhere}.l-recv-phone{font-size:15pt;font-weight:600;margin-bottom:1mm}.l-recv-addr{font-size:12pt;line-height:1.3;overflow-wrap:anywhere}.l-foot{display:flex;border-top:1px solid #000;min-height:15mm;align-items:center}.l-note{flex:1;font-size:10pt;font-weight:600;padding-left:1mm;color:#000;overflow-wrap:anywhere}.l-zip{font-size:30pt;font-weight:700;padding-right:1mm}`
+      'a4-4': `@page{size:A4 landscape;margin:4mm}html,body{margin:0;font-family:'Prompt',sans-serif;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.sheet{width:289mm;height:202mm;box-sizing:border-box;page-break-after:always;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:3mm}.plabel{min-width:0;min-height:0;box-sizing:border-box;padding:1mm;display:flex}.l-inner{border:1.5px solid #000;border-radius:1mm;flex:1;min-width:0;display:flex;flex-direction:column;padding:2mm}.l-sender{padding-bottom:1mm;border-bottom:1px dashed #000;font-size:13pt;line-height:1.3;overflow-wrap:anywhere}.l-recv{flex:1;padding:2mm 1mm}.l-recv-name{font-size:22pt;font-weight:700;line-height:1.15;margin-bottom:1mm;overflow-wrap:anywhere}.l-recv-phone{font-size:15pt;font-weight:600;margin-bottom:1mm}.l-recv-addr{font-size:12pt;line-height:1.3;overflow-wrap:anywhere}.l-foot{display:flex;border-top:1px solid #000;min-height:15mm;align-items:center}.l-note{flex:1;font-size:10pt;font-weight:600;padding-left:1mm;color:#000;overflow-wrap:anywhere}.l-zip{font-size:30pt;font-weight:700;padding-right:1mm}`
     };
+
+    let layoutCss = cssMap[size] || cssMap['therm-150x100'];
+    if (size === "therm-100x75" || size === "therm-custom") {
+      const widthMm = size === "therm-100x75" ? 100 : Math.max(50, Math.min(300, Number(labelSettings.customWidth) || 100));
+      const heightMm = size === "therm-100x75" ? 75 : Math.max(50, Math.min(300, Number(labelSettings.customHeight) || 75));
+      const scale = Math.min(widthMm / 150, heightMm / 100);
+      layoutCss = `@page{size:${widthMm}mm ${heightMm}mm;margin:0}html,body{margin:0;width:${widthMm}mm;font-family:'Prompt',sans-serif}.plabel{width:${widthMm}mm;height:${heightMm}mm;box-sizing:border-box;padding:2mm;page-break-after:always;display:flex}.l-inner{border:1.5px solid #000;border-radius:1mm;flex:1;min-width:0;display:flex;flex-direction:column;padding:2mm}.l-sender{font-size:${Math.max(8, 13 * scale)}pt;line-height:1.25;overflow-wrap:anywhere}.l-recv{flex:1;padding:2mm 1mm}.l-recv-name{font-size:${Math.max(11, 22 * scale)}pt;font-weight:700;line-height:1.15;margin-bottom:1mm;overflow-wrap:anywhere}.l-recv-phone{font-size:${Math.max(9, 15 * scale)}pt;font-weight:600;margin-bottom:1mm}.l-recv-addr{font-size:${Math.max(8, 12 * scale)}pt;line-height:1.3;overflow-wrap:anywhere}.l-foot{display:flex;border-top:1px solid #000;min-height:${Math.max(10, 15 * scale)}mm;align-items:center}.l-note{flex:1;font-size:${Math.max(8, 10 * scale)}pt;font-weight:600;padding-left:1mm;color:#000;overflow-wrap:anywhere}.l-zip{font-size:${Math.max(14, 30 * scale)}pt;font-weight:700;padding-right:1mm}`;
+    }
+    if (labelsPerSheet && a4Rows && a4Cols) {
+      const pageWidthMm = a4Orientation === "landscape" ? 289 : 202;
+      const pageHeightMm = a4Orientation === "landscape" ? 202 : 289;
+      const labelWidthMm = (pageWidthMm - ((a4Cols - 1) * 3)) / a4Cols;
+      const labelHeightMm = (pageHeightMm - ((a4Rows - 1) * 3)) / a4Rows;
+      const scale = Math.min(labelWidthMm / 150, labelHeightMm / 100);
+      const gridLayoutCss = `@page{size:A4 ${a4Orientation};margin:4mm}html,body{margin:0;font-family:'Prompt',sans-serif;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.sheet{width:${pageWidthMm}mm;height:${pageHeightMm}mm;box-sizing:border-box;page-break-after:always;display:grid;grid-template-columns:repeat(${a4Cols},minmax(0,1fr));grid-template-rows:repeat(${a4Rows},minmax(0,1fr));gap:3mm}.plabel{min-width:0;min-height:0;box-sizing:border-box;padding:1mm;display:flex}.l-inner{border:1.5px solid #000;border-radius:1mm;flex:1;min-width:0;display:flex;flex-direction:column;padding:2mm}.l-sender{font-size:${Math.max(8, Math.min(15, 13 * scale))}pt;line-height:1.25;overflow-wrap:anywhere}.l-recv{flex:1;padding:2mm 1mm}.l-recv-name{font-size:${Math.max(10, Math.min(25, 22 * scale))}pt;font-weight:700;line-height:1.15;margin-bottom:1mm;overflow-wrap:anywhere}.l-recv-phone{font-size:${Math.max(8, Math.min(17, 15 * scale))}pt;font-weight:600;margin-bottom:1mm}.l-recv-addr{font-size:${Math.max(7, Math.min(14, 12 * scale))}pt;line-height:1.25;overflow-wrap:anywhere}.l-foot{display:flex;border-top:1px solid #000;min-height:${Math.max(9, Math.min(18, 15 * scale))}mm;align-items:center}.l-note{flex:1;font-size:${Math.max(7, Math.min(12, 10 * scale))}pt;font-weight:600;padding-left:1mm;color:#000;overflow-wrap:anywhere}.l-zip{font-size:${Math.max(12, Math.min(34, 30 * scale))}pt;font-weight:700;padding-right:1mm}`;
+      layoutCss = size === "a4-grid-custom" || a4PresetMatch ? gridLayoutCss : layoutCss;
+    }
 
     const escapeHTML = (str) => {
       if (!str) return '';
@@ -525,9 +554,9 @@ export default function Tracking({ authState }) {
       }).join('')
       : listToPrint.map(renderLabel).join('');
 
-    const labelTheme = `.l-sender{background:#111318;color:#fff!important;border:0!important;border-radius:1mm;padding:2mm!important;margin-bottom:2mm}.l-sender strong,.l-sender-title{color:#fff!important}.l-sender-title{font-weight:700;font-size:.9em;letter-spacing:.02em;margin-bottom:1mm}.l-recv-title{font-size:10pt;font-weight:700;margin-bottom:4px;color:#111318}.l-foot{border-top:1px solid #111318}.l-note{color:#8a5200!important}`;
-    const documentHtml = `<html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet"><style>${cssMap[size] || cssMap['therm-150x100']}${labelTheme}</style></head><body>${labelsHtml}</body></html>`;
-    setLabelPreview({ documentHtml, count: listToPrint.length, size });
+    const labelTheme = `.l-sender{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#111318!important;color:#fff!important;border:0!important;border-radius:1mm;padding:2mm!important;margin-bottom:2mm}.l-sender strong,.l-sender-title{color:#fff!important}.l-sender-title{font-weight:700;font-size:.95em;letter-spacing:.02em;margin-bottom:1mm}.l-sender>div:not(.l-sender-title){font-weight:600}.l-recv-title{font-size:10pt;font-weight:700;margin-bottom:4px;color:#111318}.l-foot{border-top:1px solid #111318}.l-note{color:#8a5200!important}`;
+    const documentHtml = `<html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet"><style>${layoutCss}${labelTheme}</style></head><body>${labelsHtml}</body></html>`;
+    setLabelPreview({ documentHtml, count: listToPrint.length, size, labelsPerSheet, a4Rows, a4Cols, a4Orientation, customWidth: labelSettings.customWidth, customHeight: labelSettings.customHeight });
   };
 
   const printPreviewLabels = () => {
@@ -987,15 +1016,42 @@ export default function Tracking({ authState }) {
                      <div><div style={{ fontWeight: "700", color: "var(--teal)" }}>100×150 มม. (แนวตั้ง)</div><div style={{ fontSize: "12px", color: "var(--t2)" }}>มาตรฐานเครื่องพิมพ์ความร้อน</div></div>
                    </label>
                    {[
-                     ["a4-1", "A4 · 1 ใบต่อแผ่น", "ฉลากขนาดใหญ่ อ่านง่าย เหมาะกับที่อยู่ยาว"],
-                     ["a4-2", "A4 · 2 ใบต่อแผ่น", "ฉลากขนาดกลาง พิมพ์แนวตั้ง 2 แถว"],
-                     ["a4-4", "A4 · 4 ใบต่อแผ่น", "ฉลากแนวนอนขนาดใกล้เคียง 150 × 100 มม. จัดวาง 2 × 2"]
+                     ["therm-100x75", "100×75 มม. (แนวนอน)", "ขนาดฉลากความร้อนยอดนิยม"],
+                     ["therm-custom", "กำหนดขนาดฉลากเอง", "ระบุความกว้างและความสูงเป็นมิลลิเมตร"]
                    ].map(([value, title, description]) => (
                      <label key={value} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", border: `1px solid ${labelSettings.size === value ? "var(--teal)" : "var(--br)"}`, borderRadius: "8px", cursor: "pointer", background: labelSettings.size === value ? "var(--teal-bg)" : "var(--bg2)" }}>
                        <input type="radio" name="size" value={value} checked={labelSettings.size === value} onChange={e => setLabelSettings({ ...labelSettings, size: e.target.value })} style={{ width: "auto", accentColor: "var(--teal)" }} />
                        <div><div style={{ fontWeight: "700", color: "var(--teal)" }}>{title}</div><div style={{ fontSize: "12px", color: "var(--t2)" }}>{description}</div></div>
                      </label>
                    ))}
+                   {labelSettings.size === "therm-custom" && (
+                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: 12, borderRadius: 8, background: "var(--bg2)" }}>
+                       <label style={{ display: "grid", gap: 5, fontSize: 12 }}>กว้าง (มม.)<input className="inp" type="number" min="50" max="300" value={labelSettings.customWidth} onChange={e => setLabelSettings({ ...labelSettings, customWidth: e.target.value })} /></label>
+                       <label style={{ display: "grid", gap: 5, fontSize: 12 }}>สูง (มม.)<input className="inp" type="number" min="50" max="300" value={labelSettings.customHeight} onChange={e => setLabelSettings({ ...labelSettings, customHeight: e.target.value })} /></label>
+                     </div>
+                   )}
+                   {[
+                     ["a4-1", "A4 · 1 ใบต่อแผ่น", "ฉลากขนาดใหญ่ อ่านง่าย เหมาะกับที่อยู่ยาว"],
+                     ["a4-2", "A4 · 2 ใบต่อแผ่น", "ฉลากขนาดกลาง พิมพ์แนวตั้ง 2 แถว"],
+                     ["a4-4", "A4 · 4 ใบต่อแผ่น", "ฉลากแนวนอนใกล้เคียง 150 × 100 มม. จัดวาง 2 × 2"],
+                     ["a4-grid-2x3-portrait", "A4 · 2 คอลัมน์ × 3 แถว (6 ใบ)", "ขนาดฉลากประมาณ 100 × 94 มม."],
+                     ["a4-grid-2x4-portrait", "A4 · 2 คอลัมน์ × 4 แถว (8 ใบ)", "ใกล้เคียงฉลาก 100 × 75 มม."],
+                     ["a4-grid-3x3-portrait", "A4 · 3 คอลัมน์ × 3 แถว (9 ใบ)", "ฉลากขนาดเล็กประมาณ 66 × 94 มม."],
+                     ["a4-grid-custom", "A4 · กำหนดจำนวนช่องเอง", "เลือกจำนวนคอลัมน์ แถว และแนวกระดาษ"]
+                   ].map(([value, title, description]) => (
+                     <label key={value} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", border: `1px solid ${labelSettings.size === value ? "var(--teal)" : "var(--br)"}`, borderRadius: "8px", cursor: "pointer", background: labelSettings.size === value ? "var(--teal-bg)" : "var(--bg2)" }}>
+                       <input type="radio" name="size" value={value} checked={labelSettings.size === value} onChange={e => setLabelSettings({ ...labelSettings, size: e.target.value })} style={{ width: "auto", accentColor: "var(--teal)" }} />
+                       <div><div style={{ fontWeight: "700", color: "var(--teal)" }}>{title}</div><div style={{ fontSize: "12px", color: "var(--t2)" }}>{description}</div></div>
+                     </label>
+                   ))}
+                   {labelSettings.size === "a4-grid-custom" && (
+                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, padding: 12, borderRadius: 8, background: "var(--bg2)" }}>
+                       <label style={{ display: "grid", gap: 5, fontSize: 12 }}>คอลัมน์ (1–4)<input className="inp" type="number" min="1" max="4" value={labelSettings.a4Cols} onChange={e => setLabelSettings({ ...labelSettings, a4Cols: e.target.value })} /></label>
+                       <label style={{ display: "grid", gap: 5, fontSize: 12 }}>แถว (1–4)<input className="inp" type="number" min="1" max="4" value={labelSettings.a4Rows} onChange={e => setLabelSettings({ ...labelSettings, a4Rows: e.target.value })} /></label>
+                       <label style={{ display: "grid", gap: 5, fontSize: 12 }}>แนวกระดาษ<select className="inp" value={labelSettings.a4Orientation} onChange={e => setLabelSettings({ ...labelSettings, a4Orientation: e.target.value })}><option value="portrait">แนวตั้ง</option><option value="landscape">แนวนอน</option></select></label>
+                       <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--t2)" }}>ประมาณ {Math.floor(((labelSettings.a4Orientation === "landscape" ? 289 : 202) - (Number(labelSettings.a4Cols) - 1) * 3) / Number(labelSettings.a4Cols || 1))} × {Math.floor(((labelSettings.a4Orientation === "landscape" ? 202 : 289) - (Number(labelSettings.a4Rows) - 1) * 3) / Number(labelSettings.a4Rows || 1))} มม. ต่อฉลาก · {Number(labelSettings.a4Cols || 1) * Number(labelSettings.a4Rows || 1)} ใบต่อแผ่น</div>
+                     </div>
+                   )}
                  </div>
                </div>
 
@@ -1088,7 +1144,17 @@ export default function Tracking({ authState }) {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 18px", borderBottom: "1px solid var(--br)" }}>
               <div>
                 <strong style={{ display: "block", color: "var(--teal)" }}>ตัวอย่างลาเบลก่อนพิมพ์</strong>
-                <span style={{ fontSize: 12, color: "var(--t2)" }}>{labelPreview.count} ใบ · {labelPreview.size.startsWith("a4-") ? `A4 (${labelPreview.size.slice(3)} ใบต่อแผ่น)` : labelPreview.size === "therm-100x150" ? "100 × 150 มม." : "150 × 100 มม."}</span>
+                <span style={{ fontSize: 12, color: "var(--t2)" }}>
+                  {labelPreview.count} ใบ · {labelPreview.size.startsWith("a4-grid")
+                    ? `A4 ${labelPreview.a4Orientation === "landscape" ? "แนวนอน" : "แนวตั้ง"} · ${labelPreview.a4Cols} × ${labelPreview.a4Rows} ช่อง · ประมาณ ${Math.floor(((labelPreview.a4Orientation === "landscape" ? 289 : 202) - (labelPreview.a4Cols - 1) * 3) / labelPreview.a4Cols)} × ${Math.floor(((labelPreview.a4Orientation === "landscape" ? 202 : 289) - (labelPreview.a4Rows - 1) * 3) / labelPreview.a4Rows)} มม./ใบ`
+                    : labelPreview.size === "therm-custom"
+                      ? `กำหนดเอง ${labelPreview.customWidth} × ${labelPreview.customHeight} มม.`
+                      : labelPreview.size === "therm-100x75" ? "100 × 75 มม."
+                        : labelPreview.size === "therm-100x150" ? "100 × 150 มม."
+                          : labelPreview.size === "a4-4" ? "A4 แนวนอน · 4 ใบต่อแผ่น"
+                            : labelPreview.size === "a4-2" ? "A4 · 2 ใบต่อแผ่น"
+                              : labelPreview.size === "a4-1" ? "A4 · 1 ใบต่อแผ่น" : "150 × 100 มม."}
+                </span>
               </div>
               <button type="button" className="btn btn-outline" onClick={() => setLabelPreview(null)} aria-label="ปิดตัวอย่าง">✕</button>
             </div>
