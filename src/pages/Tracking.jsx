@@ -7,6 +7,8 @@ import { auth } from "../lib/firebase.js";
 import { formatFirebaseDate } from "../utils/format.js";
 import { exportCSV } from "../utils/csvTracking.js";
 
+const MANUAL_LABELS_STORAGE_KEY = "talib_tracking_manual_labels_v1";
+
 export default function Tracking({ authState }) {
   // --- View & Routing State ---
   const [view, setView] = useState("home");
@@ -34,8 +36,22 @@ export default function Tracking({ authState }) {
   const [activeModal, setActiveModal] = useState(null); // 'edit-recipient', 'edit-record', 'label'
   const [editData, setEditData] = useState({});
   const [labelSettings, setLabelSettings] = useState({ name: "สมาคม Talib Club", phone: "", addr: "", size: "therm-150x100" });
-  const [manualLabels, setManualLabels] = useState([]);
+  const [manualLabels, setManualLabels] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(MANUAL_LABELS_STORAGE_KEY);
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed.filter(item => item && item.id && item.fullName && item.address) : [];
+    } catch { return []; }
+  });
   const [manualLabelDraft, setManualLabelDraft] = useState({ fullName: "", phone: "", address: "", postalCode: "", bonusNote: "" });
+  const [manualLabelModalOpen, setManualLabelModalOpen] = useState(false);
+  const [editingManualLabelId, setEditingManualLabelId] = useState(null);
+  const [labelPreview, setLabelPreview] = useState(null);
+
+  useEffect(() => {
+    try { sessionStorage.setItem(MANUAL_LABELS_STORAGE_KEY, JSON.stringify(manualLabels)); }
+    catch (error) { console.warn("Could not save temporary manual labels:", error); }
+  }, [manualLabels]);
 
   // PapaParse used to be injected from cdnjs at runtime with no integrity hash,
   // so whatever that CDN served got full access to this page — and to the CSV of
@@ -243,12 +259,54 @@ export default function Tracking({ authState }) {
             rows.push(dataObj);
           });
 
+          if (rows.length === 0) {
+            await myAlert("ไม่พบข้อมูลที่ถูกต้องในไฟล์ CSV\n\nโปรดตรวจสอบให้แน่ใจว่าในไฟล์มีคอลัมน์ 'ชื่อ' หรือ 'name'");
+            setIsLoading(false);
+            e.target.value = "";
+            return;
+          }
+
+          const normalize = value => String(value || "").toLowerCase().replace(/[\s\-.,/]/g, "");
+          const getImportKey = item => {
+            if (targetCollection === "records") {
+              const trackingNumber = normalize(item.trackingNumber);
+              return trackingNumber ? `tracking:${trackingNumber}` : `record:${normalize(item.phone)}:${normalize(item.fullName)}`;
+            }
+            const phone = normalize(item.phone).replace(/\D/g, "");
+            return phone ? `phone:${phone}` : `recipient:${normalize(item.fullName)}:${normalize(item.address)}`;
+          };
+          const existingSnap = await getDocs(collection(db, targetCollection));
+          const seenKeys = new Set(existingSnap.docs.map(item => getImportKey(item.data())));
+          const uniqueRows = [];
+          const duplicateRows = [];
+          rows.forEach(item => {
+            const key = getImportKey(item);
+            if (seenKeys.has(key)) duplicateRows.push(item);
+            else { seenKeys.add(key); uniqueRows.push(item); }
+          });
+
+          if (uniqueRows.length === 0) {
+            await myAlert(`ข้อมูลในไฟล์ซ้ำกับในระบบทั้งหมด ${duplicateRows.length} รายการ จึงไม่ได้เพิ่มข้อมูล`, "ไม่พบรายการใหม่");
+            setIsLoading(false);
+            e.target.value = "";
+            return;
+          }
+          const duplicateNote = duplicateRows.length
+            ? `\nข้ามรายการซ้ำ ${duplicateRows.length} รายการ\nตัวอย่าง: ${duplicateRows.slice(0, 4).map(item => item.fullName).join(", ")}${duplicateRows.length > 4 ? " …" : ""}`
+            : "\nไม่พบรายการซ้ำ";
+          const proceed = await myConfirm(`ตรวจพบข้อมูลใหม่ ${uniqueRows.length} รายการ${duplicateNote}\n\nต้องการนำเข้ารายการใหม่หรือไม่?`);
+          if (!proceed) {
+            setIsLoading(false);
+            e.target.value = "";
+            return;
+          }
+
           const BATCH_LIMIT = 450;
           const commitPromises = [];
           
-          for (let i = 0; i < rows.length; i += BATCH_LIMIT) {
+          for (let i = 0; i < uniqueRows.length; i += BATCH_LIMIT) {
             const batch = writeBatch(db);
-            for (const dataObj of rows.slice(i, i + BATCH_LIMIT)) {
+            for (const dataObj of uniqueRows.slice(i, i + BATCH_LIMIT)) {
               batch.set(doc(collection(db, targetCollection)), dataObj);
             }
             commitPromises.push(batch.commit());
@@ -261,7 +319,7 @@ export default function Tracking({ authState }) {
           const results = await Promise.allSettled(commitPromises);
           const failedBatches = results.filter(r => r.status === "rejected");
 
-          const count = rows.length;
+          const count = uniqueRows.length;
           if (failedBatches.length > 0) {
             console.error("CSV import: some batches failed", failedBatches.map(f => f.reason));
             const savedCount = Math.max(0, count - failedBatches.length * BATCH_LIMIT);
@@ -270,7 +328,7 @@ export default function Tracking({ authState }) {
               "บันทึกไม่ครบ"
             );
           } else if (count > 0) {
-            await myAlert(`บันทึกข้อมูลสำเร็จ ${count} รายการเข้าสู่ระบบ`, "สำเร็จ");
+            await myAlert(`บันทึกข้อมูลสำเร็จ ${count} รายการ${duplicateRows.length ? ` (ข้ามรายการซ้ำ ${duplicateRows.length} รายการ)` : ""}`, "สำเร็จ");
             if (targetCollection === "recipients") setAdminTab(2);
             else setAdminTab(4);
           } else {
@@ -290,13 +348,19 @@ export default function Tracking({ authState }) {
   // ★ BULK ACTIONS (โบนัส, ลบ, Export)
   // ==========================================
   const handleBulkDelete = async (collectionName, selectedIds, clearAll = false) => {
-    let idsToDelete = clearAll ? (collectionName === "recipients" ? recipients : records).map(r => r.id) : selectedIds;
+    const sourceRows = collectionName === "recipients" ? recipients : records;
+    const rowsToDelete = clearAll ? sourceRows : sourceRows.filter(row => selectedIds.includes(row.id));
+    const idsToDelete = rowsToDelete.map(row => row.id);
     if (idsToDelete.length === 0) {
       await myAlert("กรุณาเลือกรายการที่ต้องการลบ");
       return;
     }
-    
-    const isConfirmed = await myConfirm(`ยืนยันการลบข้อมูลจำนวน ${idsToDelete.length} รายการใช่หรือไม่?`);
+
+    const sampleNames = rowsToDelete.slice(0, 6).map(row => row.fullName || row.trackingNumber || "ไม่ระบุชื่อ");
+    const remainingCount = rowsToDelete.length - sampleNames.length;
+    const preview = `${sampleNames.join("\n")}${remainingCount > 0 ? `\nและอีก ${remainingCount} รายการ` : ""}`;
+    const actionLabel = clearAll ? "ล้างรายชื่อทั้งหมด" : "ลบรายการที่เลือก";
+    const isConfirmed = await myConfirm(`${actionLabel} จำนวน ${idsToDelete.length} รายการใช่หรือไม่?\n\n${preview}\n\nการลบนี้ไม่สามารถย้อนกลับได้`, clearAll ? "ยืนยันล้างข้อมูลทั้งหมด" : "ตรวจสอบรายการก่อนลบ");
     if (!isConfirmed) return;
 
     setIsLoading(true);
@@ -310,8 +374,8 @@ export default function Tracking({ authState }) {
         await batch.commit();
       }
       await myAlert("ลบข้อมูลออกจากระบบสำเร็จ", "สำเร็จ");
-      if (collectionName === "recipients") fetchRecipients();
-      else fetchRecords();
+      if (collectionName === "recipients") { setSelectedRecipients([]); await fetchRecipients(); }
+      else { setSelectedRecords([]); await fetchRecords(); }
     } catch (e) { 
       console.error(e); 
       await myAlert("เกิดข้อผิดพลาดในการลบข้อมูล", "ข้อผิดพลาด"); 
@@ -372,28 +436,49 @@ export default function Tracking({ authState }) {
   // ==========================================
   // ★ LABEL PRINTER
   // ==========================================
-  const addManualLabel = async () => {
+  const openManualLabelModal = (label = null) => {
+    setEditingManualLabelId(label?.id || null);
+    setManualLabelDraft(label ? {
+      fullName: label.fullName || "",
+      phone: label.phone || "",
+      address: [label.address, label.postalCode].filter(Boolean).join(" "),
+      postalCode: label.postalCode || "",
+      bonusNote: label.bonusNote || "",
+    } : { fullName: "", phone: "", address: "", postalCode: "", bonusNote: "" });
+    setManualLabelModalOpen(true);
+  };
+
+  const saveManualLabel = async () => {
     const fullName = manualLabelDraft.fullName.trim();
-    const address = manualLabelDraft.address.trim();
-    const postalCode = manualLabelDraft.postalCode.trim();
-    if (!fullName || !address || !postalCode) {
-      await myAlert("กรุณากรอกชื่อผู้รับ ที่อยู่ และรหัสไปรษณีย์ให้ครบ");
+    const fullAddress = manualLabelDraft.address.trim();
+    if (!fullName || !fullAddress) {
+      await myAlert("กรุณากรอกชื่อผู้รับและที่อยู่ให้ครบ");
       return;
     }
-    setManualLabels(prev => [...prev, {
+    const postalCode = fullAddress.match(/\b\d{5}\b/)?.[0] || manualLabelDraft.postalCode.trim();
+    const address = postalCode ? fullAddress.replace(postalCode, "").replace(/[,\s]+$/, "").trim() : fullAddress;
+    const labelData = {
       ...manualLabelDraft,
-      id: `manual-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       fullName,
       phone: manualLabelDraft.phone.trim(),
       address,
       postalCode,
       bonusNote: manualLabelDraft.bonusNote.trim(),
-    }]);
+    };
+    if (editingManualLabelId) {
+      setManualLabels(prev => prev.map(item => item.id === editingManualLabelId ? { ...item, ...labelData } : item));
+    } else {
+      setManualLabels(prev => [...prev, { ...labelData, id: `manual-${Date.now()}-${Math.random().toString(36).slice(2)}` }]);
+    }
     setManualLabelDraft({ fullName: "", phone: "", address: "", postalCode: "", bonusNote: "" });
+    setEditingManualLabelId(null);
+    setManualLabelModalOpen(false);
   };
 
-  const printLabels = async () => {
-    const selectedList = recipients.filter(r => selectedRecipients.length === 0 || selectedRecipients.includes(r.id));
+  const printLabels = async (mode = "selected") => {
+    const selectedList = mode === "all"
+      ? recipients
+      : recipients.filter(r => selectedRecipients.includes(r.id));
     const listToPrint = [...selectedList, ...manualLabels];
     if (listToPrint.length === 0) {
       await myAlert("ไม่มีรายชื่อให้พิมพ์ กรุณาเลือกรายชื่อหรือเพิ่มลาเบลเองก่อน");
@@ -440,15 +525,29 @@ export default function Tracking({ authState }) {
       }).join('')
       : listToPrint.map(renderLabel).join('');
 
-    const iframe = document.createElement("iframe");
-    iframe.style.display = "none";
-    document.body.appendChild(iframe);
-    const doc = iframe.contentWindow.document;
-    doc.open();
     const labelTheme = `.l-sender{background:#111318;color:#fff!important;border:0!important;border-radius:1mm;padding:2mm!important;margin-bottom:2mm}.l-sender strong,.l-sender-title{color:#fff!important}.l-sender-title{font-weight:700;font-size:.9em;letter-spacing:.02em;margin-bottom:1mm}.l-recv-title{font-size:10pt;font-weight:700;margin-bottom:4px;color:#111318}.l-foot{border-top:1px solid #111318}.l-note{color:#8a5200!important}`;
-    doc.write(`<html><head><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet"><style>${cssMap[size] || cssMap['therm-150x100']}${labelTheme}</style></head><body>${labelsHtml}</body></html>`);
-    doc.close();
-    setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => document.body.removeChild(iframe), 1000); }, 500);
+    const documentHtml = `<html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet"><style>${cssMap[size] || cssMap['therm-150x100']}${labelTheme}</style></head><body>${labelsHtml}</body></html>`;
+    setLabelPreview({ documentHtml, count: listToPrint.length, size });
+  };
+
+  const printPreviewLabels = () => {
+    if (!labelPreview) return;
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.style.visibility = "hidden";
+    document.body.appendChild(iframe);
+    const printDoc = iframe.contentWindow.document;
+    printDoc.open();
+    printDoc.write(labelPreview.documentHtml);
+    printDoc.close();
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(() => iframe.remove(), 1000);
+    }, 500);
   };
 
   // ==========================================
@@ -457,6 +556,8 @@ export default function Tracking({ authState }) {
 
   const filteredRecipients = recipients.filter(r => searchQ === "" || r.fullName.includes(searchQ) || (r.phone||"").includes(searchQ));
   const filteredRecords = records.filter(r => searchQ === "" || r.fullName.includes(searchQ) || (r.trackingNumber||"").includes(searchQ) || (r.phone||"").includes(searchQ));
+  const allFilteredRecipientsSelected = filteredRecipients.length > 0 && filteredRecipients.every(r => selectedRecipients.includes(r.id));
+  const allFilteredRecordsSelected = filteredRecords.length > 0 && filteredRecords.every(r => selectedRecords.includes(r.id));
 
   return (
     <div className="tracking-wrapper animate-fade-in" style={{ color: "var(--text)" }}>
@@ -662,20 +763,24 @@ export default function Tracking({ authState }) {
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                     <button className="btn" style={{ background: "var(--teal)", color: "white" }} onClick={() => setActiveModal('label')}>🏷️ สร้าง/พิมพ์ลาเบล</button>
                     <button className="btn btn-outline" onClick={() => exportCSV(recipients, false, myAlert)}>📥 Export CSV</button>
-                    <button className="btn btn-outline" style={{ color: "#d97706", borderColor: "#fcd34d", background: "#fffbeb" }} onClick={() => handleBulkBonus("recipients", selectedRecipients)}>🎁 โบนัสที่เลือก</button>
-                    <button className="btn btn-outline" style={{ color: "#dc2626", borderColor: "#fecaca", background: "#fef2f2" }} onClick={() => handleBulkDelete("recipients", selectedRecipients)}>🗑️ ลบที่เลือก</button>
-                    <button className="btn" style={{ background: "#dc2626", color: "white" }} onClick={() => handleBulkDelete("recipients", [], true)}>🗑️ ล้างทั้งหมด</button>
+                    <span style={{ alignSelf: "center", fontSize: 12, color: "var(--t2)" }}>เลือกอยู่ {selectedRecipients.length} รายการ</span>
+                    <button className="btn btn-outline" disabled={selectedRecipients.length === 0} style={{ color: "#d97706", borderColor: "#fcd34d", background: "#fffbeb", opacity: selectedRecipients.length ? 1 : 0.5 }} onClick={() => handleBulkBonus("recipients", selectedRecipients)}>🎁 โบนัสที่เลือก ({selectedRecipients.length})</button>
+                    <button className="btn btn-outline" disabled={selectedRecipients.length === 0} style={{ color: "#dc2626", borderColor: "#fecaca", background: "#fef2f2", opacity: selectedRecipients.length ? 1 : 0.5 }} onClick={() => handleBulkDelete("recipients", selectedRecipients)}>🗑️ ลบที่เลือก ({selectedRecipients.length})</button>
+                    <button className="btn" style={{ background: "#dc2626", color: "white" }} onClick={() => handleBulkDelete("recipients", [], true)}>🗑️ ล้างทั้งหมด ({recipients.length})</button>
                   </div>
                </div>
 
-               <div style={{ fontSize: "14px", fontWeight: "700", color: "var(--teal)", marginBottom: "12px" }}>{filteredRecipients.length} รายชื่อเตรียมจัดส่ง</div>
+               <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", fontSize: "14px", marginBottom: "12px" }}>
+                 <strong style={{ color: "var(--teal)" }}>พบ {filteredRecipients.length} จาก {recipients.length} รายชื่อ</strong>
+                 <span style={{ color: "var(--t2)", fontSize: 12 }}>เลือกทั้งหมด = เลือกเฉพาะผลค้นหาที่แสดงอยู่</span>
+               </div>
 
                <div style={{ overflowX: "auto", border: "1px solid var(--br)", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
                  <table style={{ width: "100%", fontSize: "13px", textAlign: "left", borderCollapse: "collapse" }}>
                    <thead style={{ background: "var(--teal)", color: "white", borderBottom: "2px solid rgba(0,0,0,0.15)" }}>
                      <tr>
                        <th style={{ padding: "12px", width: "40px", textAlign: "center" }}>
-                         <input type="checkbox" checked={selectedRecipients.length === filteredRecipients.length && filteredRecipients.length > 0} onChange={(e) => setSelectedRecipients(e.target.checked ? filteredRecipients.map(r => r.id) : [])} style={{ accentColor: "var(--teal)", cursor: "pointer", width: "16px", height: "16px" }} />
+                         <input type="checkbox" aria-label="เลือกหรือยกเลิกการเลือกผลค้นหาที่แสดง" title="เลือก/ยกเลิกผลค้นหาที่แสดง" checked={allFilteredRecipientsSelected} onChange={(e) => setSelectedRecipients(prev => e.target.checked ? [...new Set([...prev, ...filteredRecipients.map(r => r.id)])] : prev.filter(id => !filteredRecipients.some(r => r.id === id)))} style={{ accentColor: "var(--teal)", cursor: "pointer", width: "16px", height: "16px" }} />
                        </th>
                        <th style={{ padding: "12px", width: "40px" }}>#</th>
                        <th style={{ padding: "12px" }}>ชื่อ-นามสกุล</th>
@@ -748,20 +853,24 @@ export default function Tracking({ authState }) {
                   </div>
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                     <button className="btn btn-outline" onClick={() => exportCSV(records, true, myAlert)}>📥 Export CSV</button>
-                    <button className="btn btn-outline" style={{ color: "#d97706", borderColor: "#fcd34d", background: "#fffbeb" }} onClick={() => handleBulkBonus("records", selectedRecords)}>🎁 โบนัสที่เลือก</button>
-                    <button className="btn btn-outline" style={{ color: "#dc2626", borderColor: "#fecaca", background: "#fef2f2" }} onClick={() => handleBulkDelete("records", selectedRecords)}>🗑️ ลบที่เลือก</button>
-                    <button className="btn" style={{ background: "#dc2626", color: "white" }} onClick={() => handleBulkDelete("records", [], true)}>🗑️ ล้างทั้งหมด</button>
+                    <span style={{ alignSelf: "center", fontSize: 12, color: "var(--t2)" }}>เลือกอยู่ {selectedRecords.length} รายการ</span>
+                    <button className="btn btn-outline" disabled={selectedRecords.length === 0} style={{ color: "#d97706", borderColor: "#fcd34d", background: "#fffbeb", opacity: selectedRecords.length ? 1 : 0.5 }} onClick={() => handleBulkBonus("records", selectedRecords)}>🎁 โบนัสที่เลือก ({selectedRecords.length})</button>
+                    <button className="btn btn-outline" disabled={selectedRecords.length === 0} style={{ color: "#dc2626", borderColor: "#fecaca", background: "#fef2f2", opacity: selectedRecords.length ? 1 : 0.5 }} onClick={() => handleBulkDelete("records", selectedRecords)}>🗑️ ลบที่เลือก ({selectedRecords.length})</button>
+                    <button className="btn" style={{ background: "#dc2626", color: "white" }} onClick={() => handleBulkDelete("records", [], true)}>🗑️ ล้างทั้งหมด ({records.length})</button>
                   </div>
                </div>
 
-               <div style={{ fontSize: "14px", fontWeight: "700", color: "var(--teal)", marginBottom: "12px" }}>{filteredRecords.length} รายการในระบบ</div>
+               <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", fontSize: "14px", marginBottom: "12px" }}>
+                 <strong style={{ color: "var(--teal)" }}>พบ {filteredRecords.length} จาก {records.length} รายการ</strong>
+                 <span style={{ color: "var(--t2)", fontSize: 12 }}>เลือกทั้งหมด = เลือกเฉพาะผลค้นหาที่แสดงอยู่</span>
+               </div>
 
                <div style={{ overflowX: "auto", border: "1px solid var(--br)", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
                   <table style={{ width: "100%", fontSize: "13px", textAlign: "left", borderCollapse: "collapse" }}>
                     <thead style={{ background: "var(--teal)", color: "white", borderBottom: "2px solid rgba(0,0,0,0.15)", whiteSpace: "nowrap" }}>
                       <tr>
                         <th style={{ padding: "12px", width: "40px", textAlign: "center" }}>
-                          <input type="checkbox" checked={selectedRecords.length === filteredRecords.length && filteredRecords.length > 0} onChange={(e) => setSelectedRecords(e.target.checked ? filteredRecords.map(r => r.id) : [])} style={{ accentColor: "var(--teal)", cursor: "pointer", width: "16px", height: "16px" }} />
+                          <input type="checkbox" aria-label="เลือกหรือยกเลิกการเลือกผลค้นหาที่แสดง" title="เลือก/ยกเลิกผลค้นหาที่แสดง" checked={allFilteredRecordsSelected} onChange={(e) => setSelectedRecords(prev => e.target.checked ? [...new Set([...prev, ...filteredRecords.map(r => r.id)])] : prev.filter(id => !filteredRecords.some(r => r.id === id)))} style={{ accentColor: "var(--teal)", cursor: "pointer", width: "16px", height: "16px" }} />
                         </th>
                         <th style={{ padding: "12px", width: "40px" }}>#</th>
                         <th style={{ padding: "12px" }}>ชื่อ-นามสกุล</th>
@@ -866,35 +975,6 @@ export default function Tracking({ authState }) {
                  <textarea className="inp" placeholder="ที่อยู่ผู้ส่ง..." rows="2" value={labelSettings.addr} onChange={e => setLabelSettings({...labelSettings, addr: e.target.value})}></textarea>
                </div>
 
-               <div style={{ marginBottom: "24px", background: "#111318", color: "#f5f5f5", padding: "16px", borderRadius: "10px", border: "1px solid #2b2d36" }}>
-                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-                   <div style={{ fontSize: "13px", fontWeight: "700", color: "#65d6b3" }}>✍️ เพิ่มลาเบลเอง</div>
-                   <span style={{ fontSize: 12, color: "#a1a1aa" }}>เพิ่มผู้รับที่ไม่มีในรายชื่อ Tracking · {manualLabels.length} รายการ</span>
-                 </div>
-                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
-                   <input className="inp" placeholder="ชื่อผู้รับ *" value={manualLabelDraft.fullName} onChange={e => setManualLabelDraft({ ...manualLabelDraft, fullName: e.target.value })} style={{ background: "#1b1d25", color: "#f5f5f5", borderColor: "#343741" }} />
-                   <input className="inp" placeholder="เบอร์โทร (ถ้ามี)" value={manualLabelDraft.phone} onChange={e => setManualLabelDraft({ ...manualLabelDraft, phone: e.target.value })} style={{ background: "#1b1d25", color: "#f5f5f5", borderColor: "#343741" }} />
-                   <input className="inp" placeholder="รหัสไปรษณีย์ *" value={manualLabelDraft.postalCode} onChange={e => setManualLabelDraft({ ...manualLabelDraft, postalCode: e.target.value })} style={{ background: "#1b1d25", color: "#f5f5f5", borderColor: "#343741" }} />
-                   <input className="inp" placeholder="หมายเหตุ (ถ้ามี)" value={manualLabelDraft.bonusNote} onChange={e => setManualLabelDraft({ ...manualLabelDraft, bonusNote: e.target.value })} style={{ background: "#1b1d25", color: "#f5f5f5", borderColor: "#343741" }} />
-                   <textarea className="inp" placeholder="ที่อยู่ผู้รับ *" rows="2" value={manualLabelDraft.address} onChange={e => setManualLabelDraft({ ...manualLabelDraft, address: e.target.value })} style={{ gridColumn: "1 / -1", background: "#1b1d25", color: "#f5f5f5", borderColor: "#343741" }} />
-                 </div>
-                 <button type="button" className="btn btn-outline" onClick={addManualLabel} style={{ marginTop: 10, color: "#65d6b3", borderColor: "#3b9f84", background: "#17221f" }}>
-                   <i className="ti ti-plus"></i> เพิ่มลงรายการพิมพ์
-                 </button>
-                 {manualLabels.length > 0 && (
-                   <div style={{ display: "grid", gap: 6, marginTop: 12 }}>
-                     {manualLabels.map((label, index) => (
-                       <div key={label.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 6, background: "#1b1d25", color: "#e4e4e7", border: "1px solid #2b2d36", fontSize: 12 }}>
-                         <span><strong>{index + 1}. {label.fullName}</strong> · {label.postalCode}{label.address ? ` · ${label.address}` : ""}</span>
-                         <button type="button" aria-label={`ลบลาเบล ${label.fullName}`} className="btn btn-outline" onClick={() => setManualLabels(prev => prev.filter(item => item.id !== label.id))} style={{ padding: "4px 8px", color: "var(--red)", flexShrink: 0 }}>
-                           <i className="ti ti-trash"></i>
-                         </button>
-                       </div>
-                     ))}
-                   </div>
-                 )}
-               </div>
-               
                <div style={{ background: "var(--bg)", padding: "16px", borderRadius: "8px", border: "1px solid var(--br2)" }}>
                  <div style={{ fontSize: "13px", fontWeight: "700", marginBottom: "12px", color: "var(--teal)" }}>📐 ขนาดลาเบล (Printer Size)</div>
                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -918,11 +998,105 @@ export default function Tracking({ authState }) {
                    ))}
                  </div>
                </div>
+
+               <div style={{ marginTop: 24, background: "#111318", color: "#f5f5f5", padding: 16, borderRadius: 10, border: "1px solid #2b2d36" }}>
+                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: manualLabels.length ? 12 : 0 }}>
+                   <div>
+                     <strong style={{ display: "block", color: "#65d6b3", fontSize: 13 }}>📋 รายการลาเบล</strong>
+                     <span style={{ fontSize: 12, color: "#a1a1aa" }}>ลาเบลเพิ่มเอง {manualLabels.length} รายการ · ร่างเก็บไว้ในแท็บนี้</span>
+                   </div>
+                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                     {manualLabels.length > 0 && <button type="button" className="btn btn-outline" onClick={async () => { if (await myConfirm(`ล้างลาเบลที่เพิ่มเอง ${manualLabels.length} รายการใช่หรือไม่?`)) setManualLabels([]); }} style={{ padding: "7px 10px", color: "#fca5a5", borderColor: "#6b343b", background: "#2a191d", fontSize: 12 }}>ล้างรายการ</button>}
+                     <button type="button" className="btn btn-outline" onClick={() => openManualLabelModal()} style={{ padding: "7px 12px", color: "#65d6b3", borderColor: "#3b9f84", background: "#17221f" }}>
+                       <i className="ti ti-plus"></i> เพิ่มลาเบลเอง
+                     </button>
+                   </div>
+                 </div>
+                 {manualLabels.length > 0 && <div style={{ display: "grid", gap: 8 }}>
+                   {manualLabels.map((label, index) => (
+                     <div key={label.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 8, background: "#1b1d25", color: "#e4e4e7", border: "1px solid #2b2d36" }}>
+                       <div style={{ minWidth: 0, fontSize: 12 }}>
+                         <strong style={{ color: "#f4f4f5" }}>{index + 1}. {label.fullName}</strong>
+                         <div style={{ color: "#a1a1aa", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label.phone ? `${label.phone} · ` : ""}{label.address} {label.postalCode}</div>
+                       </div>
+                       <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                         <button type="button" className="btn btn-outline" aria-label={`แก้ไขลาเบล ${label.fullName}`} onClick={() => openManualLabelModal(label)} style={{ padding: "5px 8px", color: "#d4d4d8", borderColor: "#454752" }}><i className="ti ti-edit"></i></button>
+                         <button type="button" className="btn btn-outline" aria-label={`ลบลาเบล ${label.fullName}`} onClick={() => setManualLabels(prev => prev.filter(item => item.id !== label.id))} style={{ padding: "5px 8px", color: "#fca5a5", borderColor: "#6b343b" }}><i className="ti ti-trash"></i></button>
+                       </div>
+                     </div>
+                   ))}
+                 </div>}
+               </div>
              </div>
              <div style={{ padding: "16px 24px", borderTop: "1px solid var(--br)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg)" }}>
-               <span style={{ fontSize: "13px", color: "var(--t2)" }}>จำนวนที่จะพิมพ์: <strong style={{ color: "var(--teal)", fontSize: "16px" }}>{(selectedRecipients.length > 0 ? selectedRecipients.length : recipients.length) + manualLabels.length}</strong> ใบ</span>
-               <button className="btn" style={{ background: "var(--teal)", color: "white" }} onClick={printLabels}>🖨️ พิมพ์ลาเบลที่เลือก</button>
+               <div style={{ fontSize: "13px", color: "var(--t2)" }}>
+                 เลือกไว้ <strong style={{ color: "var(--teal)" }}>{selectedRecipients.length}</strong> รายการ
+                 {manualLabels.length > 0 && <> · เพิ่มเอง <strong style={{ color: "var(--teal)" }}>{manualLabels.length}</strong> รายการ</>}
+               </div>
+               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+                 <button className="btn btn-outline" disabled={selectedRecipients.length + manualLabels.length === 0} style={{ color: "var(--teal)", borderColor: "var(--teal)", opacity: selectedRecipients.length + manualLabels.length === 0 ? 0.5 : 1 }} onClick={() => printLabels("selected")}>
+                   🖨️ พิมพ์ที่เลือก ({selectedRecipients.length + manualLabels.length})
+                 </button>
+                 <button className="btn" disabled={recipients.length + manualLabels.length === 0} style={{ background: "var(--teal)", color: "white", opacity: recipients.length + manualLabels.length === 0 ? 0.5 : 1 }} onClick={() => printLabels("all")}>
+                   🖨️ พิมพ์ทั้งหมด ({recipients.length + manualLabels.length})
+                 </button>
+               </div>
              </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {manualLabelModalOpen && createPortal(
+        <div role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setManualLabelModalOpen(false); }} style={{ position: "fixed", inset: 0, zIndex: 1150, background: "rgba(0,0,0,.72)", display: "grid", placeItems: "center", padding: 16 }}>
+          <form role="dialog" aria-modal="true" aria-labelledby="manual-label-title" onSubmit={e => { e.preventDefault(); saveManualLabel(); }} className="card" style={{ width: "min(520px, 100%)", maxHeight: "90vh", overflowY: "auto", padding: 0, background: "#111318", color: "#f5f5f5", border: "1px solid #343741", borderRadius: 12, boxShadow: "0 24px 70px rgba(0,0,0,.55)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", borderBottom: "1px solid #2b2d36" }}>
+              <h3 id="manual-label-title" style={{ margin: 0, color: "#f4f4f5", fontSize: 15 }}><i className="ti ti-plus" style={{ color: "#65d6b3", marginRight: 8 }}></i>{editingManualLabelId ? "แก้ไขลาเบล" : "เพิ่มลาเบลพิเศษ"}</h3>
+              <button type="button" className="btn btn-outline" aria-label="ปิดหน้าต่างเพิ่มลาเบล" onClick={() => setManualLabelModalOpen(false)} style={{ padding: "4px 8px", color: "#a1a1aa", borderColor: "#343741", background: "transparent" }}>✕</button>
+            </div>
+            <div style={{ display: "grid", gap: 12, padding: 16 }}>
+              <label style={{ display: "grid", gap: 6, fontSize: 12, color: "#c4c4cc", fontWeight: 600 }}>
+                ชื่อ-นามสกุล *
+                <input autoFocus required className="inp" placeholder="เช่น นาย สมชาย ใจดี" value={manualLabelDraft.fullName} onChange={e => setManualLabelDraft(prev => ({ ...prev, fullName: e.target.value }))} style={{ background: "#1b1d25", color: "#f5f5f5", borderColor: "#343741" }} />
+              </label>
+              <label style={{ display: "grid", gap: 6, fontSize: 12, color: "#c4c4cc", fontWeight: 600 }}>
+                เบอร์โทร
+                <input className="inp" placeholder="0xx-xxx-xxxx" value={manualLabelDraft.phone} onChange={e => setManualLabelDraft(prev => ({ ...prev, phone: e.target.value }))} style={{ background: "#1b1d25", color: "#f5f5f5", borderColor: "#343741" }} />
+              </label>
+              <label style={{ display: "grid", gap: 6, fontSize: 12, color: "#c4c4cc", fontWeight: 600 }}>
+                ที่อยู่แบบเต็ม *
+                <textarea required rows={3} className="inp" placeholder="บ้านเลขที่ ซอย ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด รหัสไปรษณีย์" value={manualLabelDraft.address} onChange={e => setManualLabelDraft(prev => ({ ...prev, address: e.target.value }))} style={{ background: "#1b1d25", color: "#f5f5f5", borderColor: "#343741", resize: "vertical" }} />
+              </label>
+              <label style={{ display: "grid", gap: 6, fontSize: 12, color: "#c4c4cc", fontWeight: 600 }}>
+                หมายเหตุบนลาเบล
+                <input className="inp" placeholder="เช่น ประธาน / ด่วน" value={manualLabelDraft.bonusNote} onChange={e => setManualLabelDraft(prev => ({ ...prev, bonusNote: e.target.value }))} style={{ background: "#1b1d25", color: "#f5f5f5", borderColor: "#343741" }} />
+              </label>
+            </div>
+            <div style={{ padding: "0 16px 16px" }}>
+              <button type="submit" className="btn" style={{ width: "100%", justifyContent: "center", background: "#24252d", color: "#f4f4f5", border: "1px solid #41434c" }}>
+                <i className={editingManualLabelId ? "ti ti-device-floppy" : "ti ti-plus"}></i> {editingManualLabelId ? "บันทึกการแก้ไข" : "เพิ่มลาเบลนี้"}
+              </button>
+            </div>
+          </form>
+        </div>,
+        document.body
+      )}
+
+      {labelPreview && createPortal(
+        <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,.65)", display: "grid", placeItems: "center", padding: 16 }}>
+          <div className="card" style={{ width: "min(1000px, 100%)", height: "min(88vh, 900px)", display: "flex", flexDirection: "column", padding: 0, overflow: "hidden" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 18px", borderBottom: "1px solid var(--br)" }}>
+              <div>
+                <strong style={{ display: "block", color: "var(--teal)" }}>ตัวอย่างลาเบลก่อนพิมพ์</strong>
+                <span style={{ fontSize: 12, color: "var(--t2)" }}>{labelPreview.count} ใบ · {labelPreview.size.startsWith("a4-") ? `A4 (${labelPreview.size.slice(3)} ใบต่อแผ่น)` : labelPreview.size === "therm-100x150" ? "100 × 150 มม." : "150 × 100 มม."}</span>
+              </div>
+              <button type="button" className="btn btn-outline" onClick={() => setLabelPreview(null)} aria-label="ปิดตัวอย่าง">✕</button>
+            </div>
+            <iframe title="ตัวอย่างหน้ากระดาษลาเบล" srcDoc={labelPreview.documentHtml} style={{ width: "100%", flex: 1, minHeight: 0, border: 0, background: "#d4d4d8" }} />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "12px 18px", borderTop: "1px solid var(--br)" }}>
+              <button type="button" className="btn btn-outline" onClick={() => setLabelPreview(null)}>กลับไปแก้ไข</button>
+              <button type="button" className="btn" onClick={printPreviewLabels} style={{ background: "var(--teal)", color: "white" }}>🖨️ พิมพ์ {labelPreview.count} ใบ</button>
+            </div>
           </div>
         </div>,
         document.body
