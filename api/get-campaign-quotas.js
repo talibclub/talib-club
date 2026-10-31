@@ -38,16 +38,20 @@ export default async function handler(req, res) {
       const campaign = doc.data();
       const quota = Number(campaign.quota || 0);
       
-      const holdsSnap = await db.collection(`book_campaigns/${doc.id}/holds`).get();
+      const [holdsSnap, registrationsSnap] = await Promise.all([
+        db.collection(`book_campaigns/${doc.id}/holds`).get(),
+        db.collection("book_registrations").where("campaignId", "==", doc.id).get(),
+      ]);
       
       let activeCount = 0;
-      let completedCount = 0;
+      // Registrations are the source of truth for completed quota. Old admin
+      // deletions could leave completed hold documents behind indefinitely.
+      const completedCount = registrationsSnap.size;
       
       holdsSnap.forEach(holdDoc => {
         const d = holdDoc.data();
-        if (d.status === "completed") {
-          completedCount++;
-        } else if (d.status === "reserved" && d.expiresAt && d.expiresAt.toMillis() > nowMs) {
+        const expiryMs = d.expiresAt?.toMillis?.() ?? (d.expiresAt instanceof Date ? d.expiresAt.getTime() : Number(d.expiresAt));
+        if (d.status === "reserved" && Number.isFinite(expiryMs) && expiryMs > nowMs) {
           activeCount++;
         }
       });

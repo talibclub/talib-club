@@ -87,9 +87,10 @@ export default async function handler(req, res) {
         }
       });
       
-      const completedHoldsSnap = await tx.get(campaignRef.collection("holds").where("status", "==", "completed"));
-      const staleOwnCompletion = existingHold.exists && existingHold.data()?.status === "completed" && !registrationSnap.exists ? 1 : 0;
-      if (activeCount + completedHoldsSnap.size - staleOwnCompletion >= quota) throw new Error("Campaign quota is full");
+      // Count actual registrations instead of completed holds: deleted
+      // registrations may have stale completed hold documents from older code.
+      const registrationsSnap = await tx.get(db.collection("book_registrations").where("campaignId", "==", campaignId));
+      if (activeCount + registrationsSnap.size >= quota) throw new Error("Campaign quota is full");
 
       const expiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + timeLimit * 60 * 1000);
       tx.set(holdRef, {

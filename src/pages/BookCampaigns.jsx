@@ -35,11 +35,15 @@ export default function BookCampaigns({ go }) {
     fetchCampaigns()
 
     // Fetch quotas
-    fetch("/api/get-campaign-quotas")
+    const fetchQuotas = () => fetch("/api/get-campaign-quotas", { cache: "no-store" })
       .then(res => res.json())
       .then(data => { if (!cancelled) setQuotas(data) })
       .catch(console.error)
-    return () => { cancelled = true }
+    fetchQuotas()
+    // A reservation can expire while this page remains open; refresh the
+    // displayed quota without requiring the visitor to reload the page.
+    const quotaTimer = setInterval(fetchQuotas, 15000)
+    return () => { cancelled = true; clearInterval(quotaTimer) }
   }, [retry])
 
   return (
