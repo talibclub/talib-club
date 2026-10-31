@@ -53,7 +53,7 @@ export default function Tracking({ authState }) {
   // --- Modals State ---
   const [activeModal, setActiveModal] = useState(null); // 'edit-recipient', 'edit-record', 'label'
   const [editData, setEditData] = useState({});
-  const [labelSettings, setLabelSettings] = useState({ name: "สมาคม Talib Club", phone: "", addr: "", size: "therm-150x100", customWidth: 100, customHeight: 75, a4LabelWidth: 100, a4LabelHeight: 75, a4Rows: 3, a4Cols: 2, a4Orientation: "portrait" });
+  const [labelSettings, setLabelSettings] = useState({ name: "สมาคม Talib Club", phone: "", addr: "", senderTheme: "dark", size: "therm-150x100", customWidth: 100, customHeight: 75, a4LabelWidth: 100, a4LabelHeight: 75, a4Rows: 3, a4Cols: 2, a4Orientation: "portrait" });
   const [manualLabels, setManualLabels] = useState(() => {
     try {
       const saved = sessionStorage.getItem(MANUAL_LABELS_STORAGE_KEY);
@@ -587,7 +587,8 @@ export default function Tracking({ authState }) {
       }).join('')
       : listToPrint.map(renderLabel).join('');
 
-    const labelTheme = `.l-sender{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#111318!important;background-color:#111318!important;color:#fff!important;border:0!important;border-radius:1mm;padding:2mm!important;margin-bottom:2mm}.l-sender *{color:#fff!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.l-sender strong,.l-sender-title{color:#fff!important}.l-sender-title{font-weight:700;font-size:.95em;letter-spacing:.02em;margin-bottom:1mm}.l-sender>div:not(.l-sender-title){font-weight:600}.l-recv-title{font-size:10pt;font-weight:700;margin-bottom:4px;color:#111318}.l-recv-addr.addr-medium{font-size:90%}.l-recv-addr.addr-long{font-size:80%}.l-foot{border-top:1px solid #111318}.l-note{color:#8a5200!important}`;
+    const senderTheme = labelSettings.senderTheme === "light" ? { background: "#fff", foreground: "#111318", border: "1px solid #111318" } : { background: "#111318", foreground: "#fff", border: "0" };
+    const labelTheme = `.l-sender{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:${senderTheme.background}!important;background-color:${senderTheme.background}!important;color:${senderTheme.foreground}!important;border:${senderTheme.border}!important;border-radius:1mm;padding:2mm!important;margin-bottom:2mm}.l-sender *{color:${senderTheme.foreground}!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.l-sender strong,.l-sender-title{color:${senderTheme.foreground}!important}.l-sender-title{font-weight:700;font-size:.95em;letter-spacing:.02em;margin-bottom:1mm}.l-sender>div:not(.l-sender-title){font-weight:600}.l-recv-title{font-size:10pt;font-weight:700;margin-bottom:4px;color:#111318}.l-recv-addr.addr-medium{font-size:90%}.l-recv-addr.addr-long{font-size:80%}.l-foot{border-top:1px solid #111318}.l-note{color:#8a5200!important}`;
     const documentHtml = `<html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet"><style>${layoutCss}${labelTheme}</style></head><body>${labelsHtml}</body></html>`;
     setLabelPreview({ documentHtml, count: listToPrint.length, size, labelsPerSheet, a4Rows, a4Cols, a4Orientation, a4FitLayout, customWidth: labelSettings.customWidth, customHeight: labelSettings.customHeight });
   };
@@ -1047,6 +1048,13 @@ export default function Tracking({ authState }) {
                    <input type="text" className="inp" placeholder="เบอร์โทรผู้ส่ง..." value={labelSettings.phone} onChange={e => setLabelSettings({...labelSettings, phone: e.target.value})} />
                  </div>
                  <textarea className="inp" placeholder="ที่อยู่ผู้ส่ง..." rows="2" value={labelSettings.addr} onChange={e => setLabelSettings({...labelSettings, addr: e.target.value})}></textarea>
+                 <label style={{ display: "grid", gap: 6, marginTop: 10, fontSize: 12, color: "var(--t2)", fontWeight: 600 }}>
+                   รูปแบบพื้นหลังส่วนผู้ส่ง
+                   <select className="inp" value={labelSettings.senderTheme} onChange={e => setLabelSettings({ ...labelSettings, senderTheme: e.target.value })}>
+                     <option value="dark">พื้นดำ ตัวอักษรสีขาว</option>
+                     <option value="light">พื้นขาว ตัวอักษรสีดำ</option>
+                   </select>
+                 </label>
                </div>
 
                <div style={{ background: "var(--bg)", padding: "16px", borderRadius: "8px", border: "1px solid var(--br2)" }}>
