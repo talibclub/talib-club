@@ -413,8 +413,9 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
                       {getStatusBadge(reg.status)}
                       {reg.trackingNumber && <div style={{ marginTop: 6, fontSize: 11, fontFamily: "monospace", color: "var(--teal)", fontWeight: "bold" }}>{reg.trackingNumber}</div>}
                     </td>
-                    <td style={{ padding: 12 }}>
-                      <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", maxWidth: 180, margin: "0 auto" }}>
+                    <td style={{ padding: 12, minWidth: 220 }}>
+                      <div style={{ display: "grid", justifyItems: "center", gap: 8, width: "max-content", minWidth: "100%" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexWrap: "wrap", maxWidth: 220 }}>
                         {(!reg.status || reg.status === "submitted") && (
                           <>
                             <button className="btn btn-outline" onClick={() => handleUpdateStatus(reg, "approved")} style={{ padding: "4px 8px", fontSize: 12, color: "var(--teal)", borderColor: "var(--teal-bg)", background: "var(--teal-bg)" }}>
@@ -446,12 +447,15 @@ export default function CampaignRegistrationsViewer({ campaign, onBack }) {
                             <i className="ti ti-edit"></i> แก้ไขเลขพัสดุ
                           </button>
                         )}
-                        <button className="btn btn-outline" onClick={() => startEdit(reg)} style={{ padding: "4px 8px", fontSize: 12 }}>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "center", gap: 6, paddingTop: 2, borderTop: "1px solid var(--br2)", width: "100%" }}>
+                        <button className="btn btn-outline" onClick={() => startEdit(reg)} style={{ padding: "5px 9px", fontSize: 12, whiteSpace: "nowrap" }}>
                           <i className="ti ti-edit"></i> แก้ไขข้อมูล
                         </button>
-                        <button className="btn btn-outline" onClick={() => handleDelete(reg)} style={{ padding: "4px 8px", fontSize: 12, color: "var(--red)", borderColor: "rgba(239, 68, 68, 0.2)" }}>
+                        <button className="btn btn-outline" onClick={() => handleDelete(reg)} style={{ padding: "5px 9px", fontSize: 12, color: "var(--red)", borderColor: "rgba(239, 68, 68, 0.2)", whiteSpace: "nowrap" }}>
                           <i className="ti ti-trash"></i> ลบ
                         </button>
+                        </div>
                       </div>
                     </td>
                   </tr>
