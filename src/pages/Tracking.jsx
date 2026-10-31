@@ -34,6 +34,8 @@ export default function Tracking({ authState }) {
   const [activeModal, setActiveModal] = useState(null); // 'edit-recipient', 'edit-record', 'label'
   const [editData, setEditData] = useState({});
   const [labelSettings, setLabelSettings] = useState({ name: "สมาคม Talib Club", phone: "", addr: "", size: "therm-150x100" });
+  const [manualLabels, setManualLabels] = useState([]);
+  const [manualLabelDraft, setManualLabelDraft] = useState({ fullName: "", phone: "", address: "", postalCode: "", bonusNote: "" });
 
   // PapaParse used to be injected from cdnjs at runtime with no integrity hash,
   // so whatever that CDN served got full access to this page — and to the CSV of
@@ -370,10 +372,31 @@ export default function Tracking({ authState }) {
   // ==========================================
   // ★ LABEL PRINTER
   // ==========================================
+  const addManualLabel = async () => {
+    const fullName = manualLabelDraft.fullName.trim();
+    const address = manualLabelDraft.address.trim();
+    const postalCode = manualLabelDraft.postalCode.trim();
+    if (!fullName || !address || !postalCode) {
+      await myAlert("กรุณากรอกชื่อผู้รับ ที่อยู่ และรหัสไปรษณีย์ให้ครบ");
+      return;
+    }
+    setManualLabels(prev => [...prev, {
+      ...manualLabelDraft,
+      id: `manual-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      fullName,
+      phone: manualLabelDraft.phone.trim(),
+      address,
+      postalCode,
+      bonusNote: manualLabelDraft.bonusNote.trim(),
+    }]);
+    setManualLabelDraft({ fullName: "", phone: "", address: "", postalCode: "", bonusNote: "" });
+  };
+
   const printLabels = async () => {
-    const listToPrint = recipients.filter(r => selectedRecipients.length === 0 || selectedRecipients.includes(r.id));
+    const selectedList = recipients.filter(r => selectedRecipients.length === 0 || selectedRecipients.includes(r.id));
+    const listToPrint = [...selectedList, ...manualLabels];
     if (listToPrint.length === 0) {
-      await myAlert("ไม่มีรายชื่อให้พิมพ์ กรุณาลงรายชื่อเตรียมจัดส่งก่อน");
+      await myAlert("ไม่มีรายชื่อให้พิมพ์ กรุณาเลือกรายชื่อหรือเพิ่มลาเบลเองก่อน");
       return;
     }
     
@@ -841,6 +864,35 @@ export default function Tracking({ authState }) {
                  </div>
                  <textarea className="inp" placeholder="ที่อยู่ผู้ส่ง..." rows="2" value={labelSettings.addr} onChange={e => setLabelSettings({...labelSettings, addr: e.target.value})}></textarea>
                </div>
+
+               <div style={{ marginBottom: "24px", background: "var(--bg)", padding: "16px", borderRadius: "8px", border: "1px solid var(--br2)" }}>
+                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+                   <div style={{ fontSize: "13px", fontWeight: "700", color: "var(--teal)" }}>✍️ เพิ่มลาเบลเอง</div>
+                   <span style={{ fontSize: 12, color: "var(--t2)" }}>เพิ่มผู้รับที่ไม่มีในรายชื่อ Tracking · {manualLabels.length} รายการ</span>
+                 </div>
+                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
+                   <input className="inp" placeholder="ชื่อผู้รับ *" value={manualLabelDraft.fullName} onChange={e => setManualLabelDraft({ ...manualLabelDraft, fullName: e.target.value })} />
+                   <input className="inp" placeholder="เบอร์โทร (ถ้ามี)" value={manualLabelDraft.phone} onChange={e => setManualLabelDraft({ ...manualLabelDraft, phone: e.target.value })} />
+                   <input className="inp" placeholder="รหัสไปรษณีย์ *" value={manualLabelDraft.postalCode} onChange={e => setManualLabelDraft({ ...manualLabelDraft, postalCode: e.target.value })} />
+                   <input className="inp" placeholder="หมายเหตุ (ถ้ามี)" value={manualLabelDraft.bonusNote} onChange={e => setManualLabelDraft({ ...manualLabelDraft, bonusNote: e.target.value })} />
+                   <textarea className="inp" placeholder="ที่อยู่ผู้รับ *" rows="2" value={manualLabelDraft.address} onChange={e => setManualLabelDraft({ ...manualLabelDraft, address: e.target.value })} style={{ gridColumn: "1 / -1" }} />
+                 </div>
+                 <button type="button" className="btn btn-outline" onClick={addManualLabel} style={{ marginTop: 10, color: "var(--teal)", borderColor: "var(--teal)" }}>
+                   <i className="ti ti-plus"></i> เพิ่มลงรายการพิมพ์
+                 </button>
+                 {manualLabels.length > 0 && (
+                   <div style={{ display: "grid", gap: 6, marginTop: 12 }}>
+                     {manualLabels.map((label, index) => (
+                       <div key={label.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 6, background: "var(--bg2)", fontSize: 12 }}>
+                         <span><strong>{index + 1}. {label.fullName}</strong> · {label.postalCode}{label.address ? ` · ${label.address}` : ""}</span>
+                         <button type="button" aria-label={`ลบลาเบล ${label.fullName}`} className="btn btn-outline" onClick={() => setManualLabels(prev => prev.filter(item => item.id !== label.id))} style={{ padding: "4px 8px", color: "var(--red)", flexShrink: 0 }}>
+                           <i className="ti ti-trash"></i>
+                         </button>
+                       </div>
+                     ))}
+                   </div>
+                 )}
+               </div>
                
                <div style={{ background: "var(--bg)", padding: "16px", borderRadius: "8px", border: "1px solid var(--br2)" }}>
                  <div style={{ fontSize: "13px", fontWeight: "700", marginBottom: "12px", color: "var(--teal)" }}>📐 ขนาดลาเบล (Printer Size)</div>
@@ -867,7 +919,7 @@ export default function Tracking({ authState }) {
                </div>
              </div>
              <div style={{ padding: "16px 24px", borderTop: "1px solid var(--br)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg)" }}>
-               <span style={{ fontSize: "13px", color: "var(--t2)" }}>จำนวนที่จะพิมพ์: <strong style={{ color: "var(--teal)", fontSize: "16px" }}>{selectedRecipients.length > 0 ? selectedRecipients.length : recipients.length}</strong> ใบ</span>
+               <span style={{ fontSize: "13px", color: "var(--t2)" }}>จำนวนที่จะพิมพ์: <strong style={{ color: "var(--teal)", fontSize: "16px" }}>{(selectedRecipients.length > 0 ? selectedRecipients.length : recipients.length) + manualLabels.length}</strong> ใบ</span>
                <button className="btn" style={{ background: "var(--teal)", color: "white" }} onClick={printLabels}>🖨️ พิมพ์ลาเบลที่เลือก</button>
              </div>
           </div>
