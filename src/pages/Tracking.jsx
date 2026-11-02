@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import Papa from "papaparse";
+import toast from "react-hot-toast";
 import { collection, getDocs, writeBatch, doc, updateDoc, Timestamp } from "firebase/firestore";
 import { trackingDb as db } from "../lib/trackingFirebase.js";
 import { auth } from "../lib/firebase.js";
@@ -165,6 +166,15 @@ export default function Tracking({ authState }) {
   // ==========================================
   // ★ PUBLIC SEARCH (หน้าบ้านผู้ใช้)
   // ==========================================
+  const handleCopyTracking = async (trackingNumber) => {
+    try {
+      await navigator.clipboard.writeText(String(trackingNumber).trim());
+      toast.success("คัดลอกเลขพัสดุแล้ว");
+    } catch {
+      toast.error("คัดลอกไม่สำเร็จ กรุณาคัดลอกเลขพัสดุด้วยตนเอง");
+    }
+  };
+
   // Every click scheduled another 1.5s reset without clearing the previous one,
   // so an earlier timer could fire mid-sequence and reset the counter just as
   // the third tap landed.
@@ -693,10 +703,21 @@ export default function Tracking({ authState }) {
                  {item.trackingNumber ? (
                    <div style={{ marginTop: "8px", paddingTop: "16px", borderTop: "1px dashed var(--br2)" }}>
                      <div style={{ color: "var(--t2)", fontSize: "12px", marginBottom: "8px" }}>เลข Tracking</div>
-                     <div style={{ background: "var(--bg)", padding: "16px", borderRadius: "8px", border: "1px solid var(--br2)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                     <div style={{ background: "var(--bg)", padding: "16px", borderRadius: "8px", border: "1px solid var(--br2)", display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "space-between", alignItems: "center" }}>
                        <span style={{ fontFamily: "monospace", fontSize: "22px", fontWeight: "700", color: "var(--teal)" }}>{item.trackingNumber}</span>
-                       <button className="btn btn-outline btn-sm" onClick={() => navigator.clipboard.writeText(item.trackingNumber)}>คัดลอก</button>
+                       <a
+                         className="btn btn-outline btn-sm"
+                         href={`https://track.thailandpost.co.th/?trackNumber=${encodeURIComponent(String(item.trackingNumber).trim())}`}
+                         target="_blank"
+                         rel="noopener noreferrer"
+                         onClick={() => handleCopyTracking(item.trackingNumber)}
+                         style={{ textDecoration: "none" }}
+                         aria-label={`คัดลอกและเช็กพัสดุ ${item.trackingNumber} ที่ไปรษณีย์ไทย (เปิดแท็บใหม่)`}
+                       >
+                         คัดลอกและเช็กพัสดุ <i className="ti ti-external-link" aria-hidden="true"></i>
+                       </a>
                      </div>
+                     <p style={{ color: "var(--t2)", fontSize: "12px", margin: "8px 0 0" }}>เปิดเว็บไปรษณีย์ไทยในแท็บใหม่พร้อมเลขพัสดุ</p>
                    </div>
                  ) : (
                    <div style={{ marginTop: "8px", padding: "16px", background: "var(--acc2)", borderRadius: "8px", color: "var(--teal)", fontSize: "14px", fontWeight: "500", display: "flex", gap: "8px", alignItems: "center" }}>

@@ -1,6 +1,41 @@
 import React, { useState, useEffect } from "react"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
+
+function BookCoverImage({ src, alt = "", thumbnail = false }) {
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => setFailed(false), [src])
+
+  if (!src || failed) {
+    return (
+      <div
+        role="img"
+        aria-label={failed ? "โหลดรูปปกไม่สำเร็จ" : "ไม่มีรูปปก"}
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: thumbnail ? 0 : 10,
+          background: "var(--bg3)",
+          color: "var(--t3)",
+          textAlign: "center",
+          padding: thumbnail ? 0 : 20,
+          boxSizing: "border-box",
+        }}
+      >
+        <i className="ti ti-book-off" style={{ fontSize: thumbnail ? 22 : 52 }} />
+        {!thumbnail && <span style={{ fontSize: 14 }}>{failed ? "โหลดรูปปกไม่สำเร็จ" : "ไม่มีรูปปก"}</span>}
+      </div>
+    )
+  }
+
+  return <img src={src} alt={alt} onError={() => setFailed(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+}
+
 export default function BookCampaigns({ go }) {
   const [campaigns, setCampaigns] = useState([])
   const [loading, setLoading] = useState(true)
@@ -195,11 +230,9 @@ export default function BookCampaigns({ go }) {
                           {/* Featured Image */}
                           <div className="book-img-container book-featured" style={{ width: "100%", aspectRatio: "3/4", borderRadius: 16, overflow: "hidden", boxShadow: "0 16px 32px rgba(0,0,0,0.15)" }}>
                             {activeItem.imageUrl ? (
-                              <img src={activeItem.imageUrl} alt={activeItem.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                              <BookCoverImage src={activeItem.imageUrl} alt={activeItem.name} />
                             ) : (
-                              <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", background: "var(--bg3)", color: "var(--t3)" }}>
-                                <i className="ti ti-book" style={{ fontSize: 60 }}></i>
-                              </div>
+                              <BookCoverImage />
                             )}
                           </div>
                           
@@ -220,7 +253,7 @@ export default function BookCampaigns({ go }) {
                                   onMouseEnter={e => { if (activeIdx !== idx) e.currentTarget.style.opacity = 0.9 }} 
                                   onMouseLeave={e => { if (activeIdx !== idx) e.currentTarget.style.opacity = 0.6 }}
                                 >
-                                  {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ background: "var(--bg3)", height: "100%" }} />}
+                                  <BookCoverImage src={item.imageUrl} alt={item.name} thumbnail />
                                 </div>
                               ))}
                             </div>
