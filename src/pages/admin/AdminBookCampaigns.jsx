@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
-import { collection, query, orderBy, getDocs, doc, setDoc, deleteDoc, serverTimestamp, updateDoc, where, writeBatch } from "firebase/firestore"
-import { ref, uploadBytes, getDownloadURL } from "../../lib/driveStorage.js"
+import { collection, query, orderBy, getDocs, doc, setDoc, deleteDoc, serverTimestamp, updateDoc, where } from "firebase/firestore"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { db, storage } from "../../lib/firebase.js"
 import toast from "react-hot-toast"
 import { confirmAction } from "../../utils/feedback.jsx"
@@ -8,7 +8,6 @@ import BroadcastModal from "./components/BroadcastModal.jsx"
 import { triggerPushNotification } from "../../utils/pushNotifications.js"
 import CampaignRegistrationsViewer from "./CampaignRegistrationsViewer.jsx"
 import { getNextSequenceId } from "../../lib/contentStore/hooks.js"
-import { compressImage } from '../../utils/image.js'
 
 export default function AdminBookCampaigns() {
   const [campaigns, setCampaigns] = useState([])
@@ -106,42 +105,23 @@ export default function AdminBookCampaigns() {
   }
 
   const handleDelete = async (id) => {
-    // confirmAction takes ONE argument (an options object, or a bare string used
-    // as the message). Passing two dropped the second silently, so the only
-    // warning that this also deletes every registration attached to the campaign
-    // never reached the screen.
     const confirmed = await confirmAction({
-      title: "ยืนยันการลบแคมเปญ",
+      title: "ยืนยันการลบแคมเปญ?",
       message: "คุณต้องการลบแคมเปญนี้ใช่หรือไม่? ข้อมูลการลงทะเบียนที่ผูกอยู่ทั้งหมดจะถูกลบทิ้งถาวรด้วย",
-      confirmText: "ลบแคมเปญ",
+      confirmText: "ลบถาวร",
       danger: true,
     })
     if (!confirmed) return
     const toastId = toast.loading("กำลังลบแคมเปญและข้อมูลที่เกี่ยวข้อง...")
     try {
-      // Fired as one unbounded Promise.all before: a campaign with a few hundred
-      // registrations opened that many parallel deletes, and if any of them
-      // failed the campaign document was already gone — leaving registrations
-      // pointing at a campaign that no longer exists and no way to retry from
-      // the UI. Deleted in batches, and the campaign itself goes last so a
-      // failure part way through can simply be run again.
-      const deleteAllInBatches = async (docs) => {
-        const BATCH_LIMIT = 450
-        for (let i = 0; i < docs.length; i += BATCH_LIMIT) {
-          const batch = writeBatch(db)
-          docs.slice(i, i + BATCH_LIMIT).forEach(d => batch.delete(d.ref))
-          await batch.commit()
-        }
-      }
-
       // 1. Delete associated registrations
       const regsQ = query(collection(db, "book_registrations"), where("campaignId", "==", id))
       const regsSnap = await getDocs(regsQ)
-      await deleteAllInBatches(regsSnap.docs)
-
+      await Promise.all(regsSnap.docs.map(d => deleteDoc(d.ref)))
+      
       // 2. Delete holds subcollection
       const holdsSnap = await getDocs(collection(db, `book_campaigns/${id}/holds`))
-      await deleteAllInBatches(holdsSnap.docs)
+      await Promise.all(holdsSnap.docs.map(d => deleteDoc(d.ref)))
 
       // 3. Delete campaign itself
       await deleteDoc(doc(db, "book_campaigns", id))
@@ -182,14 +162,13 @@ export default function AdminBookCampaigns() {
       const ext = file.name.split('.').pop()
       const fileName = `campaign_images/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${ext}`
       const storageRef = ref(storage, fileName)
-      const compressed = await compressImage(file, { maxWidth: 1400, maxHeight: 1400, quality: 0.8 })
-      await uploadBytes(storageRef, compressed)
+      await uploadBytes(storageRef, file)
       const url = await getDownloadURL(storageRef)
       onComplete(url)
       toast.success("อัปโหลดรูปภาพสำเร็จ")
     } catch (err) {
       console.error(err)
-      toast.error(err.message || "เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ")
+      toast.error("เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ")
     } finally {
       setUploadingImage(false)
     }
@@ -215,7 +194,7 @@ export default function AdminBookCampaigns() {
       } else {
         toast.error(`ส่งแจ้งเตือนล้มเหลว: ${result.error}`, { id: toastId })
       }
-    } catch {
+    } catch (err) {
       toast.error("เกิดข้อผิดพลาดในการส่งแจ้งเตือน", { id: toastId })
     }
   }

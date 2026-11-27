@@ -103,7 +103,8 @@ export default function AdminScholars() {
 
   function openNew() {
     const defaultEra = taxonomy.scholarEras?.[0]?.id || "salaf"
-    const defaultField = (typeof taxonomy.scholarFields?.[0] === "string" ? taxonomy.scholarFields[0] : taxonomy.scholarFields?.[0]?.label) || "อากีดะฮ์"
+    const rawField = taxonomy.scholarFields?.[0]
+    const defaultField = (typeof rawField === "string" ? rawField : rawField?.label) || "อากีดะฮ์"
     setEdit({ ...EMPTY, era: defaultEra, field: defaultField })
   }
 
@@ -119,7 +120,7 @@ export default function AdminScholars() {
       await saveItem(editing)
       setEdit(null)
       notifySuccess("บันทึกข้อมูลเรียบร้อยแล้ว")
-    } catch {
+    } catch (err) {
       notifyError("บันทึกไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
     } finally {
       setBusy(false)
@@ -135,7 +136,7 @@ export default function AdminScholars() {
       await deleteItem(scholar.id)
       setSelected(prev => prev.filter(id => id !== scholar.id))
       notifySuccess("ลบเรียบร้อยแล้ว")
-    } catch {
+    } catch (err) {
       notifyError("ลบไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
     } finally {
       setBusy(false)
@@ -155,7 +156,7 @@ export default function AdminScholars() {
       } else {
         notifyError(`ลบสำเร็จ ${deleted} รายการ แต่ล้มเหลว ${failed} รายการ — กรุณาตรวจสิทธิ์ Firestore`)
       }
-    } catch {
+    } catch (err) {
       notifyError("เกิดข้อผิดพลาดในการลบข้อมูล")
     } finally {
       setBusy(false)

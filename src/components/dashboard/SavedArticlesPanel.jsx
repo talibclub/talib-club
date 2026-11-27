@@ -72,10 +72,10 @@ export default function SavedArticlesPanel({ authState, go, setView }) {
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(a =>
-        (a.title || "").toLowerCase().includes(q) ||
-        (a.excerpt && a.excerpt.toLowerCase().includes(q)) ||
-        (a.author && a.author.toLowerCase().includes(q)) ||
-        (a.tags && a.tags.some(t => t.toLowerCase().includes(q)))
+        String(a.title || "").toLowerCase().includes(q) ||
+        (a.excerpt && String(a.excerpt).toLowerCase().includes(q)) ||
+        (a.author && String(a.author).toLowerCase().includes(q)) ||
+        (Array.isArray(a.tags) && a.tags.some(t => String(t).toLowerCase().includes(q)))
       );
     }
 
@@ -107,10 +107,10 @@ export default function SavedArticlesPanel({ authState, go, setView }) {
         return timeA - timeB;
       }
       if (sortBy === "newest_article") {
-        return b.date.localeCompare(a.date);
+        return String(b.date || "").localeCompare(String(a.date || ""));
       }
       if (sortBy === "oldest_article") {
-        return a.date.localeCompare(b.date);
+        return String(a.date || "").localeCompare(String(b.date || ""));
       }
       return 0;
     });

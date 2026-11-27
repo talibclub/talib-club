@@ -1,8 +1,6 @@
-import QuickArticleCover from "./components/QuickArticleCover.jsx"
 import React, { useState, useEffect, useMemo, useRef } from "react"
 import { createPortal } from "react-dom"
 import ReactQuill from "react-quill"
-import DOMPurify from "dompurify"
 import "react-quill/dist/quill.snow.css"
 
 const Quill = ReactQuill.Quill;
@@ -157,19 +155,10 @@ import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.
 import ContentStatusBanner from "../../components/ContentStatusBanner.jsx"
 import BroadcastModal from "./components/BroadcastModal.jsx"
 import { clampPage } from "../../utils/pagination.js"
-import { getDownloadURL, ref, uploadBytes, getStorage } from "../../lib/driveStorage.js"
+import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage"
 import { storage, app } from "../../lib/firebase.js"
 import { compressImage } from "../../utils/image.js"
 import { triggerPushNotification } from "../../utils/pushNotifications.js"
-
-// EMPTY is evaluated once when the module loads, so a hardcoded date here was
-// the date the tab was opened — an admin who left the page open overnight filed
-// the next day's articles under yesterday. `date` is filled in by newArticle()
-// at the moment the form is actually opened.
-const todayBE = () => {
-  const d = new Date()
-  return `${d.getFullYear() + 543}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-}
 
 const EMPTY = {
   type: "general",
@@ -180,7 +169,7 @@ const EMPTY = {
   category: "aqeedah",
   excerpt: "",
   author: "Talib Club",
-  date: "",
+  date: `${new Date().getFullYear() + 543}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
   tags: [],
   body: "",
   coverUrl: "",
@@ -206,25 +195,10 @@ export default function AdminArticles() {
     } catch { return null }
   })
 
-  const [draftStatus, setDraftStatus] = useState("")
-  const saveLocalDraft = () => {
-    try {
-      localStorage.setItem("talib_article_draft", JSON.stringify(editing))
-      setDraftStatus(`เก็บร่างในเครื่องแล้ว ${new Date().toLocaleTimeString("th-TH")}`)
-      return true
-    } catch {
-      setDraftStatus("เก็บร่างไม่สำเร็จ พื้นที่ในเครื่องอาจเต็ม กรุณาคัดลอกเนื้อหาเก็บไว้ก่อนออก")
-      return false
-    }
-  }
-
-  // An article with a base64 cover pasted into it can exceed the localStorage
-  // quota on its own. setItem then throws, and an uncaught throw inside an
-  // effect takes the whole admin page down mid-edit — losing the draft this is
-  // meant to protect.
   useEffect(() => {
-    if (!editing) return
-    saveLocalDraft()
+    if (editing) {
+      localStorage.setItem("talib_article_draft", JSON.stringify(editing))
+    }
   }, [editing])
 
   const [search, setSearch] = useState("")
@@ -235,18 +209,7 @@ export default function AdminArticles() {
   const [sortOrder, setSortOrder] = useState("newest")
 
   const [selected, setSelected] = useState([])
-  const [savingArticle, setBusy] = useState(false)
-  const [coverUploads, setCoverUploads] = useState(0)
-  const busy = savingArticle || coverUploads > 0
-  const coverSaveQueue = useRef(Promise.resolve())
-  const onCoverBusy = value => setCoverUploads(count => Math.max(0, count + (value ? 1 : -1)))
-  const saveQuickCover = (article, coverUrl) => {
-    const pending = coverSaveQueue.current.catch(() => {}).then(() => saveItem({
-      id: article.id, coverUrl, ...(article.createdAt ? { createdAt: article.createdAt } : {}),
-    }))
-    coverSaveQueue.current = pending
-    return pending
-  }
+  const [busy, setBusy] = useState(false)
 
   const [bulkType, setBulkType] = useState("")
   const [bulkCategory, setBulkCategory] = useState("")
@@ -326,7 +289,7 @@ export default function AdminArticles() {
   }
 
   function openNew() {
-    setEdit({ ...EMPTY, date: todayBE() })
+    setEdit({ ...EMPTY })
   }
 
   function openEdit(article) {
@@ -366,7 +329,7 @@ export default function AdminArticles() {
       await deleteItem(article.id)
       setSelected(prev => prev.filter(id => id !== article.id))
       notifySuccess("ลบบทความเรียบร้อยแล้ว")
-    } catch {
+    } catch (err) {
       notifyError("ลบไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
     } finally {
       setBusy(false)
@@ -386,7 +349,7 @@ export default function AdminArticles() {
       } else {
         notifyError(`ลบสำเร็จ ${deleted} รายการ แต่ล้มเหลว ${failed} รายการ — กรุณาตรวจสิทธิ์ Firestore`)
       }
-    } catch {
+    } catch (err) {
       notifyError("เกิดข้อผิดพลาดในการลบข้อมูล")
     } finally {
       setBusy(false)
@@ -465,7 +428,7 @@ export default function AdminArticles() {
       } else {
         notifyError(`ส่งแจ้งเตือนล้มเหลว: ${result.error}`)
       }
-    } catch {
+    } catch (err) {
       notifyError("เกิดข้อผิดพลาดในการส่งแจ้งเตือน")
     } finally {
       setBusy(false)
@@ -473,15 +436,7 @@ export default function AdminArticles() {
   }
 
   if (editing) {
-    return <ArticleForm item={editing} setItem={setEdit} onSave={save}
-      draftStatus={draftStatus} onSaveDraft={() => { if (saveLocalDraft()) notifySuccess("เก็บร่างในเครื่องแล้ว ยังไม่ได้เผยแพร่การแก้ไข") }}
-      onCancel={async () => {
-        if (busy) return
-        const discard = await confirmAction({ title: "ทิ้งร่างที่กำลังแก้ไข?", message: "ร่างในเครื่องจะถูกลบ บทความที่เผยแพร่ไว้แล้วจะไม่เปลี่ยนแปลง", confirmText: "ทิ้งร่าง", danger: true })
-        if (!discard) return
-        try { localStorage.removeItem("talib_article_draft"); setEdit(null) }
-        catch { notifyError("ลบร่างไม่สำเร็จ กรุณาลองอีกครั้ง") }
-      }} taxonomy={taxonomy} busy={busy} articlesList={sorted} />
+    return <ArticleForm item={editing} setItem={setEdit} onSave={save} onCancel={() => { localStorage.removeItem("talib_article_draft"); setEdit(null); }} taxonomy={taxonomy} busy={busy} articlesList={sorted} />
   }
 
   return (
@@ -673,17 +628,15 @@ export default function AdminArticles() {
         </div>
       )}
 
-      <p style={{ fontSize: 12, color: "var(--t2)", marginBottom: 12 }}>เปลี่ยนปกได้จากรายการนี้: คลิกรูปหรือลากไฟล์มาวาง ระบบบันทึกปกให้อัตโนมัติ แล้วทำรายการถัดไปได้ทันที</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {currentItems.map(article => {
           // หากเป็นบทความซีรีส์ ให้ดึงชื่อซีรีส์มาแสดง
           const seriesInfo = isSeriesType(article.type) && taxonomy.articleSeries?.find(s => s.id === article.seriesId);
 
           return (
-            <div key={article.id} className="card" style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, opacity: savingArticle ? 0.6 : 1 }}>
+            <div key={article.id} className="card" style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, opacity: busy ? 0.6 : 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
                 <input type="checkbox" checked={selected.includes(article.id)} onChange={() => toggleSelect(article.id)} disabled={busy} style={{ width: 18, height: 18, cursor: busy ? "not-allowed" : "pointer", flexShrink: 0 }} />
-                <QuickArticleCover article={article} disabled={savingArticle} saveCover={saveQuickCover} onBusyChange={onCoverBusy} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", gap: 6, marginBottom: 4, flexWrap: "wrap", alignItems: "center" }}>
                     <span className="tag tag-teal">{article.category}</span>
@@ -792,7 +745,7 @@ const QuillPromptModal = ({ isOpen, type, onClose, onSubmit, initialData }) => {
 
   const modalContent = (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 999999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-      <div style={{ background: '#fff', padding: 24, borderRadius: 12, width: 400, maxWidth: '90%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--br)', padding: 24, borderRadius: 12, width: 400, maxWidth: '90%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)' }} onClick={e => e.stopPropagation()}>
         <h3 style={{ margin: '0 0 16px 0', fontSize: 18, color: 'var(--text)' }}>{title}</h3>
         {input1 && (
           <div style={{ marginBottom: 12 }}>
@@ -834,7 +787,7 @@ const QuillPromptModal = ({ isOpen, type, onClose, onSubmit, initialData }) => {
   return createPortal(modalContent, document.body);
 }
 
-const CustomToolbar = React.memo(function CustomToolbar() { return (
+const CustomToolbar = React.memo(() => (
   <div id="admin-article-toolbar" className="ql-toolbar ql-snow">
     <span className="ql-formats">
       <select className="ql-header" defaultValue="">
@@ -891,10 +844,10 @@ const CustomToolbar = React.memo(function CustomToolbar() { return (
       <button className="ql-insertPdf" data-title="แนบไฟล์ PDF" />
     </span>
   </div>
-); }, () => true);
+), () => true);
+CustomToolbar.displayName = "CustomToolbar";
 
-function ArticleForm({ item, setItem, onSave, onCancel, onSaveDraft, draftStatus, taxonomy, busy, articlesList }) {
-  const [showPreview, setShowPreview] = useState(false)
+function ArticleForm({ item, setItem, onSave, onCancel, taxonomy, busy, articlesList }) {
   const set = (key, value) => setItem(prev => ({ ...prev, [key]: value }))
   const [uploadingImage, setUploadingImage] = useState(false)
   const [showMeta, setShowMeta] = useState(!item.id)
@@ -1088,37 +1041,37 @@ function ArticleForm({ item, setItem, onSave, onCancel, onSaveDraft, draftStatus
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (import.meta.env.DEV) console.log("Starting Article Image Upload: v4 Diagnostic Logger active.");
-    if (import.meta.env.DEV) console.log("Original File Name:", file.name, "Size:", file.size, "Type:", file.type);
+    console.log("Starting Article Image Upload: v4 Diagnostic Logger active.");
+    console.log("Original File Name:", file.name, "Size:", file.size, "Type:", file.type);
     
     setUploadingImage(true)
     try {
-      if (import.meta.env.DEV) console.log("Compressing image...");
+      console.log("Compressing image...");
       const compressedFile = await compressImage(file, { maxWidth: 1000, maxHeight: 1000, quality: 0.75 })
-      if (import.meta.env.DEV) console.log("Image compression complete. Output Name:", compressedFile.name, "Size:", compressedFile.size);
+      console.log("Image compression complete. Output Name:", compressedFile.name, "Size:", compressedFile.size);
       
       const safeName = compressedFile.name.replace(/[^a-zA-Z0-9.-]/g, "_")
       const usedStorage = storage || getStorage(app)
       let storageRef = null
       try {
         storageRef = ref(usedStorage, `article_covers/${Date.now()}_${safeName}`)
-        if (import.meta.env.DEV) console.log("Uploading bytes to Google Drive reference:", storageRef.fullPath);
+        console.log("Uploading bytes to Firebase Storage reference:", storageRef.fullPath);
         await uploadBytes(storageRef, compressedFile)
       } catch (uploadErr) {
         console.error("Upload error (storageRef):", uploadErr?.code || "-", uploadErr?.message || uploadErr, "ref:", storageRef?.fullPath)
         throw uploadErr
       }
 
-      if (import.meta.env.DEV) console.log("Google Drive upload completed. Retrieving download URL...");
+      console.log("Firebase upload completed. Retrieving download URL...");
       const url = await getDownloadURL(storageRef)
-      if (import.meta.env.DEV) console.log("Success! Cover URL obtained:", url);
+      console.log("Success! Cover URL obtained:", url);
       set("coverUrl", url)
       notifySuccess("อัปโหลดรูปภาพปกเรียบร้อยแล้ว")
     } catch (err) {
       console.error("Diagnostic error caught inside handleUploadImage:", err?.code || "-", err?.message || err)
-      notifyError(err.message || "อัปโหลดรูปภาพล้มเหลว")
+      notifyError("อัปโหลดรูปภาพล้มเหลว")
     } finally {
-      if (import.meta.env.DEV) console.log("Finally block executed. Setting uploadingImage back to false.");
+      console.log("Finally block executed. Setting uploadingImage back to false.");
       setUploadingImage(false)
     }
   }
@@ -1152,19 +1105,15 @@ function ArticleForm({ item, setItem, onSave, onCancel, onSaveDraft, draftStatus
   return (
     <div style={{ maxWidth: 840, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-        <button className="btn btn-outline" onClick={onCancel} disabled={busy}>ทิ้งร่างและกลับ</button>
+        <button className="btn btn-outline" onClick={onCancel}><i className="ti ti-arrow-left" style={{ marginRight: 6 }}></i>กลับ</button>
         <h2 style={{ margin: 0, fontSize: 20 }}>{item.id ? "แก้ไขบทความ" : "เพิ่มบทความใหม่"}</h2>
       </div>
 
-      <div className="card" style={{ padding: 16, marginBottom: 20 }}>
-        <p role="status" style={{ marginBottom: 6 }}>{draftStatus}</p>
-        <p style={{ fontSize: 12, color: "var(--t2)" }}>ร่างนี้อยู่ในเบราว์เซอร์เครื่องนี้เท่านั้น การแก้ไขจะขึ้นเว็บไซต์เมื่อกด{item.id ? "อัปเดตบทความบนเว็บไซต์" : "เผยแพร่บทความ"}</p>
-      </div>
       <div className="card" style={{ marginBottom: 24, overflow: "hidden" }}>
         <button 
           type="button"
           onClick={() => setShowMeta(!showMeta)}
-          style={{ width: "100%", padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", background: showMeta ? "var(--bg2)" : "#fff", border: "none", cursor: "pointer", textAlign: "left", borderBottom: showMeta ? "1px solid var(--br2)" : "none" }}
+          style={{ width: "100%", padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", background: showMeta ? "var(--bg2)" : "var(--card)", border: "none", cursor: "pointer", textAlign: "left", borderBottom: showMeta ? "1px solid var(--br2)" : "none" }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600, color: "var(--text)", fontSize: 15 }}>
             <i className="ti ti-adjustments-horizontal" style={{ color: "var(--teal)" }}></i> ข้อมูลทั่วไปของบทความ (ชื่อเรื่อง, หน้าปก, แท็ก)
@@ -1281,10 +1230,10 @@ function ArticleForm({ item, setItem, onSave, onCancel, onSaveDraft, draftStatus
               <span style={{ fontSize: 13, color: "var(--t3)", padding: "0 8px" }}>
                 {currentIndex + 1} / {articlesList.length}
               </span>
-              <button type="button" className="btn btn-outline" onClick={handlePrev} disabled={!hasPrev || busy || navDirection} style={{ padding: "6px 12px", fontSize: 13, background: "#fff", display: "flex", alignItems: "center" }}>
+              <button type="button" className="btn btn-outline" onClick={handlePrev} disabled={!hasPrev || busy || navDirection} style={{ padding: "6px 12px", fontSize: 13, background: "var(--card)", display: "flex", alignItems: "center" }}>
                 {navDirection === 'prev' ? <i className="ti ti-loader-2 spin" style={{ marginRight: 4 }}></i> : <i className="ti ti-chevron-left" style={{ marginRight: 4 }}></i>} ก่อนหน้า
               </button>
-              <button type="button" className="btn btn-outline" onClick={handleNext} disabled={!hasNext || busy || navDirection} style={{ padding: "6px 12px", fontSize: 13, background: "#fff", display: "flex", alignItems: "center" }}>
+              <button type="button" className="btn btn-outline" onClick={handleNext} disabled={!hasNext || busy || navDirection} style={{ padding: "6px 12px", fontSize: 13, background: "var(--card)", display: "flex", alignItems: "center" }}>
                 ถัดไป {navDirection === 'next' ? <i className="ti ti-loader-2 spin" style={{ marginLeft: 4 }}></i> : <i className="ti ti-chevron-right" style={{ marginLeft: 4 }}></i>}
               </button>
             </div>
@@ -1325,18 +1274,19 @@ function ArticleForm({ item, setItem, onSave, onCancel, onSaveDraft, draftStatus
             />
           </div>
           <style>{`
-            .ql-editor { min-height: 360px; font-size: 15px; font-family: inherit; line-height: 1.6; }
-            .ql-editor p { margin-bottom: 22px; }
+            .ql-editor { min-height: 360px; font-size: 15px; font-family: inherit; line-height: 1.6; color: #111827; }
+            .ql-editor strong, .ql-editor b { color: #111827 !important; }
+            .ql-editor p { margin-bottom: 22px; color: #111827; }
             .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid var(--br); background: #f8f9fa; position: sticky; top: 72px; z-index: 10; border-top-left-radius: 8px; border-top-right-radius: 8px; border: 1px solid var(--br); margin-top: -1px; margin-left: -1px; margin-right: -1px; }
             .ql-container.ql-snow { border: none; }
             #admin-article-toolbar button.ql-insertFootnote, #admin-article-toolbar button.ql-insertQuran, #admin-article-toolbar button.ql-numberCircle, #admin-article-toolbar button.ql-insertPdf, #admin-article-toolbar button.ql-highlightText, #admin-article-toolbar button.ql-insertDivider, #admin-article-toolbar button.ql-arabicBlock, #admin-article-toolbar button.ql-calloutInfo, #admin-article-toolbar button.ql-calloutWarn, #admin-article-toolbar button.ql-dropCap, #admin-article-toolbar button.ql-insertFloatImage, #admin-article-toolbar button.ql-insertAudio { width: auto; padding: 0 6px; }
-            #admin-article-toolbar button.ql-insertFootnote::after { content: "FN"; font-weight: 700; font-size: 13px; color: var(--teal); }
-            #admin-article-toolbar button.ql-insertQuran::after { content: "QR"; font-weight: 700; font-size: 13px; color: var(--teal); }
-            #admin-article-toolbar button.ql-numberCircle::after { content: "01"; font-weight: 700; font-size: 13px; color: var(--teal); border-radius: 50%; border: 1px solid var(--teal); padding: 1px 4px; }
+            #admin-article-toolbar button.ql-insertFootnote::after { content: "FN"; font-weight: 700; font-size: 13px; color: #0f6e56; }
+            #admin-article-toolbar button.ql-insertQuran::after { content: "QR"; font-weight: 700; font-size: 13px; color: #0f6e56; }
+            #admin-article-toolbar button.ql-numberCircle::after { content: "01"; font-weight: 700; font-size: 13px; color: #0f6e56; border-radius: 50%; border: 1px solid #0f6e56; padding: 1px 4px; }
             #admin-article-toolbar button.ql-insertPdf::after { content: "PDF"; font-weight: 700; font-size: 13px; color: #dc2626; }
             #admin-article-toolbar button.ql-highlightText::after { content: "HL"; font-weight: 700; font-size: 13px; color: #ca8a04; background: #fef08a; padding: 2px 4px; border-radius: 4px; }
-            #admin-article-toolbar button.ql-dropCap::after { content: "A"; font-weight: 700; font-size: 15px; font-family: serif; }
-            #admin-article-toolbar button.ql-insertDivider::after { content: "—"; font-weight: 700; font-size: 14px; color: var(--text); }
+            #admin-article-toolbar button.ql-dropCap::after { content: "A"; font-weight: 700; font-size: 15px; font-family: serif; color: #111827; }
+            #admin-article-toolbar button.ql-insertDivider::after { content: "—"; font-weight: 700; font-size: 14px; color: #334155; }
             #admin-article-toolbar button.ql-arabicBlock::after { content: "ع"; font-weight: 700; font-size: 16px; color: var(--teal); }
             #admin-article-toolbar button.ql-calloutInfo::after { content: "i"; font-weight: 700; font-size: 12px; color: #10b981; border: 1px solid #10b981; border-radius: 50%; padding: 0 4px; }
             #admin-article-toolbar button.ql-calloutWarn::after { content: "!"; font-weight: 700; font-size: 12px; color: #ef4444; border: 1px solid #ef4444; border-radius: 50%; padding: 0 5px; }
@@ -1346,20 +1296,12 @@ function ArticleForm({ item, setItem, onSave, onCancel, onSaveDraft, draftStatus
           `}</style>
         </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-        <button className="btn btn-outline" onClick={onSaveDraft} disabled={busy || uploadingImage}>เก็บร่างในเครื่อง</button>
-        <button className="btn btn-outline" onClick={() => setShowPreview(value => !value)} aria-expanded={showPreview}>{showPreview ? "ปิดตัวอย่าง" : "ดูตัวอย่างเนื้อหา"}</button>
-        <button className="btn btn-teal" onClick={onSave} disabled={busy || uploadingImage}>
-          <i className={`ti ${busy ? "ti-loader-2 spin" : "ti-check"}`} style={{ marginRight: 6 }}></i>{busy ? "กำลังเผยแพร่..." : item.id ? "อัปเดตบทความบนเว็บไซต์" : "เผยแพร่บทความ"}
+      <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
+        <button className="btn btn-outline" onClick={onCancel}>ยกเลิก</button>
+        <button className="btn btn-teal" onClick={onSave} disabled={busy}>
+          <i className={`ti ${busy ? "ti-loader-2 spin" : "ti-check"}`} style={{ marginRight: 6 }}></i>{busy ? "กำลังบันทึก..." : "บันทึกบทความ"}
         </button>
       </div>
-
-      {showPreview && <section className="card" aria-label="ตัวอย่างเนื้อหาบทความ" style={{ padding: 24, marginTop: 20, overflowWrap: "anywhere" }}>
-        <p style={{ color: "var(--t2)", marginBottom: 16 }}>ตัวอย่างเนื้อหา — การจัดรูปแบบอ้างอิงบางส่วนอาจต่างจากหน้าอ่านจริง</p>
-        <h2>{item.title || "ยังไม่ได้ระบุชื่อบทความ"}</h2>
-        <p>{item.author} · {item.date}</p>
-        <div className="ql-editor" style={{ padding: "16px 0" }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.body || "") }} />
-      </section>}
 
       <QuillPromptModal 
         isOpen={!!promptState}

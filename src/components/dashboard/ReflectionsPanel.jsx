@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react"
+import { useState, useMemo, useRef, useEffect } from "react"
 import { createPortal } from "react-dom"
 import DOMPurify from "dompurify"
 import toast from 'react-hot-toast'
@@ -98,10 +98,7 @@ export default function ReflectionsPanel({ authState, setView, theme }) {
       } else {
         const session = sessionItems.find(s => String(s.id) === String(note.id))
         if (session) {
-          // A verified session requires a reflection of at least
-          // MIN_REFLECTION_CHARS, so clearing the text has to clear the flag —
-          // otherwise the evidence is gone but the streak day still counts.
-          await saveSession({ ...session, reflection: "", verified: false })
+          await saveSession({ ...session, reflection: "" })
         }
       }
       toast.success("ลบข้อคิดเรียบร้อยแล้ว")
@@ -163,7 +160,7 @@ export default function ReflectionsPanel({ authState, setView, theme }) {
                 {filteredNotes.map(note => (
                   <div key={note.id} className="card" style={{ padding: 20, border: "0.5px solid var(--br)", background: "var(--bg3)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-                      <span className={`badge ${note.type === "quran" ? "badge-teal" : "badge-outline"}`} style={{ fontSize: 11, borderColor: note.type === "quran" ? "transparent" : "rgba(168,85,247,0.4)", color: note.type === "quran" ? "#fff" : "#a855f7" }}>
+                      <span className={`badge ${note.type === "quran" ? "badge-teal" : "badge-acc"}`} style={{ fontSize: 11, borderColor: note.type === "quran" ? "transparent" : "rgba(168,85,247,0.35)", color: note.type === "quran" ? "var(--teal)" : "#a855f7", background: note.type === "quran" ? "var(--teal-bg)" : "rgba(168,85,247,0.1)" }}>
                         <i className={`ti ${note.type === "quran" ? "ti-book" : "ti-notebook"}`} style={{ marginRight: 4 }}></i>
                         {note.title}
                       </span>
@@ -234,6 +231,12 @@ export default function ReflectionsPanel({ authState, setView, theme }) {
 function EditReflectionModal({ note, onClose, onSave, theme }) {
   const [text, setText] = useState(note.notes)
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose?.() }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [onClose])
 
   const handleSave = async () => {
     if (!text.trim()) {
@@ -330,12 +333,19 @@ function EditReflectionModal({ note, onClose, onSave, theme }) {
 function ExportCardModal({ note, onClose, theme }) {
   const cardRef = useRef(null)
 
-  const handlePrint = () => {
-    const printContent = cardRef.current.innerHTML
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose?.() }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [onClose])
 
+  const handlePrint = () => {
+    if (!cardRef.current) return
+    const printContent = cardRef.current.innerHTML
+    
     const win = window.open("", "_blank")
     if (!win) {
-      toast.error("เบราว์เซอร์บล็อกป๊อปอัป กรุณาอนุญาตป๊อปอัปสำหรับเว็บนี้แล้วลองใหม่")
+      toast.error("เบราว์เซอร์บล็อกหน้าต่างป๊อปอัป กรุณาอนุญาตป๊อปอัปเพื่อพิมพ์การ์ด")
       return
     }
     win.document.write(`

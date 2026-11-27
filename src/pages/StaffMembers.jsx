@@ -7,18 +7,13 @@ import { db } from "../lib/firebase.js"
 import { toast } from "react-hot-toast"
 import { Z } from "../utils/ui.js"
 import { formatFirebaseDate } from "../utils/format.js"
+import { safeDateNow } from "../utils/time.js"
 
 const USERS_CACHE_TTL = 60 * 1000
 const USER_STATS_CACHE_TTL = 60 * 1000
 let cachedUsersList = null
 let cachedUsersListAt = 0
 const cachedUserStatsMap = new Map()
-
-function roleTier(u) {
-  const role = u?.role || "member"
-  if (role === "owner") return "admin"
-  return role
-}
 
 export default function StaffMembers({ authState, go }) {
   const { profile } = authState
@@ -41,15 +36,10 @@ export default function StaffMembers({ authState, go }) {
   })
 
   const currentUser = authState?.profile?.displayName || authState?.user?.displayName || ""
-  const isSuperAdmin = profile?.role === "owner"
-
-  // Fetch users on mount
-  useEffect(() => {
-    fetchUsers()
-  }, [])
+  const isSuperAdmin = profile?.role === "admin" || profile?.role === "owner"
 
   const fetchUsers = async () => {
-    const now = Date.now()
+    const now = safeDateNow()
     if (cachedUsersList && now - cachedUsersListAt < USERS_CACHE_TTL) {
       setUsers(cachedUsersList)
       setLoading(false)
@@ -71,9 +61,23 @@ export default function StaffMembers({ authState, go }) {
     }
   }
 
-  // The tabs matched `u.role` exactly, so accounts with role "owner" appeared
-  // under no tab at all, and members stored without a role field were counted
-  // by the "สมาชิก" pill but filtered out of the list underneath it.
+  // Fetch users on mount
+  useEffect(() => {
+    fetchUsers()
+  }, [])
+
+  useEffect(() => {
+    if (!selectedUser && !confirmRoleChange.isOpen) return
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        if (confirmRoleChange.isOpen) setConfirmRoleChange({ isOpen: false, userToChange: null, targetRole: "" })
+        else if (selectedUser) setSelectedUser(null)
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [selectedUser, confirmRoleChange.isOpen])
+
   // Filter and sort users
   const filteredUsers = useMemo(() => {
     let result = users.filter(u => {
@@ -82,7 +86,7 @@ export default function StaffMembers({ authState, go }) {
         (u.email || "").toLowerCase().includes(search.toLowerCase())
       
       if (roleFilter === "all") return matchesSearch
-      return matchesSearch && roleTier(u) === roleFilter
+      return matchesSearch && u.role === roleFilter
     })
 
     result.sort((a, b) => {
@@ -111,7 +115,7 @@ export default function StaffMembers({ authState, go }) {
     try {
       const uid = member.id || member.uid
       const cached = cachedUserStatsMap.get(uid)
-      if (cached && Date.now() - cached.at < USER_STATS_CACHE_TTL) {
+      if (cached && safeDateNow() - cached.at < USER_STATS_CACHE_TTL) {
         setUserStats(cached.data)
         return
       }
@@ -184,7 +188,7 @@ export default function StaffMembers({ authState, go }) {
       }
       setUserStats(statsData)
       cachedUserStatsMap.set(uid, {
-        at: Date.now(),
+        at: safeDateNow(),
         data: statsData
       })
     } catch (err) {
@@ -198,13 +202,12 @@ export default function StaffMembers({ authState, go }) {
   // Handle promoting/demoting user roles
   const handleRoleChangeConfirm = async () => {
     const { userToChange, targetRole } = confirmRoleChange
-    if (!userToChange || !isSuperAdmin) return
+    if (!userToChange) return
 
     try {
       const userRef = doc(db, "users", userToChange.id)
       await updateDoc(userRef, { role: targetRole })
-      const roleLabels = { admin: "แอดมิน", staff: "สตาฟ", member: "สมาชิกทั่วไป" }
-      toast.success(`อัปเดตสิทธิ์ของ "${userToChange.displayName || userToChange.email}" เป็น ${roleLabels[targetRole] || targetRole} สำเร็จ`)
+      toast.success(`อัปเดตสิทธิ์ของ "${userToChange.displayName || userToChange.email}" เป็น ${targetRole === "staff" ? "สตาฟ" : "สมาชิกทั่วไป"} สำเร็จ`)
       
       // Update local state
       setUsers(prev => prev.map(u => u.id === userToChange.id ? { ...u, role: targetRole } : u))
@@ -243,10 +246,10 @@ export default function StaffMembers({ authState, go }) {
           
           <div style={{ display: "flex", gap: "6px" }}>
             <button className={`pill ${roleFilter === "all" ? "on" : ""}`} onClick={() => setRoleFilter("all")}>ทั้งหมด ({users.length})</button>
-            <button className={`pill ${roleFilter === "member" ? "on" : ""}`} onClick={() => setRoleFilter("member")}>สมาชิก ({users.filter(u => roleTier(u) === "member").length})</button>
-            <button className={`pill ${roleFilter === "staff" ? "on" : ""}`} onClick={() => setRoleFilter("staff")}>สตาฟ ({users.filter(u => roleTier(u) === "staff").length})</button>
-            {users.some(u => roleTier(u) === "admin") && (
-              <button className={`pill ${roleFilter === "admin" ? "on" : ""}`} onClick={() => setRoleFilter("admin")}>แอดมิน ({users.filter(u => roleTier(u) === "admin").length})</button>
+            <button className={`pill ${roleFilter === "member" ? "on" : ""}`} onClick={() => setRoleFilter("member")}>สมาชิก ({users.filter(u => u.role === "member" || !u.role).length})</button>
+            <button className={`pill ${roleFilter === "staff" ? "on" : ""}`} onClick={() => setRoleFilter("staff")}>สตาฟ ({users.filter(u => u.role === "staff").length})</button>
+            {users.some(u => u.role === "admin") && (
+              <button className={`pill ${roleFilter === "admin" ? "on" : ""}`} onClick={() => setRoleFilter("admin")}>แอดมิน ({users.filter(u => u.role === "admin").length})</button>
             )}
             <select 
               className="input" 
@@ -277,8 +280,8 @@ export default function StaffMembers({ authState, go }) {
         <div style={{ display: "grid", gap: "12px" }}>
           {filteredUsers.map(u => {
             const isSelf = u.id === authState?.user?.uid
-            const roleLabel = u.role === "admin" ? "แอดมิน" : u.role === "staff" ? "สตาฟ" : "สมาชิกทั่วไป"
-            const roleBadgeClass = u.role === "admin" ? "badge-acc" : u.role === "staff" ? "badge-teal" : ""
+            const roleLabel = u.role === "owner" ? "เจ้าของระบบ" : u.role === "admin" ? "แอดมิน" : u.role === "staff" ? "สตาฟ" : "สมาชิกทั่วไป"
+            const roleBadgeClass = u.role === "owner" || u.role === "admin" ? "badge-acc" : u.role === "staff" ? "badge-teal" : ""
 
             return (
               <div 
@@ -334,33 +337,22 @@ export default function StaffMembers({ authState, go }) {
                           style={{ padding: "6px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 4, borderColor: "rgba(224, 85, 85, 0.4)", color: "#e05555" }}
                           disabled={!isSuperAdmin}
                           onClick={() => setConfirmRoleChange({ isOpen: true, userToChange: u, targetRole: "member" })}
-                          title={!isSuperAdmin ? "เฉพาะเจ้าของเว็บไซต์เท่านั้นที่เปลี่ยนตำแหน่งได้" : ""}
+                          title={!isSuperAdmin ? "ต้องใช้สิทธิ์แอดมินในการเปลี่ยนตำแหน่ง" : ""}
                         >
                           <i className="ti ti-user-down"></i> ลดสิทธิ์เป็นสมาชิก
                         </button>
-                      ) : roleTier(u) === "admin" ? null : (
-                        <button
-                          className="btn btn-teal"
-                          style={{ padding: "6px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}
-                          disabled={!isSuperAdmin}
-                          onClick={() => setConfirmRoleChange({ isOpen: true, userToChange: u, targetRole: "staff" })}
-                          title={!isSuperAdmin ? "เฉพาะเจ้าของเว็บไซต์เท่านั้นที่เปลี่ยนตำแหน่งได้" : ""}
-                        >
-                          <i className="ti ti-user-up"></i> แต่งตั้งเป็นสตาฟ
-                        </button>
-                      )}
-                      {/* `handleRoleChangeConfirm` has always handled targetRole
-                          "admin", but nothing in the UI could ever send it. */}
-                      {roleTier(u) === "staff" && (
-                        <button
-                          className="btn btn-outline"
-                          style={{ padding: "6px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}
-                          disabled={!isSuperAdmin}
-                          onClick={() => setConfirmRoleChange({ isOpen: true, userToChange: u, targetRole: "admin" })}
-                          title={!isSuperAdmin ? "เฉพาะเจ้าของเว็บไซต์เท่านั้นที่เปลี่ยนตำแหน่งได้" : ""}
-                        >
-                          <i className="ti ti-shield-check"></i> เลื่อนเป็นแอดมิน
-                        </button>
+                      ) : (
+                        u.role !== "admin" && u.role !== "owner" && (
+                          <button
+                            className="btn btn-teal"
+                            style={{ padding: "6px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}
+                            disabled={!isSuperAdmin}
+                            onClick={() => setConfirmRoleChange({ isOpen: true, userToChange: u, targetRole: "staff" })}
+                            title={!isSuperAdmin ? "ต้องใช้สิทธิ์แอดมินในการเปลี่ยนตำแหน่ง" : ""}
+                          >
+                            <i className="ti ti-user-up"></i> แต่งตั้งเป็นสตาฟ
+                          </button>
+                        )
                       )}
                     </>
                   )}

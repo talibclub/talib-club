@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react"
 import { collection, getDocs, query, orderBy, where, getCountFromServer, writeBatch } from "firebase/firestore"
 import { db } from "../../lib/firebase.js"
-import { updateCollectionMetadata } from "../../lib/contentStore.js"
+import toast from "react-hot-toast"
+import { confirmAction } from "../../utils/feedback.jsx"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
 export default function AdminDashboard() {
@@ -131,32 +132,35 @@ export default function AdminDashboard() {
 
   const [fixing, setFixing] = useState(false)
   const fixDb = async () => {
-    if (!window.confirm("ฟังก์ชันนี้จะทำความสะอาดข้อมูลที่ถูกลบซ่อนอยู่ (soft delete) ออกจากฐานข้อมูลทั้งหมด เพื่อให้ตัวเลขนับรวมตรงกับความจริง ยืนยันการทำงาน?")) return;
+    const ok = await confirmAction({
+      title: "ซ่อมแซมตัวเลขสถิติ?",
+      message: "ฟังก์ชันนี้จะทำความสะอาดข้อมูลที่ถูกลบซ่อนอยู่ (soft delete) ออกจากฐานข้อมูลทั้งหมด เพื่อให้ตัวเลขนับรวมตรงกับความจริง ยืนยันการทำงาน?",
+      confirmText: "ยืนยัน",
+      danger: true,
+    });
+    if (!ok) return;
     setFixing(true);
     try {
       const collections = ["content_articles", "content_books", "content_media", "content_scholars"];
-      // A single writeBatch caps at 500 operations. Any collection with more
-      // than 500 tombstones made commit() throw, so the "repair" silently did
-      // nothing at all on exactly the databases that needed it most.
-      const BATCH_LIMIT = 450;
       let totalDeleted = 0;
       for (const col of collections) {
         const snap = await getDocs(collection(db, col));
-        const stale = snap.docs.filter(docSnap => docSnap.data().deleted === true);
-        for (let i = 0; i < stale.length; i += BATCH_LIMIT) {
-          const batch = writeBatch(db);
-          stale.slice(i, i + BATCH_LIMIT).forEach(docSnap => batch.delete(docSnap.ref));
+        const batch = writeBatch(db);
+        let count = 0;
+        snap.forEach(docSnap => {
+          if (docSnap.data().deleted === true) {
+            batch.delete(docSnap.ref);
+            count++;
+            totalDeleted++;
+          }
+        });
+        if (count > 0) {
           await batch.commit();
         }
-        // Visitors hold these lists in localStorage and IndexedDB and only
-        // refetch when the metadata timestamp moves. Without this bump they
-        // would keep serving the rows that were just deleted.
-        if (stale.length > 0) await updateCollectionMetadata(col);
-        totalDeleted += stale.length;
       }
-      alert(`ลบข้อมูลที่ตกค้างสำเร็จทั้งหมด ${totalDeleted} รายการ กรุณารีเฟรชหน้าเว็บ`);
+      toast.success(`ลบข้อมูลที่ตกค้างสำเร็จทั้งหมด ${totalDeleted} รายการ`);
     } catch (e) {
-      alert("เกิดข้อผิดพลาด: " + e.message);
+      toast.error("เกิดข้อผิดพลาด: " + e.message);
     }
     setFixing(false);
   }
@@ -218,7 +222,7 @@ export default function AdminDashboard() {
         </div>
         
         {loading && (
-          <div style={{ position: "absolute", inset: 0, background: "rgba(var(--card-rgb), 0.7)", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ position: "absolute", inset: 0, background: "var(--nav-bg)", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 16 }}>
             <i className="ti ti-loader-2 spin" style={{ fontSize: 32, color: "var(--teal)" }}></i>
           </div>
         )}
