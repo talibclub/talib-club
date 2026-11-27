@@ -2485,6 +2485,336 @@ export const OPENHOUSE_BOOTHS = [
         ]
       }
     ]
+  },
+  {
+    "id": "truthislam",
+    "slug": "truthislam",
+    "name": "สำนักพิมพ์ผู้สนใจในอิสลาม (Truth Islam Publisher)",
+    "category": "institution",
+    "language": "Thai",
+    "platforms": [
+      "Facebook"
+    ],
+    "socialLinks": {
+      "Facebook": "https://www.facebook.com/profile.php?id=61565389662125"
+    },
+    "description": "สำนักพิมพ์และเพจเผยแพร่หนังสือแปลอิสลาม บทความศาสนา และสื่อความรู้สำหรับมุสลิมและผู้สนใจอิสลาม",
+    "logoUrl": "",
+    "themeColor": "#0f766e",
+    "order": 42,
+    "networks": [],
+    "campuses": [
+      {
+        "id": "truthislam-fb",
+        "name": "เพจสำนักพิมพ์ผู้สนใจในอิสลาม (Facebook)",
+        "description": "ติดตามหนังสือออกใหม่และบทความความรู้จากสำนักพิมพ์",
+        "order": 1,
+        "links": [
+          {
+            "id": "ti-fb-page",
+            "title": "เข้าชมเพจ Facebook Truth Islam Publisher",
+            "url": "https://www.facebook.com/profile.php?id=61565389662125"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "humanwrite",
+    "slug": "humanwrite",
+    "name": "สำนักพิมพ์ Human Write",
+    "category": "institution",
+    "language": "Thai",
+    "platforms": [
+      "Facebook"
+    ],
+    "socialLinks": {
+      "Facebook": "https://www.facebook.com/profile.php?id=100063260017282"
+    },
+    "description": "สำนักพิมพ์อิสระที่จัดทำและเผยแพร่หนังสืออิสลาม บทความ และงานเขียนเชิงวิชาการภาษาไทย",
+    "logoUrl": "",
+    "themeColor": "#1e3a8a",
+    "order": 43,
+    "networks": [],
+    "campuses": [
+      {
+        "id": "humanwrite-fb",
+        "name": "เพจสำนักพิมพ์ Human Write (Facebook)",
+        "description": "ติดตามผลงานหนังสือและบทความของสำนักพิมพ์",
+        "order": 1,
+        "links": [
+          {
+            "id": "hw-fb-page",
+            "title": "เข้าชมเพจ Facebook สำนักพิมพ์ Human Write",
+            "url": "https://www.facebook.com/profile.php?id=100063260017282"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "attaymiyyah",
+    "slug": "attaymiyyah",
+    "name": "อัต-ตัยมียะฮ์ (التيمية)",
+    "category": "articles",
+    "language": "Thai",
+    "platforms": [
+      "Facebook"
+    ],
+    "socialLinks": {
+      "Facebook": "https://www.facebook.com/profile.php?id=61572292302402"
+    },
+    "description": "เพจเผยแพร่บทความแปล ฟะวาอิด และคำสอนจากตำราของชัยคุลอิสลาม อิบนุ ตัยมียะฮ์ และปราชญ์สายสะลัฟ",
+    "logoUrl": "",
+    "themeColor": "#7c2d12",
+    "order": 44,
+    "networks": [],
+    "campuses": [
+      {
+        "id": "attaymiyyah-fb",
+        "name": "เพจอัต-ตัยมียะฮ์ (Facebook)",
+        "description": "ติดตามบทความแปลและข้อคิดจากตำราอุละมาอ์สะลัฟ",
+        "order": 1,
+        "links": [
+          {
+            "id": "at-fb-page",
+            "title": "เข้าชมเพจ Facebook อัต-ตัยมียะฮ์ — التيمية",
+            "url": "https://www.facebook.com/profile.php?id=61572292302402"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ruknulkitab",
+    "slug": "ruknulkitab",
+    "name": "มุมหนังสือ (ركن الكتاب)",
+    "category": "library",
+    "language": "Thai",
+    "platforms": [
+      "Facebook"
+    ],
+    "socialLinks": {
+      "Facebook": "https://www.facebook.com/furhan621411005"
+    },
+    "description": "เพจแนะนำหนังสืออิสลาม บทความแปล และแบ่งปันความรู้จากตำราวิชาการสายสะลัฟ",
+    "logoUrl": "",
+    "themeColor": "#b45309",
+    "order": 45,
+    "networks": [],
+    "campuses": [
+      {
+        "id": "ruknulkitab-fb",
+        "name": "เพจมุมหนังสือ (Facebook)",
+        "description": "ติดตามรีวิวหนังสือและบทความแปลจากตำรา",
+        "order": 1,
+        "links": [
+          {
+            "id": "rk-fb-page",
+            "title": "เข้าชมเพจ Facebook มุมหนังสือ ركن الكتاب",
+            "url": "https://www.facebook.com/furhan621411005"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "abbas-salafi",
+    "slug": "abbas-salafi",
+    "name": "Abbas Mtp",
+    "category": "articles",
+    "language": "Thai",
+    "platforms": [
+      "Facebook"
+    ],
+    "socialLinks": {
+      "Facebook": "https://www.facebook.com/Abbas.M.salafi"
+    },
+    "description": "เพจแบ่งปันบทความแปล ข้อคิดศาสนา และคำสอนตามแนวทางสะละฟุศศอลิห์",
+    "logoUrl": "",
+    "themeColor": "#047857",
+    "order": 46,
+    "networks": [],
+    "campuses": [
+      {
+        "id": "abbas-fb",
+        "name": "เพจ Abbas Mtp (Facebook)",
+        "description": "ติดตามบทความและข้อคิดศาสนา",
+        "order": 1,
+        "links": [
+          {
+            "id": "abbas-fb-page",
+            "title": "เข้าชมเพจ Facebook Abbas Mtp",
+            "url": "https://www.facebook.com/Abbas.M.salafi"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "pinionmoon",
+    "slug": "pinionmoon",
+    "name": "Pinion Moon",
+    "category": "articles",
+    "language": "Thai",
+    "platforms": [
+      "Facebook"
+    ],
+    "socialLinks": {
+      "Facebook": "https://www.facebook.com/profile.php?id=100075962754486"
+    },
+    "description": "เพจแบ่งปันความรู้ ข้อคิดเตือนใจ และสื่ออ่านอิสลามภาษาไทย",
+    "logoUrl": "",
+    "themeColor": "#334155",
+    "order": 47,
+    "networks": [],
+    "campuses": [
+      {
+        "id": "pinionmoon-fb",
+        "name": "เพจ Pinion Moon (Facebook)",
+        "description": "ติดตามบทความและสื่อความรู้บน Facebook",
+        "order": 1,
+        "links": [
+          {
+            "id": "pm-fb-page",
+            "title": "เข้าชมเพจ Facebook Pinion Moon",
+            "url": "https://www.facebook.com/profile.php?id=100075962754486"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ibnuyusuf",
+    "slug": "ibnuyusuf",
+    "name": "Ibnu Yusuf",
+    "category": "articles",
+    "language": "Thai",
+    "platforms": [
+      "Instagram"
+    ],
+    "socialLinks": {
+      "Instagram": "https://www.instagram.com/_ibnuyusuf/"
+    },
+    "description": "อินสตาแกรมแบ่งปันข้อคิดศาสนา คำสอนอุละมาอ์ และหนังสือแนะนำสายสะลัฟ",
+    "logoUrl": "",
+    "themeColor": "#be185d",
+    "order": 48,
+    "networks": [],
+    "campuses": [
+      {
+        "id": "ibnuyusuf-ig",
+        "name": "ช่องทาง Instagram (@_ibnuyusuf)",
+        "description": "ติดตามโพสต์ข้อคิดและแนะนำหนังสือ",
+        "order": 1,
+        "links": [
+          {
+            "id": "iy-ig-page",
+            "title": "เข้าชม Instagram @_ibnuyusuf",
+            "url": "https://www.instagram.com/_ibnuyusuf/"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "troid",
+    "slug": "troid",
+    "name": "TROID (The Reign of Islamic Daʿwah)",
+    "category": "articles",
+    "language": "English",
+    "platforms": [
+      "Website"
+    ],
+    "socialLinks": {
+      "Website": "https://www.troid.org"
+    },
+    "description": "ศูนย์ดะอ์วะฮ์สะลัฟในแคนาดา แหล่งต้นฉบับแผ่นพับดะอ์วะฮ์ บทความวิชาการ และสื่อเสียงแนวทางสะละฟีภาษาอังกฤษคุณภาพสูง",
+    "logoUrl": "",
+    "themeColor": "#0f766e",
+    "order": 49,
+    "networks": [],
+    "campuses": [
+      {
+        "id": "troid-main",
+        "name": "คลังบทความ สื่อเสียง & แผ่นพับดะอ์วะฮ์",
+        "description": "ศึกษาบทความและสื่อดะอ์วะฮ์ต้นฉบับภาษาอังกฤษ",
+        "order": 1,
+        "links": [
+          {
+            "id": "troid-home",
+            "title": "หน้าหลัก TROID.org",
+            "url": "https://www.troid.org"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "archive-th-islam",
+    "slug": "archive-th-islam",
+    "name": "Internet Archive — คลังหนังสืออิสลามภาษาไทย",
+    "category": "library",
+    "language": "Thai",
+    "platforms": [
+      "Website"
+    ],
+    "socialLinks": {
+      "Website": "https://archive.org/search?query=%E0%B8%AB%E0%B8%99%E0%B8%B1%E0%B8%87%E0%B8%AA%E0%B8%B7%E0%B8%AD%E0%B8%AD%E0%B8%B4%E0%B8%AA%E0%B8%A5%E0%B8%B2%E0%B8%A1&and%5B%5D=mediatype%3A%22texts%22"
+    },
+    "description": "แหล่งรวมไฟล์ PDF และ E-Book อิสลามภาษาไทย เช่น อัลกุรอานแปลไทย หนังสือดุอาอ์ และตำราวิชาการเก่าหายาก",
+    "logoUrl": "",
+    "themeColor": "#475569",
+    "order": 50,
+    "networks": [],
+    "campuses": [
+      {
+        "id": "archive-main",
+        "name": "ค้นหาหนังสืออิสลามภาษาไทย (PDF / E-Book)",
+        "description": "เข้าชมรายการเอกสารและหนังสือที่เก็บถาวรบน Internet Archive",
+        "order": 1,
+        "links": [
+          {
+            "id": "arc-th-books",
+            "title": "คลังหนังสืออิสลามภาษาไทย (Internet Archive)",
+            "url": "https://archive.org/search?query=%E0%B8%AB%E0%B8%99%E0%B8%B1%E0%B8%87%E0%B8%AA%E0%B8%B7%E0%B8%AD%E0%B8%AD%E0%B8%B4%E0%B8%AA%E0%B8%A5%E0%B8%B2%E0%B8%A1&and%5B%5D=mediatype%3A%22texts%22"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "anyflip-islam-th",
+    "slug": "anyflip-islam-th",
+    "name": "AnyFlip — คลัง E-Book หนังสืออิสลามภาษาไทย",
+    "category": "library",
+    "language": "Thai",
+    "platforms": [
+      "Website"
+    ],
+    "socialLinks": {
+      "Website": "https://anyflip.com/explore?q=%E0%B8%AD%E0%B8%B4%E0%B8%AA%E0%B8%A5%E0%B8%B2%E0%B8%A1"
+    },
+    "description": "แหล่งรวม E-Book หนังสืออิสลามภาษาไทยแบบเปิดอ่านออนไลน์ได้ทันทีบนเบราว์เซอร์",
+    "logoUrl": "",
+    "themeColor": "#0284c7",
+    "order": 51,
+    "networks": [],
+    "campuses": [
+      {
+        "id": "anyflip-main",
+        "name": "ค้นหา E-Book อิสลามภาษาไทย",
+        "description": "เปิดอ่านหนังสือ E-Book ออนไลน์บน AnyFlip",
+        "order": 1,
+        "links": [
+          {
+            "id": "af-th-books",
+            "title": "คลัง E-Book อิสลามภาษาไทย (AnyFlip)",
+            "url": "https://anyflip.com/explore?q=%E0%B8%AD%E0%B8%B4%E0%B8%AA%E0%B8%A5%E0%B8%B2%E0%B8%A1"
+          }
+        ]
+      }
+    ]
   }
 ]
 
