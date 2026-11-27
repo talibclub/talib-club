@@ -8,25 +8,18 @@ export default function Donation() {
   // ดึงข้อมูลการตั้งค่าเว็บล่าสุดจากฐานข้อมูล
   const { site } = useSiteSettings(SITE)
 
-  // ข้อมูลบัญชีธนาคาร — อ่านจาก content_settings/site ก่อน
-  //
-  // These were a hardcoded array while the same page already pulled site
-  // settings for its social links, so changing an account number meant editing
-  // source and redeploying. The literal below is now only the fallback for a
-  // site document that has no bankAccounts yet.
-  const bankAccounts = (Array.isArray(site?.bankAccounts) && site.bankAccounts.length > 0)
-    ? site.bankAccounts
-    : [
-      {
-        id: 1,
-        bankName: "ธนาคารไทยพาณิชย์ (SCB)",
-        accountName: "นายสอบรีย์ บิลังโหลด",
-        accountNumber: "704-287501-5",
-        tag: "สมทบทุน",
-        logo: "/scb-logo.png",
-        qrImage: "/scb-qr.png"
-      }
-    ]
+  // ข้อมูลบัญชีธนาคารจากโปสเตอร์
+  const bankAccounts = [
+    {
+      id: 1,
+      bankName: "ธนาคารไทยพาณิชย์ (SCB)",
+      accountName: "นายสอบรีย์ บิลังโหลด",
+      accountNumber: "704-287501-5",
+      tag: "สมทบทุน",
+      logo: "/scb-logo.png",
+      qrImage: "/scb-qr.png"
+    }
+  ]
 
   // ฟังก์ชันกดคัดลอกเลขบัญชี
   const handleCopy = async (number) => {
@@ -58,7 +51,7 @@ export default function Donation() {
         <p style={{ color: "var(--t2)", fontSize: 16 }}>เป็นส่วนหนึ่งในการทำงานดะวะฮฺของกลุ่มฏอลิบ</p>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", gap: 30, padding: "0 20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 30, padding: "0 20px" }}>
         
         {/* ฝั่งซ้าย: บัญชีธนาคาร และ วัตถุประสงค์ */}
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -92,8 +85,8 @@ export default function Donation() {
               </div>
 
               {/* ส่วนแสดงข้อมูลบัญชี */}
-              <div style={{ flex: "1 1 200px", minWidth: 0, overflowWrap: "anywhere" }}>
-                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                   <img src={acc.logo} alt={acc.bankName} style={{ width: 32, height: 32, objectFit: "contain" }} />
                   <h3 style={{ margin: 0, fontSize: 16, color: "var(--text)" }}>{acc.bankName}</h3>
                   <span style={{ fontSize: 12, background: "var(--teal-bg)", color: "var(--teal)", padding: "2px 8px", borderRadius: 12 }}>{acc.tag}</span>
@@ -161,31 +154,31 @@ export default function Donation() {
             <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 20, color: "var(--text)" }}>
               
               {site?.social?.facebook && (
-                <a href={site.social.facebook} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#1877F2"} onMouseOut={(e) => e.target.style.color = "inherit"}>
+                <a href={site.social.facebook} target="_blank" rel="noopener noreferrer" aria-label="Facebook" title="Facebook" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#1877F2"} onMouseLeave={(e) => e.currentTarget.style.color = "inherit"}>
                   <i className="ti ti-brand-facebook"></i>
                 </a>
               )}
               
               {site?.social?.instagram && (
-                <a href={site.social.instagram} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#E4405F"} onMouseOut={(e) => e.target.style.color = "inherit"}>
+                <a href={site.social.instagram} target="_blank" rel="noopener noreferrer" aria-label="Instagram" title="Instagram" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#E4405F"} onMouseLeave={(e) => e.currentTarget.style.color = "inherit"}>
                   <i className="ti ti-brand-instagram"></i>
                 </a>
               )}
               
               {site?.social?.tiktok && (
-                <a href={site.social.tiktok} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#000000"} onMouseOut={(e) => e.target.style.color = "inherit"}>
+                <a href={site.social.tiktok} target="_blank" rel="noopener noreferrer" aria-label="TikTok" title="TikTok" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "var(--teal)"} onMouseLeave={(e) => e.currentTarget.style.color = "inherit"}>
                   <i className="ti ti-brand-tiktok"></i>
                 </a>
               )}
               
               {site?.social?.youtube && (
-                <a href={site.social.youtube} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#FF0000"} onMouseOut={(e) => e.target.style.color = "inherit"}>
+                <a href={site.social.youtube} target="_blank" rel="noopener noreferrer" aria-label="YouTube" title="YouTube" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#FF0000"} onMouseLeave={(e) => e.currentTarget.style.color = "inherit"}>
                   <i className="ti ti-brand-youtube"></i>
                 </a>
               )}
               
               {site?.social?.spotify && (
-                <a href={site.social.spotify} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => e.target.style.color = "#1DB954"} onMouseOut={(e) => e.target.style.color = "inherit"}>
+                <a href={site.social.spotify} target="_blank" rel="noopener noreferrer" aria-label="Spotify" title="Spotify" style={{ color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.color = "#1DB954"} onMouseLeave={(e) => e.currentTarget.style.color = "inherit"}>
                   <i className="ti ti-brand-spotify"></i>
                 </a>
               )}

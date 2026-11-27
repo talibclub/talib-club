@@ -1,5 +1,4 @@
-import { getCoverUrl as getDirectUrl } from "../utils/bookCover.js"
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { BOOKS, DEFAULT_TAXONOMY } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 import toast from "react-hot-toast"
@@ -9,17 +8,38 @@ import PaginationBar from "../components/PaginationBar.jsx"
 import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
-import { isJournal, getTimestampMs } from "../utils/library.js"
-import { isDriveStorageUrl } from '../lib/driveStorage.js'
-import { detailPath } from "../utils/slug.js"
+
+// ฟังก์ชันเช็คประเภทหนังสือ/วารสารให้รองรับทั้งภาษาไทยและรหัสอังกฤษ
+function isJournalType(type) {
+  const t = String(type || "").toLowerCase().trim()
+  return t === "journal" || t === "วารสาร" || t === "นิตยสาร"
+}
+
+function matchesBookType(itemType, filterType) {
+  if (!filterType || filterType === "all") return true
+  const it = String(itemType || "").toLowerCase().trim()
+  const ft = String(filterType || "").toLowerCase().trim()
+  if (it === ft) return true
+  if (isJournalType(it) && isJournalType(ft)) return true
+  if ((ft === "book" || ft === "หนังสือ") && (it === "book" || it === "หนังสือ")) return true
+  if (ft === "pdf" && it === "pdf") return true
+  if ((ft === "report" || ft === "รายงาน") && (it === "report" || it === "รายงาน")) return true
+  return false
+}
 
 // ฟังก์ชันดึงรูปปก
-
+function getDirectUrl(url) {
+  if (!url) return ""
+  const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)\//)
+  if (match && match[1]) {
+    return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w800`
+  }
+  return url
+}
 
 // ฟังก์ชันแปลงลิงก์ดาวน์โหลด
 function getDownloadUrl(url) {
   if (!url) return ""
-  if (isDriveStorageUrl(url)) { const download = new URL(url, window.location.origin); download.searchParams.set('download', '1'); return download.href; }
   const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)\//)
   if (match && match[1]) {
     return `https://drive.google.com/uc?export=download&id=${match[1]}`
@@ -28,14 +48,14 @@ function getDownloadUrl(url) {
 }
 
 export default function Library({ go, authState, ctx }) {
-  const booksQueryOptions = useMemo(() => ({ live: false, limit: 1000 }), [])
+  const booksQueryOptions = useMemo(() => ({ live: false, limit: 200 }), [])
   const { items: books, loading, error, isUsingFallback } = useContentCollection("books", BOOKS, null, booksQueryOptions)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
 
   const filter = ctx?.filter || "all"
   const categoryFilter = ctx?.cat || "all"
   const sourceFilter = ctx?.source || "all"
-  const sortBy = ctx?.sortBy || (isJournal(filter) ? "issue-desc" : "newest")
+  const sortBy = ctx?.sortBy || (filter === "journal" ? "issue-desc" : "newest")
   const showAdvancedFilters = ctx?.showAdv === "true"
   const requestedPage = parseInt(ctx?.page, 10) || 1
   const ITEMS_PER_PAGE = 12
@@ -72,23 +92,13 @@ export default function Library({ go, authState, ctx }) {
     if (newParams.filter !== undefined || newParams.cat !== undefined || newParams.source !== undefined || newParams.search !== undefined || newParams.showAdv !== undefined || newParams.sortBy !== undefined) {
       updated.page = 1
     }
-    if (isJournal(newParams.filter) && newParams.sortBy === undefined) {
+    if (newParams.filter === "journal" && newParams.sortBy === undefined) {
       updated.sortBy = "issue-desc"
-    } else if (newParams.filter !== undefined && !isJournal(newParams.filter) && newParams.sortBy === undefined) {
+    } else if (newParams.filter !== undefined && newParams.filter !== "journal" && newParams.sortBy === undefined) {
       updated.sortBy = "newest"
     }
     go("library", updated, { replace: true, noScroll: true })
   }
-
-  // Same as the article list: filtering is local, only the URL sync needs to
-  // wait, so a router navigate no longer fires on every keystroke.
-  const searchSyncRef = useRef(null)
-  const handleSearchChange = (value) => {
-    setSearch(value)
-    clearTimeout(searchSyncRef.current)
-    searchSyncRef.current = setTimeout(() => updateFilters({ search: value }), 350)
-  }
-  useEffect(() => () => clearTimeout(searchSyncRef.current), [])
 
   const handleDownloadClick = async (b) => {
     if (!b?.id) return
@@ -100,23 +110,21 @@ export default function Library({ go, authState, ctx }) {
   }
 
   const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim()
     const result = books.filter(b => {
-      const matchType = filter === "all" || b.type === filter || (isJournal(filter) && isJournal(b.type))
+      const matchType = matchesBookType(b.type, filter)
       const matchCategory = categoryFilter === "all" || b.category === categoryFilter
       const matchSource = sourceFilter === "all" || b.source === sourceFilter
       const matchSearch =
-        !search ||
-        // Guarded like the two fields below it. A book document created
-        // outside the admin form — a console edit, an import script — has no
-        // title, and searching the library then threw on the first keystroke.
-        (b.title || "").toLowerCase().includes(search.toLowerCase()) ||
-        (b.desc && b.desc.toLowerCase().includes(search.toLowerCase())) ||
-        (b.author && b.author.toLowerCase().includes(search.toLowerCase()))
+        !q ||
+        String(b.title || "").toLowerCase().includes(q) ||
+        (b.desc && String(b.desc).toLowerCase().includes(q)) ||
+        (b.author && String(b.author).toLowerCase().includes(q))
       return matchType && matchCategory && matchSource && matchSearch
     })
 
     return [...result].sort((a, b) => {
-      if (isJournal(filter)) {
+      if (isJournalType(filter)) {
         const issueA = Number(a.issueNumber) || 0
         const issueB = Number(b.issueNumber) || 0
         if (sortBy === "issue-asc") {
@@ -143,11 +151,11 @@ export default function Library({ go, authState, ctx }) {
         }
         
         // Fallback to creation time
-        const timeA = getTimestampMs(a.createdAt)
-        const timeB = getTimestampMs(b.createdAt)
+        const timeA = a.createdAt?.seconds || 0
+        const timeB = b.createdAt?.seconds || 0
         if (timeA !== timeB) return timeA - timeB
         
-        return String(a.id || "").localeCompare(String(a.id || ""), undefined, { numeric: true })
+        return String(a.id || "").localeCompare(String(b.id || ""))
       } else {
         if (yearA !== yearB) return yearB - yearA
         
@@ -159,11 +167,11 @@ export default function Library({ go, authState, ctx }) {
         }
         
         // Fallback to creation time (newest first)
-        const timeA = getTimestampMs(a.createdAt)
-        const timeB = getTimestampMs(b.createdAt)
+        const timeA = a.createdAt?.seconds || 0
+        const timeB = b.createdAt?.seconds || 0
         if (timeA !== timeB) return timeB - timeA
         
-        return String(b.id || "").localeCompare(String(a.id || ""), undefined, { numeric: true })
+        return String(b.id || "").localeCompare(String(a.id || ""))
       }
     })
   }, [books, filter, categoryFilter, sourceFilter, search, sortBy])
@@ -196,10 +204,8 @@ export default function Library({ go, authState, ctx }) {
         <div style={{ flex: 1, position: "relative" }}>
           <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
           <input
-            type="search"
-            aria-label="ค้นหาหนังสือ ผู้เขียน หรือเนื้อหา"
             value={search}
-            onChange={e => handleSearchChange(e.target.value)}
+            onChange={e => { setSearch(e.target.value); updateFilters({ search: e.target.value }) }}
             placeholder="ค้นหาชื่อหนังสือ, ผู้เขียน, หรือเนื้อหา..."
             style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "12px 16px 12px 42px", background: "var(--bg2)", border: "1px solid transparent", fontSize: 14, outline: "none", transition: "border 0.2s" }}
             onFocus={(e) => e.target.style.border = "1px solid var(--teal)"}
@@ -208,8 +214,6 @@ export default function Library({ go, authState, ctx }) {
         </div>
         <button
           onClick={() => updateFilters({ showAdv: !showAdvancedFilters ? "true" : "false" })}
-          aria-label="ตัวกรองเพิ่มเติม"
-          aria-expanded={showAdvancedFilters}
           style={{ 
             padding: "0 18px", 
             borderRadius: 24, 
@@ -256,7 +260,7 @@ export default function Library({ go, authState, ctx }) {
 
           <label style={{ display: "grid", gap: 6 }}>
             <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>เรียงลำดับ</span>
-            {isJournal(filter) ? (
+            {filter === "journal" ? (
               <select value={sortBy} onChange={e => updateFilters({ sortBy: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
                 <option value="issue-desc">เล่มใหม่ล่าสุด ➜ เล่มเก่า</option>
                 <option value="issue-asc">เล่มเก่าสุด ➜ เล่มใหม่</option>
@@ -308,19 +312,16 @@ export default function Library({ go, authState, ctx }) {
             }
 
             return (
-              // Stays a clickable <div>: the card body already contains the
-              // download / read-online <a> tags, and an anchor cannot legally
-              // nest another anchor. Crawlers reach these books through
-              // api/seo-prerender.js, which lists them as real links.
               <div
                 key={b.id}
                 className="card"
-                role="button"
-                tabIndex={0}
-                aria-label={b.title}
                 style={{ padding: 16, display: "flex", gap: 16, cursor: "pointer" }}
-                onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); e.currentTarget.click() } }}
                 onClick={() => {
+                  if (!authState?.user) {
+                    toast.error("กรุณาเข้าสู่ระบบก่อนดาวน์โหลดหรือดูหนังสือ")
+                    go("auth")
+                    return
+                  }
                   go("library-detail", b)
                 }}
               >
@@ -329,7 +330,7 @@ export default function Library({ go, authState, ctx }) {
                     <ImageWithFallback src={getDirectUrl(b.coverUrl)} alt={b.title} fallbackEmoji="📚" style={{ width: "100%", borderRadius: 6, objectFit: "cover", aspectRatio: "3/4", border: ".5px solid var(--br2)", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }} />
                   ) : (
                     <div style={{ width: "100%", aspectRatio: "3/4", borderRadius: 6, background: "var(--acc2)", display: "flex", alignItems: "center", justifyContent: "center", border: ".5px solid var(--br2)" }}>
-                      <i className={`ti ${isJournal(b.type) ? "ti-news" : b.type === "PDF" ? "ti-file-text" : "ti-book"}`} style={{ fontSize: 24, color: "var(--acc)" }}></i>
+                      <i className={`ti ${isJournalType(b.type) ? "ti-news" : String(b.type).toLowerCase() === "pdf" ? "ti-file-text" : "ti-book"}`} style={{ fontSize: 24, color: "var(--acc)" }}></i>
                     </div>
                   )}
                 </div>
@@ -338,7 +339,7 @@ export default function Library({ go, authState, ctx }) {
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 4 }}>
                     <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                       <span className="tag tag-acc" style={{ fontSize: 10 }}>{b.type}</span>
-                      {isJournal(b.type) && b.issueNumber !== undefined && b.issueNumber !== "" && (
+                      {isJournalType(b.type) && b.issueNumber !== undefined && b.issueNumber !== "" && (
                         <span className="tag" style={{ fontSize: 10, background: "rgba(45, 190, 160, 0.15)", color: "var(--teal)" }}>เล่มที่ {b.issueNumber}</span>
                       )}
                       {b.category && <span className="tag" style={{ fontSize: 10, background: "var(--bg2)", color: "var(--t2)" }}>{b.category}</span>}
@@ -367,7 +368,7 @@ export default function Library({ go, authState, ctx }) {
                         onClick={(e) => {
                           e.stopPropagation()
                           toast.error("กรุณาเข้าสู่ระบบก่อนดาวน์โหลดหรือดูหนังสือ")
-                          go("auth", null, { returnTo: detailPath("library-detail", b.id, b.title) })
+                          go("auth")
                         }}
                         style={{
                           width: "100%",

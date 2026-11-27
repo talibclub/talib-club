@@ -70,7 +70,7 @@ export default function MemberDashboard({ authState, go, initialView = "overview
       setCopied(label)
       toast.success("คัดลอกข้อความแล้ว")
       window.setTimeout(() => setCopied(""), 1800)
-    } catch {
+    } catch (err) {
       toast.error("คัดลอกไม่สำเร็จ")
       setCopied("")
     }
@@ -92,7 +92,7 @@ export default function MemberDashboard({ authState, go, initialView = "overview
         toast.success("ออกจากระบบสำเร็จ", { id: toastId });
         go("home");
       } catch (error) {
-        if (process.env.NODE_ENV !== "production") {
+        if (import.meta.env.DEV) {
           console.error("Logout failed:", error);
         }
         toast.error("เกิดข้อผิดพลาดในการออกจากระบบ", { id: toastId });
@@ -145,7 +145,7 @@ export default function MemberDashboard({ authState, go, initialView = "overview
                   toast.success("ส่งลิงก์ยืนยันตัวตนไปยังอีเมลของคุณอีกครั้งเรียบร้อยแล้ว!");
                 }
               } catch (err) {
-                if (process.env.NODE_ENV !== "production") {
+                if (import.meta.env.DEV) {
                   console.error("Failed to send email verification:", err);
                 }
                 toast.error("ไม่สามารถส่งอีเมลยืนยันตัวตนได้ในขณะนี้");

@@ -1,12 +1,10 @@
-import { isPlainLeftClick } from "../utils/linkNavigation.js"
-import { detailPath } from "../utils/slug.js"
 import { useState, useEffect, useMemo } from "react"
 import { ARTICLES, BOOKS, MEDIA, SITE } from "../data/index.js"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 import { useContentCollection, useSiteSettings, useCollectionCount } from "../lib/contentStore.js"
+import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
+import ImageWithFallback from "../components/ImageWithFallback.jsx"
 import ArticleCard from "../components/ArticleCard.jsx"
-import HomeReadingShortcuts from "../components/HomeReadingShortcuts.jsx"
-import { isJournal } from "../utils/library.js"
 
 const QURAN_DUAS = [
   { sura: 1, aya: 6 },
@@ -59,11 +57,9 @@ const SURAH_NAMES = {
   60: "อัล-มุมตะหะนะฮ์"
 }
 
-export default function Home({ go, authState, readingSessions }) {
-  // Matches books and media below: cached, invalidated by the metadata
-  // timestamp. This was the only live listener on the landing page, and it made
-  // every single visit re-read the six newest articles and hold a socket open.
-  const articleQueryOptions = useMemo(() => ({ live: false, limit: 6, orderByField: "date", orderDirection: "desc" }), [])
+export default function Home({ go }) {
+  // Articles should reflect the current Firestore state immediately.
+  const articleQueryOptions = useMemo(() => ({ live: true, limit: 6, orderByField: "date", orderDirection: "desc" }), [])
   const bookQueryOptions = useMemo(() => ({ live: false, limit: 6, orderByField: "year", orderDirection: "desc" }), [])
   const mediaQueryOptions = useMemo(() => ({ live: false, limit: 6, orderByField: "date", orderDirection: "desc" }), [])
   
@@ -185,9 +181,11 @@ export default function Home({ go, authState, readingSessions }) {
             "logo": `${BASE_URL}/logo.png`,
             "description": "คลังความรู้อิสลามวิชาการ สำหรับมุสลิมและผู้สนใจทุกท่าน",
             "sameAs": [
-              "https://www.facebook.com/TalibPublisher",
-              "https://www.youtube.com/@talibpublusher"
-            ]
+              site?.social?.facebook,
+              site?.social?.youtube,
+              site?.social?.instagram,
+              site?.social?.tiktok,
+            ].filter(Boolean)
           }
         ]}
       />
@@ -215,8 +213,6 @@ export default function Home({ go, authState, readingSessions }) {
         </div>
       </header>
 
-      {authState?.user?.uid && <HomeReadingShortcuts key={authState.user.uid} uid={authState.user.uid} go={go} readingSessions={readingSessions} />}
-
       {/* AYAH */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
         <i className="ti ti-bookmark" style={{ color: "var(--teal)", fontSize: 15 }}></i>
@@ -241,12 +237,12 @@ export default function Home({ go, authState, readingSessions }) {
       {/* STATS */}
       <div className="grid4" style={{ marginBottom:32 }}>
         {[
-          { n: scholarCount, l: "ทำเนียบบุคคล", icon: "ti-address-book" },
-          { n: articleCount, l: "บทความ", icon: "ti-file-text" },
-          { n: bookCount, l: "หนังสือ/วารสาร", icon: "ti-books" },
-          { n: mediaCount, l: "มีเดีย", icon: "ti-player-play" },
+          { n: scholarCount, l: "ทำเนียบบุคคล", icon: "ti-address-book", target: "scholars" },
+          { n: articleCount, l: "บทความ", icon: "ti-file-text", target: "articles" },
+          { n: bookCount, l: "หนังสือ/วารสาร", icon: "ti-books", target: "library" },
+          { n: mediaCount, l: "มีเดีย", icon: "ti-player-play", target: "media" },
         ].map((s, i) => (
-          <div key={i} className="card" style={{ padding:"16px", textAlign:"center" }}>
+          <div key={i} className="card" onClick={() => go(s.target)} style={{ padding:"16px", textAlign:"center", cursor:"pointer" }}>
             <i className={`ti ${s.icon}`} style={{ fontSize:20, color:"var(--teal)", display:"block", marginBottom:6 }}></i>
             <div style={{ fontSize:20, fontWeight:600, color:"var(--text)", lineHeight:1 }}>{s.n}</div>
             <div style={{ fontSize:11, color:"var(--t3)", fontWeight:300, marginTop:4 }}>{s.l}</div>
@@ -316,8 +312,8 @@ export default function Home({ go, authState, readingSessions }) {
           ) : (
             <div className="flex-col">
               {recentMedia.slice(0, 3).map(m => (
-                <a key={m.id} className="card" href={detailPath("media-detail", m.id, m.title)} onClick={e => { if (isPlainLeftClick(e)) { e.preventDefault(); go("media-detail", m) } }} aria-label={m.title}
-                  style={{ padding:"11px 14px", display:"flex", alignItems:"center", gap:10, cursor:"pointer", color:"inherit", textDecoration:"none" }}>
+                <div key={m.id} className="card" style={{ padding:"11px 14px", display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}
+                  onClick={() => go("media-detail", m)}>
                   <div style={{
                     width:32, height:32, borderRadius:"50%", background:"var(--acc2)",
                     border:".5px solid var(--acc-br)", display:"flex", alignItems:"center",
@@ -338,7 +334,7 @@ export default function Home({ go, authState, readingSessions }) {
                       {m.series || m.channel}{m.duration ? ` · ${m.duration}` : ""}
                     </div>
                   </div>
-                </a>
+                </div>
               ))}
             </div>
           )}
@@ -365,20 +361,20 @@ export default function Home({ go, authState, readingSessions }) {
           ) : (
             <div className="flex-col">
               {newBooks.map(b => (
-                <a key={b.id} className="card" href={detailPath("library-detail", b.id, b.title)} onClick={e => { if (isPlainLeftClick(e)) { e.preventDefault(); go("library-detail", b) } }} aria-label={b.title} style={{
+                <div key={b.id} className="card" style={{
                   padding:"11px 14px", display:"flex", alignItems:"center",
-                  justifyContent:"space-between", gap:10, cursor:"pointer", color:"inherit", textDecoration:"none"
-                }}>
+                  justifyContent:"space-between", gap:10, cursor:"pointer"
+                }} onClick={() => go("library-detail", b)}>
                   <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                    <i className={`ti ${isJournal(b.type) ? "ti-news" : b.type==="PDF" ? "ti-file-text" : "ti-book"}`}
+                    <i className={`ti ${b.type==="วารสาร" ? "ti-news" : b.type==="PDF" ? "ti-file-text" : "ti-book"}`}
                       style={{ fontSize:16, color:"var(--teal)", flexShrink:0 }}></i>
                     <div>
                       <div style={{ fontSize:12, fontWeight:500, color:"var(--text)" }}>{b.title}</div>
-                      <div style={{ fontSize:10, color:"var(--t3)", fontWeight:300 }}>{b.type} {isJournal(b.type) && b.issueNumber ? `เล่มที่ ${b.issueNumber}` : ""} · {b.year}</div>
+                      <div style={{ fontSize:10, color:"var(--t3)", fontWeight:300 }}>{b.type} · {b.year}</div>
                     </div>
                   </div>
                   {b.isNew && <span className="tag tag-new" style={{ flexShrink:0 }}>ใหม่</span>}
-                </a>
+                </div>
               ))}
             </div>
           )}
@@ -416,11 +412,11 @@ export default function Home({ go, authState, readingSessions }) {
 
 function Footer({ site }) {
   const links = [
-    { key: "facebook", icon: "ti-brand-facebook", label: "Facebook" },
-    { key: "youtube", icon: "ti-brand-youtube", label: "YouTube" },
-    { key: "spotify", icon: "ti-brand-spotify", label: "Spotify" },
-    { key: "instagram", icon: "ti-brand-instagram", label: "Instagram" },
-    { key: "tiktok", icon: "ti-brand-tiktok", label: "TikTok" },
+    { key: "facebook", icon: "ti-brand-facebook" },
+    { key: "youtube", icon: "ti-brand-youtube" },
+    { key: "spotify", icon: "ti-brand-spotify" },
+    { key: "instagram", icon: "ti-brand-instagram" },
+    { key: "tiktok", icon: "ti-brand-tiktok" },
   ].map(item => ({ ...item, url: site?.social?.[item.key] }))
    .filter(item => item.url && /^https?:\/\//i.test(item.url))
 
@@ -440,8 +436,8 @@ function Footer({ site }) {
       {/* กลุ่มปุ่มโซเชียล และ ปุ่มขึ้นบน (จัดให้อยู่ด้วยกัน) */}
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
         {links.map(item => (
-          <a key={item.key} href={item.url} target="_blank" rel="noreferrer" aria-label={item.label}
-             style={{ width: "44px", height: "44px", backgroundColor: "var(--card)", border: ".5px solid var(--br)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t2)", textDecoration: "none", transition: "0.2s" }}
+          <a key={item.key} href={item.url} target="_blank" rel="noreferrer" aria-label={item.key} title={item.key}
+             style={{ width: "36px", height: "36px", backgroundColor: "var(--card)", border: ".5px solid var(--br)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t2)", textDecoration: "none", transition: "0.2s" }}
              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--teal)"; e.currentTarget.style.color = "#fff"; e.currentTarget.style.borderColor = "var(--teal)"; }}
              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--card)"; e.currentTarget.style.color = "var(--t2)"; e.currentTarget.style.borderColor = "var(--br)"; }}
           >
@@ -450,8 +446,8 @@ function Footer({ site }) {
         ))}
 
         {/* ปุ่มลูกศรขึ้นบน (เอา absolute ออก แล้วเรียงต่อกันแทน) */}
-        <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} aria-label="เลื่อนขึ้นด้านบนสุด"
-                style={{ width: "44px", height: "44px", backgroundColor: "var(--teal-bg)", border: "1px solid rgba(15,110,86,0.1)", borderRadius: "50%", color: "var(--teal)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "0.2s", marginLeft: "10px" }}
+        <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} aria-label="กลับขึ้นด้านบน" title="กลับขึ้นด้านบน" 
+                style={{ width: "36px", height: "36px", backgroundColor: "var(--teal-bg)", border: "1px solid rgba(15,110,86,0.1)", borderRadius: "50%", color: "var(--teal)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "0.2s", marginLeft: "10px" }}
                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--teal)"; e.currentTarget.style.color = "#fff"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--teal-bg)"; e.currentTarget.style.color = "var(--teal)"; }}
         >

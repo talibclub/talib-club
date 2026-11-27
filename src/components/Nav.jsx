@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState, useMemo } from "react"
 import { Link } from "react-router-dom"
+import { SITE } from "../data/index.js"
+
 import { getPagePath } from "../utils/url.js"
 import toast from "react-hot-toast"
 import { confirmAction } from "../utils/feedback.jsx"
-import { useUserDoc, invalidateContentCache } from "../lib/contentStore.js"
+import { useContentCollection, useUserDoc, invalidateContentCache } from "../lib/contentStore.js"
+import { ARTICLES, BOOKS } from "../data/index.js"
 import { usePWA } from "../hooks/usePWA.js"
 import { AccountDropdown, AccountDrawer } from "./nav/AccountComponents.jsx"
 import { NotificationDropdown, NotificationDrawer } from "./nav/NotificationComponents.jsx"
 // M2: Import shared utilities instead of duplicating them
-import { getLocalDayKey } from "../utils/streak.js"
+import { getMs as getTimeMs, getLocalDayKey } from "../utils/streak.js"
 import { safeDateNow } from "../utils/time.js"
-import { isJournal, getTimestampMs } from "../utils/library.js"
 
 
 
@@ -49,19 +51,11 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
 
   useEffect(() => { goRef.current = go }, [go])
 
-  // Realtime notification listeners for signed-in users
-  const notifUid = authState?.user?.uid
   useEffect(() => {
-    if (!notifUid) {
-      setDynamicNotifications([])
-      return undefined
-    }
-
-    const unsubs = []
-
-    async function setupRealtimeNotifications() {
+    let unsubs = []
+    async function setupDynamicNotifications() {
       try {
-        const { collection, query, limit, onSnapshot } = await import("firebase/firestore")
+        const { collection, query, orderBy, limit, onSnapshot } = await import("firebase/firestore")
         const { db } = await import("../lib/firebase.js")
         
         const latestDocs = { article: null, media: null, book: null, campaign: null }
@@ -95,16 +89,13 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
           }
           
           if (book) {
-            const isJr = isJournal(book.type)
             newNotifs.push({
               id: `book-${book.id}`,
-              title: isJr ? "วารสารฉบับใหม่" : "หนังสือและตำราใหม่",
-              desc: isJr
-                ? `วารสารล่าสุด: "${book.title}"${book.issueNumber !== undefined && book.issueNumber !== "" ? ` (เล่มที่ ${book.issueNumber})` : ""}`
-                : `ดาวน์โหลดผลงานล่าสุด: "${book.title}" หมวดหมู่ ${book.category || "ทั่วไป"}`,
-              time: book.year ? `ปี ${book.year}` : "เมื่อเร็วๆ นี้",
-              icon: isJr ? "ti-news" : "ti-book",
-              color: isJr ? "var(--teal)" : "rgb(255, 179, 0)",
+              title: "หนังสือและตำราใหม่",
+              desc: `ดาวน์โหลดผลงานล่าสุด: "${book.title}" หมวดหมู่ ${book.category}`,
+              time: "เมื่อเร็วๆ นี้",
+              icon: "ti-book",
+              color: "rgb(255, 179, 0)",
               onClick: () => { goRef.current("library-detail", book); setMenuOpen(false); setAccountOpen(false); setNotificationOpen(false) }
             })
           }
@@ -113,8 +104,8 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
             newNotifs.push({
               id: `camp-${campaign.id}`,
               title: "แจกหนังสือ/ตำราใหม่",
-              desc: `แคมเปญ: "${campaign.title || campaign.items?.[0]?.name || "แจกหนังสือฟรี"}" มารับได้เลย!`,
-              time: "กำลังเปิดรับ",
+              desc: `แคมเปญใหม่: "${campaign.title || campaign.items?.[0]?.name || "แจกหนังสือฟรี"}" มารับได้เลย!`,
+              time: "เมื่อเร็วๆ นี้",
               icon: "ti-gift",
               color: "var(--teal)",
               onClick: () => { goRef.current("books"); setMenuOpen(false); setAccountOpen(false); setNotificationOpen(false) }
@@ -124,116 +115,37 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
           setDynamicNotifications(newNotifs)
         }
 
-        const parseDateToMs = (dateStr) => {
-          if (!dateStr || typeof dateStr !== "string") return 0
-          const match = dateStr.trim().match(/^(\d{4})-(\d{2})-(\d{2})/)
-          if (match) {
-            let year = parseInt(match[1], 10)
-            const month = parseInt(match[2], 10) - 1
-            const day = parseInt(match[3], 10)
-            if (year > 2400) year -= 543
-            return new Date(year, month, day).getTime()
-          }
-          const parsed = Date.parse(dateStr)
-          return isNaN(parsed) ? 0 : parsed
-        }
-
-        const getDocTime = (doc) => {
-          return getTimestampMs(doc.createdAt) || parseDateToMs(doc.date) || getTimestampMs(doc.updatedAt) || 0
-        }
-
-        const sortBooks = (items) => {
-          return [...items].sort((a, b) => {
-            let yA = Number(a.year) || 0
-            if (yA > 2400) yA -= 543
-            let yB = Number(b.year) || 0
-            if (yB > 2400) yB -= 543
-            if (yA !== yB) return yB - yA
-
-            const isJA = isJournal(a.type)
-            const isJB = isJournal(b.type)
-            if (isJA && isJB) {
-              const issA = Number(a.issueNumber) || 0
-              const issB = Number(b.issueNumber) || 0
-              if (issA !== issB) return issB - issA
+        const watchLatestDoc = (colName, orderField, key) => {
+          const q = query(collection(db, colName), orderBy(orderField, "desc"), limit(10))
+          const unsub = onSnapshot(q, (snap) => {
+            if (snap.empty) {
+              latestDocs[key] = null
+            } else {
+              const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+              const validDoc = docs.find(d => d.deleted !== true)
+              latestDocs[key] = validDoc || null
             }
-            const tA = getTimestampMs(a.createdAt)
-            const tB = getTimestampMs(b.createdAt)
-            if (tA !== tB) return tB - tA
-            return getTimestampMs(b.updatedAt) - getTimestampMs(a.updatedAt)
-          })
+            updateNotifs()
+          }, (err) => console.error("Error watching notifications:", err))
+          unsubs.push(unsub)
         }
 
-        // 1. Articles listener
-        unsubs.push(
-          onSnapshot(
-            query(collection(db, "content_articles"), limit(25)),
-            (snap) => {
-              const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => !d.deleted)
-              docs.sort((a, b) => getDocTime(b) - getDocTime(a))
-              latestDocs.article = docs[0] || null
-              updateNotifs()
-            },
-            (err) => console.error("Error listening to articles:", err)
-          )
-        )
-
-        // 2. Media listener
-        unsubs.push(
-          onSnapshot(
-            query(collection(db, "content_media"), limit(25)),
-            (snap) => {
-              const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => !d.deleted)
-              docs.sort((a, b) => getDocTime(b) - getDocTime(a))
-              latestDocs.media = docs[0] || null
-              updateNotifs()
-            },
-            (err) => console.error("Error listening to media:", err)
-          )
-        )
-
-        // 3. Books listener
-        unsubs.push(
-          onSnapshot(
-            query(collection(db, "content_books"), limit(40)),
-            (snap) => {
-              const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => !d.deleted)
-              const sorted = sortBooks(docs)
-              latestDocs.book = sorted[0] || null
-              updateNotifs()
-            },
-            (err) => console.error("Error listening to books:", err)
-          )
-        )
-
-        // 4. Campaigns listener
-        unsubs.push(
-          onSnapshot(
-            query(collection(db, "book_campaigns"), limit(10)),
-            (snap) => {
-              const docs = snap.docs
-                .map(d => ({ id: d.id, ...d.data() }))
-                .filter(d => !d.deleted && d.status !== "closed" && d.status !== "inactive")
-              docs.sort((a, b) => getDocTime(b) - getDocTime(a))
-              latestDocs.campaign = docs[0] || null
-              updateNotifs()
-            },
-            (err) => console.error("Error listening to campaigns:", err)
-          )
-        )
+        watchLatestDoc("content_articles", "date", "article")
+        watchLatestDoc("content_media", "date", "media")
+        watchLatestDoc("content_books", "createdAt", "book")
+        watchLatestDoc("book_campaigns", "createdAt", "campaign")
+        
       } catch(e) {
-        console.error("Failed to setup realtime dynamic notifications:", e)
+        console.error("Failed to setup dynamic notifications:", e)
       }
     }
     
-    setupRealtimeNotifications()
+    setupDynamicNotifications()
     
     return () => {
-      unsubs.forEach(unsub => {
-        if (typeof unsub === "function") unsub()
-      })
+      unsubs.forEach(unsub => unsub && unsub())
     }
-  }, [notifUid])
+  }, [])
 
   useEffect(() => {
     document.body.classList.toggle("menu-open", menuOpen)
@@ -257,45 +169,22 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
     return normalizeStreakSettings(streakRecord, uid)
   }, [streakRecord, uid])
 
-  // Tracked as state (ticked each minute) so a tab left open across midnight
-  // rolls over to the new day, and uses safeDateNow() so a skewed device clock
-  // agrees with the streak calculation.
-  const [todayDayKey, setTodayDayKey] = useState(() => getLocalDayKey(safeDateNow()))
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTodayDayKey(prev => {
-        const next = getLocalDayKey(safeDateNow())
-        return next === prev ? prev : next
-      })
-    }, 60000)
-    return () => clearInterval(timer)
-  }, [])
-
   const hasReadToday = useMemo(() => {
     if (!uid || !readingSessions) return false
+    const today = getLocalDayKey(Date.now())
     return readingSessions.some(
-      session => session.uid === uid &&
-      session.verified &&
-      (session.dayKey || getLocalDayKey(session.completedAt || session.createdAt)) === todayDayKey
+      session => session.uid === uid && 
+      session.verified && 
+      (session.dayKey || getLocalDayKey(session.completedAt || session.createdAt)) === today
     )
-  }, [readingSessions, uid, todayDayKey])
+  }, [readingSessions, uid])
 
   const [timeRemaining, setTimeRemaining] = useState("") // Countdown timer for 23:00 - 00:00
 
   // We keep a record of times we've alerted today to prevent duplicate alerts in the same minute
   const alertedTimesRef = useRef({ date: "", times: new Set() })
 
-  // This used to be a one-second setInterval that every visitor paid for,
-  // signed in or not, and it wrote a currentHM state nothing ever read — so the
-  // whole nav re-rendered once a second, all day. Anonymous visitors have no
-  // streak and no reminders, so they get no timer at all now, and one-second
-  // resolution is only needed while the 23:00 countdown is on screen. Outside
-  // that hour a reminder can only come due once a minute, so it polls slowly.
   useEffect(() => {
-    if (!uid) {
-      setTimeRemaining("")
-      return undefined
-    }
     let timer = null
     const tick = () => {
       const now = new Date(safeDateNow())
@@ -318,7 +207,7 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
         const s = secondsRemaining % 60
         setTimeRemaining(`${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`)
       } else {
-        setTimeRemaining("")
+        setTimeRemaining(prev => (prev ? "" : prev))
       }
 
       // Check custom reminder matching
@@ -346,13 +235,20 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
           })
         }
       }
-
-      timer = setTimeout(tick, now.getHours() === 23 ? 1000 : 20000)
     }
-    tick()
 
-    return () => clearTimeout(timer)
-  }, [uid, userSettings, hasReadToday])
+    const start = () => { if (!timer) timer = setInterval(tick, 1000) }
+    const stop = () => { if (timer) { clearInterval(timer); timer = null } }
+    const onVis = () => (document.hidden ? stop() : start())
+
+    document.addEventListener("visibilitychange", onVis)
+    start()
+
+    return () => {
+      stop()
+      document.removeEventListener("visibilitychange", onVis)
+    }
+  }, [userSettings, hasReadToday])
 
 
   const notifications = useMemo(() => {
@@ -505,6 +401,7 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
     }
     function closeOnEsc(e) {
       if (e.key === "Escape") {
+        setMenuOpen(false)
         setAccountOpen(false)
         setNotificationOpen(false)
       }
@@ -544,7 +441,7 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
         if (authState?.logout) await authState.logout();
         toast.success("ออกจากระบบสำเร็จ", { id: toastId });
         nav("home"); // เปลี่ยนหน้าแบบ SPA ลื่นๆ โดยไม่ต้องรีโหลดหน้าเว็บใหม่
-      } catch {
+      } catch (error) {
         toast.error("เกิดข้อผิดพลาดในการออกจากระบบ", { id: toastId });
       }
     }, 400);
@@ -660,10 +557,6 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
                 photoURL
                   ? <img src={photoURL} alt="" onError={() => setAvatarBroken(true)} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
                   : userInitial
-              ) : authState?.loading ? (
-                // Auth still resolving — content renders immediately, only this
-                // corner shows a spinner instead of flashing "เข้าสู่ระบบ".
-                <i className="ti ti-loader-2 spin" style={{ fontSize: 16 }}></i>
               ) : (
                 <>
                   <i className="ti ti-login" style={{ fontSize: 16 }}></i>
@@ -686,16 +579,11 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
             )}
           </div>
           <button onClick={() => setTheme(theme === "light" ? "dark" : "light")} style={{
-            background: "transparent", border: "none", cursor: "pointer",
-            color: "var(--t3)", width: 44, height: 44, margin: -5,
+            background: "var(--bg2)", border: "none", cursor: "pointer",
+            color: "var(--t3)", width: 34, height: 34, borderRadius: "50%",
             display: "flex", alignItems: "center", justifyContent: "center"
           }} title="เปลี่ยนธีม" aria-label={theme === "light" ? "Switch to dark theme" : "Switch to light theme"}>
-            <span style={{
-              background: "var(--bg2)", width: 34, height: 34, borderRadius: "50%",
-              display: "flex", alignItems: "center", justifyContent: "center"
-            }}>
-              <i className={`ti ${theme === "light" ? "ti-moon" : "ti-sun"}`}></i>
-            </span>
+            <i className={`ti ${theme === "light" ? "ti-moon" : "ti-sun"}`}></i>
           </button>
         </div>
       </nav>
@@ -736,9 +624,18 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
           }} />
           <div style={{
             position: "absolute", top: 0, left: 0, bottom: 0, width: "280px",
-            background: "var(--bg)", padding: "60px 20px",
+            background: "var(--bg)", padding: "20px",
             borderRight: "1px solid var(--br2)", boxShadow: "5px 0 15px rgba(0,0,0,0.1)",
+            overflowY: "auto",
           }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 16, marginBottom: 8, borderBottom: "0.5px solid var(--br2)" }}>
+              <span style={{ fontFamily: '"Times New Roman", Times, serif', color: "var(--text)", fontSize: "22px", fontWeight: "bold", letterSpacing: "1px", textTransform: "uppercase" }}>
+                Talib
+              </span>
+              <button onClick={() => setMenuOpen(false)} style={iconButtonStyle} aria-label="ปิดเมนู">
+                <i className="ti ti-x"></i>
+              </button>
+            </div>
             {NAV_LINKS.map(l => (
               <Link key={l.id} to={getPagePath(l.id)} onClick={() => nav(l.id, null, true)} style={mobileButtonStyle(page, l.id)}>
                 <i className={`ti ${l.icon}`} style={{ marginRight: 15 }}></i>
@@ -756,13 +653,24 @@ export default function Nav({ page, go, theme, setTheme, authState, readingSessi
   )
 }
 
+function isNavActive(page, id) {
+  if (page === id) return true
+  if (id === "articles" && page === "article") return true
+  if (id === "library" && page === "library-detail") return true
+  if (id === "media" && page === "media-detail") return true
+  if (id === "openhouse" && page === "openhouse-campus") return true
+  return false
+}
+
 function DesktopNavButton({ item, page, nav }) {
+  const active = isNavActive(page, item.id)
   return (
     <Link to={getPagePath(item.id)} onClick={() => { nav(item.id, null, true) }} style={{
-      background: page === item.id ? "var(--bg2)" : "transparent",
+      background: active ? "var(--bg2)" : "transparent",
       border: "none", cursor: "pointer", padding: "6px 12px",
       borderRadius: 8, fontSize: 13,
-      color: page === item.id ? "var(--text)" : "var(--t2)",
+      color: active ? "var(--text)" : "var(--t2)",
+      fontWeight: active ? 500 : 400,
       fontFamily: "'Prompt',sans-serif",
       textDecoration: "none",
       display: "inline-block"
@@ -773,28 +681,22 @@ function DesktopNavButton({ item, page, nav }) {
 }
 
 function mobileButtonStyle(page, id) {
+  const active = isNavActive(page, id)
   return {
-    display: "block", width: "100%", textAlign: "left", padding: "18px 10px",
+    display: "block", width: "100%", textAlign: "left", padding: "16px 10px",
     fontSize: 16, background: "transparent", border: "none",
-    color: page === id ? "var(--teal)" : "var(--text)", cursor: "pointer",
+    color: active ? "var(--teal)" : "var(--text)", cursor: "pointer",
+    fontWeight: active ? 500 : 400,
     fontFamily: "'Prompt',sans-serif",
     textDecoration: "none",
     boxSizing: "border-box"
   }
 }
 
-// 44×44 minimum hit area (WCAG 2.5.5) — the visible glyph stays 20px; the
-// negative margin keeps the layout footprint unchanged.
 const iconButtonStyle = {
   background: "transparent",
   border: "none",
   fontSize: 20,
   cursor: "pointer",
   color: "var(--text)",
-  minWidth: 44,
-  minHeight: 44,
-  display: "grid",
-  placeItems: "center",
-  padding: 0,
-  margin: -8,
 }

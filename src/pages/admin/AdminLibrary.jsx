@@ -1,107 +1,12 @@
-import { useState, useEffect, useMemo, useRef } from "react"
-import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp } from "firebase/firestore"
+import { useState, useEffect, useMemo } from "react"
 import { BOOKS, DEFAULT_TAXONOMY } from "../../data/index.js"
-import { useContentCollection, useTaxonomySettings, updateCollectionMetadata, invalidateCollectionCache, CONTENT_COLLECTIONS } from "../../lib/contentStore.js"
+import { useContentCollection, useTaxonomySettings } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
-import { getDownloadURL, ref, uploadBytes, getStorage } from "../../lib/driveStorage.js"
-import DriveUploadButton from '../../components/DriveUploadButton.jsx'
-import { storage, app, db } from "../../lib/firebase.js"
+import { getDownloadURL, ref, uploadBytes, getStorage } from "firebase/storage"
+import { storage, app } from "../../lib/firebase.js"
 import { compressImage } from "../../utils/image.js"
 import ContentStatusBanner from "../../components/ContentStatusBanner.jsx"
 import { clampPage } from "../../utils/pagination.js"
-import { isJournal, getTimestampMs } from "../../utils/library.js"
-
-const ALMAKTABAH_SOURCE = "อัลมักตะบะฮ์ อัษรียะฮ์"
-
-function AlMaktabahSyncBanner() {
-  const [status, setStatus] = useState("loading") // loading | hidden | shown | mixed | none
-  const [total, setTotal] = useState(0)
-  const [busy, setBusy] = useState(false)
-
-  async function refresh() {
-    setStatus("loading")
-    const snap = await getDocs(query(collection(db, "content_books"), where("source", "==", ALMAKTABAH_SOURCE)))
-    if (snap.empty) {
-      setStatus("none")
-      setTotal(0)
-      return
-    }
-    const deletedCount = snap.docs.filter(d => d.data().deleted === true).length
-    setTotal(snap.size)
-    if (deletedCount === snap.size) setStatus("hidden")
-    else if (deletedCount === 0) setStatus("shown")
-    else setStatus("mixed")
-  }
-
-  useEffect(() => { refresh() }, [])
-
-  async function toggle() {
-    const willShow = status === "hidden" || status === "mixed"
-    const ok = await confirmAction({
-      title: willShow ? `แสดงหนังสือจาก ${ALMAKTABAH_SOURCE}?` : `ซ่อนหนังสือจาก ${ALMAKTABAH_SOURCE}?`,
-      message: willShow
-        ? `หนังสือ ${total} เล่มจะกลับมาแสดงบนเว็บไซต์ทันที`
-        : `หนังสือ ${total} เล่มจะถูกซ่อนจากเว็บไซต์ทันที (ข้อมูลยังอยู่ครบ กดแสดงกลับได้ตลอด)`,
-      confirmText: willShow ? "แสดง" : "ซ่อน",
-      danger: !willShow,
-    })
-    if (!ok) return
-
-    setBusy(true)
-    try {
-      const snap = await getDocs(query(collection(db, "content_books"), where("source", "==", ALMAKTABAH_SOURCE)))
-      const docs = snap.docs
-      for (let i = 0; i < docs.length; i += 400) {
-        const batch = writeBatch(db)
-        docs.slice(i, i + 400).forEach(d => {
-          batch.update(doc(db, "content_books", d.id), { deleted: !willShow, updatedAt: serverTimestamp() })
-        })
-        await batch.commit()
-      }
-      // Visitors read the book list from a localStorage/IndexedDB cache that is
-      // only invalidated by content_settings/metadata.content_books moving
-      // forward — there is no TTL on that path. Writing the batch straight to
-      // Firestore without bumping the timestamp left every returning visitor
-      // looking at the pre-hide list indefinitely, which is why the site kept
-      // showing all 442 books after they were hidden here.
-      await updateCollectionMetadata(CONTENT_COLLECTIONS.books)
-      invalidateCollectionCache(CONTENT_COLLECTIONS.books)
-      notifySuccess(willShow ? "แสดงหนังสือแล้ว" : "ซ่อนหนังสือแล้ว")
-      await refresh()
-    } catch (err) {
-      console.error(err)
-      notifyError("เกิดข้อผิดพลาด กรุณาตรวจสิทธิ์ Firestore")
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  if (status === "loading" || status === "none") return null
-
-  const isVisible = status === "shown"
-  return (
-    <div className="card" style={{ padding: 16, borderRadius: 16, marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", border: `1.5px solid ${isVisible ? "var(--teal)" : "var(--br)"}` }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <i className="ti ti-books" style={{ fontSize: 20, color: isVisible ? "var(--teal)" : "var(--t3)" }}></i>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>
-            แหล่งข้อมูล {ALMAKTABAH_SOURCE} — {total} เล่ม
-            {status === "mixed" && <span style={{ color: "#bd7a13", fontWeight: 500 }}> (สถานะไม่ตรงกันบางส่วน)</span>}
-          </div>
-          <div style={{ fontSize: 12, color: "var(--t2)" }}>
-            {isVisible ? "กำลังแสดงบนเว็บไซต์อยู่" : "กำลังซ่อนจากเว็บไซต์อยู่"}
-          </div>
-        </div>
-      </div>
-      <button className={`btn ${isVisible ? "btn-outline" : "btn-teal"}`} onClick={toggle} disabled={busy} style={{ padding: "8px 16px", fontSize: 13 }}>
-        <i className={busy ? "ti ti-loader-2 spin" : isVisible ? "ti ti-eye-off" : "ti ti-eye"} style={{ marginRight: 6 }}></i>
-        {busy ? "กำลังดำเนินการ..." : isVisible ? "ซ่อนทั้งหมด" : "แสดงทั้งหมด"}
-      </button>
-    </div>
-  )
-}
-
-export { isJournal, getTimestampMs }
 
 const EMPTY = {
   title: "",
@@ -116,15 +21,28 @@ const EMPTY = {
   issueNumber: "",
 }
 
+export const isJournalType = (type) => {
+  const t = String(type || "").toLowerCase().trim()
+  return t === "journal" || t === "วารสาร" || t === "นิตยสาร"
+}
+
+export const matchesBookType = (itemType, filterType) => {
+  if (!filterType || filterType === "all") return true
+  const it = String(itemType || "").toLowerCase().trim()
+  const ft = String(filterType || "").toLowerCase().trim()
+  if (it === ft) return true
+  if (isJournalType(it) && isJournalType(ft)) return true
+  if ((ft === "book" || ft === "หนังสือ") && (it === "book" || it === "หนังสือ")) return true
+  if (ft === "pdf" && it === "pdf") return true
+  if ((ft === "report" || ft === "รายงาน") && (it === "report" || it === "รายงาน")) return true
+  return false
+}
+
 export default function AdminLibrary() {
   const adminQueryOptions = useMemo(() => ({ live: false }), [])
   const { items, loading, error, saveItem, deleteItem, isUsingFallback } = useContentCollection("books", BOOKS, null, adminQueryOptions)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
-  const bookTypes = useMemo(
-    () => (taxonomy.bookTypes || []).map(t => typeof t === "string" ? { id: t, label: t } : t),
-    [taxonomy.bookTypes]
-  )
-
+  
   const [editing, setEdit] = useState(null)
   
   const [search, setSearch] = useState("")
@@ -132,64 +50,10 @@ export default function AdminLibrary() {
   const [categoryFilter, setCategoryFilter] = useState("all") 
   const [sourceFilter, setSourceFilter] = useState("all") 
   const [showAdvanced, setShowAdvanced] = useState(false) 
-  const [sortOrder, setSortOrder] = useState("newest")
+  const [sortOrder, setSortOrder] = useState("created_desc")
 
   const [selected, setSelected] = useState([]) 
   const [busy, setBusy] = useState(false)
-  const [coverBatch, setCoverBatch] = useState(null)
-  const stopCovers = useRef(false)
-  useEffect(() => () => { stopCovers.current = true }, [])
-
-  async function generateSelectedCovers() {
-    if (busy) return
-    const selectedBooks = items.filter(book => selected.includes(book.id))
-    if (!selectedBooks.length) return
-    const books = selectedBooks
-    stopCovers.current = false
-    setBusy(true)
-    const progress = { total: books.length, done: 0, success: 0, skipped: 0, failures: [], current: '', running: true }
-    const report = () => setCoverBatch({ ...progress, failures: [...progress.failures] })
-    report()
-    try {
-      const { createBookCover } = await import('../../utils/createBookCover.js')
-      const { runCoverQueue } = await import('../../utils/coverQueue.js')
-      const { hasUsableCover } = await import('../../utils/bookCover.js')
-      const active = new Map()
-      await runCoverQueue(books, async (book) => {
-        active.set(book.id, book.title || String(book.id))
-        progress.current = [...active.values()].join(' · ')
-        report()
-        try {
-          if (await hasUsableCover(book.coverUrl)) {
-            progress.skipped++
-          } else {
-            if (!book.fileUrl) throw new Error('ไม่มีลิงก์ไฟล์หนังสือ')
-            const cover = await createBookCover(book.fileUrl)
-            const target = ref(null, `library_covers/${crypto.randomUUID()}_book-cover.jpg`)
-            await uploadBytes(target, cover)
-            const coverUrl = await getDownloadURL(target)
-            // Patch only the cover; preserve other fields edited by another admin.
-            await saveItem({ id: book.id, coverUrl, ...(book.createdAt ? { createdAt: book.createdAt } : {}) })
-            progress.success++
-          }
-          setSelected(prev => prev.filter(id => id !== book.id))
-        } catch (err) {
-          progress.failures.push({ id: book.id, title: book.title || String(book.id), message: err.message || 'สร้างปกไม่สำเร็จ' })
-        }
-        active.delete(book.id)
-        progress.current = [...active.values()].join(' · ')
-        progress.done++
-        report()
-      }, () => stopCovers.current)
-    } catch (err) {
-      notifyError(err.message || 'เริ่มสร้างรูปปกไม่สำเร็จ')
-    } finally {
-      progress.running = false
-      progress.current = ''
-      report()
-      setBusy(false)
-    }
-  }
 
   const [bulkSource, setBulkSource] = useState("")
   const [bulkType, setBulkType] = useState("")
@@ -207,9 +71,7 @@ export default function AdminLibrary() {
   const filtered = items.filter(b => {
     const matchSearch = String(b.title || "").toLowerCase().includes(search.toLowerCase()) || 
                         String(b.author || "").toLowerCase().includes(search.toLowerCase())
-    const matchType = typeFilter === "all" || 
-                      b.type === typeFilter || 
-                      (isJournal(typeFilter) && isJournal(b.type))
+    const matchType = matchesBookType(b.type, typeFilter)
     const matchCat = categoryFilter === "all" || b.category === categoryFilter
     const matchSource = sourceFilter === "all" || b.source === sourceFilter
     
@@ -224,65 +86,39 @@ export default function AdminLibrary() {
     }
     const yearA = normalizeYear(a.year)
     const yearB = normalizeYear(b.year)
+    const getMs = (val) => {
+      if (!val) return 0
+      if (typeof val.toDate === "function") return val.toDate().getTime()
+      if (val.seconds !== undefined) return val.seconds * 1000
+      if (typeof val === "number") return val
+      const parsed = Date.parse(val)
+      return isNaN(parsed) ? 0 : parsed
+    }
+    const timeA = getMs(a.createdAt) || getMs(a.updatedAt)
+    const timeB = getMs(b.createdAt) || getMs(b.updatedAt)
+    const issueA = Number(a.issueNumber) || 0
+    const issueB = Number(b.issueNumber) || 0
 
-    if (sortOrder === "newest") {
-      // 1. เรียงตามปีที่พิมพ์ (ใหม่ไปเก่า)
+    if (sortOrder === "created_desc") {
+      if (timeA !== timeB) return timeB - timeA
+      if (issueA !== issueB && (issueA > 0 || issueB > 0)) return issueB - issueA
       if (yearA !== yearB) return yearB - yearA
-
-      // 2. หากปีเท่ากัน: ถ้าเป็นวารสาร ให้เรียงตามลำดับเล่มที่/ฉบับที่ (issueNumber) มากไปน้อย
-      const isJournalA = isJournal(a.type)
-      const isJournalB = isJournal(b.type)
-      if (isJournalA && isJournalB) {
-        const issueA = Number(a.issueNumber) || 0
-        const issueB = Number(b.issueNumber) || 0
-        if (issueA !== issueB) return issueB - issueA
-      } else if (a.issueNumber !== undefined && b.issueNumber !== undefined && a.issueNumber !== "" && b.issueNumber !== "") {
-        const issueA = Number(a.issueNumber) || 0
-        const issueB = Number(b.issueNumber) || 0
-        if (issueA !== issueB) return issueB - issueA
-      }
-
-      // 3. หากปีเท่ากัน (หรือเล่มที่เท่ากัน/ไม่ใช่เล่มวารสารทั้งคู่): เรียงตามวันที่สร้าง (createdAt) ใหม่ไปเก่า
-      const createdA = getTimestampMs(a.createdAt)
-      const createdB = getTimestampMs(b.createdAt)
-      if (createdA !== createdB) return createdB - createdA
-
-      // 4. Fallback วันที่อัปเดต (updatedAt)
-      const updatedA = getTimestampMs(a.updatedAt)
-      const updatedB = getTimestampMs(b.updatedAt)
-      if (updatedA !== updatedB) return updatedB - updatedA
-
-      // 5. Fallback รหัสเอกสารแบบตัวเลขอัจฉริยะ (numeric-aware sort)
-      return String(b.id || "").localeCompare(String(a.id || ""), undefined, { numeric: true })
-    } else {
-      // 1. เรียงตามปีที่พิมพ์ (เก่าไปใหม่)
+      return String(b.id || "").localeCompare(String(a.id || ""))
+    } else if (sortOrder === "issue_desc") {
+      if (issueA !== issueB && (issueA > 0 || issueB > 0)) return issueB - issueA
+      if (yearA !== yearB) return yearB - yearA
+      if (timeA !== timeB) return timeB - timeA
+      return String(b.id || "").localeCompare(String(a.id || ""))
+    } else if (sortOrder === "oldest") {
       if (yearA !== yearB) return yearA - yearB
-
-      // 2. หากปีเท่ากัน: ถ้าเป็นวารสาร เรียงตามเล่มที่ น้อยไปมาก
-      const isJournalA = isJournal(a.type)
-      const isJournalB = isJournal(b.type)
-      if (isJournalA && isJournalB) {
-        const issueA = Number(a.issueNumber) || 0
-        const issueB = Number(b.issueNumber) || 0
-        if (issueA !== issueB) return issueA - issueB
-      } else if (a.issueNumber !== undefined && b.issueNumber !== undefined && a.issueNumber !== "" && b.issueNumber !== "") {
-        const issueA = Number(a.issueNumber) || 0
-        const issueB = Number(b.issueNumber) || 0
-        if (issueA !== issueB) return issueA - issueB
-      }
-
-      // 3. วันที่สร้าง เก่าไปใหม่
-      const createdA = getTimestampMs(a.createdAt)
-      const createdB = getTimestampMs(b.createdAt)
-      if (createdA !== createdB) return createdA - createdB
-
-      // 4. Fallback วันที่อัปเดต
-      const updatedA = getTimestampMs(a.updatedAt)
-      const updatedB = getTimestampMs(b.updatedAt)
-      if (updatedA !== updatedB) return updatedA - updatedB
-
-      // 5. Fallback ID
-      return String(a.id || "").localeCompare(String(a.id || ""), undefined, { numeric: true })
+      if (issueA !== issueB && (issueA > 0 || issueB > 0)) return issueA - issueB
+      if (timeA !== timeB) return timeA - timeB
+      return String(a.id || "").localeCompare(String(b.id || ""))
+    } else {
+      if (yearA !== yearB) return yearB - yearA
+      if (issueA !== issueB && (issueA > 0 || issueB > 0)) return issueB - issueA
+      if (timeA !== timeB) return timeB - timeA
+      return String(b.id || "").localeCompare(String(a.id || ""))
     }
   })
 
@@ -304,9 +140,9 @@ export default function AdminLibrary() {
   }
 
   function openNew() {
-    const defaultType = bookTypes[0]?.id || "journal"
+    const journalType = taxonomy.bookTypes?.find(t => isJournalType(t.id || t))?.id || "journal"
     const defaultSource = taxonomy.bookSources?.[0] || "Talib Club"
-    setEdit({ ...EMPTY, type: defaultType, source: defaultSource })
+    setEdit({ ...EMPTY, type: journalType, source: defaultSource })
   }
 
   // --- ฟังก์ชันที่หายไป เติมกลับมาให้แล้วครับ ---
@@ -316,20 +152,13 @@ export default function AdminLibrary() {
 
   async function save() {
     if (!editing.title?.trim()) return notifyError("กรุณาใส่ชื่อหนังสือ")
-    const isJr = isJournal(editing.type)
-    const payload = { 
-      ...editing, 
-      year: Number(editing.year || (new Date().getFullYear() + 543)),
-      issueNumber: isJr && editing.issueNumber !== undefined && editing.issueNumber !== ""
-        ? Number(editing.issueNumber)
-        : (isJr ? "" : null)
-    }
+    const payload = { ...editing, year: Number(editing.year || (new Date().getFullYear() + 543)) }
     setBusy(true)
     try {
       await saveItem(payload)
       setEdit(null)
       notifySuccess("บันทึกข้อมูลขึ้นเว็บไซต์เรียบร้อยแล้ว")
-    } catch {
+    } catch (err) {
       notifyError("บันทึกไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
     } finally {
       setBusy(false)
@@ -345,7 +174,7 @@ export default function AdminLibrary() {
       await deleteItem(book.id)
       setSelected(prev => prev.filter(id => id !== book.id))
       notifySuccess("ลบเรียบร้อยแล้ว")
-    } catch {
+    } catch (err) {
       notifyError("ลบไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
     } finally {
       setBusy(false)
@@ -360,7 +189,7 @@ export default function AdminLibrary() {
       await Promise.all(selected.map(id => deleteItem(id)))
       setSelected([])
       notifySuccess(`ลบ ${selected.length} รายการเรียบร้อยแล้ว`)
-    } catch {
+    } catch (err) {
       notifyError("เกิดข้อผิดพลาดในการลบข้อมูลบางส่วน")
     } finally {
       setBusy(false)
@@ -440,8 +269,6 @@ export default function AdminLibrary() {
         </button>
       </div>
 
-      <AlMaktabahSyncBanner />
-
       {/* ━━━ SEARCH & FILTER BAR ━━━ */}
       <div style={{ display: "flex", gap: 8, marginBottom: showAdvanced ? 12 : 24 }}>
         <div style={{ flex: 1, position: "relative" }}>
@@ -482,7 +309,7 @@ export default function AdminLibrary() {
             <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>ประเภท</span>
             <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
               <option value="all">-- ทุกประเภท --</option>
-              {bookTypes.map(type => (
+              {(taxonomy.bookTypes || []).map(type => (
                 <option key={type.id} value={type.id}>{type.label}</option>
               ))}
             </select>
@@ -511,23 +338,15 @@ export default function AdminLibrary() {
           <label style={{ display: "grid", gap: 6 }}>
             <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>เรียงลำดับ</span>
             <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
-              <option value="newest">ปีพิมพ์/ลำดับล่าสุด ➜ เก่าสุด</option>
-              <option value="oldest">ปีพิมพ์/ลำดับเก่าสุด ➜ ล่าสุด</option>
+              <option value="created_desc">เพิ่มล่าสุด ➜ เก่าสุด</option>
+              <option value="issue_desc">เล่มที่ มาก ➜ น้อย</option>
+              <option value="newest">ปีที่พิมพ์ ใหม่ ➜ เก่า</option>
+              <option value="oldest">ปีที่พิมพ์ เก่า ➜ ใหม่</option>
             </select>
           </label>
         </div>
       )}
 
-      {coverBatch && (
-        <div className="card" style={{ padding: 16, marginBottom: 16 }} aria-live="polite">
-          <strong>{coverBatch.running ? 'กำลังสร้างรูปปก' : 'ผลการสร้างรูปปก'} — {coverBatch.done}/{coverBatch.total} เล่ม</strong>
-          <p>สำเร็จ {coverBatch.success} เล่ม · ไม่สำเร็จ {coverBatch.failures.length} เล่ม · ข้ามเพราะมีปกแล้ว {coverBatch.skipped} เล่ม</p>
-          {coverBatch.current && <p>{coverBatch.current}</p>}
-          {coverBatch.running && <button className="btn btn-outline" onClick={() => { stopCovers.current = true }}>หยุดหลังเล่มที่กำลังทำ</button>}
-          {coverBatch.failures.length > 0 && <details><summary>ดูรายการที่ไม่สำเร็จ</summary><ul>{coverBatch.failures.map(f => <li key={f.id}>{f.title}: {f.message}</li>)}</ul></details>}
-          {!coverBatch.running && <button className="btn btn-outline" onClick={() => setCoverBatch(null)}>ปิดผลลัพธ์</button>}
-        </div>
-      )}
       {selected.length > 0 && (
         <div className="card" style={{ border: "1.5px solid var(--teal)", padding: 20, borderRadius: 16, marginBottom: 20, background: "var(--teal-bg)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
@@ -535,9 +354,8 @@ export default function AdminLibrary() {
               <i className="ti ti-checkbox" style={{ marginRight: 6 }}></i>
               เลือกอยู่ {selected.length} รายการ
             </span>
-            <div style={{ display: "flex", gap: 8, flexWrap: 'wrap' }}>
-              <button className="btn btn-teal" onClick={generateSelectedCovers} disabled={busy}>ดึงรูปปกรายการที่เลือก</button>
-              <button className="btn btn-outline" disabled={busy} onClick={() => setSelected([])} style={{ fontSize: 12, padding: "6px 12px" }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-outline" onClick={() => setSelected([])} style={{ fontSize: 12, padding: "6px 12px" }}>
                 ยกเลิกการเลือก
               </button>
               <button className="btn" style={{ background: "#e05555", color: "#fff", padding: "6px 12px", fontSize: 12 }} onClick={removeSelected} disabled={busy}>
@@ -547,7 +365,6 @@ export default function AdminLibrary() {
             </div>
           </div>
 
-          <p style={{ fontSize: 12, marginBottom: 12 }}>ดึงปกจาก PDF, รูปภาพ, EPUB หรือ AnyFlip / Heyzine แล้วบันทึกให้แต่ละเล่มทันที เฉพาะเล่มที่ไม่มีปกหรือรูปปกโหลดไม่ได้ ปกที่แสดงได้จะถูกข้าม รายการที่ไม่สำเร็จจะยังถูกเลือกไว้เพื่อลองใหม่</p>
           <div className="divider" style={{ margin: "0 0 16px" }} />
           
           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>
@@ -568,7 +385,7 @@ export default function AdminLibrary() {
               <span style={{ fontSize: 11, color: "var(--t2)" }}>เปลี่ยนประเภท</span>
               <select value={bulkType} onChange={e => setBulkType(e.target.value)} style={{ fontSize: 12, padding: "6px 10px", background: "var(--card)" }}>
                 <option value="">-- ไม่เปลี่ยน --</option>
-                {bookTypes.map(type => <option key={type.id} value={type.id}>{type.label}</option>)}
+                {(taxonomy.bookTypes || []).map(type => <option key={type.id} value={type.id}>{type.label}</option>)}
               </select>
             </label>
 
@@ -621,7 +438,7 @@ export default function AdminLibrary() {
                 <div style={{ display: "flex", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
                   <span className="tag tag-teal">{book.category || "ไม่มีหมวดหมู่"}</span>
                   <span className="tag" style={{ background: "var(--acc2)" }}>{book.type}</span>
-                  {isJournal(book.type) && book.issueNumber !== undefined && book.issueNumber !== "" && (
+                  {book.type === "journal" && book.issueNumber !== undefined && book.issueNumber !== "" && (
                     <span className="tag" style={{ background: "rgba(45, 190, 160, 0.15)", color: "var(--teal)" }}>เล่มที่ {book.issueNumber}</span>
                   )}
                   <span className="tag" style={{ background: "var(--acc2)", color: "var(--t2)", border: ".5px solid var(--br)" }}>{book.source}</span>
@@ -660,68 +477,42 @@ export default function AdminLibrary() {
 function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
   const set = (key, value) => setItem(prev => ({ ...prev, [key]: value }))
   const [uploadingImage, setUploadingImage] = useState(false)
-  const [autoCover, setAutoCover] = useState(true)
-  const generateCover = async (source) => {
-    const { createBookCover } = await import('../../utils/createBookCover.js')
-    const cover = await createBookCover(source)
-    const target = ref(null, `library_covers/${crypto.randomUUID()}_book-cover.jpg`)
-    await uploadBytes(target, cover)
-    set('coverUrl', await getDownloadURL(target))
-  }
-  const uploadBookDone = async (url, file) => {
-    set('fileUrl', url)
-    if (autoCover) {
-      try {
-        await generateCover(file)
-        notifySuccess('อัปโหลดไฟล์และสร้างรูปปกแล้ว กรุณากดบันทึกข้อมูล')
-      } catch (err) {
-        notifyError(`อัปโหลดไฟล์แล้ว แต่ ${err.message} คุณยังอัปโหลดรูปปกเองได้`)
-      }
-    }
-  }
-  const coverFromLink = async () => {
-    setUploadingImage(true)
-    try { await generateCover(item.fileUrl); notifySuccess('สร้างรูปปกแล้ว กรุณากดบันทึกข้อมูล') }
-    catch (err) { notifyError(err.message) }
-    finally { setUploadingImage(false) }
-  }
-  const bookTypes = (taxonomy.bookTypes || []).map(t => typeof t === "string" ? { id: t, label: t } : t)
 
   const handleUploadImage = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (import.meta.env.DEV) console.log("Starting Library Image Upload: v4 Diagnostic Logger active.");
-    if (import.meta.env.DEV) console.log("Original File Name:", file.name, "Size:", file.size, "Type:", file.type);
+    console.log("Starting Library Image Upload: v4 Diagnostic Logger active.");
+    console.log("Original File Name:", file.name, "Size:", file.size, "Type:", file.type);
 
     setUploadingImage(true)
     try {
-      if (import.meta.env.DEV) console.log("Compressing image...");
+      console.log("Compressing image...");
       const compressedFile = await compressImage(file, { maxWidth: 1000, maxHeight: 1000, quality: 0.75 })
-      if (import.meta.env.DEV) console.log("Image compression complete. Output Name:", compressedFile.name, "Size:", compressedFile.size);
+      console.log("Image compression complete. Output Name:", compressedFile.name, "Size:", compressedFile.size);
       
       const safeName = compressedFile.name.replace(/[^a-zA-Z0-9.-]/g, "_")
       const usedStorage = storage || getStorage(app)
       let storageRef = null
       try {
         storageRef = ref(usedStorage, `library_covers/${Date.now()}_${safeName}`)
-        if (import.meta.env.DEV) console.log("Uploading bytes to Google Drive reference:", storageRef.fullPath);
+        console.log("Uploading bytes to Firebase Storage reference:", storageRef.fullPath);
         await uploadBytes(storageRef, compressedFile)
       } catch (uploadErr) {
         console.error("Upload error (storageRef):", uploadErr?.code || "-", uploadErr?.message || uploadErr, "ref:", storageRef?.fullPath)
         throw uploadErr
       }
 
-      if (import.meta.env.DEV) console.log("Google Drive upload completed. Retrieving download URL...");
+      console.log("Firebase upload completed. Retrieving download URL...");
       const url = await getDownloadURL(storageRef)
-      if (import.meta.env.DEV) console.log("Success! Cover URL obtained:", url);
+      console.log("Success! Cover URL obtained:", url);
       set("coverUrl", url)
       notifySuccess("อัปโหลดรูปภาพปกเรียบร้อยแล้ว")
     } catch (err) {
       console.error("Diagnostic error caught inside handleUploadImage:", err?.code || "-", err?.message || err)
-      notifyError(err.message || "อัปโหลดรูปภาพล้มเหลว")
+      notifyError("อัปโหลดรูปภาพล้มเหลว")
     } finally {
-      if (import.meta.env.DEV) console.log("Finally block executed. Setting uploadingImage back to false.");
+      console.log("Finally block executed. Setting uploadingImage back to false.");
       setUploadingImage(false)
     }
   }
@@ -740,15 +531,8 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
           </select>
         </Field>
         <Field label="ประเภท">
-          <select 
-            value={
-              bookTypes.some(t => t.id === item.type)
-                ? item.type
-                : (isJournal(item.type) ? bookTypes.find(t => isJournal(t.id) || isJournal(t.label))?.id || item.type : item.type) || ""
-            } 
-            onChange={e => set("type", e.target.value)}
-          >
-            {bookTypes.map(type => <option key={type.id} value={type.id}>{type.label}</option>)}
+          <select value={item.type || ""} onChange={e => set("type", e.target.value)}>
+            {(taxonomy.bookTypes || []).map(type => <option key={type.id} value={type.id}>{type.label}</option>)}
           </select>
         </Field>
         <Field label="หมวดหมู่ (ใช้ร่วมกับบทความ)">
@@ -757,39 +541,31 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
           </select>
         </Field>
         <Field label="ปีพิมพ์ (พ.ศ.)"><input type="number" value={item.year || ""} onChange={e => set("year", e.target.value)} /></Field>
-        {isJournal(item.type) && (
-          <Field label="ลำดับเล่มที่ / ฉบับที่ (issueNumber)">
+        {item.type === "journal" && (
+          <Field label="ลำดับเล่มที่ (issueNumber)">
             <input 
               type="number" 
-              value={item.issueNumber ?? ""} 
-              onChange={e => set("issueNumber", e.target.value === "" ? "" : Number(e.target.value))} 
-              placeholder="ตัวอย่าง: 1 หรือ 2"
+              value={item.issueNumber || ""} 
+              onChange={e => set("issueNumber", e.target.value ? Number(e.target.value) : "")} 
+              placeholder="ตัวอย่าง 1"
             />
           </Field>
         )}
-        <Field label="ไฟล์หนังสือ / ลิงก์ Drive หรือ AnyFlip / Heyzine" span>
-          <input value={item.fileUrl || ""} disabled={uploadingImage} onChange={e => set("fileUrl", e.target.value)} placeholder="https://..." />
-          <DriveUploadButton label="อัปโหลด PDF / EPUB / รูปภาพ" prefix="library_files" accept=".pdf,.epub,.jpg,.jpeg,.png,.webp,application/pdf,application/epub+zip,image/jpeg,image/png,image/webp" onUploaded={uploadBookDone} onBusyChange={setUploadingImage} disabled={uploadingImage || busy} />
-        </Field>
+        <Field label="ลิงก์ไฟล์ PDF/Drive" span><input value={item.fileUrl || ""} onChange={e => set("fileUrl", e.target.value)} placeholder="https://..." /></Field>
         <Field label="รูปภาพปกหนังสือ (URL)" span>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <input
               value={item.coverUrl || ""}
               onChange={e => set("coverUrl", e.target.value)}
               placeholder="https://example.com/image.jpg หรืออัปโหลดไฟล์..."
-              style={{ flex: '1 1 100%' }}
+              style={{ flex: 1 }}
             />
             <label className="btn btn-outline" style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", flexShrink: 0, padding: "10px 16px" }}>
               <i className={uploadingImage ? "ti ti-loader-2 spin" : "ti ti-upload"}></i>
-              {uploadingImage ? "กำลังอัปโหลด..." : "อัปโหลดรูปปก"}
+              {uploadingImage ? "กำลังอัปโหลด..." : "อัปโหลดรูปภาพ"}
               <input type="file" accept="image/*" onChange={handleUploadImage} disabled={uploadingImage} style={{ display: "none" }} />
             </label>
-            <button type="button" className="btn btn-outline" disabled={!item.fileUrl || uploadingImage || busy} onClick={coverFromLink}>{uploadingImage ? 'กำลังประมวลผล…' : 'ดึงรูปปกจากไฟล์ / ลิงก์'}</button>
           </div>
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 12, fontSize: 13, cursor: 'pointer' }}>
-            <input type="checkbox" style={{ width: 16, height: 16, flexShrink: 0, marginTop: 3 }} checked={autoCover} disabled={uploadingImage || busy} onChange={e => setAutoCover(e.target.checked)} />
-            <span>สร้างรูปปกอัตโนมัติเมื่ออัปโหลดไฟล์ใหม่ (แทนที่ปกเดิม)</span>
-          </label>
           {item.coverUrl && (
             <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ position: "relative", width: 120, height: 75, borderRadius: 8, overflow: "hidden", border: "1px solid var(--br2)", flexShrink: 0 }}>
@@ -826,7 +602,7 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
 
       <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
         <button className="btn btn-outline" onClick={onCancel}>ยกเลิก</button>
-        <button className="btn btn-teal" onClick={onSave} disabled={busy || uploadingImage}>
+        <button className="btn btn-teal" onClick={onSave} disabled={busy}>
           <i className={`ti ${busy ? "ti-loader-2 spin" : "ti-check"}`} style={{ marginRight: 6 }}></i>{busy ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
         </button>
       </div>
@@ -836,9 +612,9 @@ function LibraryForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
 
 function Field({ label, children, span }) {
   return (
-    <div style={span ? { gridColumn: "1 / -1" } : undefined}>
+    <label style={span ? { gridColumn: "1 / -1" } : undefined}>
       <span style={{ display: "block", fontSize: 13, color: "var(--t2)", marginBottom: 8, fontWeight: 500 }}>{label}</span>
       {children}
-    </div>
+    </label>
   )
 }

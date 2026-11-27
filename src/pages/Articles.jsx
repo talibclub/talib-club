@@ -1,21 +1,16 @@
-import { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { ARTICLES, DEFAULT_TAXONOMY } from "../data/index.js"
-import { matchesContentSearch } from "../utils/contentSearch.js"
-import { columnsAt, completeRows } from "./articles/gridFill.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 import { clampPage } from "../utils/pagination.js"
 import PaginationBar from "../components/PaginationBar.jsx"
 import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
+import ImageWithFallback from "../components/ImageWithFallback.jsx"
 import ArticleCard from "../components/ArticleCard.jsx"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 
 export default function Articles({ go, authState, ctx }) {
-  // Not live. `live: true` opened a permanent onSnapshot on the entire
-  // content_articles collection for every visitor and bypassed the cache layer
-  // entirely, so each page view re-read every article. The cache is validated
-  // against content_settings/metadata, which every admin save bumps, so a new
-  // article still shows up within the metadata TTL without the standing listener.
-  const articlesQueryOptions = useMemo(() => ({ live: false }), [])
+  // Keep the public article list fresh so it reflects the current Firestore state.
+  const articlesQueryOptions = useMemo(() => ({ live: true }), [])
   const { items: articles, loading, error, isUsingFallback } = useContentCollection("articles", ARTICLES, null, articlesQueryOptions)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
 
@@ -38,10 +33,15 @@ export default function Articles({ go, authState, ctx }) {
   const categories = [{ id: "all", label: "ทั้งหมด" }, ...(taxonomy.articleCategories || [])]
 
   const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim()
     return articles.filter(a => {
       const matchCat = cat === "all" || String(a.category).toLowerCase() === String(cat).toLowerCase()
       const matchType = type === "all" || String(a.type).toLowerCase() === String(type).toLowerCase()
-      const matchSearch = matchesContentSearch(search, a.title, a.author, a.tags, a.excerpt, a.seriesName)
+      const matchSearch = !q ||
+        String(a.title || "").toLowerCase().includes(q) ||
+        String(a.author || "").toLowerCase().includes(q) ||
+        String(a.summary || a.excerpt || "").toLowerCase().includes(q) ||
+        (Array.isArray(a.tags) && a.tags.some(t => String(t).toLowerCase().includes(q)))
       return matchCat && matchType && matchSearch
     })
   }, [articles, cat, type, search])
@@ -97,19 +97,6 @@ export default function Articles({ go, authState, ctx }) {
     }
     go("articles", updated, { replace: true, noScroll: true })
   }
-
-  // Typing used to call go() — a router navigate plus a full ctx rebuild — on
-  // every keystroke. The list itself filters from local state, so only the URL
-  // sync needs to wait.
-  const searchSyncRef = useRef(null)
-  const handleSearchChange = (value) => {
-    setSearch(value)
-    clearTimeout(searchSyncRef.current)
-    searchSyncRef.current = setTimeout(() => {
-      updateFilters({ search: value, showAllBrowse: value ? true : showAllBrowse })
-    }, 350)
-  }
-  useEffect(() => () => clearTimeout(searchSyncRef.current), [])
 
   const viewArticle = (article) => {
     go("article", {
@@ -185,19 +172,7 @@ export default function Articles({ go, authState, ctx }) {
   }, [taxonomy.articleSeries, sortedFiltered, articles]);
 
   const isDefaultView = !search && cat === "all" && type === "all" && !showAllBrowse
-
-  // Six cards in a grid four wide ends on a row of two beside a stretch of
-  // nothing, which reads as "we ran out" rather than "here is the selection".
-  // Measure the grid and show whole rows of it.
-  const gridRef = useRef(null)
-  const [gridWidth, setGridWidth] = useState(0)
-  useLayoutEffect(() => {
-    const measure = () => setGridWidth(gridRef.current?.clientWidth || 0)
-    measure()
-    window.addEventListener("resize", measure)
-    return () => window.removeEventListener("resize", measure)
-  }, [isDefaultView])
-  const recentArticles = sortedFiltered.slice(0, completeRows(sortedFiltered.length, columnsAt(gridWidth)))
+  const recentArticles = sortedFiltered.slice(0, 6)
 
   return (
     <div>
@@ -257,11 +232,9 @@ export default function Articles({ go, authState, ctx }) {
             <div style={{ flex: 1, position: "relative" }}>
               <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
               <input
-                type="search"
-                aria-label="ค้นหาบทความ"
                 value={search}
-                onChange={e => handleSearchChange(e.target.value)}
-                placeholder="ค้นหาชื่อเรื่อง ผู้เขียน หรือแท็ก..."
+                onChange={e => { setSearch(e.target.value); updateFilters({ search: e.target.value, showAllBrowse: e.target.value ? true : showAllBrowse }) }}
+                placeholder="ค้นหาบทความ..."
                 style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "12px 16px 12px 42px", background: "var(--bg2)", border: "1px solid transparent", fontSize: 14, outline: "none", transition: "border 0.2s" }}
                 onFocus={(e) => e.target.style.border = "1px solid var(--teal)"}
                 onBlur={(e) => e.target.style.border = "1px solid transparent"}
@@ -269,8 +242,6 @@ export default function Articles({ go, authState, ctx }) {
             </div>
             <button
               onClick={() => setShowAdvanced(!showAdvanced)}
-              aria-label="ตัวกรองบทความเพิ่มเติม"
-              aria-expanded={showAdvanced}
               style={{ 
                 padding: "0 18px", 
                 borderRadius: 24, 
@@ -375,12 +346,12 @@ export default function Articles({ go, authState, ctx }) {
 
               <div>
                 <div className="sec-hd"><span className="sec-title">บทความมาใหม่ล่าสุด</span></div>
-                <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>
                   {recentArticles.map(a => (
                     <ArticleCard key={a.id} article={a} onClick={viewArticle} />
                   ))}
                 </div>
-                {sortedFiltered.length > recentArticles.length && (
+                {sortedFiltered.length > 6 && (
                   <button className="btn btn-outline" onClick={() => updateFilters({ showAllBrowse: true })} style={{ margin: "28px auto 0", display: "block", fontSize: 12 }}>
                     ดูบทความทั้งหมด ({sortedFiltered.length} บทความ)
                   </button>

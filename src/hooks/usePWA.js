@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import {
   getPushSubscriptionState,
@@ -22,9 +22,6 @@ export function usePWA(user = null, isStaff = false) {
     subscribed: false
   });
 
-  // Declared before the effects that call it. It used to sit below them, so both
-  // effects referenced it before it existed in source order — harmless only
-  // because effects run after render, which is not a thing worth relying on.
   const updatePushState = useCallback(async () => {
     const state = await getPushSubscriptionState();
     setPushState(state);
@@ -54,12 +51,12 @@ export function usePWA(user = null, isStaff = false) {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
-  }, []);
+  }, [updatePushState]);
 
   // Update subscription state when user changes (e.g. login/logout)
   useEffect(() => {
     updatePushState();
-  }, [user, isStaff]);
+  }, [user, isStaff, updatePushState]);
 
   const installApp = async () => {
     if (!deferredPrompt) return;

@@ -2,75 +2,81 @@ import React, { useState, useEffect } from "react"
 import SEOHead from "../components/SEOHead.jsx"
 import { collection, query, orderBy, getDocs } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
+import {
+  OPENHOUSE_PLATFORM_ORDER,
+  normalizeFirestoreBooth,
+  mergeOpenHouseBooths,
+} from "../data/openhouse.js"
 import "../styles/openhouse.css"
 
 export default function OpenHouse({ go }) {
   const [platforms, setPlatforms] = useState([])
   const [booths, setBooths] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-  const [retry, setRetry] = useState(0)
 
   // Current view state: 'zones' (Main Hall), 'booths' (Platform selected)
   const [view, setView] = useState("zones")
   const [selectedPlatform, setSelectedPlatform] = useState(null)
 
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(false)
     // Scroll to top when entering
     window.scrollTo(0, 0)
     
     // Fetch all booths to generate the zones dynamically
     const fetchBooths = async () => {
+      let firestoreBooths = []
       try {
         const q = query(collection(db, "openhouse_booths"), orderBy("order", "asc"))
         const snap = await getDocs(q)
-        if (cancelled) return
-        const allBooths = snap.docs.map(d => ({ ...d.data(), id: d.id }))
-        
-        setBooths(allBooths)
-        
-        // Extract unique platforms
-        const uniquePlatforms = new Set()
-        allBooths.forEach(b => {
-          const plats = b.platforms || (b.platform ? [b.platform] : [])
-          plats.forEach(p => uniquePlatforms.add(p))
-        })
-        
-        const platformData = Array.from(uniquePlatforms).map(p => {
-          const count = allBooths.filter(b => {
-            const plats = b.platforms || (b.platform ? [b.platform] : [])
-            return plats.includes(p)
-          }).length
-          
-          let icon = "ti-world"
-          let title = p
-          if (p === "YouTube") { icon = "ti-brand-youtube"; title = "วิดีโอ (YouTube)"; }
-          if (p === "Website") { icon = "ti-world"; title = "เว็บไซต์และบทความ (Website)"; }
-          if (p === "Facebook") { icon = "ti-brand-facebook"; title = "เพจเฟสบุ๊ค (Facebook)"; }
-          if (p === "Telegram") { icon = "ti-brand-telegram"; title = "แชทและอัปเดต (Telegram)"; }
-          if (p === "Podcast") { icon = "ti-microphone"; title = "พอดแคสต์ (Podcast)"; }
-          if (p === "Instagram") { icon = "ti-brand-instagram"; title = "อินสตาแกรม (Instagram)"; }
-          if (p === "TikTok") { icon = "ti-brand-tiktok"; title = "ติ๊กต็อก (TikTok)"; }
-          
-          return { id: p, title, name: p, icon, count }
-        })
-        
-        setPlatforms(platformData)
-        setLoading(false)
+        firestoreBooths = snap.docs.map(d => normalizeFirestoreBooth(d.id, d.data()))
       } catch (err) {
         console.error("Error fetching open house data", err)
-        if (cancelled) return
-        setError(true)
-        setLoading(false)
       }
+
+      const allBooths = mergeOpenHouseBooths(firestoreBooths)
+      setBooths(allBooths)
+
+      // Extract unique platforms
+      const uniquePlatforms = new Set()
+      allBooths.forEach(b => {
+        const plats = b.platforms || (b.platform ? [b.platform] : [])
+        plats.forEach(p => uniquePlatforms.add(p))
+      })
+
+      const sortedPlatforms = Array.from(uniquePlatforms).sort((a, b) => {
+        const ia = OPENHOUSE_PLATFORM_ORDER.indexOf(a)
+        const ib = OPENHOUSE_PLATFORM_ORDER.indexOf(b)
+        if (ia === -1 && ib === -1) return a.localeCompare(b)
+        if (ia === -1) return 1
+        if (ib === -1) return -1
+        return ia - ib
+      })
+
+      const platformData = sortedPlatforms.map(p => {
+        const count = allBooths.filter(b => {
+          const plats = b.platforms || (b.platform ? [b.platform] : [])
+          return plats.includes(p)
+        }).length
+
+        let icon = "ti-world"
+        let title = p
+        if (p === "YouTube") { icon = "ti-brand-youtube"; title = "วิดีโอ (YouTube)"; }
+        if (p === "Website") { icon = "ti-world"; title = "เว็บไซต์และบทความ (Website)"; }
+        if (p === "Facebook") { icon = "ti-brand-facebook"; title = "เพจเฟสบุ๊ค (Facebook)"; }
+        if (p === "Telegram") { icon = "ti-brand-telegram"; title = "แชทและอัปเดต (Telegram)"; }
+        if (p === "Podcast") { icon = "ti-microphone"; title = "พอดแคสต์ (Podcast)"; }
+        if (p === "Instagram") { icon = "ti-brand-instagram"; title = "อินสตาแกรม (Instagram)"; }
+        if (p === "TikTok") { icon = "ti-brand-tiktok"; title = "ติ๊กต็อก (TikTok)"; }
+
+        return { id: p, title, name: p, icon, count }
+      })
+
+      setPlatforms(platformData)
+      setLoading(false)
     }
     
     fetchBooths()
-    return () => { cancelled = true }
-  }, [retry])
+  }, [])
 
   const enterPlatform = (platform) => {
     setSelectedPlatform(platform)
@@ -108,11 +114,6 @@ export default function OpenHouse({ go }) {
           <div className="openhouse-loading">
             <i className="ti ti-loader-2 spin"></i> กำลังรวบรวมแหล่งเรียนรู้...
           </div>
-        ) : error ? (
-          <div className="empty-state" role="alert">
-            <p>โหลดแหล่งเรียนรู้ไม่สำเร็จ กรุณาตรวจการเชื่อมต่อแล้วลองอีกครั้ง</p>
-            <button className="btn btn-teal" onClick={() => setRetry(value => value + 1)}>ลองใหม่</button>
-          </div>
         ) : (
           <div className="openhouse-content">
             {view === "zones" && (
@@ -122,8 +123,7 @@ export default function OpenHouse({ go }) {
                   {platforms.length === 0 ? (
                     <div className="empty-state">ยังไม่มีแหล่งเรียนรู้ในระบบ</div>
                   ) : platforms.map(p => (
-                    <div key={p.id} className="zone-card" role="button" tabIndex={0} onClick={() => enterPlatform(p)}
-                      onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); enterPlatform(p) } }}>
+                    <div key={p.id} className="zone-card" onClick={() => enterPlatform(p)}>
                       <div className="zone-icon"><i className={`ti ${p.icon}`}></i></div>
                       <h3 className="zone-name">{p.title}</h3>
                       <div className="zone-meta">{p.count} แหล่งเรียนรู้</div>
@@ -151,17 +151,30 @@ export default function OpenHouse({ go }) {
                     const plats = b.platforms || (b.platform ? [b.platform] : [])
                     return plats.includes(selectedPlatform.id)
                   }).map(booth => (
-                    <div key={booth.id} className="booth-card" role="button" tabIndex={0} onClick={() => enterBooth(booth)}
-                      onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); enterBooth(booth) } }}>
+                    <div key={booth.id} className="booth-card" onClick={() => enterBooth(booth)}>
                       <div className="booth-color-top" style={{ background: booth.themeColor || "var(--teal)" }}></div>
                       <div className="booth-logo-wrapper">
                         {booth.logoUrl ? (
-                          <img src={booth.logoUrl} alt={booth.name} className="booth-logo" />
-                        ) : (
-                          <div className="booth-logo-placeholder" style={{ background: booth.themeColor || "var(--bg3)" }}>
-                            <i className="ti ti-book-2"></i>
-                          </div>
-                        )}
+                          <img
+                            src={booth.logoUrl}
+                            alt={booth.name}
+                            className="booth-logo"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none"
+                              const fallback = e.currentTarget.nextElementSibling
+                              if (fallback) fallback.style.display = "flex"
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className="booth-logo-placeholder"
+                          style={{
+                            background: booth.themeColor || "var(--bg3)",
+                            display: booth.logoUrl ? "none" : "flex",
+                          }}
+                        >
+                          <i className="ti ti-book-2"></i>
+                        </div>
                       </div>
                       <div className="booth-info">
                         <h3 className="booth-name">{booth.name}</h3>

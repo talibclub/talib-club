@@ -2,6 +2,10 @@ import React, { useState, useEffect } from "react"
 import SEOHead from "../components/SEOHead.jsx"
 import { collection, query, orderBy, getDocs, doc, getDoc, where, limit } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
+import {
+  normalizeFirestoreBooth,
+  findCuratedBooth,
+} from "../data/openhouse.js"
 import "../styles/openhouse.css"
 
 export default function OpenHouseCampus({ go, ctx }) {
@@ -19,47 +23,112 @@ export default function OpenHouseCampus({ go, ctx }) {
     }
 
     const fetchData = async () => {
+      setLoading(true)
       try {
-        // Fetch Booth Info
-        const boothRef = doc(db, "openhouse_booths", boothId)
-        const boothSnap = await getDoc(boothRef)
-        
-        let boothData = null;
-        if (boothSnap.exists()) {
-          boothData = { ...boothSnap.data(), id: boothSnap.id }
-        } else {
-          // Try fetching by slug
-          const slugQuery = query(collection(db, "openhouse_booths"), where("slug", "==", boothId), limit(1))
-          const slugSnap = await getDocs(slugQuery)
-          if (!slugSnap.empty) {
-            boothData = { ...slugSnap.docs[0].data(), id: slugSnap.docs[0].id }
+        let firestoreBooth = null
+        try {
+          // Fetch Booth Info by doc ID
+          const boothRef = doc(db, "openhouse_booths", boothId)
+          const boothSnap = await getDoc(boothRef)
+
+          if (boothSnap.exists()) {
+            firestoreBooth = normalizeFirestoreBooth(boothSnap.id, boothSnap.data())
+          } else {
+            // Try fetching by slug
+            const slugQuery = query(collection(db, "openhouse_booths"), where("slug", "==", boothId), limit(1))
+            const slugSnap = await getDocs(slugQuery)
+            if (!slugSnap.empty) {
+              firestoreBooth = normalizeFirestoreBooth(slugSnap.docs[0].id, slugSnap.docs[0].data())
+            } else {
+              // Legacy fallback: docs that stored custom slug in `id` field (e.g. booth-1 -> id: "assabiqoon")
+              const legacyQuery = query(collection(db, "openhouse_booths"), where("id", "==", boothId), limit(1))
+              const legacySnap = await getDocs(legacyQuery)
+              if (!legacySnap.empty) {
+                firestoreBooth = normalizeFirestoreBooth(legacySnap.docs[0].id, legacySnap.docs[0].data())
+              }
+            }
           }
+        } catch (err) {
+          console.error("Error fetching booth from Firestore", err)
         }
-        
+
+        const curatedBooth = findCuratedBooth(firestoreBooth?.slug || boothId)
+
+        let boothData = null
+        if (firestoreBooth && curatedBooth) {
+          boothData = {
+            ...curatedBooth,
+            ...firestoreBooth,
+            id: firestoreBooth.id,
+            slug: firestoreBooth.slug || curatedBooth.slug,
+            name: firestoreBooth.name || curatedBooth.name,
+            description: firestoreBooth.description || curatedBooth.description,
+            logoUrl: firestoreBooth.logoUrl || curatedBooth.logoUrl,
+            platforms:
+              firestoreBooth.platforms && firestoreBooth.platforms.length > 0
+                ? firestoreBooth.platforms
+                : curatedBooth.platforms,
+            socialLinks:
+              firestoreBooth.socialLinks && Object.keys(firestoreBooth.socialLinks).length > 0
+                ? { ...curatedBooth.socialLinks, ...firestoreBooth.socialLinks }
+                : curatedBooth.socialLinks,
+            networks:
+              firestoreBooth.networks && firestoreBooth.networks.length > 0
+                ? firestoreBooth.networks
+                : curatedBooth.networks,
+          }
+        } else if (firestoreBooth) {
+          boothData = firestoreBooth
+        } else if (curatedBooth) {
+          boothData = curatedBooth
+        }
+
         if (boothData) {
           setBooth(boothData)
         } else {
           go("openhouse")
           return
         }
-        
-        const realId = boothData.id;
+
         // Fetch Campuses (Buildings)
-        const q = query(collection(db, `openhouse_booths/${realId}/campuses`), orderBy("order", "asc"))
-        const campusSnap = await getDocs(q)
-        setCampuses(campusSnap.docs.map(d => ({ id: d.id, ...d.data() })))
-        
-        // Fetch Networks
+        let fetchedCampuses = []
+        if (firestoreBooth) {
+          try {
+            const q = query(collection(db, `openhouse_booths/${firestoreBooth.id}/campuses`), orderBy("order", "asc"))
+            const campusSnap = await getDocs(q)
+            fetchedCampuses = campusSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+          } catch (e) {
+            console.error("Failed to fetch campuses", e)
+          }
+        }
+
+        if (fetchedCampuses.length > 0) {
+          setCampuses(fetchedCampuses)
+        } else if (curatedBooth?.campuses?.length > 0) {
+          setCampuses(curatedBooth.campuses)
+        } else {
+          setCampuses([])
+        }
+
+        // Fetch Networks (resolve from Firestore or curated data)
         const netIds = boothData.networks || []
         if (netIds.length > 0) {
-          try {
-            const netPromises = netIds.map(nid => getDoc(doc(db, "openhouse_booths", nid)))
-            const netSnaps = await Promise.all(netPromises)
-            const nets = netSnaps.filter(s => s.exists()).map(s => ({ id: s.id, ...s.data() }))
-            setNetworkBooths(nets)
-          } catch (e) {
-            console.error("Failed to fetch network booths", e)
-          }
+          const nets = await Promise.all(
+            netIds.map(async (nid) => {
+              const curatedNet = findCuratedBooth(nid)
+              try {
+                const snap = await getDoc(doc(db, "openhouse_booths", nid))
+                if (snap.exists()) {
+                  const fbNet = normalizeFirestoreBooth(snap.id, snap.data())
+                  return curatedNet ? { ...curatedNet, ...fbNet, logoUrl: fbNet.logoUrl || curatedNet.logoUrl } : fbNet
+                }
+              } catch {
+                // fall back to curatedNet
+              }
+              return curatedNet
+            })
+          )
+          setNetworkBooths(nets.filter(Boolean))
         } else {
           setNetworkBooths([])
         }
@@ -106,10 +175,23 @@ export default function OpenHouseCampus({ go, ctx }) {
           <div className="campus-profile">
             <div className="campus-logo-wrap" style={{ borderColor: booth.themeColor || "var(--teal)" }}>
               {booth.logoUrl ? (
-                <img src={booth.logoUrl} alt={booth.name} />
-              ) : (
-                <i className="ti ti-building" style={{ color: booth.themeColor || "var(--teal)" }}></i>
-              )}
+                <img
+                  src={booth.logoUrl}
+                  alt={booth.name}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none"
+                    const fallback = e.currentTarget.nextElementSibling
+                    if (fallback) fallback.style.display = "inline-block"
+                  }}
+                />
+              ) : null}
+              <i
+                className="ti ti-building"
+                style={{
+                  color: booth.themeColor || "var(--teal)",
+                  display: booth.logoUrl ? "none" : "inline-block",
+                }}
+              ></i>
             </div>
             <div className="campus-info">
               <div className="campus-badges">
@@ -205,9 +287,6 @@ export default function OpenHouseCampus({ go, ctx }) {
             <div className="buildings-grid">
               {campuses.map(campus => (
                 <div key={campus.id} className="building-card">
-                  {/* A template literal is never falsy, so the fallback was dead
-                      and a booth without themeColor got the literal colour
-                      "undefined40". */}
                   <div className="building-header" style={{ borderBottomColor: booth.themeColor ? `${booth.themeColor}40` : "var(--br)" }}>
                     <h3 className="building-name">
                       <i className="ti ti-building-arch"></i> {campus.name}

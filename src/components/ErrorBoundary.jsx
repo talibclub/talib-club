@@ -55,7 +55,7 @@ class ErrorBoundary extends React.Component {
             รีเฟรชหน้าเว็บ
           </button>
           
-          {process.env.NODE_ENV === 'development' && (
+          {import.meta.env.DEV && (
             <details style={{ marginTop: '32px', textAlign: 'left', background: 'var(--bg2)', padding: '16px', borderRadius: '8px', maxWidth: '800px', overflow: 'auto' }}>
               <summary style={{ cursor: 'pointer', color: '#d84f4f', fontWeight: 'bold' }}>Error Details (Dev Only)</summary>
               <pre style={{ marginTop: '12px', fontSize: '12px', color: '#d84f4f' }}>

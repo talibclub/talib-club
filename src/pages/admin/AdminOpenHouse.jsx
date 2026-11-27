@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react"
-import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, deleteDoc } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, deleteDoc, getDocs } from "firebase/firestore"
 import { db } from "../../lib/firebase.js"
 import { toast } from "react-hot-toast"
 import { confirmAction } from "../../utils/feedback.jsx"
+import { OPENHOUSE_BOOTHS, normalizeFirestoreBooth } from "../../data/openhouse.js"
 
 const notifySuccess = (msg) => toast.success(msg)
 const notifyError = (msg) => toast.error(msg)
@@ -10,6 +11,7 @@ const notifyError = (msg) => toast.error(msg)
 export default function AdminOpenHouse() {
   const [booths, setBooths] = useState([])
   const [loading, setLoading] = useState(true)
+  const [syncingCurated, setSyncingCurated] = useState(false)
   const [showBoothForm, setShowBoothForm] = useState(false)
   const [editingBoothId, setEditingBoothId] = useState(null)
   const [boothForm, setBoothForm] = useState({ name: "", slug: "", platforms: ["YouTube"], socialLinks: {}, language: "Thai", description: "", logoUrl: "", themeColor: "#1a5f7a", order: 1, networks: [] })
@@ -92,6 +94,81 @@ export default function AdminOpenHouse() {
     const plats = b.platforms || (b.platform ? [b.platform] : ["YouTube"])
     setBoothForm({ name: b.name, slug: b.slug || "", platforms: plats, socialLinks: b.socialLinks || {}, language: b.language || "", description: b.description || "", logoUrl: b.logoUrl || "", themeColor: b.themeColor || "#1a5f7a", order: b.order || 1, networks: b.networks || [] })
     setShowBoothForm(true)
+  }
+
+  const handleSyncCurated = async () => {
+    const ok = await confirmAction({
+      title: "นำเข้าข้อมูลแหล่งเรียนรู้ตั้งต้น",
+      message: `ระบบจะเพิ่มแหล่งเรียนรู้สะลัฟที่ตรวจสอบแล้ว (${OPENHOUSE_BOOTHS.length} แหล่ง) และหมวดหมู่เนื้อหาเข้าสู่ Firestore เฉพาะรายการที่ยังไม่มี (ไม่ทับข้อมูลที่คุณแก้ไขไว้)`,
+      confirmText: "นำเข้าข้อมูล",
+    })
+    if (!ok) return
+
+    setSyncingCurated(true)
+    try {
+      const snap = await getDocs(collection(db, "openhouse_booths"))
+      const existingBySlug = new Map()
+      snap.docs.forEach(d => {
+        const norm = normalizeFirestoreBooth(d.id, d.data())
+        existingBySlug.set(norm.slug, norm)
+      })
+
+      let addedBooths = 0
+      let enrichedCampuses = 0
+
+      for (const item of OPENHOUSE_BOOTHS) {
+        const existing = existingBySlug.get(item.slug)
+        let boothDocId = existing?.id
+
+        if (!existing) {
+          const { campuses: _c, id: _id, ...boothPayload } = item
+          const created = await addDoc(collection(db, "openhouse_booths"), {
+            ...boothPayload,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          })
+          boothDocId = created.id
+          addedBooths++
+        } else {
+          // Fill missing slug/logoUrl/networks on legacy records without overwriting edits
+          const patch = {}
+          if (!existing.slug || existing.slug !== item.slug) patch.slug = item.slug
+          if (!existing.logoUrl && item.logoUrl) patch.logoUrl = item.logoUrl
+          if ((!existing.networks || existing.networks.length === 0) && item.networks?.length) {
+            patch.networks = item.networks
+          }
+          if (Object.keys(patch).length > 0) {
+            await updateDoc(doc(db, "openhouse_booths", boothDocId), {
+              ...patch,
+              updatedAt: serverTimestamp(),
+            })
+          }
+        }
+
+        // Seed campuses only if booth currently has none
+        if (boothDocId && item.campuses?.length) {
+          const campusSnap = await getDocs(collection(db, `openhouse_booths/${boothDocId}/campuses`))
+          if (campusSnap.empty) {
+            for (const c of item.campuses) {
+              const { id: _cid, ...campusPayload } = c
+              await addDoc(collection(db, `openhouse_booths/${boothDocId}/campuses`), {
+                ...campusPayload,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+              })
+              enrichedCampuses++
+            }
+          }
+        }
+      }
+
+      notifySuccess(`นำเข้าสำเร็จ: เพิ่มแหล่งเรียนรู้ ${addedBooths} แห่ง และหมวดหมู่ ${enrichedCampuses} รายการ`)
+    } catch (err) {
+      console.error("Sync curated openhouse error", err)
+      notifyError("เกิดข้อผิดพลาดในการนำเข้าข้อมูล (ตรวจสอบสิทธิ์แอดมิน)")
+    } finally {
+      setSyncingCurated(false)
+    }
   }
 
   // --- Campus Functions ---
@@ -272,9 +349,20 @@ export default function AdminOpenHouse() {
             จัดการแหล่งเรียนรู้ (Open House)
           </h2>
         </div>
-        <button className="btn btn-teal" onClick={() => { setShowBoothForm(true); setEditingBoothId(null); setBoothForm({ name: "", slug: "", platforms: ["YouTube"], socialLinks: {}, language: "Thai", description: "", logoUrl: "", themeColor: "#1a5f7a", order: 1, networks: [] }); }} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 12, fontWeight: 600, flexShrink: 0 }}>
-          <i className="ti ti-plus"></i> เพิ่มแหล่งเรียนรู้ใหม่
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", flexShrink: 0 }}>
+          <button
+            className="btn btn-outline"
+            disabled={syncingCurated}
+            onClick={handleSyncCurated}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 12, fontWeight: 500 }}
+          >
+            <i className={`ti ${syncingCurated ? "ti-loader-2 spin" : "ti-database-import"}`}></i>
+            {syncingCurated ? "กำลังนำเข้า..." : "นำเข้าข้อมูลตั้งต้น"}
+          </button>
+          <button className="btn btn-teal" onClick={() => { setShowBoothForm(true); setEditingBoothId(null); setBoothForm({ name: "", slug: "", platforms: ["YouTube"], socialLinks: {}, language: "Thai", description: "", logoUrl: "", themeColor: "#1a5f7a", order: 1, networks: [] }); }} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 12, fontWeight: 600 }}>
+            <i className="ti ti-plus"></i> เพิ่มแหล่งเรียนรู้ใหม่
+          </button>
+        </div>
       </div>
 
       {showBoothForm && (

@@ -1,20 +1,14 @@
 import { useState, useMemo, useEffect } from "react"
 import { MEDIA, DEFAULT_TAXONOMY, SITE } from "../data/index.js"
-import { matchesContentSearch } from "../utils/contentSearch.js"
 import { useContentCollection, useTaxonomySettings, useSiteSettings } from "../lib/contentStore.js"
 import { clampPage } from "../utils/pagination.js"
 import PaginationBar from "../components/PaginationBar.jsx"
 import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
-import { detailPath } from "../utils/slug.js"
-import { isPlainLeftClick } from "../utils/linkNavigation.js"
 
 export default function Media({ go, ctx }) {
-  // 200 silently truncated the list while Library uses 1000 and Articles has no
-  // cap at all — media past the 200th simply did not exist as far as the site
-  // was concerned, with nothing on screen to say so.
-  const mediaQueryOptions = useMemo(() => ({ live: false, limit: 1000 }), [])
+  const mediaQueryOptions = useMemo(() => ({ live: false, limit: 200 }), [])
   const { items: media, loading, error, isUsingFallback } = useContentCollection("media", MEDIA, null, mediaQueryOptions)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   const { site } = useSiteSettings(SITE)
@@ -40,11 +34,11 @@ export default function Media({ go, ctx }) {
   const filters = [
     { id: "all", label: "ทั้งหมด", icon: "ti-layout-grid" },
     ...(taxonomy.mediaTypes || []).map(item => {
-      const id = String(item?.id ?? item).toLowerCase();
+      const lower = String(item).toLowerCase();
       return {
-        id,
-        label: id === "youtube" ? "YouTube" : id === "spotify" ? "Spotify" : id === "video" ? "คลิปสั้น" : (item?.label ?? id),
-        icon: id === "youtube" ? "ti-brand-youtube" : id === "spotify" ? "ti-brand-spotify" : id === "video" ? "ti-video" : "ti-player-play",
+        id: lower,
+        label: lower === "youtube" ? "YouTube" : lower === "spotify" ? "Spotify" : lower === "video" ? "คลิปสั้น" : item,
+        icon: lower === "youtube" ? "ti-brand-youtube" : lower === "spotify" ? "ti-brand-spotify" : lower === "video" ? "ti-video" : "ti-player-play",
       };
     }),
   ]
@@ -102,7 +96,8 @@ export default function Media({ go, ctx }) {
   const filteredPlaylists = useMemo(() => {
     return playlists.filter(pl => {
       const matchType = filter === "all" || String(pl.type).toLowerCase() === String(filter).toLowerCase();
-      const matchSearch = matchesContentSearch(searchPlaylist, pl.name, pl.teacher);
+      const matchSearch = String(pl.name).toLowerCase().includes(searchPlaylist.toLowerCase()) ||
+        String(pl.teacher).toLowerCase().includes(searchPlaylist.toLowerCase());
       return matchType && matchSearch;
     })
   }, [playlists, filter, searchPlaylist])
@@ -128,12 +123,13 @@ export default function Media({ go, ctx }) {
 
   // 3. กรองคลิปเมื่ออยู่ด้านใน Playlist (ค้นหาชื่อคลิป)
   const filteredClips = useMemo(() => {
-    if (!selectedPlaylist && !searchPlaylist.trim()) return []
-    const items = selectedPlaylist ? [...selectedPlaylist.items] : media.filter(item =>
-      filter === "all" || String(item.type || "").toLowerCase() === filter)
+    if (!selectedPlaylist) return []
+    const items = [...selectedPlaylist.items]
 
-    const matched = items.filter(item => matchesContentSearch(
-      selectedPlaylist ? searchClip : searchPlaylist, item.title, item.channel, item.series, item.tags))
+    const matched = !searchClip.trim() ? items : items.filter(item =>
+      String(item.title).toLowerCase().includes(searchClip.toLowerCase()) ||
+      String(item.channel).toLowerCase().includes(searchClip.toLowerCase())
+    )
 
     return matched.sort((a, b) => {
       const parseDateToMs = (dateStr) => {
@@ -162,7 +158,7 @@ export default function Media({ go, ctx }) {
         return String(a.id || "").localeCompare(String(b.id || ""))
       }
     })
-  }, [selectedPlaylist, searchClip, searchPlaylist, media, filter, sortOrder])
+  }, [selectedPlaylist, searchClip, sortOrder])
 
   const totalPages = Math.max(1, Math.ceil(filteredClips.length / ITEMS_PER_PAGE) || 1)
   const currentPage = (loading && filteredClips.length === 0) ? page : clampPage(page, totalPages)
@@ -199,9 +195,7 @@ export default function Media({ go, ctx }) {
               <input
                 value={searchPlaylist}
                 onChange={e => { setSearchPlaylist(e.target.value); updateFilters({ searchPlaylist: e.target.value }) }}
-                type="search"
-                aria-label="ค้นหาคลิป เพลย์ลิสต์ หรือชื่อช่อง"
-                placeholder="ค้นหาคลิป เพลย์ลิสต์ หรือชื่อช่อง..."
+                placeholder="ค้นหาเพลย์ลิสต์ หรือ ชื่อช่อง..."
                 style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "12px 16px 12px 42px", background: "var(--bg2)", border: "1px solid transparent", fontSize: 14, outline: "none", transition: "border 0.2s" }}
                 onFocus={(e) => e.target.style.border = "1px solid var(--teal)"}
                 onBlur={(e) => e.target.style.border = "1px solid transparent"}
@@ -209,8 +203,6 @@ export default function Media({ go, ctx }) {
             </div>
             <button
               onClick={() => setShowAdvanced(!showAdvanced)}
-              aria-label="ตัวกรองสื่อเพิ่มเติม"
-              aria-expanded={showAdvanced}
               style={{ 
                 padding: "0 18px", 
                 borderRadius: 24, 
@@ -249,30 +241,6 @@ export default function Media({ go, ctx }) {
                 </select>
               </label>
             </div>
-          )}
-
-          {!loading && searchPlaylist.trim() && (
-            <section aria-label="ผลการค้นหาคลิป" style={{ marginBottom: 28 }}>
-              <p role="status" style={{ marginBottom: 12 }}>พบ {filteredClips.length} คลิป</p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 12 }}>
-                {currentItems.map(item => (
-                  <a key={item.id} className="card" href={detailPath("media-detail", item.id, item.title)}
-                    style={{ padding: 16, color: "var(--text)", textDecoration: "none" }}
-                    onClick={event => {
-                      if (!isPlainLeftClick(event)) return
-                      event.preventDefault()
-                      go("media-detail", { ...item, returnToMedia: { searchPlaylist, filter, sort: sortOrder, page: currentPage } })
-                    }}>
-                    <strong style={{ display: "block", marginBottom: 8 }}>{item.title}</strong>
-                    <span style={{ fontSize: 12, color: "var(--t2)" }}>{item.channel} · {item.series || "วิดีโอทั่วไป"}</span>
-                    <span style={{ display: "block", marginTop: 12, color: "var(--teal)" }}>เปิดคลิป →</span>
-                  </a>
-                ))}
-              </div>
-              {filteredClips.length === 0 && <p>ลองใช้คำสั้นลง หรือเปลี่ยนตัวกรองประเภทสื่อ</p>}
-              <PaginationBar currentPage={currentPage} totalPages={totalPages} onPageChange={p => updateFilters({ page: p })} />
-              <h2 style={{ fontSize: 18, marginTop: 24 }}>เพลย์ลิสต์ที่ตรงกับคำค้น</h2>
-            </section>
           )}
 
           {loading ? (
@@ -315,7 +283,7 @@ export default function Media({ go, ctx }) {
                       onClick={() => updateFilters({ playlist: pl.name, teacher: pl.teacher, page: 1, searchClip: "" })}
                       style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12, padding: "8px 0", borderColor: "rgba(15,110,86,0.3)", color: "var(--teal)" }}
                     >
-                      <i className="ti ti-play-circle" style={{ fontSize: 13 }}></i> ดูเพลย์ลิสต์
+                      <i className="ti ti-player-play" style={{ fontSize: 13 }}></i> ดูเพลย์ลิสต์
                     </button>
                   </div>
                 </div>
@@ -375,23 +343,17 @@ export default function Media({ go, ctx }) {
                 const thumbUrl = item.coverUrl || (item.type === "youtube" && item.embedId ? `https://img.youtube.com/vi/${item.embedId}/hqdefault.jpg` : null)
 
                 return (
-                  <a
+                  <div
                     key={item.id}
                     className="card"
-                    href={detailPath("media-detail", item.id, item.title)}
-                    aria-label={item.title}
-                    style={{ padding: 0, overflow: "hidden", cursor: "pointer", display: "flex", flexDirection: "column", color: "inherit", textDecoration: "none" }}
-                    onClick={(e) => {
-                      if (!isPlainLeftClick(e)) return
-                      e.preventDefault()
-                      go?.("media-detail", {
-                        ...item,
-                        playlist: ctx?.playlist || "",
-                        teacher: ctx?.teacher || "",
-                        filter: ctx?.filter,
-                        page: currentPage,
-                      })
-                    }}
+                    style={{ padding: 0, overflow: "hidden", cursor: "pointer", display: "flex", flexDirection: "column" }}
+                    onClick={() => go?.("media-detail", {
+                      ...item,
+                      playlist: ctx?.playlist || "",
+                      teacher: ctx?.teacher || "",
+                      filter: ctx?.filter,
+                      page: currentPage,
+                    })}
                   >
                     <div style={{ height: 150, background: "var(--acc2)", position: "relative" }}>
                       {thumbUrl ? (
@@ -413,7 +375,7 @@ export default function Media({ go, ctx }) {
                       </div>
                       <div style={{ fontSize: 11, color: "var(--t3)" }}>{item.channel}</div>
                     </div>
-                  </a>
+                  </div>
                 )
               })}
             </div>
@@ -450,23 +412,23 @@ function Footer({ site }) {
         All Rights Reserved for Talib Club {new Date().getFullYear()} ©
       </div>
 
-      <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
         {links.map(item => (
-          <a key={item.key} href={item.url} target="_blank" rel="noreferrer" style={{ width: "36px", height: "36px", backgroundColor: "var(--card)", border: ".5px solid var(--br)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t2)", textDecoration: "none", transition: "0.2s" }}
+          <a key={item.key} href={item.url} target="_blank" rel="noreferrer" aria-label={item.key} title={item.key} style={{ width: "36px", height: "36px", backgroundColor: "var(--card)", border: ".5px solid var(--br)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--t2)", textDecoration: "none", transition: "0.2s" }}
             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--teal)"; e.currentTarget.style.color = "#fff"; e.currentTarget.style.borderColor = "var(--teal)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--card)"; e.currentTarget.style.color = "var(--t2)"; e.currentTarget.style.borderColor = "var(--br)"; }}
           >
             <i className={`ti ${item.icon}`} style={{ fontSize: "16px" }}></i>
           </a>
         ))}
-      </div>
 
-      <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} style={{ position: "absolute", right: "0", top: "32px", width: "38px", height: "38px", backgroundColor: "var(--teal-bg)", border: "1px solid rgba(15,110,86,0.1)", borderRadius: "50%", color: "var(--teal)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "0.2s" }}
-        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--teal)"; e.currentTarget.style.color = "#fff"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--teal-bg)"; e.currentTarget.style.color = "var(--teal)"; }}
-      >
-        <i className="ti ti-arrow-up" style={{ fontSize: "16px" }}></i>
-      </button>
+        <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} aria-label="กลับขึ้นด้านบน" title="กลับขึ้นด้านบน" style={{ width: "36px", height: "36px", backgroundColor: "var(--teal-bg)", border: "1px solid rgba(15,110,86,0.1)", borderRadius: "50%", color: "var(--teal)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "0.2s", marginLeft: "6px" }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--teal)"; e.currentTarget.style.color = "#fff"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--teal-bg)"; e.currentTarget.style.color = "var(--teal)"; }}
+        >
+          <i className="ti ti-arrow-up" style={{ fontSize: "16px" }}></i>
+        </button>
+      </div>
     </footer>
   )
 }

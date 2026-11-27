@@ -1,6 +1,4 @@
-import { useState, useMemo } from "react"
-import { useSearchParams } from "react-router-dom"
-import ContentStatusBanner from "../components/ContentStatusBanner.jsx"
+import { useState, useMemo, useEffect } from "react"
 import { DEFAULT_TAXONOMY, SCHOLARS } from "../data/index.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
@@ -11,10 +9,6 @@ const ERA_LABELS = {
   revival: "ยุคฟื้นฟู ค.ศ. 1500–1800",
   modern: "ยุคปัจจุบัน ค.ศ. 1800–ปัจจุบัน"
 }
-// Twelve at a time, and twelve more on each press: it divides by two, three,
-// four and six, so the grid ends on a full row at every width it lays out.
-const SCHOLARS_PER_STEP = 12
-
 const ERA_COLORS = {
   salaf: "var(--teal)",
   classical: "#c9a84c",
@@ -34,41 +28,21 @@ const mapEraValue = (val) => {
 
 export default function Scholars() {
   const scholarsQueryOptions = useMemo(() => ({ live: false }), [])
-  const { items: scholars, loading, error, isUsingFallback } = useContentCollection("scholars", SCHOLARS, null, scholarsQueryOptions)
+  const { items: scholars, loading } = useContentCollection("scholars", SCHOLARS, null, scholarsQueryOptions)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
-  const [params, setParams] = useSearchParams()
-  const search = params.get("search") || ""
-  const era = params.get("era") || "0"
-  const field = params.get("field") || "all"
-  const aqFilter = params.get("aq") || ""
-  const mhFilter = params.get("mh") || ""
-  const mzFilter = params.get("mz") || ""
-  const showAdvanced = params.get("filters") === "open"
-  const setFilter = (key, value, fallback = "") => setParams(previous => {
-    const next = new URLSearchParams(previous)
-    if (!value || value === fallback) next.delete(key)
-    else next.set(key, value)
-    return next
-  }, { replace: true })
-  const setSearch = value => setFilter("search", value)
-  const setEra = value => setFilter("era", value, "0")
-  const setField = value => setFilter("field", value, "all")
-  const setAqFilter = value => setFilter("aq", value)
-  const setMhFilter = value => setFilter("mh", value)
-  const setMzFilter = value => setFilter("mz", value)
-  const setShowAdvanced = value => setFilter("filters", value ? "open" : "")
+  const [search, setSearch] = useState("")
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [era, setEra] = useState("0")
+  const [field, setField] = useState("all")
 
-  // Keyed by whatever era ids the taxonomy actually has. It used to be seeded
-  // with salaf/classical/revival/modern, which are the colour keys and not the
-  // ids this list iterates — so `prev[eraNum]` was undefined, adding six made it
-  // NaN, and NaN falls back through `|| SCHOLARS_PER_STEP` to the same number
-  // forever. The button could not work, and the count beside it gave it away:
-  // it said 25 left, which is only true if 12 were showing rather than the 6 the
-  // seed asked for.
-  const [visibleCounts, setVisibleCounts] = useState({})
+  const [aqFilter, setAqFilter] = useState("")
+  const [mhFilter, setMhFilter] = useState("")
+  const [mzFilter, setMzFilter] = useState("")
+
+  const [visibleCounts, setVisibleCounts] = useState({ salaf: 6, classical: 6, revival: 6, modern: 6 })
 
   const resetVisible = () => {
-    setVisibleCounts({})
+    setVisibleCounts({ salaf: 6, classical: 6, revival: 6, modern: 6 })
   }
 
   const fields = ["all", ...new Set([...(taxonomy.scholarFields || []).map(f => typeof f === 'string' ? f : f.label), ...scholars.map(s => s.field).filter(Boolean)])]
@@ -138,7 +112,7 @@ export default function Scholars() {
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ marginBottom: 8 }}>ทำเนียบบุคคลในอิสลาม</h1>
         <p style={{ color: "var(--t2)" }}>รวบรวมบุคคลและปราชญ์ในประวัติศาสตร์อิสลามแบ่งตามยุคสมัย พร้อมข้อมูลวิชาการ</p>
-        <ContentStatusBanner loading={loading} error={error} isUsingFallback={isUsingFallback} />
+        {loading && <p style={{ marginTop: 8, fontSize: 12 }}>กำลังโหลดรายชื่อใหม่ล่าสุด...</p>}
       </div>
 
       {/* DISCLAIMER BANNER */}
@@ -165,8 +139,6 @@ export default function Scholars() {
         <div style={{ flex: 1, position: "relative" }}>
           <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
           <input
-            type="search"
-            aria-label="ค้นหาบุคคล"
             value={search}
             onChange={e => { setSearch(e.target.value); resetVisible(); }}
             placeholder="ค้นหาชื่ออุลามาอ์ (ไทย/English/ประวัติ)..."
@@ -177,8 +149,6 @@ export default function Scholars() {
         </div>
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
-          aria-label="ตัวกรองบุคคลเพิ่มเติม"
-          aria-expanded={showAdvanced}
           style={{
             padding: "0 18px",
             borderRadius: 24,
@@ -257,19 +227,6 @@ export default function Scholars() {
         </div>
       )}
 
-      {(search || era !== "0" || field !== "all" || aqFilter || mhFilter || mzFilter) && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 20 }}>
-          <span role="status">พบ {filtered.length} ท่าน</span>
-          <button className="btn btn-outline" onClick={() => {
-            setParams(previous => {
-              const next = new URLSearchParams(previous)
-              for (const key of ["search", "era", "field", "aq", "mh", "mz"]) next.delete(key)
-              return next
-            }, { replace: true })
-            resetVisible()
-          }}>ล้างคำค้นและตัวกรอง</button>
-        </div>
-      )}
       {/* TIMELINE */}
       {loading ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
@@ -293,8 +250,7 @@ export default function Scholars() {
           const eraScholars = filtered.filter(s => mapEraValue(s.era) === mapEraValue(eraNum))
           if (eraScholars.length === 0) return null
           const color = ERA_COLORS[eraNum] || "var(--teal)"
-          const shown = visibleCounts[eraNum] ?? SCHOLARS_PER_STEP
-          const visibleScholars = eraScholars.slice(0, shown)
+          const visibleScholars = eraScholars.slice(0, visibleCounts[eraNum] ?? 6)
 
           return (
             <div key={eraNum} style={{ marginBottom: 36 }}>
@@ -327,7 +283,7 @@ export default function Scholars() {
               {eraScholars.length > visibleScholars.length && (
                 <div style={{ textAlign: "center", marginTop: 20 }}>
                   <button
-                    onClick={() => setVisibleCounts(prev => ({ ...prev, [eraNum]: (prev[eraNum] ?? SCHOLARS_PER_STEP) + SCHOLARS_PER_STEP }))}
+                    onClick={() => setVisibleCounts(prev => ({ ...prev, [eraNum]: (prev[eraNum] ?? 6) + 6 }))}
                     style={{
                       fontFamily: "'Prompt', sans-serif", fontSize: 11, fontWeight: 300,
                       padding: "5px 16px", borderRadius: 20, border: ".5px solid var(--br)",
@@ -377,10 +333,6 @@ function ScholarCard({ s, color, getAqClass, getMhClass, getMzClass }) {
   return (
     <div
       className="card scholar-card"
-      role={isLong ? "button" : undefined}
-      tabIndex={isLong ? 0 : undefined}
-      aria-expanded={isLong ? expanded : undefined}
-      onKeyDown={isLong ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded(!expanded) } } : undefined}
       onClick={() => {
         if (isLong) {
           setExpanded(!expanded)
@@ -402,6 +354,14 @@ function ScholarCard({ s, color, getAqClass, getMhClass, getMzClass }) {
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = "translateY(0px)"
         e.currentTarget.style.boxShadow = "none"
+      }}
+      role={isLong ? "button" : undefined}
+      tabIndex={isLong ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (isLong && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault()
+          setExpanded(!expanded)
+        }
       }}
     >
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
@@ -462,7 +422,7 @@ function ScholarCard({ s, color, getAqClass, getMhClass, getMzClass }) {
             style={{
               fontSize: 11.5,
               lineHeight: 1.55,
-              color: "var(--text2)",
+              color: "var(--t2)",
               fontWeight: 300,
               display: "-webkit-box",
               WebkitLineClamp: expanded ? "unset" : 3,
