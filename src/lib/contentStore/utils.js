@@ -117,12 +117,8 @@ export function stableStringify(obj) {
   if (obj === null) return "null"
   if (typeof obj !== "object" || Array.isArray(obj)) return JSON.stringify(obj)
 
-  const sorted = {}
   const keys = Object.keys(obj).sort()
-  for (const key of keys) {
-    sorted[key] = stableStringify(obj[key])
-  }
-  return JSON.stringify(sorted)
+  return "{" + keys.map(key => `${JSON.stringify(key)}:${stableStringify(obj[key])}`).join(",") + "}"
 }
 
 export function getQueryCacheKey(collectionName, uid, limitCount, orderByField, orderDirection) {

@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from "react"
+import { useLocation } from "react-router-dom"
 import { createPortal } from "react-dom"
 import toast from "react-hot-toast"
 import DOMPurify from "dompurify"
@@ -7,6 +8,7 @@ import { useContentCollection, useContentDoc, saveContentItem } from "../lib/con
 import { collection, getDocs, query, where, limit } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
 import { bumpContentMetric } from "../utils/contentMetrics.js"
+import { parseDetailId } from "../utils/slug.js"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
 import SEOHead, { stripHtml, truncate, BASE_URL } from '../components/SEOHead.jsx'
 
@@ -18,7 +20,8 @@ const READER_TONE_LABELS = { 1: "1", 2: "2", 3: "3", 4: "4", 5: "5" }
 
 export default function ArticleDetail({ item, go, authState }) {
   const uid = authState?.user?.uid;
-  const urlId = new URLSearchParams(window.location.search).get("id")
+  const location = useLocation()
+  const urlId = parseDetailId(location.pathname, location.search)
   const articleId = urlId || item?.id
   const fallbackArticle = useMemo(
     () => (articleId ? ARTICLES.find(a => String(a.id) === String(articleId)) : null) ?? null,

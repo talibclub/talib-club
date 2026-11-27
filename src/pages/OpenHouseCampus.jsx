@@ -76,14 +76,16 @@ export default function OpenHouseCampus({ go, ctx }) {
               firestoreBooth.socialLinks && Object.keys(firestoreBooth.socialLinks).length > 0
                 ? { ...curatedBooth.socialLinks, ...firestoreBooth.socialLinks }
                 : curatedBooth.socialLinks,
-            networks: Array.isArray(firestoreBooth.networks)
-              ? firestoreBooth.networks
-              : curatedBooth.networks,
+            // Never display unverified cross-organization affiliate links.
+            // Curated booths keep only explicitly verified same-organization
+            // networks (currently cleared unless verified), overriding stale
+            // Firestore `networks` arrays from earlier imports.
+            networks: [],
           }
         } else if (firestoreBooth) {
-          boothData = firestoreBooth
+          boothData = { ...firestoreBooth, networks: [] }
         } else if (curatedBooth) {
-          boothData = curatedBooth
+          boothData = { ...curatedBooth, networks: [] }
         }
 
         if (boothData) {

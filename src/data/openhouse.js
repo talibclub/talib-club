@@ -2870,7 +2870,7 @@ export function mergeOpenHouseBooths(firestoreBooths = [], deletedSlugs = []) {
           fb.socialLinks && Object.keys(fb.socialLinks).length > 0
             ? fb.socialLinks
             : curated.socialLinks,
-        networks: Array.isArray(fb.networks) ? fb.networks : curated.networks,
+        networks: [],
         _curatedCampuses: curated.campuses || [],
       }
     })

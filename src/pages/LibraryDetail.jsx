@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useLocation } from "react-router-dom"
 import toast from "react-hot-toast"
 import { BOOKS } from "../data/index.js"
 import { useContentCollection, useContentDoc, saveContentItem } from "../lib/contentStore.js"
 import { bumpContentMetric } from "../utils/contentMetrics.js"
+import { parseDetailId } from "../utils/slug.js"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
 import SEOHead, { truncate, BASE_URL } from "../components/SEOHead.jsx"
 
@@ -34,7 +36,8 @@ function getPreviewUrl(url) {
 
 export default function LibraryDetail({ item, go, authState }) {
   const uid = authState?.user?.uid;
-  const urlId = new URLSearchParams(window.location.search).get("id")
+  const location = useLocation()
+  const urlId = parseDetailId(location.pathname, location.search)
   const bookId = urlId || item?.id
   const fallbackBook = useMemo(
     () => (bookId ? BOOKS.find(b => String(b.id) === String(bookId)) : null) ?? null,

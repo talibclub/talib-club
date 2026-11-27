@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef } from "react"
+import { useLocation } from "react-router-dom"
 import toast from "react-hot-toast"
 import { useContentDoc, saveContentItem } from "../lib/contentStore.js"
 import { MEDIA } from "../data/index.js"
+import { parseDetailId } from "../utils/slug.js"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 
 export default function MediaDetail({ item: initialItem, go, authState }) {
   const uid = authState?.user?.uid;
-  const urlId = new URLSearchParams(window.location.search).get("id")
+  const location = useLocation()
+  const urlId = parseDetailId(location.pathname, location.search)
   const mediaId = urlId || initialItem?.id
   const fallbackMedia = useMemo(
     () => (mediaId ? MEDIA.find(m => String(m.id) === String(mediaId)) : null) ?? null,

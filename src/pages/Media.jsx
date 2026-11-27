@@ -8,7 +8,7 @@ import ImageWithFallback from "../components/ImageWithFallback.jsx"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 
 export default function Media({ go, ctx }) {
-  const mediaQueryOptions = useMemo(() => ({ live: false, limit: 200 }), [])
+  const mediaQueryOptions = useMemo(() => ({ live: false }), [])
   const { items: media, loading, error, isUsingFallback } = useContentCollection("media", MEDIA, null, mediaQueryOptions)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   const { site } = useSiteSettings(SITE)

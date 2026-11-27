@@ -48,7 +48,9 @@ function getDownloadUrl(url) {
 }
 
 export default function Library({ go, authState, ctx }) {
-  const booksQueryOptions = useMemo(() => ({ live: false, limit: 200 }), [])
+  // Do not cap with `limit(200)`: soft-deleted tombstones sort ahead of active
+  // books in Firestore __name__ order and would fill the entire 200-doc window.
+  const booksQueryOptions = useMemo(() => ({ live: false }), [])
   const { items: books, loading, error, isUsingFallback } = useContentCollection("books", BOOKS, null, booksQueryOptions)
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
 
