@@ -109,9 +109,9 @@ export default function AdminOpenHouse() {
 
   const handleSyncCurated = async () => {
     const ok = await confirmAction({
-      title: "นำเข้าข้อมูลแหล่งเรียนรู้ตั้งต้น",
-      message: `ระบบจะเพิ่มแหล่งเรียนรู้สะลัฟที่ตรวจสอบแล้ว (${OPENHOUSE_BOOTHS.length} แหล่ง) และหมวดหมู่เนื้อหาเข้าสู่ Firestore เฉพาะรายการที่ยังไม่มี (ไม่ทับข้อมูลที่คุณแก้ไขไว้)`,
-      confirmText: "นำเข้าข้อมูล",
+      title: "นำเข้าและอัปเดตข้อมูลแหล่งเรียนรู้",
+      message: `ระบบจะเพิ่มแหล่งเรียนรู้ใหม่ที่ยังไม่มี (ข้ามรายการที่คุณลบไว้) พร้อมอัปเดตโลโก้ เครือข่ายพันธมิตร และหมวดหมู่เพลย์ลิสต์เชิงลึกให้ครบทั้งหมด (${OPENHOUSE_BOOTHS.length} แหล่ง)`,
+      confirmText: "นำเข้าและอัปเดต",
     })
     if (!ok) return
 
@@ -129,6 +129,7 @@ export default function AdminOpenHouse() {
       })
 
       let addedBooths = 0
+      let updatedBooths = 0
       let skippedDeleted = 0
       let enrichedCampuses = 0
 
@@ -150,26 +151,40 @@ export default function AdminOpenHouse() {
           boothDocId = created.id
           addedBooths++
         } else {
-          // Fill missing slug/logoUrl/category on existing records without overwriting edits
+          // Upgrade missing/old logoUrl, category, slug, and clean up old cross-org networks
           const patch = {}
           if (!existing.slug || existing.slug !== item.slug) patch.slug = item.slug
-          if (!existing.logoUrl?.trim() && item.logoUrl) patch.logoUrl = item.logoUrl
+          const curLogo = (existing.logoUrl || "").trim()
+          if ((!curLogo || curLogo === "https://assabiqoon.com/favicon.svg") && item.logoUrl) {
+            patch.logoUrl = item.logoUrl
+          }
           if (!existing.category && item.category) patch.category = item.category
+          const curNets = JSON.stringify(existing.networks || [])
+          const newNets = JSON.stringify(item.networks || [])
+          if (curNets !== newNets) {
+            patch.networks = item.networks || []
+          }
           if (Object.keys(patch).length > 0) {
             await updateDoc(doc(db, "openhouse_booths", boothDocId), {
               ...patch,
               updatedAt: serverTimestamp(),
             })
+            updatedBooths++
           }
         }
 
-        // Seed campuses only if booth currently has none
+        // Seed or upgrade campuses when booth has none OR has fewer campuses than the new deep categorized set
         if (boothDocId && item.campuses?.length) {
-          const campusSnap = await getDocs(collection(db, `openhouse_booths/${boothDocId}/campuses`))
-          if (campusSnap.empty) {
+          const campusCol = collection(db, `openhouse_booths/${boothDocId}/campuses`)
+          const campusSnap = await getDocs(campusCol)
+          const needsUpgrade = campusSnap.empty || campusSnap.size < item.campuses.length
+          if (needsUpgrade) {
+            for (const oldDoc of campusSnap.docs) {
+              await deleteDoc(doc(db, `openhouse_booths/${boothDocId}/campuses`, oldDoc.id))
+            }
             for (const c of item.campuses) {
               const { id: _cid, ...campusPayload } = c
-              await addDoc(collection(db, `openhouse_booths/${boothDocId}/campuses`), {
+              await addDoc(campusCol, {
                 ...campusPayload,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
@@ -180,7 +195,7 @@ export default function AdminOpenHouse() {
         }
       }
 
-      notifySuccess(`นำเข้าสำเร็จ: เพิ่ม ${addedBooths} แหล่ง, หมวดหมู่ ${enrichedCampuses} รายการ${skippedDeleted > 0 ? ` (ข้ามรายการที่ลบไว้ ${skippedDeleted} แหล่ง)` : ""}`)
+      notifySuccess(`สำเร็จ: เพิ่มใหม่ ${addedBooths} แหล่ง, อัปเดต ${updatedBooths} แหล่ง, หมวดหมู่ ${enrichedCampuses} รายการ${skippedDeleted > 0 ? ` (ข้ามที่ลบไว้ ${skippedDeleted})` : ""}`)
     } catch (err) {
       console.error("Sync curated openhouse error", err)
       notifyError("เกิดข้อผิดพลาดในการนำเข้าข้อมูล (ตรวจสอบสิทธิ์แอดมิน)")
