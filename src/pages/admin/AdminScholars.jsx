@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react"
 import { DEFAULT_TAXONOMY, SCHOLARS } from "../../data/index.js"
-import { VERIFIED_SCHOLARS, normalizeScholarThaiName } from "../../data/scholarsVerified.js"
+import { ALL_VERIFIED_SCHOLARS, ADDED_SCHOLARS, normalizeScholarThaiName } from "../../data/scholarsVerified.js"
 import { useContentCollection, useTaxonomySettings, bulkDeleteItems } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
 import ContentStatusBanner from "../../components/ContentStatusBanner.jsx"
@@ -176,8 +176,10 @@ export default function AdminScholars() {
     try {
       let updated = 0
       let removed = 0
+      let added = 0
+      const existingIds = new Set(items.map(s => String(s.id)))
       for (const s of items) {
-        const patch = VERIFIED_SCHOLARS[s.id]
+        const patch = ALL_VERIFIED_SCHOLARS[s.id]
         if (patch?.duplicateOf) {
           await deleteItem(s.id)
           removed++
@@ -192,7 +194,13 @@ export default function AdminScholars() {
           }
         }
       }
-      notifySuccess(`ซิงก์สำเร็จ: อัปเดต ${updated} ท่าน${removed > 0 ? ` และลบรายการซ้ำ ${removed} รายการ` : ""}`)
+      for (const newScholar of ADDED_SCHOLARS) {
+        if (!existingIds.has(String(newScholar.id))) {
+          await saveItem(newScholar)
+          added++
+        }
+      }
+      notifySuccess(`ซิงก์สำเร็จ: อัปเดต ${updated} ท่าน${added > 0 ? `, เพิ่มใหม่ ${added} ท่าน` : ""}${removed > 0 ? `, ลบรายการซ้ำ ${removed} รายการ` : ""}`)
     } catch (err) {
       console.error(err)
       notifyError("ซิงก์ข้อมูลไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")

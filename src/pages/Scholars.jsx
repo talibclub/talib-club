@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react"
+import { createPortal } from "react-dom"
 import { DEFAULT_TAXONOMY, SCHOLARS } from "../data/index.js"
 import { mergeScholarsList } from "../data/scholarsVerified.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
@@ -46,9 +47,14 @@ export default function Scholars() {
 
   useEffect(() => {
     if (!selectedScholar) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
     const onKey = (e) => { if (e.key === "Escape") setSelectedScholar(null) }
     window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
+    return () => {
+      document.body.style.overflow = prevOverflow
+      window.removeEventListener("keydown", onKey)
+    }
   }, [selectedScholar])
 
   const resetVisible = () => {
@@ -528,41 +534,26 @@ function ScholarDetailModal({ s, color, getAqClass, getMhClass, getMzClass, onCl
   const shamelaSearchUrl = `https://shamela.ws/search?q=${encodeURIComponent(s.arabicName || s.name)}`
   const emaanSearchUrl = `https://www.emaanlibrary.com/?s=${encodeURIComponent(s.latin || s.name)}`
 
-  return (
+  const content = (
     <div
+      className="scholar-drawer-overlay"
       role="dialog"
       aria-modal="true"
       aria-label={s.name}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1000,
-        background: "rgba(0,0,0,0.55)",
-        backdropFilter: "blur(3px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
     >
       <div
-        className="card"
-        style={{
-          width: "100%",
-          maxWidth: 620,
-          maxHeight: "86vh",
-          overflowY: "auto",
-          padding: 24,
-          borderTop: `4px solid ${color}`,
-          position: "relative",
-        }}
+        className="scholar-drawer"
+        style={{ borderTop: `4px solid ${color}` }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 10 }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 18, color: "var(--text)", lineHeight: 1.4 }}>{s.name}</h2>
+        {/* Sticky Header */}
+        <div className="scholar-drawer-header">
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: "var(--text)", lineHeight: 1.4 }}>
+              {s.name}
+            </h2>
             {s.arabicName && (
-              <div dir="rtl" style={{ fontSize: 17, color: "var(--t2)", fontFamily: "serif", marginTop: 4 }}>
+              <div dir="rtl" style={{ fontSize: 17, color: "var(--t2)", fontFamily: "serif", marginTop: 4, textAlign: "right" }}>
                 {s.arabicName}
               </div>
             )}
@@ -574,103 +565,100 @@ function ScholarDetailModal({ s, color, getAqClass, getMhClass, getMzClass, onCl
           </div>
           <button
             type="button"
+            className="scholar-drawer-close"
             onClick={onClose}
             aria-label="ปิดหน้าต่าง"
-            style={{
-              background: "var(--bg2)",
-              border: "none",
-              borderRadius: "50%",
-              width: 32,
-              height: 32,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              color: "var(--t2)",
-              flexShrink: 0,
-            }}
+            title="ปิด (Esc)"
           >
-            <i className="ti ti-x" style={{ fontSize: 16 }}></i>
+            <i className="ti ti-x" style={{ fontSize: 18 }}></i>
           </button>
         </div>
 
-        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12, marginBottom: 12 }}>
-          <span><strong style={{ color: "var(--t3)", fontWeight: 400 }}>ฮ.ศ.:</strong> <span style={{ color, fontWeight: 600 }}>{s.hijri || "-"}</span></span>
-          <span><strong style={{ color: "var(--t3)", fontWeight: 400 }}>ค.ศ.:</strong> {s.ad || "-"}</span>
-          {s.field && <span><strong style={{ color: "var(--t3)", fontWeight: 400 }}>สาขา:</strong> {s.field}</span>}
-        </div>
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
-          {s.aq && s.aq !== "ไม่ระบุ" && (
-            <span className={`badge-mockup ${getAqClass(s.aq)}`} style={{ fontSize: 11, padding: "3px 9px" }}>
-              <span style={{ opacity: 0.8, fontWeight: 400 }}>อะกีดะฮ์: </span>{s.aq}
-            </span>
-          )}
-          {s.mh && s.mh !== "ไม่ระบุ" && (
-            <span className={`badge-mockup ${getMhClass(s.mh)}`} style={{ fontSize: 11, padding: "3px 9px" }}>
-              <span style={{ opacity: 0.8, fontWeight: 400 }}>มันฮัจญ์: </span>{s.mh}
-            </span>
-          )}
-          {s.mz && s.mz !== "ไม่ระบุ" && (
-            <span className={`badge-mockup ${getMzClass(s.mz)}`} style={{ fontSize: 11, padding: "3px 9px" }}>
-              <span style={{ opacity: 0.8, fontWeight: 400 }}>มัซฮับ: </span>{s.mz}
-            </span>
-          )}
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>
-            <i className="ti ti-user-circle" style={{ marginRight: 6, color: "var(--teal)" }}></i>
-            ประวัติโดยย่อ
+        {/* Scrollable Body */}
+        <div className="scholar-drawer-body">
+          {/* Meta row */}
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12.5, marginBottom: 14, padding: "10px 14px", background: "var(--bg2)", borderRadius: 10 }}>
+            <span><strong style={{ color: "var(--t3)", fontWeight: 400 }}>ฮ.ศ.:</strong> <span style={{ color, fontWeight: 600 }}>{s.hijri || "-"}</span></span>
+            <span><strong style={{ color: "var(--t3)", fontWeight: 400 }}>ค.ศ.:</strong> <span style={{ color: "var(--text)" }}>{s.ad || "-"}</span></span>
+            {s.field && <span><strong style={{ color: "var(--t3)", fontWeight: 400 }}>สาขา:</strong> <span style={{ color: "var(--text)" }}>{s.field}</span></span>}
           </div>
-          <p style={{ fontSize: 13, lineHeight: 1.75, color: "var(--t2)", margin: 0 }}>
-            {s.bio || s.note}
-          </p>
+
+          {/* Badges */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 20 }}>
+            {s.aq && s.aq !== "ไม่ระบุ" && (
+              <span className={`badge-mockup ${getAqClass(s.aq)}`} style={{ fontSize: 11, padding: "3px 10px" }}>
+                <span style={{ opacity: 0.8, fontWeight: 400 }}>อะกีดะฮ์: </span>{s.aq}
+              </span>
+            )}
+            {s.mh && s.mh !== "ไม่ระบุ" && (
+              <span className={`badge-mockup ${getMhClass(s.mh)}`} style={{ fontSize: 11, padding: "3px 10px" }}>
+                <span style={{ opacity: 0.8, fontWeight: 400 }}>มันฮัจญ์: </span>{s.mh}
+              </span>
+            )}
+            {s.mz && s.mz !== "ไม่ระบุ" && (
+              <span className={`badge-mockup ${getMzClass(s.mz)}`} style={{ fontSize: 11, padding: "3px 10px" }}>
+                <span style={{ opacity: 0.8, fontWeight: 400 }}>มัซฮับ: </span>{s.mz}
+              </span>
+            )}
+          </div>
+
+          {/* Bio */}
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+              <i className="ti ti-user-circle" style={{ color: "var(--teal)", fontSize: 17 }}></i>
+              <span>ประวัติโดยย่อ</span>
+            </div>
+            <p style={{ fontSize: 13.5, lineHeight: 1.8, color: "var(--t2)", margin: 0 }}>
+              {s.bio || s.note}
+            </p>
+          </div>
+
+          {/* Works */}
+          {Array.isArray(s.works) && s.works.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                <i className="ti ti-books" style={{ color: "var(--teal)", fontSize: 17 }}></i>
+                <span>ผลงานสำคัญ ({s.works.length} รายการ)</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {s.works.map((w, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      background: "var(--bg2)",
+                      border: "0.5px solid var(--br)",
+                      borderRadius: 12,
+                      padding: "12px 14px",
+                    }}
+                  >
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)", lineHeight: 1.4 }}>{w.title}</div>
+                    {w.arabicTitle && (
+                      <div dir="rtl" style={{ fontSize: 13.5, color: "var(--teal)", fontFamily: "serif", marginTop: 3, textAlign: "right" }}>
+                        {w.arabicTitle}
+                      </div>
+                    )}
+                    {w.description && (
+                      <p style={{ fontSize: 12.5, color: "var(--t2)", lineHeight: 1.65, margin: "6px 0 0" }}>
+                        {w.description}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        {Array.isArray(s.works) && s.works.length > 0 && (
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>
-              <i className="ti ti-books" style={{ marginRight: 6, color: "var(--teal)" }}></i>
-              ผลงานสำคัญ ({s.works.length} รายการ)
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {s.works.map((w, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    background: "var(--bg2)",
-                    border: "0.5px solid var(--br2)",
-                    borderRadius: 10,
-                    padding: "10px 14px",
-                  }}
-                >
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{w.title}</div>
-                  {w.arabicTitle && (
-                    <div dir="rtl" style={{ fontSize: 13, color: "var(--teal)", fontFamily: "serif", marginTop: 2 }}>
-                      {w.arabicTitle}
-                    </div>
-                  )}
-                  {w.description && (
-                    <p style={{ fontSize: 12, color: "var(--t2)", lineHeight: 1.6, margin: "4px 0 0" }}>
-                      {w.description}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div style={{ borderTop: "0.5px solid var(--br2)", paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-          <div style={{ fontSize: 11, color: "var(--t3)" }}>
+        {/* Sticky Footer */}
+        <div className="scholar-drawer-footer">
+          <div style={{ fontSize: 11, color: "var(--t3)", lineHeight: 1.4 }}>
             แหล่งอ้างอิง: {Array.isArray(s.sources) && s.sources.length > 0 ? s.sources.join(" · ") : "ฐานข้อมูล Talib Club"}
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <a href={shamelaSearchUrl} target="_blank" rel="noreferrer" className="btn btn-outline" style={{ fontSize: 11, padding: "4px 10px", textDecoration: "none" }}>
+          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            <a href={shamelaSearchUrl} target="_blank" rel="noreferrer" className="btn btn-outline" style={{ fontSize: 11.5, padding: "5px 12px", textDecoration: "none" }}>
               ค้นใน Shamela ↗
             </a>
-            <a href={emaanSearchUrl} target="_blank" rel="noreferrer" className="btn btn-outline" style={{ fontSize: 11, padding: "4px 10px", textDecoration: "none" }}>
+            <a href={emaanSearchUrl} target="_blank" rel="noreferrer" className="btn btn-outline" style={{ fontSize: 11.5, padding: "5px 12px", textDecoration: "none" }}>
               EmaanLibrary ↗
             </a>
           </div>
@@ -678,4 +666,6 @@ function ScholarDetailModal({ s, color, getAqClass, getMhClass, getMzClass, onCl
       </div>
     </div>
   )
+
+  return typeof document !== "undefined" ? createPortal(content, document.body) : content
 }

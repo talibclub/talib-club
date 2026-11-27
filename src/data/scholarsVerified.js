@@ -1,3 +1,5 @@
+import { VERIFIED_SCHOLARS_MORE, ADDED_SCHOLARS } from "./scholarsVerifiedMore.js"
+
 // ============================================================
 //  TALIB CLUB — ข้อมูลทำเนียบบุคคลที่ตรวจสอบและปรับปรุงแล้ว
 //  อ้างอิงหลัก: المكتبة الشاملة (shamela.ws) และ EmaanLibrary
@@ -970,15 +972,24 @@ export const VERIFIED_SCHOLARS = {
   }
 }
 
+export const ALL_VERIFIED_SCHOLARS = {
+  ...VERIFIED_SCHOLARS,
+  ...VERIFIED_SCHOLARS_MORE,
+}
+
+export { ADDED_SCHOLARS }
+
 /**
  * รวมข้อมูลอุละมาอ์จาก Firestore เข้ากับข้อมูลที่ตรวจสอบแล้ว
- * และปรับมาตรฐานทับศัพท์ภาษาไทยให้สม่ำเสมอ
+ * เติมรายชื่ออุละมาอ์สำคัญที่ขาดตก และปรับมาตรฐานทับศัพท์ภาษาไทยให้สม่ำเสมอ
  */
 export function mergeScholarsList(rawScholars = []) {
   const result = []
+  const existingIds = new Set()
   for (const s of rawScholars) {
     if (!s || s.deleted) continue
-    const patch = VERIFIED_SCHOLARS[s.id]
+    existingIds.add(String(s.id))
+    const patch = ALL_VERIFIED_SCHOLARS[s.id]
     if (patch?.duplicateOf) continue
     if (patch) {
       result.push({
@@ -992,6 +1003,11 @@ export function mergeScholarsList(rawScholars = []) {
         ...s,
         name: normalizeScholarThaiName(s.name),
       })
+    }
+  }
+  for (const added of ADDED_SCHOLARS) {
+    if (!existingIds.has(String(added.id))) {
+      result.push({ ...added, verified: true })
     }
   }
   return result
