@@ -530,72 +530,6 @@ export const OPENHOUSE_BOOTHS = [
     ]
   },
   {
-    "id": "genfa",
-    "slug": "genfa",
-    "name": "GenFa (เก็นฟา — สื่ออิสลามสายซุนนะฮ์)",
-    "category": "articles",
-    "language": "Thai",
-    "platforms": [
-      "Website"
-    ],
-    "socialLinks": {
-      "Website": "https://genfa.co"
-    },
-    "description": "คลัง E-Book บทความ และสื่อความรู้อิสลามสายซุนนะฮ์ ครอบคลุมกุรอาน หะดีษ ดุอาอ์ ฟิกฮ์ ครอบครัว ประวัติศาสตร์ และภาษาอาหรับ",
-    "logoUrl": "",
-    "themeColor": "#059669",
-    "order": 7,
-    "networks": [],
-    "campuses": [
-      {
-        "id": "genfa-quran",
-        "name": "หมวดอัลกุรอาน หะดีษ & ดุอาอ์",
-        "description": "บทความด้านคัมภีร์อัลกุรอาน หะดีษ และอัซการ์ประจำวัน",
-        "order": 1,
-        "links": [
-          {
-            "id": "gf-quran",
-            "title": "อัลกุรอาน & หะดีษ",
-            "url": "https://genfa.co/category/%e0%b8%9a%e0%b8%97%e0%b8%84%e0%b8%a7%e0%b8%b2%e0%b8%a1/%e0%b8%ad%e0%b8%b1%e0%b8%a5%e0%b8%81%e0%b8%b8%e0%b8%a3%e0%b8%ad%e0%b9%88%e0%b8%b2%e0%b8%99-%e0%b8%ab%e0%b8%b0%e0%b8%94%e0%b8%b5%e0%b8%a9/"
-          },
-          {
-            "id": "gf-dua",
-            "title": "ดุอาอ์ & อัซการ์",
-            "url": "https://genfa.co/category/%e0%b8%9a%e0%b8%97%e0%b8%84%e0%b8%a7%e0%b8%b2%e0%b8%a1/%e0%b8%94%e0%b8%b8%e0%b8%ad%e0%b8%b2%e0%b8%ad%e0%b9%8c-%e0%b8%ad%e0%b8%b1%e0%b8%8b%e0%b8%81%e0%b8%b2%e0%b8%a3/"
-          }
-        ]
-      },
-      {
-        "id": "genfa-life",
-        "name": "หมวดฟิกฮ์ ครอบครัว ประวัติศาสตร์ & ภาษาอาหรับ",
-        "description": "ความรู้ด้านศาสนบัญญัติ การเลี้ยงลูก และภาษาอาหรับ",
-        "order": 2,
-        "links": [
-          {
-            "id": "gf-fiqh",
-            "title": "ฟิกฮ์ & ถาม-ตอบ",
-            "url": "https://genfa.co/category/%e0%b8%9a%e0%b8%97%e0%b8%84%e0%b8%a7%e0%b8%b2%e0%b8%a1/%e0%b8%9f%e0%b8%b4%e0%b8%81%e0%b8%ae%e0%b8%ba-%e0%b8%96%e0%b8%b2%e0%b8%a1%e0%b8%95%e0%b8%ad%e0%b8%9a/"
-          },
-          {
-            "id": "gf-family",
-            "title": "ครอบครัว & การเลี้ยงลูก",
-            "url": "https://genfa.co/category/%e0%b8%9a%e0%b8%97%e0%b8%84%e0%b8%a7%e0%b8%b2%e0%b8%a1/%e0%b8%84%e0%b8%a3%e0%b8%ad%e0%b8%9a%e0%b8%84%e0%b8%a3%e0%b8%b1%e0%b8%a7-%e0%b8%81%e0%b8%b2%e0%b8%a3%e0%b9%80%e0%b8%a5%e0%b8%b5%e0%b9%89%e0%b8%a2%e0%b8%87%e0%b8%a5%e0%b8%b9%e0%b8%81/"
-          },
-          {
-            "id": "gf-history",
-            "title": "ประวัติศาสตร์อิสลาม",
-            "url": "https://genfa.co/category/%e0%b8%9a%e0%b8%97%e0%b8%84%e0%b8%a7%e0%b8%b2%e0%b8%a1/%e0%b8%9b%e0%b8%a3%e0%b8%b0%e0%b8%a7%e0%b8%b1%e0%b8%95%e0%b8%b4%e0%b8%a8%e0%b8%b2%e0%b8%aa%e0%b8%95%e0%b8%a3%e0%b9%8c/"
-          },
-          {
-            "id": "gf-arabic",
-            "title": "ภาษาอาหรับ",
-            "url": "https://genfa.co/category/%e0%b8%9a%e0%b8%97%e0%b8%84%e0%b8%a7%e0%b8%b2%e0%b8%a1/%e0%b8%a0%e0%b8%b2%e0%b8%a9%e0%b8%b2%e0%b8%ad%e0%b8%b2%e0%b8%ab%e0%b8%a3%e0%b8%b1%e0%b8%9a/"
-          }
-        ]
-      }
-    ]
-  },
-  {
     "id": "rightpath",
     "slug": "rightpath",
     "name": "Right Path Salafi",
@@ -614,7 +548,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "แหล่งบทความวิชาการด้านพิสูจน์อิสลามเชิงประจักษ์ หักล้างข้อกล่าวหา และหลักการเรียนรู้อิสลามที่ถูกต้องตามแนวทางสะลัฟ",
     "logoUrl": "",
     "themeColor": "#0284c7",
-    "order": 8,
+    "order": 7,
     "networks": [],
     "campuses": [
       {
@@ -666,82 +600,6 @@ export const OPENHOUSE_BOOTHS = [
     ]
   },
   {
-    "id": "darisslamm",
-    "slug": "darisslamm",
-    "name": "ดารุสสลาม (Darisslamm)",
-    "category": "articles",
-    "language": "Thai",
-    "platforms": [
-      "Website"
-    ],
-    "socialLinks": {
-      "Website": "https://darisslamm.com"
-    },
-    "description": "คลังบทความวิชาการอิสลามภาษาไทย แยกหมวดหมู่อย่างชัดเจนทั้งอะกีดะฮ์ หะดีษ ฟิกฮ์อิบาดาต-มุอามาลาต ประวัติศาสตร์ และขัดเกลาจิตใจ",
-    "logoUrl": "",
-    "themeColor": "#047857",
-    "order": 9,
-    "networks": [],
-    "campuses": [
-      {
-        "id": "dar-foundations",
-        "name": "หมวดอะกีดะฮ์ หะดีษ ประวัติศาสตร์ & ขัดเกลาจิตใจ",
-        "description": "รากฐานศรัทธา วจนะนบี และพัฒนาจิตวิญญาณ",
-        "order": 1,
-        "links": [
-          {
-            "id": "dar-aqidah",
-            "title": "หมวดอะกีดะฮ์",
-            "url": "https://darisslamm.com/category/aqidah/"
-          },
-          {
-            "id": "dar-hadith",
-            "title": "หมวดหะดีษ",
-            "url": "https://darisslamm.com/category/hadith/"
-          },
-          {
-            "id": "dar-history",
-            "title": "หมวดประวัติศาสตร์",
-            "url": "https://darisslamm.com/category/history/"
-          },
-          {
-            "id": "dar-tazkiyah",
-            "title": "หมวดขัดเกลาจิตใจ",
-            "url": "https://darisslamm.com/category/article/%e0%b8%82%e0%b8%b1%e0%b8%94%e0%b9%80%e0%b8%81%e0%b8%a5%e0%b8%b2%e0%b8%88%e0%b8%b4%e0%b8%95%e0%b9%83%e0%b8%88/"
-          }
-        ]
-      },
-      {
-        "id": "dar-fiqh",
-        "name": "หมวดฟิกฮ์อิบาดาต & มุอามาลาต",
-        "description": "บทบัญญัติการละหมาด รอมฎอน และธุรกรรมอิสลาม",
-        "order": 2,
-        "links": [
-          {
-            "id": "dar-ibadah",
-            "title": "ฟิกฮ์อิบาดาตทั้งหมด",
-            "url": "https://darisslamm.com/category/%e0%b8%9f%e0%b8%b4%e0%b8%81%e0%b8%ae%e0%b9%8c%e0%b8%ad%e0%b8%b4%e0%b8%9a%e0%b8%b2%e0%b8%94%e0%b8%b2%e0%b8%95/"
-          },
-          {
-            "id": "dar-salah",
-            "title": "เกี่ยวกับการละหมาด",
-            "url": "https://darisslamm.com/category/%e0%b8%9f%e0%b8%b4%e0%b8%81%e0%b8%ae%e0%b9%8c%e0%b8%ad%e0%b8%b4%e0%b8%9a%e0%b8%b2%e0%b8%94%e0%b8%b2%e0%b8%95/%e0%b9%80%e0%b8%81%e0%b8%b5%e0%b9%88%e0%b8%a2%e0%b8%a7%e0%b8%81%e0%b8%b1%e0%b8%9a%e0%b8%81%e0%b8%b2%e0%b8%a3%e0%b8%a5%e0%b8%b0%e0%b8%ab%e0%b8%a1%e0%b8%b2%e0%b8%94/"
-          },
-          {
-            "id": "dar-ramadan",
-            "title": "เกี่ยวกับรอมฎอน",
-            "url": "https://darisslamm.com/category/%e0%b8%9f%e0%b8%b4%e0%b8%81%e0%b8%ae%e0%b9%8c%e0%b8%ad%e0%b8%b4%e0%b8%9a%e0%b8%b2%e0%b8%94%e0%b8%b2%e0%b8%95/ramdan/"
-          },
-          {
-            "id": "dar-muamalat",
-            "title": "ฟิกฮ์มุอามาลาต",
-            "url": "https://darisslamm.com/category/fiqh/"
-          }
-        ]
-      }
-    ]
-  },
-  {
     "id": "islaminthailand",
     "slug": "islaminthailand",
     "name": "อิสลามในประเทศไทย (Islam in Thailand)",
@@ -756,7 +614,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "ศูนย์รวมอัลกุรอาน อัซซุนนะฮ์ ประวัตินบี และคลังบทความ/เสียงบรรยายวิชาการโดยคณาจารย์และเชคริฎอ อะหมัด สมะดี",
     "logoUrl": "",
     "themeColor": "#0d9488",
-    "order": 10,
+    "order": 8,
     "networks": [],
     "campuses": [
       {
@@ -817,7 +675,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "คลังความรู้อิสลามนานาชาติภาคภาษาไทย รวบรวมหนังสือ PDF บทความ ฟัตวา ไฟล์เสียง และวิดีโอที่ผ่านการตรวจสอบ",
     "logoUrl": "https://islamhouse.com/logo_IslamHouse.jpg",
     "themeColor": "#1d4ed8",
-    "order": 11,
+    "order": 9,
     "networks": [],
     "campuses": [
       {
@@ -878,7 +736,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "คลังหนังสือ บทความ และสื่อดะอ์วะฮ์แปลไทย ครอบคลุมหลักศรัทธาอะกีดะตุสสะลัฟ ฟิกฮ์ และคู่มือมุสลิมหลายภาษา",
     "logoUrl": "",
     "themeColor": "#0e7490",
-    "order": 12,
+    "order": 10,
     "networks": [],
     "campuses": [
       {
@@ -907,39 +765,6 @@ export const OPENHOUSE_BOOTHS = [
     ]
   },
   {
-    "id": "islamicbooks19",
-    "slug": "islamicbooks19",
-    "name": "IslamicBooks19 (สำนักพิมพ์ดิจิทัลอิสลาม)",
-    "category": "library",
-    "language": "Thai",
-    "platforms": [
-      "Website"
-    ],
-    "socialLinks": {
-      "Website": "https://islamicbooks19.netlify.app"
-    },
-    "description": "คลังบทความ ดุอาอ์ และหนังสือแนะนำอิสลามภาษาไทยที่ถ่ายทอดความรู้คลาสสิกให้อ่านเข้าใจง่ายและนำไปใช้ได้จริง",
-    "logoUrl": "",
-    "themeColor": "#15803d",
-    "order": 13,
-    "networks": [],
-    "campuses": [
-      {
-        "id": "ib19-main",
-        "name": "คลังหนังสือและบทความแนะนำ",
-        "description": "เลือกดูหนังสือแนะนำและสื่อความรู้ดิจิทัล",
-        "order": 1,
-        "links": [
-          {
-            "id": "ib19-home",
-            "title": "เข้าสู่หน้าหลัก IslamicBooks19 →",
-            "url": "https://islamicbooks19.netlify.app"
-          }
-        ]
-      }
-    ]
-  },
-  {
     "id": "sunnahthai",
     "slug": "sunnahthai",
     "name": "ซุนนะห์ไทย (SunnahThai)",
@@ -954,7 +779,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "แหล่งค้นคว้าอัลกุรอานพร้อมตัฟซีรและบทความวิชาการอิสลามภาษาไทยที่อ่านง่ายและเป็นระบบ",
     "logoUrl": "https://sunnahthai.com/upload/logo/launchericon-192x192.png",
     "themeColor": "#047857",
-    "order": 14,
+    "order": 11,
     "networks": [],
     "campuses": [
       {
@@ -992,7 +817,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "เว็บอ่านอัลกุรอานพร้อมคำแปลภาษาไทยและตัฟซีร ค้นหาอายะฮ์และซูเราะฮ์ได้สะดวกรวดเร็ว",
     "logoUrl": "",
     "themeColor": "#065f46",
-    "order": 15,
+    "order": 12,
     "networks": [],
     "campuses": [
       {
@@ -1025,7 +850,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "สารานุกรมหะดีษนบีพร้อมคำอธิบายและคำแปลหลายภาษารวมถึงภาษาไทย อังกฤษ และอาหรับ",
     "logoUrl": "https://hadeethenc.com/assets_v2/images/og_new_logo.jpg",
     "themeColor": "#0369a1",
-    "order": 16,
+    "order": 13,
     "networks": [
       "quranenc"
     ],
@@ -1070,7 +895,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "โครงการแปลความหมายอัลกุรอานที่เชื่อถือได้ในหลากหลายภาษา พร้อมเสียงอ่านและคำอธิบายประกอบ",
     "logoUrl": "https://quranenc.com/assets/images/og_new_logo.jpg",
     "themeColor": "#15803d",
-    "order": 17,
+    "order": 14,
     "networks": [
       "hadeethenc"
     ],
@@ -1110,7 +935,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "คลังค้นหาคำวินิจฉัยปัญหาศาสนา (ฟัตวา) ภาษาไทยจากบรรดานักวิชาการอะฮ์ลิสซุนนะฮ์ วัลญะมาอะฮ์",
     "logoUrl": "",
     "themeColor": "#0d9488",
-    "order": 18,
+    "order": 15,
     "networks": [],
     "campuses": [
       {
@@ -1143,7 +968,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "คลังแปลคำวินิจฉัยปัญหาศาสนา (ฟัตวา) จาก IslamQA เป็นภาษาไทย พร้อมบล็อกบทความสะลัฟในเครือ",
     "logoUrl": "",
     "themeColor": "#0369a1",
-    "order": 19,
+    "order": 16,
     "networks": [],
     "campuses": [
       {
@@ -1203,7 +1028,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "เว็บไซต์ความรู้อิสลามภาษาไทยรุ่นบุกเบิก รวบรวมบทความศาสนา ฟัตวา และวิทยุ Risalah Radio ตามแนวทางอัลกุรอานและซุนนะฮ์",
     "logoUrl": "",
     "themeColor": "#0e7490",
-    "order": 20,
+    "order": 17,
     "networks": [],
     "campuses": [
       {
@@ -1240,112 +1065,6 @@ export const OPENHOUSE_BOOTHS = [
     ]
   },
   {
-    "id": "alhamdtv",
-    "slug": "alhamdtv",
-    "name": "AlhamdTV (อัลฮัมดุลิลลาฮ์ กรุ๊ป)",
-    "category": "media",
-    "language": "Thai",
-    "platforms": [
-      "Website",
-      "YouTube"
-    ],
-    "socialLinks": {
-      "Website": "https://alhamdtv.com",
-      "YouTube": "https://www.youtube.com/@AlhamdTV"
-    },
-    "description": "สถานีและคลังสื่อบรรยายศาสนาอิสลามสายซุนนะฮ์ จัดเก็บคลิปและรายการย้อนหลังแยกตามปี พ.ศ. อย่างเป็นระบบ",
-    "logoUrl": "https://yt3.googleusercontent.com/JSxFrtDNDvsd5dwZAo-38fNOhQY5tixHKMX7sv65xywk3wnGl24U9YDNIB2k-roMrVH4vOib=s900-c-k-c0x00ffffff-no-rj",
-    "themeColor": "#0f766e",
-    "order": 21,
-    "networks": [],
-    "campuses": [
-      {
-        "id": "ah-tafsir",
-        "name": "หมวดตัฟซีรอัลกุรอาน (อ.ยูซุฟ ศรีมาลา)",
-        "description": "บทเรียนตัฟซีรซูเราะฮ์สำคัญแบบต่อเนื่อง",
-        "order": 1,
-        "links": [
-          {
-            "id": "ah-pl-shuara",
-            "title": "ซูเราะฮ์อัชชุอะรออ์ (อ.ยูซุฟ ศรีมาลา)",
-            "url": "https://www.youtube.com/playlist?list=PLSMV1iAReH5w"
-          },
-          {
-            "id": "ah-pl-furqan",
-            "title": "ซูเราะฮ์อัลฟุรกอน (อ.ยูซุฟ ศรีมาลา)",
-            "url": "https://www.youtube.com/playlist?list=PL5xEqPgEaO_P-nftqpjrEzs84sMiFDS20"
-          },
-          {
-            "id": "ah-pl-nur",
-            "title": "ซูเราะฮ์อันนูร (อ.ยูซุฟ ศรีมาลา)",
-            "url": "https://www.youtube.com/playlist?list=PL5xEqPgEaO_PgFsfIotMYL6LlonK4UH61"
-          }
-        ]
-      },
-      {
-        "id": "ah-books-qa",
-        "name": "หมวดอธิบายตำรา & ตอบปัญหาศาสนา",
-        "description": "บทเรียนอธิบายหนังสือวิชาการและรายการถาม-ตอบ",
-        "order": 2,
-        "links": [
-          {
-            "id": "ah-pl-faith",
-            "title": "อธิบายหนังสือ \"Faith in the Modern World\" (อ.อะละวี่)",
-            "url": "https://www.youtube.com/playlist?list=PL5xEqPgEaO_NVTExYDY_FR4d0-C3j2Src"
-          },
-          {
-            "id": "ah-pl-qudamah",
-            "title": "คำสั่งเสียของอิหม่ามอิบนุกุดามะฮ์ (อ.อับดุลวาริซ)",
-            "url": "https://www.youtube.com/playlist?list=PL5xEqPgEaO_MvXahlUjvLbhjvWbxzEFzU"
-          },
-          {
-            "id": "ah-pl-qa",
-            "title": "ถาม-ตอบปัญหาศาสนา",
-            "url": "https://www.youtube.com/playlist?list=PL5xEqPgEaO_OVFRgHKP8mUH4BGBen5UQ_"
-          },
-          {
-            "id": "ah-pl-halal",
-            "title": "รายการ Halal มั๊ย",
-            "url": "https://www.youtube.com/playlist?list=PL5xEqPgEaO_MGrIlZyqkINrs_cmR3_J7Y"
-          }
-        ]
-      },
-      {
-        "id": "ah-teachers",
-        "name": "หมวดรวมบรรยายคณาจารย์ & คลังรายปี",
-        "description": "เลือกฟังตามคณาจารย์และคลังรายการย้อนหลังบนเว็บไซต์",
-        "order": 3,
-        "links": [
-          {
-            "id": "ah-pl-khalid",
-            "title": "รวมบรรยาย อ.คอลิด วารีย์",
-            "url": "https://www.youtube.com/playlist?list=PLMK-xBInWDP8"
-          },
-          {
-            "id": "ah-pl-asman",
-            "title": "รวมบรรยาย อ.อัสมัน มีสมบูรณ์",
-            "url": "https://www.youtube.com/playlist?list=PLI_2Y_syJgGY"
-          },
-          {
-            "id": "ah-pl-ameen",
-            "title": "รวมบรรยาย อ.อามีน มูซานัดวี",
-            "url": "https://www.youtube.com/playlist?list=PL5xEqPgEaO_M_NHLE6y795GWq6CmUeiPD"
-          },
-          {
-            "id": "ah-2569",
-            "title": "คลังรายการปี 2569 (เว็บไซต์)",
-            "url": "https://alhamdtv.com/category/42"
-          },
-          {
-            "id": "ah-2568",
-            "title": "คลังรายการปี 2568 (เว็บไซต์)",
-            "url": "https://alhamdtv.com/category/41"
-          }
-        ]
-      }
-    ]
-  },
-  {
     "id": "ilmulnafi",
     "slug": "ilmulnafi",
     "name": "ศูนย์การเรียนรู้อิลมุนนาเฟียอ์ (مركز العلم النافع)",
@@ -1360,7 +1079,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "เผยแพร่ความรู้ที่ยังประโยชน์จากตำราอุละมาอ์ที่เจริญรอยตามสะลัฟ ในรูปแบบบรรยายซีรีส์ระยะยาวและบทเรียนศาสนา",
     "logoUrl": "https://yt3.googleusercontent.com/FfbF-7OeURal1lop02CLX8o2D3VKRHbP69LGpopkf6SOJhZQmtBC2tFaFBOidTtM9gLjeGsipw=s900-c-k-c0x00ffffff-no-rj",
     "themeColor": "#047857",
-    "order": 22,
+    "order": 18,
     "networks": [],
     "campuses": [
       {
@@ -1464,7 +1183,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "ช่องยูทูบชมรมอัซซะละฟิยูน เผยแพร่คำบรรยาย บทเรียนตำราสะลัฟ และคลิปความรู้ศาสนาภาษาไทย",
     "logoUrl": "https://yt3.googleusercontent.com/ytc/AIdro_mdppEaMMmJoT7JJ1NV36n7ctqXrfMfD8kiIRyn_nt-wZ8=s900-c-k-c0x00ffffff-no-rj",
     "themeColor": "#1a5f7a",
-    "order": 23,
+    "order": 19,
     "networks": [],
     "campuses": [
       {
@@ -1544,77 +1263,6 @@ export const OPENHOUSE_BOOTHS = [
     ]
   },
   {
-    "id": "sufumothman",
-    "slug": "sufumothman",
-    "name": "ซุฟอัม อุษมาน (Suf-um Othman)",
-    "category": "media",
-    "language": "Thai",
-    "platforms": [
-      "YouTube"
-    ],
-    "socialLinks": {
-      "YouTube": "https://www.youtube.com/@sufumothman"
-    },
-    "description": "ช่องบรรยายและสอนตำราศาสนาอิสลามโดย อ.ซุฟอัม อุษมาน ครอบคลุมตัฟซีร หะดีษ อะกีดะฮ์ และฟิกฮ์",
-    "logoUrl": "https://yt3.googleusercontent.com/EP8Efjy3Kenp8d90TeO6QYIOoKlrd8pu3HdKrt5whCj1q6IjbYeau-vfuafN-Iv1qDtN2Akq=s900-c-k-c0x00ffffff-no-rj",
-    "themeColor": "#0f766e",
-    "order": 24,
-    "networks": [],
-    "campuses": [
-      {
-        "id": "so-tafsir",
-        "name": "หมวดสรุปตัฟซีรอัลกุรอานรายซูเราะฮ์",
-        "description": "สรุปตัฟซีรและบทเรียนสำคัญจากแต่ละซูเราะฮ์โดย อ.ซุฟอัม อุษมาน",
-        "order": 1,
-        "links": [
-          {
-            "id": "so-pl-shura",
-            "title": "สรุปตัฟซีร ซูเราะฮ์ อัช-ชูรอ",
-            "url": "https://www.youtube.com/playlist?list=PLRokdVsVhjSY"
-          },
-          {
-            "id": "so-pl-tur",
-            "title": "สรุปตัฟซีร ซูเราะฮ์ อัฏ-ฏูร",
-            "url": "https://www.youtube.com/playlist?list=PLVImP2r1ifl4"
-          },
-          {
-            "id": "so-pl-fussilat",
-            "title": "สรุปตัฟซีร ซูเราะฮ์ ฟุศศิลัต",
-            "url": "https://www.youtube.com/playlist?list=PLTsAxKRrpVEloRXuPSmHUMVTUgUR8_hk-"
-          },
-          {
-            "id": "so-pl-ghafir",
-            "title": "สรุปบทเรียนจากซูเราะฮ์ ฆอฟิร",
-            "url": "https://www.youtube.com/playlist?list=PLTsAxKRrpVEnAtk_Ry48HcKe7DB-1J3DI"
-          }
-        ]
-      },
-      {
-        "id": "so-tadabbur",
-        "name": "หมวดตะดับบุร ข้อคิด & วิดีโอภาษาอังกฤษ",
-        "description": "คลิปใคร่ครวญอายะฮ์ รู้จักชัยฏอน และคลิปบรรยายภาษาอังกฤษ",
-        "order": 2,
-        "links": [
-          {
-            "id": "so-pl-tadabbur",
-            "title": "อายะฮ์นี้ดีต่อใจ (ตะดับบุร)",
-            "url": "https://www.youtube.com/playlist?list=PLTsAxKRrpVEny1udCMhehDRGnG_hPYoDT"
-          },
-          {
-            "id": "so-pl-shaytan",
-            "title": "รู้จักชัยฏอน (คลิปสั้น)",
-            "url": "https://www.youtube.com/playlist?list=PLTsAxKRrpVEnK-btyfqa2cF2TXPh4p1KE"
-          },
-          {
-            "id": "so-pl-en",
-            "title": "VDO in English",
-            "url": "https://www.youtube.com/playlist?list=PLTsAxKRrpVEkd5il3SA7PXW1cU_Jef3tY"
-          }
-        ]
-      }
-    ]
-  },
-  {
     "id": "alflower",
     "slug": "alflower",
     "name": "อัลฟะวาเอ็ด (alflower.1)",
@@ -1631,7 +1279,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "ช่องบทเรียนศาสนา อรรถาธิบายพระนามอันวิจิตรของอัลลอฮ์ กฎเหล็กการขัดเกลาจิตใจ และแนะนำหนังสือแปลสายสะละฟี",
     "logoUrl": "https://yt3.googleusercontent.com/tJqHYC5TERk0WZs8RKyn2pxa60ZUKWZJ7zKCNb894zOLcWy3FEkSCibrKi_Y7vmMp9DZCqO9Sw=s900-c-k-c0x00ffffff-no-rj",
     "themeColor": "#be185d",
-    "order": 25,
+    "order": 20,
     "networks": [],
     "campuses": [
       {
@@ -1726,158 +1374,6 @@ export const OPENHOUSE_BOOTHS = [
     ]
   },
   {
-    "id": "alyaqeen",
-    "slug": "alyaqeen",
-    "name": "ALYAQEEN CHANNEL",
-    "category": "media",
-    "language": "Thai",
-    "platforms": [
-      "YouTube"
-    ],
-    "socialLinks": {
-      "YouTube": "https://www.youtube.com/@ALYAQEENCHANNEL"
-    },
-    "description": "ช่องสื่อวิดีโอความรู้ศาสนาอิสลาม คลิปบรรยาย และรายการตอบข้อสงสัยทางศาสนาภาษาไทย",
-    "logoUrl": "https://yt3.googleusercontent.com/E_l5ZiAdg9yedjQ8iG--Lzv5HGJ4DRPQdZ1AD0dUbeKW0-16uOqeAZHuhCJooag9zq5gr6a8M48=s900-c-k-c0x00ffffff-no-rj",
-    "themeColor": "#0369a1",
-    "order": 26,
-    "networks": [],
-    "campuses": [
-      {
-        "id": "ay-ibadah",
-        "name": "หมวดฟิกฮ์อิบาดะฮ์ & ภาษาอาหรับ",
-        "description": "บทเรียนฮัจญ์ อุมเราะฮ์ การถือศีลอด และการออกเสียงภาษาอาหรับ",
-        "order": 1,
-        "links": [
-          {
-            "id": "ay-pl-hajj",
-            "title": "วิธีการทำฮัจญ์และอุมเราะฮ์",
-            "url": "https://www.youtube.com/playlist?list=PLtIQiH2VTZvDiCWrOiwLIz9WdoYUjBJWM"
-          },
-          {
-            "id": "ay-pl-fasting",
-            "title": "การถือศีลอด",
-            "url": "https://www.youtube.com/playlist?list=PLtIQiH2VTZvAROWh0OlCi-GiM5ocD4teH"
-          },
-          {
-            "id": "ay-pl-ramadan",
-            "title": "บรรยายเดือนรอมฎอน",
-            "url": "https://www.youtube.com/playlist?list=PLtIQiH2VTZvBvroQE9g16nL41kQHI6vYP"
-          },
-          {
-            "id": "ay-pl-arabic",
-            "title": "การออกเสียงภาษาอาหรับ",
-            "url": "https://www.youtube.com/playlist?list=PLtIQiH2VTZvAAvQxNDRMKG9oG81WwuK4L"
-          }
-        ]
-      },
-      {
-        "id": "ay-teachers",
-        "name": "หมวดรวมบรรยาย & พอดแคสต์คณาจารย์",
-        "description": "คลังบรรยายและพอดแคสต์แยกตามผู้บรรยาย",
-        "order": 2,
-        "links": [
-          {
-            "id": "ay-pl-mustafa",
-            "title": "อ.มุสตอฟา อยู่เป็นสุข (พอดแคสต์)",
-            "url": "https://www.youtube.com/playlist?list=PLtIQiH2VTZvBNH4Z1LYfvcPyMlwzhS--U"
-          },
-          {
-            "id": "ay-pl-yusuf",
-            "title": "อ.ยูซุฟ พงกาวี (พอดแคสต์)",
-            "url": "https://www.youtube.com/playlist?list=PLtIQiH2VTZvDS5Cd-aqaxljztidG3PJTT"
-          },
-          {
-            "id": "ay-pl-abidin",
-            "title": "อ.อาบีดีน ฮัดซัน",
-            "url": "https://www.youtube.com/playlist?list=PLtIQiH2VTZvDi0h3yI807ic8BSl-_rDE1"
-          },
-          {
-            "id": "ay-pl-samit",
-            "title": "อ.สมิตร มะดะเรส",
-            "url": "https://www.youtube.com/playlist?list=PLtIQiH2VTZvAQ8s5xE0-qtkK1CvDEhOS0"
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "id": "manarah",
-    "slug": "manarah",
-    "name": "Manarah Channel",
-    "category": "media",
-    "language": "Thai",
-    "platforms": [
-      "YouTube"
-    ],
-    "socialLinks": {
-      "YouTube": "https://www.youtube.com/@manarah"
-    },
-    "description": "ช่องสื่อวิชาการอิสลาม บทเรียนศาสนา และคลิปแปลคำสอนของปราชญ์สายสะลัฟภาษาไทย",
-    "logoUrl": "https://yt3.googleusercontent.com/LpHEgzZK6rzKWWM__S5H5E05VL6yWt3Zai77HEC5aZnhUMvpTdMhZYhxmktvRyTefezF9pauIfc=s900-c-k-c0x00ffffff-no-rj",
-    "themeColor": "#b45309",
-    "order": 27,
-    "networks": [],
-    "campuses": [
-      {
-        "id": "mn-aqidah-hadith",
-        "name": "หมวดอะกีดะฮ์ หะดีษ & รอมฎอน",
-        "description": "ซีรีส์สอนตำราอะกีดะฮ์ 40 หะดีษอันนะวะวีย์ และบทเรียนรอมฎอน",
-        "order": 1,
-        "links": [
-          {
-            "id": "mn-pl-aqidah",
-            "title": "อะกีดะฮ์ อิบนุ ดะกีก (อ.ซอบรี นภากร)",
-            "url": "https://www.youtube.com/playlist?list=PLZ_W_53H1W2uq_d8iFTCIiEDzleuKPXeq"
-          },
-          {
-            "id": "mn-pl-40",
-            "title": "อธิบาย 40 หะดีษอันนะวะวีย์",
-            "url": "https://www.youtube.com/playlist?list=PLZ_W_53H1W2vIRhuPOdpia2VNndrPSG8E"
-          },
-          {
-            "id": "mn-pl-ramadan",
-            "title": "รอมฎอน ฮ.ศ. 1446 / 2025",
-            "url": "https://www.youtube.com/playlist?list=PLZ_W_53H1W2tc8CATlWcKFCCicXgTgh8j"
-          },
-          {
-            "id": "mn-pl-world",
-            "title": "สถานการณ์โลกมุสลิม",
-            "url": "https://www.youtube.com/playlist?list=PLZ_W_53H1W2t_5zfqfVz0up9dNukSTVBV"
-          }
-        ]
-      },
-      {
-        "id": "mn-teachers",
-        "name": "หมวดรวมบรรยายแยกตามคณาจารย์",
-        "description": "เลือกฟังคำบรรยายจากคณาจารย์แต่ละท่าน",
-        "order": 2,
-        "links": [
-          {
-            "id": "mn-pl-hafiz",
-            "title": "บรรยาย อ.ฮาฟิซ วันแอเลาะ",
-            "url": "https://www.youtube.com/playlist?list=PLZ_W_53H1W2udQY6BBOMOih3kRwJ6mmks"
-          },
-          {
-            "id": "mn-pl-abdullah",
-            "title": "บรรยาย อ.อับดุลเลาะห์ และเยาะ",
-            "url": "https://www.youtube.com/playlist?list=PLZ_W_53H1W2uWojhdxTWbApTEuWj7Deuj"
-          },
-          {
-            "id": "mn-pl-hamid",
-            "title": "บรรยาย อ.อับดุลฮามิด ดาราฉาย",
-            "url": "https://www.youtube.com/playlist?list=PLZ_W_53H1W2vJQoUpfnLwyCAAa-TUHKI9"
-          },
-          {
-            "id": "mn-pl-afadee",
-            "title": "บรรยาย อ.อาฟาดี คุรุสวัสดิ์",
-            "url": "https://www.youtube.com/playlist?list=PLZ_W_53H1W2vtKFSStO9KeGtq0rFj1DrU"
-          }
-        ]
-      }
-    ]
-  },
-  {
     "id": "arifsalafi",
     "slug": "arifsalafi",
     "name": "Arif Salafi",
@@ -1892,7 +1388,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "ช่องคลิปแปลคำบรรยายและฟัตวาของบรรดาอุละมาอ์ใหญ่สายสะลัฟพร้อมซับไทย",
     "logoUrl": "https://yt3.googleusercontent.com/hWBXgQR6LGV5jW6f7jRQs3xssXX9Wmuiug3KwIFxbxXugYirl14K038CbisTHxANzYA0hP84Vw=s900-c-k-c0x00ffffff-no-rj",
     "themeColor": "#334155",
-    "order": 28,
+    "order": 21,
     "networks": [],
     "campuses": [
       {
@@ -1977,158 +1473,6 @@ export const OPENHOUSE_BOOTHS = [
     ]
   },
   {
-    "id": "whitechannel",
-    "slug": "whitechannel",
-    "name": "White Channel (สถานีความดี 24 ชั่วโมง)",
-    "category": "media",
-    "language": "Thai",
-    "platforms": [
-      "YouTube"
-    ],
-    "socialLinks": {
-      "YouTube": "https://www.youtube.com/@whitechannel24hr"
-    },
-    "description": "สถานีโทรทัศน์และช่องยูทูบเผยแผ่ความรู้อิสลามสายซุนนะฮ์ ครอบคลุมรายการบรรยาย ถาม-ตอบปัญหาศาสนา และสารคดีอิสลาม",
-    "logoUrl": "https://yt3.googleusercontent.com/T10ooOmG4ak_Vp4vkoAGFk9_ImueiN_kivvsGauekaQ6Z43LLYkGuS-8_QbgQFgC782GIHPodEY=s900-c-k-c0x00ffffff-no-rj",
-    "themeColor": "#1d4ed8",
-    "order": 29,
-    "networks": [],
-    "campuses": [
-      {
-        "id": "wc-quran-ibadah",
-        "name": "หมวดอัลกุรอาน ซิกรุลลอฮ์ & อิบาดะฮ์",
-        "description": "รายการอัลกุรอาน การถือศีลอด และสารคดีจัดการศพ",
-        "order": 1,
-        "links": [
-          {
-            "id": "wc-pl-juz",
-            "title": "วันละญุซ Season 2",
-            "url": "https://www.youtube.com/playlist?list=PLNGVBR2UPGmzU07y-uhayivtS7KzsU97y"
-          },
-          {
-            "id": "wc-pl-dhikr",
-            "title": "ซิกรุลลอฮ์",
-            "url": "https://www.youtube.com/playlist?list=PLNGVBR2UPGmwL2KycXWhof223B3N0pDsJ"
-          },
-          {
-            "id": "wc-pl-fast",
-            "title": "ถือศีลอด",
-            "url": "https://www.youtube.com/playlist?list=PLNGVBR2UPGmw-PnPTv1amMAWuJWrIW67R"
-          },
-          {
-            "id": "wc-pl-janazah",
-            "title": "สารคดีจัดการศพตามบัญญัติอิสลาม",
-            "url": "https://www.youtube.com/playlist?list=PLNGVBR2UPGmz2TcnHbnczwrQH9PZPILYJ"
-          }
-        ]
-      },
-      {
-        "id": "wc-docs-family",
-        "name": "หมวดสารคดีศรัทธา & ครอบครัว",
-        "description": "สารคดีวันสิ้นโลก ทูตสวรรค์ 101 และรายการครอบครัว",
-        "order": 2,
-        "links": [
-          {
-            "id": "wc-pl-qiyamah",
-            "title": "สารคดีวันสิ้นโลก",
-            "url": "https://www.youtube.com/playlist?list=PLNGVBR2UPGmwVeJi6Yu19IjUXsbnZ1W03"
-          },
-          {
-            "id": "wc-pl-angels",
-            "title": "ทูตสวรรค์ 101",
-            "url": "https://www.youtube.com/playlist?list=PLNGVBR2UPGmzbG-vTwX7bJADrnW_52B6I"
-          },
-          {
-            "id": "wc-pl-halaqah",
-            "title": "รายการหะละเกาะฮ์ - วงล้อมแห่งศรัทธา 1446",
-            "url": "https://www.youtube.com/playlist?list=PLNGVBR2UPGmz_icKuBZtiBqOLf8buIbIO"
-          },
-          {
-            "id": "wc-pl-kids",
-            "title": "รายการ ภารกิจพิชิตใจลูก",
-            "url": "https://www.youtube.com/playlist?list=PLNGVBR2UPGmzEGnqoOpiCeRtB2j0Qc8dJ"
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "id": "yateemtv",
-    "slug": "yateemtv",
-    "name": "Yateem TV (YouTube)",
-    "category": "media",
-    "language": "Thai",
-    "platforms": [
-      "YouTube"
-    ],
-    "socialLinks": {
-      "YouTube": "https://www.youtube.com/@YateemTV1433"
-    },
-    "description": "ช่องยูทูบ Yateem TV รวมคลิปรายการศาสนา การสอนอัลกุรอาน ฟิกฮ์ และบรรยายวิชาการโดยคณาจารย์ไทย",
-    "logoUrl": "https://yt3.googleusercontent.com/wPHvdLtwsKdUjL-rZRQ0_hicdTXq7isN5kLnZ1AZs34Fp2adZt-Nw115E1vhd1otIBeeOrwe=s900-c-k-c0x00ffffff-no-rj",
-    "themeColor": "#047857",
-    "order": 30,
-    "networks": [],
-    "campuses": [
-      {
-        "id": "yt-quran-qa",
-        "name": "หมวดตัฟซีรอัลกุรอาน กีรออาตี & รายการวิชาการ",
-        "description": "เรียนอ่านอัลกุรอาน ตัฟซีร และรายการตอบประเด็นศาสนา",
-        "order": 1,
-        "links": [
-          {
-            "id": "yt-pl-tafsir",
-            "title": "ตัฟซีรอัลกุรอาน (อ.ชุโก๊ร ดาณีสมัน)",
-            "url": "https://www.youtube.com/playlist?list=PLkUN5HygkdGObA9cZeXdhoof0mWpk3S6t"
-          },
-          {
-            "id": "yt-pl-qiraati",
-            "title": "รายการสอนอ่านอัลกุรอาน กีรออาตี",
-            "url": "https://www.youtube.com/playlist?list=PLBT0uCftVskw"
-          },
-          {
-            "id": "yt-pl-bayyinah",
-            "title": "อัลบัยยีนะฮ์ หลักฐานที่ชัดเจน",
-            "url": "https://www.youtube.com/playlist?list=PLkUN5HygkdGOuHTRgrK70bC7TnXNNfHR5"
-          },
-          {
-            "id": "yt-pl-qa",
-            "title": "รายการเปิดประเด็นตอบ",
-            "url": "https://www.youtube.com/playlist?list=PLkUN5HygkdGNgMzdMFhVVqCY6cBpzGzDq"
-          }
-        ]
-      },
-      {
-        "id": "yt-teachers",
-        "name": "หมวดรวมบรรยายคณาจารย์",
-        "description": "คลังคลิปบรรยายแยกตามคณาจารย์แต่ละท่าน",
-        "order": 2,
-        "links": [
-          {
-            "id": "yt-pl-latif",
-            "title": "บรรยาย อ.อับดุลลาตีฟ ตำราเรียง",
-            "url": "https://www.youtube.com/playlist?list=PLFYAD-1NWi4Q"
-          },
-          {
-            "id": "yt-pl-hamid",
-            "title": "บรรยาย ดร.อับดุลฮามิด ดาราฉาย",
-            "url": "https://www.youtube.com/playlist?list=PLO4_N-d06z78"
-          },
-          {
-            "id": "yt-pl-ameen",
-            "title": "บรรยาย อ.อามีน เหมเสริม",
-            "url": "https://www.youtube.com/playlist?list=PLEStlYEHcmFQ"
-          },
-          {
-            "id": "yt-pl-fatin",
-            "title": "บรรยาย อ.มูฮำหมัดฟาฏิน สมาแอ",
-            "url": "https://www.youtube.com/playlist?list=PLTc1fp3ke73A"
-          }
-        ]
-      }
-    ]
-  },
-  {
     "id": "evolution-about",
     "slug": "evolution-about",
     "name": "Evolution-About : วิวัฒนาการตามจริง",
@@ -2143,7 +1487,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "ช่องวิชาการให้ความรู้และวิพากษ์ทฤษฎีวิวัฒนาการตามข้อเท็จจริงทางวิทยาศาสตร์ สารคดีพากย์ไทย และพอดแคสต์เชิงศรัทธา",
     "logoUrl": "https://yt3.googleusercontent.com/5g5jqwe_B9nyiOJMeM10ZJ-W5E70vju3-c7IRcB3m0B80ApngzsOGmuqseIBRVyqrBNqvDCc=s900-c-k-c0x00ffffff-no-rj",
     "themeColor": "#4338ca",
-    "order": 31,
+    "order": 22,
     "networks": [],
     "campuses": [
       {
@@ -2209,7 +1553,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "สมาคมอิสลามเก่าแก่ย่านบางกอกน้อย มีคลังหิ้งหนังสือ E-Book อิสลามภาษาไทยให้อ่านออนไลน์ฟรีจำนวนมาก",
     "logoUrl": "",
     "themeColor": "#065f46",
-    "order": 32,
+    "order": 23,
     "networks": [],
     "campuses": [
       {
@@ -2272,7 +1616,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "ห้องเรียนศาสนาอิสลามออนไลน์และชุมชนเรียนรู้สำหรับผู้แสวงหาความรู้ยุคใหม่",
     "logoUrl": "",
     "themeColor": "#0d9488",
-    "order": 33,
+    "order": 24,
     "networks": [],
     "campuses": [
       {
@@ -2312,7 +1656,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "มูลนิธิเพื่อการเผยแผ่อิสลาม โครงการแจกหนังสือและสื่อความรู้สำหรับผู้สนใจอิสลามและมุสลิมใหม่",
     "logoUrl": "",
     "themeColor": "#0284c7",
-    "order": 34,
+    "order": 25,
     "networks": [],
     "campuses": [
       {
@@ -2341,49 +1685,6 @@ export const OPENHOUSE_BOOTHS = [
     ]
   },
   {
-    "id": "ftu",
-    "slug": "ftu",
-    "name": "มหาวิทยาลัยฟาฏอนี (Fatoni University)",
-    "category": "institution",
-    "language": "Thai",
-    "platforms": [
-      "Website"
-    ],
-    "socialLinks": {
-      "Website": "https://www.ftu.ac.th"
-    },
-    "description": "สถาบันอุดมศึกษาอิสลามในประเทศไทย เปิดสอนคณะอิสลามศึกษาและนิติศาสตร์ หลักสูตรวิชาการและบัณฑิตศึกษา",
-    "logoUrl": "",
-    "themeColor": "#065f46",
-    "order": 35,
-    "networks": [],
-    "campuses": [
-      {
-        "id": "ftu-academic",
-        "name": "หลักสูตรและคณะวิชาการ",
-        "description": "ข้อมูลการศึกษาต่อด้านอิสลามศึกษาและบัณฑิตวิทยาลัย",
-        "order": 1,
-        "links": [
-          {
-            "id": "ftu-programs",
-            "title": "หลักสูตรที่เปิดสอน",
-            "url": "https://ftu.ac.th/program/"
-          },
-          {
-            "id": "ftu-islamic",
-            "title": "คณะอิสลามศึกษาและนิติศาสตร์",
-            "url": "https://islamic.ftu.ac.th/"
-          },
-          {
-            "id": "ftu-grad",
-            "title": "บัณฑิตวิทยาลัย มหาวิทยาลัยฟาฏอนี",
-            "url": "https://grad.ftu.ac.th/"
-          }
-        ]
-      }
-    ]
-  },
-  {
     "id": "ibnbaz-th",
     "slug": "ibnbaz-th",
     "name": "สถาบันอิบนุบาซเพื่ออิสลามศึกษา (Ibn Baz Institute)",
@@ -2398,7 +1699,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "สถาบันการเรียนการสอนอิสลามศึกษาและเผยแพร่ความรู้วิชาการตามแนวทางสะลัฟในประเทศไทย",
     "logoUrl": "",
     "themeColor": "#047857",
-    "order": 36,
+    "order": 26,
     "networks": [],
     "campuses": [
       {
@@ -2431,7 +1732,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "ศูนย์ดะอ์วะฮ์อิสลามแห่งประเทศไทย (مركز الدعوة الإسلامية) ถ่ายทอดหลักการอิสลามที่ถูกต้องแก่มุสลิมและผู้สนใจอิสลาม",
     "logoUrl": "",
     "themeColor": "#0f766e",
-    "order": 37,
+    "order": 27,
     "networks": [],
     "campuses": [
       {
@@ -2464,7 +1765,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "มูลนิธิเพื่อการแบ่งปันความรู้และสื่อหนังสืออิสลามเพื่อสังคม",
     "logoUrl": "",
     "themeColor": "#0369a1",
-    "order": 38,
+    "order": 28,
     "networks": [],
     "campuses": [
       {
@@ -2497,7 +1798,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "สถาบันและเพจเผยแพร่บทเรียนภาษาอาหรับ ตำราศาสนา และความรู้สะลัฟ",
     "logoUrl": "",
     "themeColor": "#1e40af",
-    "order": 39,
+    "order": 29,
     "networks": [],
     "campuses": [
       {
@@ -2532,7 +1833,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "รวมเพจสำนักพิมพ์อิสระ มุมหนังสือ และนักแปลตำราสะลัฟภาษาไทยที่เผยแพร่หนังสือและบทความคุณภาพบน Facebook และ Instagram",
     "logoUrl": "",
     "themeColor": "#7c2d12",
-    "order": 40,
+    "order": 30,
     "networks": [],
     "campuses": [
       {
@@ -2605,7 +1906,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "ศูนย์เผยแพร่และสำนักพิมพ์สะลัฟชั้นนำในสหราชอาณาจักร รวบรวมบทความแปลจากปราชญ์ใหญ่ด้านอะกีดะฮ์ อิบาดะฮ์ และมันฮัจย์",
     "logoUrl": "https://yt3.googleusercontent.com/ytc/AIdro_nuTdWXrzxA8Eenmb_lzKNAFsBW82CisrBQAL1OlcFTpg=s900-c-k-c0x00ffffff-no-rj",
     "themeColor": "#1a5f7a",
-    "order": 41,
+    "order": 31,
     "networks": [
       "abukhadeejah",
       "salafisounds",
@@ -2654,7 +1955,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "คลังบทความ เอกสารแจกฟรี และหนังสือ PDF แนวทางสะละฟีภาษาอังกฤษ เหมาะสำหรับศึกษาค้นคว้าและนำมาแปลเผยแผ่เป็นภาษาไทย",
     "logoUrl": "",
     "themeColor": "#0f766e",
-    "order": 42,
+    "order": 32,
     "networks": [
       "spubs",
       "salafisounds",
@@ -2705,7 +2006,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "คลังเสียงบรรยาย คุฏบะฮ์วันศุกร์ และบทเรียนอธิบายตำราคลาสสิกภาษาอังกฤษฟรีจากเครือข่าย Salafi Publications",
     "logoUrl": "",
     "themeColor": "#2563eb",
-    "order": 43,
+    "order": 33,
     "networks": [
       "spubs",
       "abukhadeejah",
@@ -2761,7 +2062,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "คลังบทความวิจัยและงานแปลเชิงวิชาการโดยอบู อิยาด (Amjad Rafiq) ด้านอะกีดะฮ์ มันฮัจย์ และการวิเคราะห์กระแสความคิดร่วมสมัย",
     "logoUrl": "",
     "themeColor": "#334155",
-    "order": 44,
+    "order": 34,
     "networks": [
       "spubs",
       "abukhadeejah",
@@ -2810,7 +2111,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "เว็บไซต์เฉพาะทางด้านหลักศรัทธา (อะกีดะฮ์) ของอะฮ์ลิสซุนนะฮ์ วัลญะมาอะฮ์ พร้อมงานแปลตำราคลาสสิกและคำอธิบายของปราชญ์",
     "logoUrl": "",
     "themeColor": "#0f766e",
-    "order": 45,
+    "order": 35,
     "networks": [
       "abuiyaad",
       "manhaj",
@@ -2864,7 +2165,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "เว็บไซต์เฉพาะทางด้านมันฮัจย์ (แนวทางและระเบียบวิธีปฏิบัติ) ของชาวสะลัฟศอลิหฺ การดะวะฮ์ และหลักวิชาการอัลญัรหฺ วัตตะอ์ดีล",
     "logoUrl": "",
     "themeColor": "#475569",
-    "order": 46,
+    "order": 36,
     "networks": [
       "abuiyaad",
       "aqidah",
@@ -2918,7 +2219,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "ห้องสมุดดิจิทัลตำราอิสลามคลาสสิกภาษาอาหรับที่ใหญ่ที่สุด ครอบคลุมอะกีดะฮ์ ตัฟซีร หะดีษ ฟิกฮ์ และประวัติศาสตร์ พร้อมระบบค้นหาฉบับมาตรฐาน",
     "logoUrl": "https://shamela.ws/favicon.png",
     "themeColor": "#b45309",
-    "order": 47,
+    "order": 37,
     "networks": [],
     "campuses": [
       {
@@ -2979,7 +2280,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "คลังดาวน์โหลดตำรา คู่มืออธิบายหลักศรัทธา อะกีดะฮ์ ฟิกฮ์ สารานุกรมอัลกุรอาน และตารางสรุปวิชาการอิสลามหลายภาษา",
     "logoUrl": "",
     "themeColor": "#0f766e",
-    "order": 48,
+    "order": 38,
     "networks": [],
     "campuses": [
       {
@@ -3027,7 +2328,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "เว็บไซต์ทางการของศูนย์กษัตริย์ฟะฮัด ณ นครมะดีนะฮ์ รวบรวมมุศฮัฟมาตรฐาน คำแปลอัลกุรอานหลายภาษา และฟอนต์อุษมานีย์ทางการ",
     "logoUrl": "",
     "themeColor": "#065f46",
-    "order": 49,
+    "order": 39,
     "networks": [],
     "campuses": [
       {
@@ -3069,7 +2370,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "เว็บไซต์ทางการของเชค อับดุลอะซีซ บิน บาซ (ร.ฮ.) รวบรวมมัจมูอ์ฟัตวา รายการนูรอะลัดดัรบ์ คำอธิบายตำรา และหนังสือทั้งหมด",
     "logoUrl": "https://binbaz.org.sa/img/square-logo.png",
     "themeColor": "#065f46",
-    "order": 50,
+    "order": 40,
     "networks": [],
     "campuses": [
       {
@@ -3134,7 +2435,7 @@ export const OPENHOUSE_BOOTHS = [
     "description": "เว็บไซต์ทางการของเชค ดร.อับดุรร็อซซาก อัล-บัดร์ รวบรวมบทเรียนอธิบายมุตูนวนวิชาการ อะกีดะฮ์ หะดีษ อัซการ์ และจริยธรรมอิสลาม",
     "logoUrl": "",
     "themeColor": "#1e40af",
-    "order": 51,
+    "order": 41,
     "networks": [],
     "campuses": [
       {
@@ -3206,20 +2507,21 @@ export function normalizeFirestoreBooth(docId, rawData = {}) {
 
 /**
  * Merge Firestore booths with curated OPENHOUSE_BOOTHS.
- * Firestore values always take precedence; empty fields on existing Firestore
- * records (like missing logoUrl/networks/category) are gently enriched from curated data.
+ * - When Firestore already has booths, Firestore is the source of truth:
+ *   we ONLY enrich missing fields (logoUrl/category/campuses) on existing booths
+ *   and NEVER re-add booths that the admin has deleted.
+ * - When Firestore is empty/offline, we fall back to curated booths (excluding deletedSlugs).
  */
-export function mergeOpenHouseBooths(firestoreBooths = []) {
+export function mergeOpenHouseBooths(firestoreBooths = [], deletedSlugs = []) {
+  const deletedSet = new Set(deletedSlugs || [])
   const curatedBySlug = new Map(OPENHOUSE_BOOTHS.map((b) => [b.slug, b]))
-  const seenSlugs = new Set()
-  const merged = []
 
-  for (const fb of firestoreBooths) {
-    const slug = fb.slug || fb.id
-    seenSlugs.add(slug)
-    const curated = curatedBySlug.get(slug)
-    if (curated) {
-      merged.push({
+  if (firestoreBooths.length > 0) {
+    const enriched = firestoreBooths.map((fb) => {
+      const slug = fb.slug || fb.id
+      const curated = curatedBySlug.get(slug)
+      if (!curated) return { category: "articles", ...fb }
+      return {
         ...curated,
         ...fb,
         id: fb.id,
@@ -3227,40 +2529,33 @@ export function mergeOpenHouseBooths(firestoreBooths = []) {
         category: fb.category || curated.category || "articles",
         name: fb.name || curated.name,
         description: fb.description || curated.description,
-        logoUrl: (typeof fb.logoUrl === "string" ? fb.logoUrl.trim() : "") || curated.logoUrl,
+        logoUrl:
+          (typeof fb.logoUrl === "string" ? fb.logoUrl.trim() : "") ||
+          curated.logoUrl,
         platforms:
           fb.platforms && fb.platforms.length > 0
             ? fb.platforms
             : curated.platforms,
         socialLinks:
           fb.socialLinks && Object.keys(fb.socialLinks).length > 0
-            ? { ...curated.socialLinks, ...fb.socialLinks }
+            ? fb.socialLinks
             : curated.socialLinks,
-        networks:
-          fb.networks && fb.networks.length > 0
-            ? fb.networks
-            : curated.networks,
+        networks: Array.isArray(fb.networks) ? fb.networks : curated.networks,
         _curatedCampuses: curated.campuses || [],
-      })
-    } else {
-      merged.push({
-        category: "articles",
-        ...fb,
-      })
-    }
+      }
+    })
+    return enriched.sort(
+      (a, b) => (Number(a.order) || 999) - (Number(b.order) || 999)
+    )
   }
 
-  for (const curated of OPENHOUSE_BOOTHS) {
-    if (!seenSlugs.has(curated.slug)) {
-      merged.push({
-        ...curated,
-        _curatedCampuses: curated.campuses || [],
-        _isCuratedOnly: true,
-      })
-    }
-  }
-
-  return merged.sort((a, b) => (Number(a.order) || 999) - (Number(b.order) || 999))
+  return OPENHOUSE_BOOTHS.filter((b) => !deletedSet.has(b.slug))
+    .map((curated) => ({
+      ...curated,
+      _curatedCampuses: curated.campuses || [],
+      _isCuratedOnly: true,
+    }))
+    .sort((a, b) => (Number(a.order) || 999) - (Number(b.order) || 999))
 }
 
 export function findCuratedBooth(boothIdOrSlug) {

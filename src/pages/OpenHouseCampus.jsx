@@ -72,10 +72,9 @@ export default function OpenHouseCampus({ go, ctx }) {
               firestoreBooth.socialLinks && Object.keys(firestoreBooth.socialLinks).length > 0
                 ? { ...curatedBooth.socialLinks, ...firestoreBooth.socialLinks }
                 : curatedBooth.socialLinks,
-            networks:
-              firestoreBooth.networks && firestoreBooth.networks.length > 0
-                ? firestoreBooth.networks
-                : curatedBooth.networks,
+            networks: Array.isArray(firestoreBooth.networks)
+              ? firestoreBooth.networks
+              : curatedBooth.networks,
           }
         } else if (firestoreBooth) {
           boothData = firestoreBooth

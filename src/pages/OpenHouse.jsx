@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react"
 import SEOHead from "../components/SEOHead.jsx"
-import { collection, query, orderBy, getDocs } from "firebase/firestore"
+import { collection, query, orderBy, getDocs, doc, getDoc } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
 import {
   OPENHOUSE_PLATFORM_ORDER,
@@ -31,15 +31,22 @@ export default function OpenHouse({ go }) {
 
     const fetchBooths = async () => {
       let firestoreBooths = []
+      let deletedSlugs = []
       try {
         const q = query(collection(db, "openhouse_booths"), orderBy("order", "asc"))
-        const snap = await getDocs(q)
+        const [snap, settingsSnap] = await Promise.all([
+          getDocs(q),
+          getDoc(doc(db, "settings", "openhouse")).catch(() => null),
+        ])
         firestoreBooths = snap.docs.map(d => normalizeFirestoreBooth(d.id, d.data()))
+        if (settingsSnap?.exists()) {
+          deletedSlugs = settingsSnap.data().deletedSlugs || []
+        }
       } catch (err) {
         console.error("Error fetching open house data", err)
       }
 
-      const allBooths = mergeOpenHouseBooths(firestoreBooths)
+      const allBooths = mergeOpenHouseBooths(firestoreBooths, deletedSlugs)
       setBooths(allBooths)
 
       // Extract unique platforms

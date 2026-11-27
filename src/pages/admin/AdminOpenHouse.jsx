@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, deleteDoc, getDocs } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, setDoc, getDoc, doc, serverTimestamp, deleteDoc, getDocs, arrayUnion, arrayRemove } from "firebase/firestore"
 import { db } from "../../lib/firebase.js"
 import { toast } from "react-hot-toast"
 import { confirmAction } from "../../utils/feedback.jsx"
@@ -64,6 +64,9 @@ export default function AdminOpenHouse() {
       } else {
         data.createdAt = serverTimestamp()
         await addDoc(collection(db, "openhouse_booths"), data)
+        if (boothForm.slug) {
+          await setDoc(doc(db, "settings", "openhouse"), { deletedSlugs: arrayRemove(boothForm.slug) }, { merge: true }).catch(() => {})
+        }
         notifySuccess("เพิ่มบูธใหม่แล้ว")
       }
       setShowBoothForm(false)
@@ -78,14 +81,22 @@ export default function AdminOpenHouse() {
   const handleDeleteBooth = async (id) => {
     const ok = await confirmAction({
       title: "ยืนยันการลบบูธ",
-      message: "ต้องการลบบูธและข้อมูลทั้งหมดในบูธนี้ใช่หรือไม่? (ไม่สามารถกู้คืนได้)",
+      message: "ต้องการลบบูธและข้อมูลทั้งหมดในบูธนี้ใช่หรือไม่? (ระบบจะจำไว้และไม่เพิ่มรายการนี้กลับมาอีก)",
       confirmText: "ลบทิ้ง",
       danger: true
     })
     if (ok) {
+      const target = booths.find(b => b.id === id)
+      const norm = target ? normalizeFirestoreBooth(target.id, target) : null
+      if (norm?.slug) {
+        await setDoc(
+          doc(db, "settings", "openhouse"),
+          { deletedSlugs: arrayUnion(norm.slug), updatedAt: serverTimestamp() },
+          { merge: true }
+        ).catch(() => {})
+      }
       await deleteDoc(doc(db, "openhouse_booths", id))
-      // Note: In a real app, we should also delete sub-collections or associated campuses
-      notifySuccess("ลบบูธแล้ว")
+      notifySuccess("ลบบูธแล้ว (จะไม่ถูกนำเข้าซ้ำอีก)")
     }
   }
 
@@ -106,7 +117,11 @@ export default function AdminOpenHouse() {
 
     setSyncingCurated(true)
     try {
-      const snap = await getDocs(collection(db, "openhouse_booths"))
+      const [snap, settingsSnap] = await Promise.all([
+        getDocs(collection(db, "openhouse_booths")),
+        getDoc(doc(db, "settings", "openhouse")).catch(() => null),
+      ])
+      const deletedSlugs = new Set(settingsSnap?.exists() ? (settingsSnap.data().deletedSlugs || []) : [])
       const existingBySlug = new Map()
       snap.docs.forEach(d => {
         const norm = normalizeFirestoreBooth(d.id, d.data())
@@ -114,9 +129,14 @@ export default function AdminOpenHouse() {
       })
 
       let addedBooths = 0
+      let skippedDeleted = 0
       let enrichedCampuses = 0
 
       for (const item of OPENHOUSE_BOOTHS) {
+        if (deletedSlugs.has(item.slug)) {
+          skippedDeleted++
+          continue
+        }
         const existing = existingBySlug.get(item.slug)
         let boothDocId = existing?.id
 
@@ -130,13 +150,11 @@ export default function AdminOpenHouse() {
           boothDocId = created.id
           addedBooths++
         } else {
-          // Fill missing slug/logoUrl/networks on legacy records without overwriting edits
+          // Fill missing slug/logoUrl/category on existing records without overwriting edits
           const patch = {}
           if (!existing.slug || existing.slug !== item.slug) patch.slug = item.slug
-          if (!existing.logoUrl && item.logoUrl) patch.logoUrl = item.logoUrl
-          if ((!existing.networks || existing.networks.length === 0) && item.networks?.length) {
-            patch.networks = item.networks
-          }
+          if (!existing.logoUrl?.trim() && item.logoUrl) patch.logoUrl = item.logoUrl
+          if (!existing.category && item.category) patch.category = item.category
           if (Object.keys(patch).length > 0) {
             await updateDoc(doc(db, "openhouse_booths", boothDocId), {
               ...patch,
@@ -162,7 +180,7 @@ export default function AdminOpenHouse() {
         }
       }
 
-      notifySuccess(`นำเข้าสำเร็จ: เพิ่มแหล่งเรียนรู้ ${addedBooths} แห่ง และหมวดหมู่ ${enrichedCampuses} รายการ`)
+      notifySuccess(`นำเข้าสำเร็จ: เพิ่ม ${addedBooths} แหล่ง, หมวดหมู่ ${enrichedCampuses} รายการ${skippedDeleted > 0 ? ` (ข้ามรายการที่ลบไว้ ${skippedDeleted} แหล่ง)` : ""}`)
     } catch (err) {
       console.error("Sync curated openhouse error", err)
       notifyError("เกิดข้อผิดพลาดในการนำเข้าข้อมูล (ตรวจสอบสิทธิ์แอดมิน)")
