@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react"
 import { DEFAULT_TAXONOMY, SCHOLARS } from "../../data/index.js"
+import { VERIFIED_SCHOLARS, normalizeScholarThaiName } from "../../data/scholarsVerified.js"
 import { useContentCollection, useTaxonomySettings, bulkDeleteItems } from "../../lib/contentStore.js"
 import { confirmAction, notifyError, notifySuccess } from "../../utils/feedback.jsx"
 import ContentStatusBanner from "../../components/ContentStatusBanner.jsx"
@@ -163,6 +164,43 @@ export default function AdminScholars() {
     }
   }
 
+  async function syncVerifiedScholars() {
+    const ok = await confirmAction({
+      title: "ซิงก์ข้อมูลที่ตรวจสอบแล้วลง Firestore?",
+      message: "ระบบจะอัปเดตชื่อทับศัพท์ ปี ฮ.ศ./ค.ศ. อะกีดะฮ์/มันฮัจญ์/มัซฮับ ประวัติย่อ และผลงานสำคัญจาก Shamela พร้อมลบรายการซ้ำซ้อนลงฐานข้อมูล",
+      confirmText: "อัปเดตข้อมูล",
+      confirmColor: "var(--teal)",
+    })
+    if (!ok) return
+    setBusy(true)
+    try {
+      let updated = 0
+      let removed = 0
+      for (const s of items) {
+        const patch = VERIFIED_SCHOLARS[s.id]
+        if (patch?.duplicateOf) {
+          await deleteItem(s.id)
+          removed++
+        } else if (patch) {
+          await saveItem({ ...s, ...patch, id: s.id })
+          updated++
+        } else {
+          const normalized = normalizeScholarThaiName(s.name)
+          if (normalized && normalized !== s.name) {
+            await saveItem({ ...s, name: normalized, id: s.id })
+            updated++
+          }
+        }
+      }
+      notifySuccess(`ซิงก์สำเร็จ: อัปเดต ${updated} ท่าน${removed > 0 ? ` และลบรายการซ้ำ ${removed} รายการ` : ""}`)
+    } catch (err) {
+      console.error(err)
+      notifyError("ซิงก์ข้อมูลไม่สำเร็จ กรุณาตรวจสิทธิ์ Firestore")
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (editing) {
     return <ScholarForm item={editing} setItem={setEdit} onSave={save} onCancel={() => setEdit(null)} taxonomy={taxonomy} busy={busy} />
   }
@@ -177,6 +215,9 @@ export default function AdminScholars() {
           </p>
           <ContentStatusBanner loading={loading} error={error} isUsingFallback={isUsingFallback} />
         </div>
+        <button className="btn btn-outline" onClick={syncVerifiedScholars} disabled={busy} style={{ opacity: busy ? 0.6 : 1 }}>
+          <i className="ti ti-refresh" style={{ marginRight: 6 }}></i>ซิงก์ข้อมูลที่ตรวจสอบแล้ว
+        </button>
         <button className="btn btn-teal" onClick={openNew} disabled={busy} style={{ opacity: busy ? 0.6 : 1 }}>
           <i className="ti ti-plus" style={{ marginRight: 6 }}></i>เพิ่มใหม่
         </button>

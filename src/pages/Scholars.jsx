@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react"
 import { DEFAULT_TAXONOMY, SCHOLARS } from "../data/index.js"
+import { mergeScholarsList } from "../data/scholarsVerified.js"
 import { useContentCollection, useTaxonomySettings } from "../lib/contentStore.js"
 import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 
@@ -28,18 +29,27 @@ const mapEraValue = (val) => {
 
 export default function Scholars() {
   const scholarsQueryOptions = useMemo(() => ({ live: false }), [])
-  const { items: scholars, loading } = useContentCollection("scholars", SCHOLARS, null, scholarsQueryOptions)
+  const { items: rawScholars, loading } = useContentCollection("scholars", SCHOLARS, null, scholarsQueryOptions)
+  const scholars = useMemo(() => mergeScholarsList(rawScholars), [rawScholars])
   const { taxonomy } = useTaxonomySettings(DEFAULT_TAXONOMY)
   const [search, setSearch] = useState("")
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [era, setEra] = useState("0")
   const [field, setField] = useState("all")
+  const [selectedScholar, setSelectedScholar] = useState(null)
 
   const [aqFilter, setAqFilter] = useState("")
   const [mhFilter, setMhFilter] = useState("")
   const [mzFilter, setMzFilter] = useState("")
 
   const [visibleCounts, setVisibleCounts] = useState({ salaf: 6, classical: 6, revival: 6, modern: 6 })
+
+  useEffect(() => {
+    if (!selectedScholar) return
+    const onKey = (e) => { if (e.key === "Escape") setSelectedScholar(null) }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [selectedScholar])
 
   const resetVisible = () => {
     setVisibleCounts({ salaf: 6, classical: 6, revival: 6, modern: 6 })
@@ -50,10 +60,16 @@ export default function Scholars() {
   const filtered = useMemo(() => {
     return scholars.filter(s => {
       const term = search.toLowerCase().trim()
+      const worksText = Array.isArray(s.works)
+        ? s.works.map(w => `${w.title || ""} ${w.arabicTitle || ""} ${w.description || ""}`).join(" ").toLowerCase()
+        : ""
       const matchSearch = !term ||
         (s.name && s.name.toLowerCase().includes(term)) ||
+        (s.arabicName && s.arabicName.toLowerCase().includes(term)) ||
         (s.latin && s.latin.toLowerCase().includes(term)) ||
-        (s.note && s.note.toLowerCase().includes(term))
+        (s.note && s.note.toLowerCase().includes(term)) ||
+        (s.bio && s.bio.toLowerCase().includes(term)) ||
+        worksText.includes(term)
 
       const matchEra = era === "0" || mapEraValue(s.era) === mapEraValue(era)
       const matchField = field === "all" || (s.field && s.field.includes(field))
@@ -306,6 +322,7 @@ export default function Scholars() {
                     getAqClass={getAqClass}
                     getMhClass={getMhClass}
                     getMzClass={getMzClass}
+                    onOpenDetail={() => setSelectedScholar({ scholar: s, color })}
                   />
                 ))}
               </div>
@@ -353,21 +370,29 @@ export default function Scholars() {
           ติดต่อเรา
         </a>
       </div>
+
+      {selectedScholar && (
+        <ScholarDetailModal
+          s={selectedScholar.scholar}
+          color={selectedScholar.color}
+          getAqClass={getAqClass}
+          getMhClass={getMhClass}
+          getMzClass={getMzClass}
+          onClose={() => setSelectedScholar(null)}
+        />
+      )}
     </div>
   )
 }
 
-function ScholarCard({ s, color, getAqClass, getMhClass, getMzClass }) {
-  const [expanded, setExpanded] = useState(false)
-  const isLong = s.note && s.note.length > 80
+function ScholarCard({ s, color, getAqClass, getMhClass, getMzClass, onOpenDetail }) {
+  const hasDetails = Boolean(s.bio || (Array.isArray(s.works) && s.works.length > 0) || (s.note && s.note.length > 80))
 
   return (
     <div
       className="card scholar-card"
       onClick={() => {
-        if (isLong) {
-          setExpanded(!expanded)
-        }
+        if (hasDetails) onOpenDetail()
       }}
       style={{
         padding: 16,
@@ -375,7 +400,7 @@ function ScholarCard({ s, color, getAqClass, getMhClass, getMzClass }) {
         display: "flex",
         flexDirection: "column",
         gap: 6,
-        cursor: isLong ? "pointer" : "default",
+        cursor: hasDetails ? "pointer" : "default",
         transition: "transform 0.2s ease, box-shadow 0.2s ease",
       }}
       onMouseEnter={(e) => {
@@ -386,17 +411,17 @@ function ScholarCard({ s, color, getAqClass, getMhClass, getMzClass }) {
         e.currentTarget.style.transform = "translateY(0px)"
         e.currentTarget.style.boxShadow = "none"
       }}
-      role={isLong ? "button" : undefined}
-      tabIndex={isLong ? 0 : undefined}
+      role={hasDetails ? "button" : undefined}
+      tabIndex={hasDetails ? 0 : undefined}
       onKeyDown={(e) => {
-        if (isLong && (e.key === "Enter" || e.key === " ")) {
+        if (hasDetails && (e.key === "Enter" || e.key === " ")) {
           e.preventDefault()
-          setExpanded(!expanded)
+          onOpenDetail()
         }
       }}
     >
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)", lineHeight: 1.4 }}>{s.name}</div>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)", lineHeight: 1.4 }}>{s.name}</div>
         <span
           className="tag"
           style={{
@@ -411,13 +436,19 @@ function ScholarCard({ s, color, getAqClass, getMhClass, getMzClass }) {
         </span>
       </div>
 
+      {s.arabicName && (
+        <div dir="rtl" style={{ fontSize: 13, color: "var(--t2)", fontFamily: "serif", lineHeight: 1.4, textAlign: "right" }}>
+          {s.arabicName}
+        </div>
+      )}
+
       {s.latin && (
         <div style={{ fontSize: 11, color: "var(--t3)", fontFamily: "'IBM Plex Mono', monospace" }}>
           {s.latin}
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 12 }}>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <div style={{ fontSize: 11, fontWeight: 300 }}>
           <span style={{ color: "var(--t3)" }}>ฮ.ศ. </span>
           <span style={{ color: color, fontWeight: 500 }}>{s.hijri}</span>
@@ -428,21 +459,21 @@ function ScholarCard({ s, color, getAqClass, getMhClass, getMzClass }) {
         </div>
       </div>
 
-      {/* Badges for Creed, Manhaj, Mazhab */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, margin: "4px 0" }}>
+      {/* Labeled Badges for Creed (อะกีดะฮ์), Manhaj (มันฮัจญ์), Mazhab (มัซฮับ) */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, margin: "4px 0" }}>
         {s.aq && s.aq !== "ไม่ระบุ" && (
-          <span className={`badge-mockup ${getAqClass(s.aq)}`} style={{ fontSize: 10, padding: "1px 6px" }}>
-            {s.aq}
+          <span className={`badge-mockup ${getAqClass(s.aq)}`} style={{ fontSize: 10, padding: "2px 7px" }} title="อะกีดะฮ์ (หลักศรัทธา)">
+            <span style={{ opacity: 0.78, fontWeight: 400 }}>อะกีดะฮ์: </span>{s.aq}
           </span>
         )}
         {s.mh && s.mh !== "ไม่ระบุ" && (
-          <span className={`badge-mockup ${getMhClass(s.mh)}`} style={{ fontSize: 10, padding: "1px 6px" }}>
-            {s.mh}
+          <span className={`badge-mockup ${getMhClass(s.mh)}`} style={{ fontSize: 10, padding: "2px 7px" }} title="มันฮัจญ์ (แนวทางการดำเนินศาสนา)">
+            <span style={{ opacity: 0.78, fontWeight: 400 }}>มันฮัจญ์: </span>{s.mh}
           </span>
         )}
         {s.mz && s.mz !== "ไม่ระบุ" && (
-          <span className={`badge-mockup ${getMzClass(s.mz)}`} style={{ fontSize: 10, padding: "1px 6px" }}>
-            {s.mz}
+          <span className={`badge-mockup ${getMzClass(s.mz)}`} style={{ fontSize: 10, padding: "2px 7px" }} title="มัซฮับ (สำนักนิติศาสตร์)">
+            <span style={{ opacity: 0.78, fontWeight: 400 }}>มัซฮับ: </span>{s.mz}
           </span>
         )}
       </div>
@@ -456,7 +487,7 @@ function ScholarCard({ s, color, getAqClass, getMhClass, getMzClass }) {
               color: "var(--t2)",
               fontWeight: 300,
               display: "-webkit-box",
-              WebkitLineClamp: expanded ? "unset" : 3,
+              WebkitLineClamp: 3,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
               margin: 0,
@@ -464,29 +495,187 @@ function ScholarCard({ s, color, getAqClass, getMhClass, getMzClass }) {
           >
             {s.note}
           </p>
-          {isLong && (
+          {hasDetails && (
             <div
               style={{
                 color: "var(--teal)",
                 fontSize: "11px",
-                padding: "4px 0 0 0",
-                display: "inline-flex",
+                padding: "6px 0 0 0",
+                display: "flex",
                 alignItems: "center",
-                gap: "2px",
+                justifyContent: "space-between",
+                gap: "6px",
                 fontFamily: "'Prompt', sans-serif",
-                fontWeight: 400,
+                fontWeight: 500,
                 marginTop: 2,
               }}
             >
-              {expanded ? (
-                <>แสดงน้อยลง <i className="ti ti-chevron-up"></i></>
-              ) : (
-                <>อ่านเพิ่มเติม <i className="ti ti-chevron-down"></i></>
-              )}
+              <span>
+                {Array.isArray(s.works) && s.works.length > 0
+                  ? `ดูประวัติและผลงาน (${s.works.length} เรื่อง)`
+                  : "ดูประวัติเพิ่มเติม"}
+              </span>
+              <i className="ti ti-chevron-right"></i>
             </div>
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+function ScholarDetailModal({ s, color, getAqClass, getMhClass, getMzClass, onClose }) {
+  const shamelaSearchUrl = `https://shamela.ws/search?q=${encodeURIComponent(s.arabicName || s.name)}`
+  const emaanSearchUrl = `https://www.emaanlibrary.com/?s=${encodeURIComponent(s.latin || s.name)}`
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={s.name}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1000,
+        background: "rgba(0,0,0,0.55)",
+        backdropFilter: "blur(3px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      <div
+        className="card"
+        style={{
+          width: "100%",
+          maxWidth: 620,
+          maxHeight: "86vh",
+          overflowY: "auto",
+          padding: 24,
+          borderTop: `4px solid ${color}`,
+          position: "relative",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 10 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 18, color: "var(--text)", lineHeight: 1.4 }}>{s.name}</h2>
+            {s.arabicName && (
+              <div dir="rtl" style={{ fontSize: 17, color: "var(--t2)", fontFamily: "serif", marginTop: 4 }}>
+                {s.arabicName}
+              </div>
+            )}
+            {s.latin && (
+              <div style={{ fontSize: 12, color: "var(--t3)", fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>
+                {s.latin}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="ปิดหน้าต่าง"
+            style={{
+              background: "var(--bg2)",
+              border: "none",
+              borderRadius: "50%",
+              width: 32,
+              height: 32,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              color: "var(--t2)",
+              flexShrink: 0,
+            }}
+          >
+            <i className="ti ti-x" style={{ fontSize: 16 }}></i>
+          </button>
+        </div>
+
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12, marginBottom: 12 }}>
+          <span><strong style={{ color: "var(--t3)", fontWeight: 400 }}>ฮ.ศ.:</strong> <span style={{ color, fontWeight: 600 }}>{s.hijri || "-"}</span></span>
+          <span><strong style={{ color: "var(--t3)", fontWeight: 400 }}>ค.ศ.:</strong> {s.ad || "-"}</span>
+          {s.field && <span><strong style={{ color: "var(--t3)", fontWeight: 400 }}>สาขา:</strong> {s.field}</span>}
+        </div>
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+          {s.aq && s.aq !== "ไม่ระบุ" && (
+            <span className={`badge-mockup ${getAqClass(s.aq)}`} style={{ fontSize: 11, padding: "3px 9px" }}>
+              <span style={{ opacity: 0.8, fontWeight: 400 }}>อะกีดะฮ์: </span>{s.aq}
+            </span>
+          )}
+          {s.mh && s.mh !== "ไม่ระบุ" && (
+            <span className={`badge-mockup ${getMhClass(s.mh)}`} style={{ fontSize: 11, padding: "3px 9px" }}>
+              <span style={{ opacity: 0.8, fontWeight: 400 }}>มันฮัจญ์: </span>{s.mh}
+            </span>
+          )}
+          {s.mz && s.mz !== "ไม่ระบุ" && (
+            <span className={`badge-mockup ${getMzClass(s.mz)}`} style={{ fontSize: 11, padding: "3px 9px" }}>
+              <span style={{ opacity: 0.8, fontWeight: 400 }}>มัซฮับ: </span>{s.mz}
+            </span>
+          )}
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>
+            <i className="ti ti-user-circle" style={{ marginRight: 6, color: "var(--teal)" }}></i>
+            ประวัติโดยย่อ
+          </div>
+          <p style={{ fontSize: 13, lineHeight: 1.75, color: "var(--t2)", margin: 0 }}>
+            {s.bio || s.note}
+          </p>
+        </div>
+
+        {Array.isArray(s.works) && s.works.length > 0 && (
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>
+              <i className="ti ti-books" style={{ marginRight: 6, color: "var(--teal)" }}></i>
+              ผลงานสำคัญ ({s.works.length} รายการ)
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {s.works.map((w, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    background: "var(--bg2)",
+                    border: "0.5px solid var(--br2)",
+                    borderRadius: 10,
+                    padding: "10px 14px",
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{w.title}</div>
+                  {w.arabicTitle && (
+                    <div dir="rtl" style={{ fontSize: 13, color: "var(--teal)", fontFamily: "serif", marginTop: 2 }}>
+                      {w.arabicTitle}
+                    </div>
+                  )}
+                  {w.description && (
+                    <p style={{ fontSize: 12, color: "var(--t2)", lineHeight: 1.6, margin: "4px 0 0" }}>
+                      {w.description}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={{ borderTop: "0.5px solid var(--br2)", paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+          <div style={{ fontSize: 11, color: "var(--t3)" }}>
+            แหล่งอ้างอิง: {Array.isArray(s.sources) && s.sources.length > 0 ? s.sources.join(" · ") : "ฐานข้อมูล Talib Club"}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <a href={shamelaSearchUrl} target="_blank" rel="noreferrer" className="btn btn-outline" style={{ fontSize: 11, padding: "4px 10px", textDecoration: "none" }}>
+              ค้นใน Shamela ↗
+            </a>
+            <a href={emaanSearchUrl} target="_blank" rel="noreferrer" className="btn btn-outline" style={{ fontSize: 11, padding: "4px 10px", textDecoration: "none" }}>
+              EmaanLibrary ↗
+            </a>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
