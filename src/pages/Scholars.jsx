@@ -109,6 +109,7 @@ export default function Scholars() {
       case "บะเรลวี": return "bmh-bareilwi"
       case "ตับลีฆ": return "bmh-tabligh"
       case "อิควาน": return "bmh-ikhwan"
+      case "คลาสสิก":
       case "กลาสสิก": return "bmh-classic"
       default: return "bmh-unknown"
     }
@@ -227,10 +228,10 @@ export default function Scholars() {
                 </label>
 
                 <label style={{ display: "grid", gap: 6 }}>
-                  <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>อะกีดะฮฺ</span>
+                  <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>อะกีดะฮ์</span>
                   <select value={aqFilter} onChange={e => { setAqFilter(e.target.value); resetVisible(); }} style={{ background: "var(--card)", border: "1px solid var(--br)", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
-                    <option value="">ทุกอะกีดะฮฺ</option>
-                    <option value="สะลัฟ">สะลัฟ / อะฮฺลุสสุนนะฮฺ</option>
+                    <option value="">ทุกอะกีดะฮ์</option>
+                    <option value="สะลัฟ">สะลัฟ / อะฮ์ลุสซุนนะฮ์</option>
                     <option value="อะชะอะรี">อะชะอะรี</option>
                     <option value="มาตุรีดี">มาตุรีดี</option>
                     <option value="ไม่ระบุ">ไม่ระบุ</option>
@@ -247,7 +248,7 @@ export default function Scholars() {
                     <option value="บะเรลวี">บะเรลวี</option>
                     <option value="ตับลีฆ">ตับลีฆ</option>
                     <option value="อิควาน">อิควาน</option>
-                    <option value="กลาสสิก">กลาสสิก / อะชะอะรี</option>
+                    <option value="คลาสสิก">คลาสสิก / อะชะอะรี</option>
                     <option value="ไม่ระบุ">ไม่ระบุ</option>
                   </select>
                 </label>

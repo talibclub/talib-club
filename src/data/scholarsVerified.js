@@ -12,11 +12,15 @@ import { VERIFIED_WORKS_REVIVAL_MODERN } from "./scholarsWorksRevivalModern.js"
  * ปรับมาตรฐานการทับศัพท์ภาษาอาหรับเป็นภาษาไทยให้สม่ำเสมอทั่วทั้งทำเนียบ
  * (ใช้กับรายชื่อที่ยังไม่ได้เขียนข้อมูลละเอียดรายท่าน)
  */
-export function normalizeScholarThaiName(name) {
-  if (!name || typeof name !== "string") return ""
-  return name
+export function normalizeScholarThaiText(text) {
+  if (!text || typeof text !== "string") return ""
+  return text
+    .replace(/สะลัฟี/g, "สะละฟี")
+    .replace(/ศะลาฟี/g, "สะละฟี")
+    .replace(/กลาสสิก/g, "คลาสสิก")
+    .replace(/อุลามาอฺ/g, "อุละมาอ์")
+    .replace(/อุลามาอ์/g, "อุละมาอ์")
     .replace(/อิบน์/g, "อิบนุ")
-    .replace(/อิมาม\s+/g, "อิมาม")
     .replace(/หะสัน/g, "ฮะซัน")
     .replace(/หะดีษ/g, "ฮะดีษ")
     .replace(/อิสหาก/g, "อิสฮาก")
@@ -34,6 +38,12 @@ export function normalizeScholarThaiName(name) {
     .replace(/ยะหฺยา/g, "ยะฮ์ยา")
     .replace(/ศอลิหฺ/g, "ศอลิฮ์")
     .replace(/อะหฺวาซี/g, "อะฮ์วาซี")
+    .replace(/หะรอมัยน์/g, "ฮะเราะมัยน์")
+    .replace(/หะรอม/g, "ฮะรอม")
+    .replace(/ชัรหฺ/g, "ชัรฮ์")
+    .replace(/ฟิกฮฺ/g, "ฟิกฮ์")
+    .replace(/อะกีดะฮฺ/g, "อะกีดะฮ์")
+    .replace(/อากีดะฮฺ/g, "อะกีดะฮ์")
     .replace(/ฮฺ/g, "ฮ์")
     .replace(/หฺ/g, "ฮ์")
     .replace(/อฺ/g, "อ์")
@@ -42,8 +52,16 @@ export function normalizeScholarThaiName(name) {
     .replace(/ลฺ/g, "ล์")
     .replace(/ตฺ/g, "ต์")
     .replace(/ซฺ/g, "ซ์")
+    .replace(/คฺ/g, "ค์")
+    .replace(/กฺ/g, "ก์")
+    .replace(/\u0E3A/g, "์")
     .replace(/\s{2,}/g, " ")
     .trim()
+}
+
+export function normalizeScholarThaiName(name) {
+  if (!name || typeof name !== "string") return ""
+  return normalizeScholarThaiText(name).replace(/อิมาม\s+/g, "อิมาม")
 }
 
 /**
@@ -999,6 +1017,7 @@ export { ADDED_SCHOLARS }
  */
 function normalizeManhaj(mh) {
   if (mh === "สะลัฟี") return "สะละฟี"
+  if (mh === "กลาสสิก") return "คลาสสิก"
   return mh
 }
 
@@ -1017,19 +1036,31 @@ export function mergeScholarsList(rawScholars = []) {
         id: s.id,
         verified: true,
       }
+      merged.name = normalizeScholarThaiName(merged.name)
+      if (merged.note) merged.note = normalizeScholarThaiText(merged.note)
+      if (merged.bio) merged.bio = normalizeScholarThaiText(merged.bio)
       merged.mh = normalizeManhaj(merged.mh)
       result.push(merged)
     } else {
       result.push({
         ...s,
         name: normalizeScholarThaiName(s.name),
+        note: s.note ? normalizeScholarThaiText(s.note) : s.note,
+        bio: s.bio ? normalizeScholarThaiText(s.bio) : s.bio,
         mh: normalizeManhaj(s.mh),
       })
     }
   }
   for (const added of ADDED_SCHOLARS) {
     if (!existingIds.has(String(added.id))) {
-      result.push({ ...added, mh: normalizeManhaj(added.mh), verified: true })
+      result.push({
+        ...added,
+        name: normalizeScholarThaiName(added.name),
+        note: added.note ? normalizeScholarThaiText(added.note) : added.note,
+        bio: added.bio ? normalizeScholarThaiText(added.bio) : added.bio,
+        mh: normalizeManhaj(added.mh),
+        verified: true,
+      })
     }
   }
   return result
