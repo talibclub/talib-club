@@ -102,6 +102,7 @@ export default function Scholars() {
 
   const getMhClass = (mh) => {
     switch (mh) {
+      case "สะละฟี":
       case "สะลัฟี": return "bmh-salafi"
       case "ศูฟี": return "bmh-sufi"
       case "เดโอบันดี": return "bmh-deobandi"
@@ -240,7 +241,7 @@ export default function Scholars() {
                   <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>มันฮัจญ์</span>
                   <select value={mhFilter} onChange={e => { setMhFilter(e.target.value); resetVisible(); }} style={{ background: "var(--card)", border: "1px solid var(--br)", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
                     <option value="">ทุกมันฮัจญ์</option>
-                    <option value="สะลัฟี">สะลัฟี</option>
+                    <option value="สะละฟี">สะละฟี</option>
                     <option value="ศูฟี">ศูฟี / ตะเซาวุฟ</option>
                     <option value="เดโอบันดี">เดโอบันดี</option>
                     <option value="บะเรลวี">บะเรลวี</option>

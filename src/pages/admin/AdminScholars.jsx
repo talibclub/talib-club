@@ -425,7 +425,7 @@ function ScholarForm({ item, setItem, onSave, onCancel, taxonomy, busy }) {
         <Field label="มันฮัจญ์ (Manhaj)">
           <select value={item.mh || ""} onChange={e => set("mh", e.target.value)}>
             <option value="">-- ไม่ระบุ --</option>
-            <option value="สะลัฟี">สะลัฟี</option>
+            <option value="สะละฟี">สะละฟี</option>
             <option value="ศูฟี">ศูฟี / ตะเซาวุฟ</option>
             <option value="เดโอบันดี">เดโอบันดี</option>
             <option value="บะเรลวี">บะเรลวี</option>
