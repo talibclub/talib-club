@@ -64,13 +64,15 @@ export default function Media({ go, ctx }) {
     return list
   }, [media])
 
+  const ctxPlaylist = ctx?.playlist || ""
+  const ctxTeacher = ctx?.teacher || ""
   const selectedPlaylist = useMemo(() => {
-    if (!ctx?.playlist) return null
+    if (!ctxPlaylist) return null
     return playlists.find(p =>
-      String(p.name).toLowerCase() === String(ctx.playlist).toLowerCase() &&
-      (!ctx.teacher || String(p.teacher).toLowerCase() === String(ctx.teacher).toLowerCase())
+      String(p.name).toLowerCase() === String(ctxPlaylist).toLowerCase() &&
+      (!ctxTeacher || String(p.teacher).toLowerCase() === String(ctxTeacher).toLowerCase())
     ) || null
-  }, [ctx?.playlist, ctx?.teacher, playlists])
+  }, [ctxPlaylist, ctxTeacher, playlists])
 
   const updateFilters = (newParams) => {
     const updated = {
@@ -189,59 +191,90 @@ export default function Media({ go, ctx }) {
         <>
           {/* แถบค้นหา และ กรองเพลย์ลิสต์ */}
           {/* ━━━ SEARCH & FILTER BAR ━━━ */}
-          <div style={{ display: "flex", gap: 8, marginBottom: showAdvanced ? 12 : 24 }}>
-            <div style={{ flex: 1, position: "relative" }}>
-              <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
-              <input
-                value={searchPlaylist}
-                onChange={e => { setSearchPlaylist(e.target.value); updateFilters({ searchPlaylist: e.target.value }) }}
-                placeholder="ค้นหาเพลย์ลิสต์ หรือ ชื่อช่อง..."
-                style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "12px 16px 12px 42px", background: "var(--bg2)", border: "1px solid transparent", fontSize: 14, outline: "none", transition: "border 0.2s" }}
-                onFocus={(e) => e.target.style.border = "1px solid var(--teal)"}
-                onBlur={(e) => e.target.style.border = "1px solid transparent"}
-              />
-            </div>
-            <button
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              style={{ 
-                padding: "0 18px", 
-                borderRadius: 24, 
-                background: showAdvanced ? "var(--teal)" : "var(--bg2)", 
-                color: showAdvanced ? "#fff" : "var(--text)", 
-                border: "none",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                transition: "all 0.2s"
-              }}
-              title="ตัวกรองเพิ่มเติม"
-            >
-              <i className="ti ti-filter" style={{ fontSize: 18 }}></i>
-            </button>
-          </div>
+          {(() => {
+            const activeFilterCount = (filter !== "all" ? 1 : 0) + (sortOrder !== "newest" ? 1 : 0);
+            return (
+              <>
+                <div style={{ display: "flex", gap: 8, marginBottom: showAdvanced ? 12 : 24 }}>
+                  <div style={{ flex: 1, position: "relative" }}>
+                    <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
+                    <input
+                      value={searchPlaylist}
+                      onChange={e => { setSearchPlaylist(e.target.value); updateFilters({ searchPlaylist: e.target.value }) }}
+                      placeholder="ค้นหาเพลย์ลิสต์ หรือ ชื่อช่อง..."
+                      style={{ width: "100%", borderRadius: 24, padding: "12px 38px 12px 42px", background: "var(--bg2)", border: "1px solid transparent", fontSize: 14, outline: "none", transition: "border 0.2s" }}
+                      onFocus={(e) => e.target.style.border = "1px solid var(--teal)"}
+                      onBlur={(e) => e.target.style.border = "1px solid transparent"}
+                    />
+                    {searchPlaylist && (
+                      <button
+                        type="button"
+                        aria-label="ล้างคำค้นหา"
+                        onClick={() => { setSearchPlaylist(""); updateFilters({ searchPlaylist: "" }) }}
+                        style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "var(--bg3)", border: "none", borderRadius: "50%", width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--t2)" }}
+                      >
+                        <i className="ti ti-x" style={{ fontSize: 13 }}></i>
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    style={{ 
+                      padding: "0 18px", 
+                      borderRadius: 24, 
+                      background: showAdvanced || activeFilterCount > 0 ? "var(--teal)" : "var(--bg2)", 
+                      color: showAdvanced || activeFilterCount > 0 ? "#fff" : "var(--text)", 
+                      border: "none",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
+                      transition: "all 0.2s"
+                    }}
+                    title="ตัวกรองเพิ่มเติม"
+                  >
+                    <i className="ti ti-filter" style={{ fontSize: 18 }}></i>
+                    {activeFilterCount > 0 && <span style={{ fontSize: 11, fontWeight: 700 }}>{activeFilterCount}</span>}
+                  </button>
+                </div>
 
-          {/* ━━━ EXPANDABLE FILTERS ━━━ */}
-          {showAdvanced && (
-            <div style={{ background: "var(--bg2)", padding: "16px", borderRadius: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
-              <label style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>แพลตฟอร์ม</span>
-                <select value={filter} onChange={e => updateFilters({ filter: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
-                  {filters.map(item => (
-                    <option key={item.id} value={item.id}>{item.label}</option>
-                  ))}
-                </select>
-              </label>
+                {/* ━━━ EXPANDABLE FILTERS ━━━ */}
+                {showAdvanced && (
+                  <div style={{ background: "var(--bg2)", padding: "16px", borderRadius: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, alignItems: "end" }}>
+                    <label style={{ display: "grid", gap: 6 }}>
+                      <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>แพลตฟอร์ม</span>
+                      <select value={filter} onChange={e => updateFilters({ filter: e.target.value })} style={{ background: "var(--card)", border: "1px solid var(--br)", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+                        {filters.map(item => (
+                          <option key={item.id} value={item.id}>{item.label}</option>
+                        ))}
+                      </select>
+                    </label>
 
-              <label style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>เรียงลำดับ</span>
-                <select value={sortOrder} onChange={e => updateFilters({ sort: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
-                  <option value="newest">ใหม่ไปเก่า</option>
-                  <option value="oldest">เก่าไปใหม่</option>
-                </select>
-              </label>
-            </div>
-          )}
+                    <label style={{ display: "grid", gap: 6 }}>
+                      <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>เรียงลำดับ</span>
+                      <select value={sortOrder} onChange={e => updateFilters({ sort: e.target.value })} style={{ background: "var(--card)", border: "1px solid var(--br)", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+                        <option value="newest">ใหม่ไปเก่า</option>
+                        <option value="oldest">เก่าไปใหม่</option>
+                      </select>
+                    </label>
+
+                    {activeFilterCount > 0 && (
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => updateFilters({ filter: "all", sort: "newest" })}
+                        style={{ padding: "8px 14px", fontSize: 12, borderRadius: 8 }}
+                      >
+                        <i className="ti ti-refresh" style={{ fontSize: 14 }}></i> ล้างตัวกรอง
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
+            );
+          })()}
 
           {loading ? (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))", gap: 14 }}>

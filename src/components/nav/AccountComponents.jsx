@@ -1,28 +1,6 @@
+import { useEffect } from "react"
 import { Link } from "react-router-dom"
-
-function getPagePath(id, data = null) {
-  if (id === "home" || id === "") return "/";
-  if (id === "tracking") return "/tracking-system";
-  
-  let p = "/" + id;
-  if (data) {
-    const qParams = new URLSearchParams()
-    if (["article", "library-detail", "media-detail"].includes(id) && data.id) {
-      qParams.set("id", String(data.id))
-    } else {
-      Object.entries(data).forEach(([key, val]) => {
-        if (val !== null && val !== undefined && typeof val !== "object") {
-          qParams.set(key, String(val))
-        }
-      })
-    }
-    const queryString = qParams.toString()
-    if (queryString) {
-      p += `?${queryString}`
-    }
-  }
-  return p;
-}
+import { getPagePath } from "../../utils/url.js"
 
 export function AccountDropdown({ name, email, photoURL, isStaff, nav, logout, isInstallable, installApp, setAccountOpen }) {
   return (
@@ -87,6 +65,14 @@ function DropdownItem({ icon, label, to, onClick, danger }) {
 }
 
 export function AccountDrawer({ name, email, photoURL, isStaff, nav, logout, onClose, page, isInstallable, installApp }) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [onClose])
+
   return (
     <div className="account-drawer" style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
       <div 

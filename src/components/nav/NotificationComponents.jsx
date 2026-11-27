@@ -1,3 +1,5 @@
+import { useEffect } from "react"
+
 export function NotificationDropdown({ notifications, seenIds, markAsRead, onDismiss, onClose, pushState, togglePushSubscription, unreadCount, markAllAsRead }) {
   return (
     <div style={{
@@ -87,7 +89,7 @@ export function NotificationDropdown({ notifications, seenIds, markAsRead, onDis
                 e.currentTarget.style.transform = "none"
                 e.currentTarget.style.background = isUnread ? "rgba(45, 190, 160, 0.08)" : "var(--bg2)"
                 const dismissBtn = e.currentTarget.querySelector(".dismiss-btn")
-                if (dismissBtn) dismissBtn.style.opacity = "0"
+                if (dismissBtn) dismissBtn.style.opacity = "0.65"
               }}
             >
               {isUnread && (
@@ -130,10 +132,10 @@ export function NotificationDropdown({ notifications, seenIds, markAsRead, onDis
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: 20,
-                  height: 20,
+                  width: 22,
+                  height: 22,
                   alignSelf: "center",
-                  opacity: 0,
+                  opacity: 0.65,
                   transition: "opacity 0.2s, background-color 0.15s, color 0.15s"
                 }}
                 onMouseEnter={(e) => {
@@ -159,6 +161,14 @@ export function NotificationDropdown({ notifications, seenIds, markAsRead, onDis
 }
 
 export function NotificationDrawer({ notifications, seenIds, markAsRead, onDismiss, onClose, pushState, togglePushSubscription, unreadCount, markAllAsRead }) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [onClose])
+
   return (
     <div className="notification-drawer" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
       <div 

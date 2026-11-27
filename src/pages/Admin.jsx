@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
+import toast from "react-hot-toast"
+import { confirmAction } from "../utils/feedback.jsx"
 import { invalidateContentCache } from "../lib/contentStore.js"
-import { clearOfflineStore } from "../lib/offlineStore.js"
 import AdminArticles from "./admin/AdminArticles.jsx"
 import AdminLibrary from "./admin/AdminLibrary.jsx"
 import AdminMedia from "./admin/AdminMedia.jsx"
@@ -30,21 +31,12 @@ export default function Admin({ go, authState, initialTab = "dashboard" }) {
   const activeTabObj = TABS.find(t => t.id === tab) || TABS[0]
   const currentUser = authState?.profile?.displayName || authState?.user?.displayName || ""
 
-  // This only ever removed the talib_cache_* localStorage keys. The content
-  // layer also mirrors collections into IndexedDB (`collections`), and that copy
-  // survived the reload — so "ล้างแคช" left the very data an admin presses it
-  // for still cached. Clear every layer, then reload.
-  const handleClearCache = async () => {
-    try {
-      await invalidateContentCache()
-    } catch (err) {
-      console.error("Clear memory/localStorage cache failed", err)
-    }
-    try {
-      await clearOfflineStore("collections")
-    } catch (err) {
-      console.error("Clear IndexedDB cache failed", err)
-    }
+  const handleClearCache = () => {
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith("talib_cache_")) {
+        localStorage.removeItem(key)
+      }
+    })
     window.location.reload()
   }
 
@@ -74,7 +66,23 @@ export default function Admin({ go, authState, initialTab = "dashboard" }) {
           <button className="btn btn-outline" onClick={() => go("staff")} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 12 }}>
             <i className="ti ti-arrow-left"></i> Staff
           </button>
-          <button className="btn btn-outline" onClick={() => authState?.logout?.()} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 12, color: "var(--red)", borderColor: "rgba(220,38,38,0.2)" }}>
+          <button
+            className="btn btn-outline"
+            onClick={async () => {
+              const ok = await confirmAction({
+                title: "ออกจากระบบ?",
+                message: "คุณต้องการออกจากระบบบัญชีผู้ดูแลระบบใช่หรือไม่?",
+                confirmText: "ออกจากระบบ",
+                danger: true,
+              })
+              if (!ok) return
+              await authState?.logout?.()
+              invalidateContentCache()
+              toast.success("ออกจากระบบแล้ว")
+              go("home")
+            }}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 12, color: "var(--red)", borderColor: "var(--red2)" }}
+          >
             <i className="ti ti-logout"></i> ออกจากระบบ
           </button>
         </div>

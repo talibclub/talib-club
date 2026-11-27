@@ -1,3 +1,7 @@
+import toast from "react-hot-toast"
+import { confirmAction } from "../utils/feedback.jsx"
+import { invalidateContentCache } from "../lib/contentStore.js"
+
 const STAFF_TOOLS = [
   {
     title: "งานสตาฟ",
@@ -35,7 +39,22 @@ export default function StaffDashboard({ authState, go }) {
           <h1 style={{ marginTop: 10, fontSize: 28 }}>Staff Workspace</h1>
           <p style={{ marginTop: 6 }}>จัดการเนื้อหา ตรวจงาน และใช้เครื่องมือทำงานของทีม Talib Club</p>
         </div>
-        <button className="btn btn-outline" onClick={authState.logout}>
+        <button
+          className="btn btn-outline"
+          onClick={async () => {
+            const ok = await confirmAction({
+              title: "ออกจากระบบ?",
+              message: "คุณต้องการออกจากระบบบัญชีสตาฟใช่หรือไม่?",
+              confirmText: "ออกจากระบบ",
+              danger: true,
+            })
+            if (!ok) return
+            await authState.logout?.()
+            invalidateContentCache()
+            toast.success("ออกจากระบบแล้ว")
+            go("home")
+          }}
+        >
           <i className="ti ti-logout" style={{ marginRight: 6 }}></i>ออกจากระบบ
         </button>
       </div>

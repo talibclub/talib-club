@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react"
-import { useSearchParams } from "react-router-dom"
 import { createPortal } from "react-dom"
 import { useAudio } from "../context/AudioContext.jsx"
 import { SURA_LIST } from "../data/surahs.js"
+import { getSurahTheme } from "../data/quranThemes.js"
 import { useUserCollection, useUserDoc } from "../lib/contentStore.js"
 import toast from "react-hot-toast"
 import { confirmAction } from "../utils/feedback.jsx"
+import DOMPurify from "dompurify"
 import { getOfflineItem, setOfflineItem } from "../lib/offlineStore.js"
 
 import "./quran/Quran.css"
@@ -25,9 +26,9 @@ import VerseList from "./quran/components/VerseList.jsx"
 import MushafView from "./quran/components/MushafView.jsx"
 import AyahMenuModal from "./quran/components/AyahMenuModal.jsx"
 import BookmarkModal from "./quran/components/BookmarkModal.jsx"
+import SEOHead, { BASE_URL } from "../components/SEOHead.jsx"
 
 export default function Quran({ initialSura, initialAyah, authState }) {
-  const [searchParams, setSearchParams] = useSearchParams()
   const [selectedSura, setSelectedSura] = useState(() => {
     const url = new URL(window.location.href);
     const suraParam = url.searchParams.get("sura");
@@ -106,39 +107,36 @@ export default function Quran({ initialSura, initialAyah, authState }) {
   }, [quranBenefits])
 
   // Synchronize Quran selection (selectedSura and targetScrollAyah) with the browser URL query parameters
-  //
-  // This used to call window.history.replaceState directly. That changes the
-  // address bar without telling React Router, so the router kept serving the
-  // previous search params — anything reading useSearchParams (and the back
-  // button) saw a URL that no longer existed.
   useEffect(() => {
-    const path = window.location.pathname
-    const isQuranPage = path === "/quran"
-    const isMemberQuran = path === "/member" && searchParams.get("view") === "quran"
-    if (!isQuranPage && !isMemberQuran) return
+    const url = new URL(window.location.href)
+    const isQuranPage = url.pathname === "/quran"
+    const isMemberQuran = url.pathname === "/member" && url.searchParams.get("view") === "quran"
 
-    const prevSura = searchParams.get("sura")
-    const prevAyah = searchParams.get("ayah")
-    const next = new URLSearchParams(searchParams)
+    if (isQuranPage || isMemberQuran) {
+      const prevSura = url.searchParams.get("sura")
+      const prevAyah = url.searchParams.get("ayah")
 
-    let changed = false
-    if (prevSura !== String(selectedSura)) {
-      next.set("sura", String(selectedSura))
-      next.delete("ayah") // Clear ayah on surah change
-      changed = true
+      let changed = false
+      if (prevSura !== String(selectedSura)) {
+        url.searchParams.set("sura", String(selectedSura))
+        url.searchParams.delete("ayah") // Clear ayah on surah change
+        changed = true
+      }
+
+      if (targetScrollAyah && prevAyah !== String(targetScrollAyah)) {
+        url.searchParams.set("ayah", targetScrollAyah)
+        changed = true
+      }
+      if (!targetScrollAyah && prevAyah) {
+        url.searchParams.delete("ayah")
+        changed = true
+      }
+
+      if (changed) {
+        window.history.replaceState(window.history.state, "", url.pathname + url.search)
+      }
     }
-
-    if (targetScrollAyah && prevAyah !== String(targetScrollAyah)) {
-      next.set("ayah", String(targetScrollAyah))
-      changed = true
-    }
-    if (!targetScrollAyah && prevAyah) {
-      next.delete("ayah")
-      changed = true
-    }
-
-    if (changed) setSearchParams(next, { replace: true })
-  }, [selectedSura, targetScrollAyah, searchParams, setSearchParams])
+  }, [selectedSura, targetScrollAyah])
 
   // Track window scroll for progress bar and scroll-to-top button
   useEffect(() => {
@@ -407,19 +405,13 @@ export default function Quran({ initialSura, initialAyah, authState }) {
     window.setTimeout(scrollToReadingArea, 80)
   }
 
-  // Bumped on every search so a slow earlier request cannot overwrite the
-  // results of a later one — typing "อัลลอฮ์" then "นบี" used to show whichever
-  // response the network happened to return last.
-  const searchRunRef = useRef(0)
   const performSearch = async (query) => {
     if (!query.trim()) return
-    const runId = ++searchRunRef.current
     setSearchLoading(true)
     setSearchError(null)
     try {
       const res = await fetch(`https://api.alquran.cloud/v1/search/${encodeURIComponent(query)}/all/th.thai`)
       const data = await res.json()
-      if (runId !== searchRunRef.current) return
       if (data.code === 200 && data.status === "OK" && data.data?.matches) {
         setSearchResults(data.data.matches)
       } else {
@@ -427,11 +419,10 @@ export default function Quran({ initialSura, initialAyah, authState }) {
       }
       setSearchHasRun(true)
     } catch (err) {
-      if (runId !== searchRunRef.current) return
       console.error(err)
       setSearchError("ไม่พบข้อมูล หรือการเชื่อมต่อเครือข่ายขัดข้อง")
     } finally {
-      if (runId === searchRunRef.current) setSearchLoading(false)
+      setSearchLoading(false)
     }
   }
 
@@ -639,21 +630,11 @@ export default function Quran({ initialSura, initialAyah, authState }) {
       return
     }
 
-    // Take the surah from the VERSE, not from `selectedSura`. In mushaf page
-    // mode `selectedSura` is only the first surah on the page, and a page
-    // regularly spans two of them (page 2 ends al-Fatihah and opens
-    // al-Baqarah). Bookmarking a verse from the second surah therefore filed it
-    // under the wrong number — and because the document id is
-    // `${uid}_sura_${sura}_aya_${aya}`, it could overwrite the note already
-    // saved for that ayah number in the first surah.
-    const verseSura = Number(v.sura ?? selectedSura)
-    const verseSuraInfo = SURA_LIST.find(s => Number(s.number) === verseSura)
-
     setActiveBookmarkModal({
       verseId: v.id,
-      sura: verseSura,
+      sura: selectedSura,
       aya: v.aya,
-      suraName: (verseSuraInfo || currentSuraInfo).englishName,
+      suraName: currentSuraInfo.englishName,
       arabicText: v.arabic_text_tajweed || v.arabic_text || "",
       translation: v.translation,
       tafsir: v.tafsir,
@@ -685,7 +666,7 @@ export default function Quran({ initialSura, initialAyah, authState }) {
 
       toast.success(isNew ? "บันทึกอายะฮ์สำเร็จ" : "อัปเดตข้อคิดแล้ว", { id: toastId })
       setActiveBookmarkModal(null)
-    } catch {
+    } catch (err) {
       setActiveBookmarkModal(prev => prev ? { ...prev, isSaving: false } : null)
       toast.error("บันทึกผิดพลาดกรุณาลองใหม่", { id: toastId })
     }
@@ -706,25 +687,15 @@ export default function Quran({ initialSura, initialAyah, authState }) {
         await deleteItem(activeBookmarkModal.bookmarkId)
         toast.success("ลบรายการบันทึกแล้ว", { id: toastId })
         setActiveBookmarkModal(null)
-      } catch {
+      } catch (err) {
         toast.error("ลบไม่สำเร็จ", { id: toastId })
       }
     }
   }
 
-  // `suraNumber` defaults to the selected surah for the translation/tafsir list,
-  // where every verse belongs to it. Mushaf page mode must pass the verse's own
-  // surah: matching on `selectedSura` alone lit the "บันทึกแล้ว" icon on the
-  // verse with the same ayah number in the OTHER surah sharing that page.
-  // Compared as numbers because QuranEnc returns them as strings while the juz
-  // and search paths set them as numbers.
-  const getBookmarkForVerse = (ayaNumber, suraNumber = selectedSura) => {
+  const getBookmarkForVerse = (ayaNumber) => {
     if (!uid) return null
-    return savedVerses.find(v =>
-      v.uid === uid &&
-      Number(v.sura) === Number(suraNumber) &&
-      Number(v.aya) === Number(ayaNumber)
-    )
+    return savedVerses.find(v => v.uid === uid && v.sura === selectedSura && v.aya === ayaNumber)
   }
 
   // Filter Surahs
@@ -747,13 +718,6 @@ export default function Quran({ initialSura, initialAyah, authState }) {
     if (cache.current[cacheKey]) {
       setVerses(cache.current[cacheKey])
       setError(null)
-      // Without this, switching to an already-cached surah while an earlier
-      // fetch was still in flight left `loading` stuck true forever: the old
-      // run bails out on `if (!active) return` and never clears it, and this
-      // path used to return before touching it. A permanently-true `loading`
-      // also blocks the scroll-to-ayah effect below, so "ย้อนกลับไปอ่านจุดเดิม"
-      // silently stopped working.
-      setLoading(false)
       return
     }
 
@@ -802,19 +766,8 @@ export default function Quran({ initialSura, initialAyah, authState }) {
         .then(([transData, tafsirData, tajweedData]) => {
           if (!active) return
 
-          // Index the tafsir by ayah number instead of trusting position.
-          // Pairing the two QuranEnc responses by array index assumed both
-          // endpoints return the same verses in the same order for every surah —
-          // and if they ever disagree by one entry, every ayah in that surah
-          // silently shows the explanation belonging to a different verse. The
-          // tajweed lookup right below already matched on the verse key; the
-          // tafsir is the one place that did not.
-          const tafsirByAya = new Map(
-            (tafsirData?.result || []).map(item => [String(item.aya), item])
-          )
-
-          const merged = transData.result.map((aya) => {
-            const tafsirAya = tafsirByAya.get(String(aya.aya)) || {}
+          const merged = transData.result.map((aya, idx) => {
+            const tafsirAya = tafsirData.result[idx] || {}
 
             let tajweedText = null
             if (tajweedData && tajweedData.verses) {
@@ -888,9 +841,22 @@ export default function Quran({ initialSura, initialAyah, authState }) {
 
   const hasBismillah = selectedSura !== 1 && selectedSura !== 9
 
+  useEffect(() => {
+    if (!isMobileNavOpen) return
+    const handleKey = (e) => {
+      if (e.key === "Escape") setIsMobileNavOpen(false)
+    }
+    window.addEventListener("keydown", handleKey)
+    return () => window.removeEventListener("keydown", handleKey)
+  }, [isMobileNavOpen])
+
   return (
     <div className="quran-container">
-      
+      <SEOHead
+        title={`ซูเราะฮ์ ${currentSuraInfo.englishName} (${currentSuraInfo.englishNameTranslation}) | อัลกุรอาน Talib Club`}
+        description="ระบบอ่านพระมหาคัมภีร์อัลกุรอานภาษาไทย พร้อมคำแปลความหมายรายอายะฮ์ เสียงอ่าน และตัฟซีรอัลมุคตะศ็อร"
+        canonical={`${BASE_URL}/quran?sura=${selectedSura}`}
+      />
 
       {/* HEADER TITLE */}
       <div style={{ marginBottom: 28 }}>

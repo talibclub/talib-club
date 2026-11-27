@@ -55,7 +55,7 @@ export default function Library({ go, authState, ctx }) {
   const filter = ctx?.filter || "all"
   const categoryFilter = ctx?.cat || "all"
   const sourceFilter = ctx?.source || "all"
-  const sortBy = ctx?.sortBy || (filter === "journal" ? "issue-desc" : "newest")
+  const sortBy = ctx?.sortBy || (isJournalType(filter) ? "issue-desc" : "newest")
   const showAdvancedFilters = ctx?.showAdv === "true"
   const requestedPage = parseInt(ctx?.page, 10) || 1
   const ITEMS_PER_PAGE = 12
@@ -92,9 +92,9 @@ export default function Library({ go, authState, ctx }) {
     if (newParams.filter !== undefined || newParams.cat !== undefined || newParams.source !== undefined || newParams.search !== undefined || newParams.showAdv !== undefined || newParams.sortBy !== undefined) {
       updated.page = 1
     }
-    if (newParams.filter === "journal" && newParams.sortBy === undefined) {
+    if (isJournalType(newParams.filter) && newParams.sortBy === undefined) {
       updated.sortBy = "issue-desc"
-    } else if (newParams.filter !== undefined && newParams.filter !== "journal" && newParams.sortBy === undefined) {
+    } else if (newParams.filter !== undefined && !isJournalType(newParams.filter) && newParams.sortBy === undefined) {
       updated.sortBy = "newest"
     }
     go("library", updated, { replace: true, noScroll: true })
@@ -200,80 +200,112 @@ export default function Library({ go, authState, ctx }) {
 
       {/* SEARCH + MAIN FILTER */}
       {/* ━━━ SEARCH & FILTER BAR ━━━ */}
-      <div style={{ display: "flex", gap: 8, marginBottom: showAdvancedFilters ? 12 : 24 }}>
-        <div style={{ flex: 1, position: "relative" }}>
-          <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
-          <input
-            value={search}
-            onChange={e => { setSearch(e.target.value); updateFilters({ search: e.target.value }) }}
-            placeholder="ค้นหาชื่อหนังสือ, ผู้เขียน, หรือเนื้อหา..."
-            style={{ width: "100%", paddingLeft: 42, borderRadius: 24, padding: "12px 16px 12px 42px", background: "var(--bg2)", border: "1px solid transparent", fontSize: 14, outline: "none", transition: "border 0.2s" }}
-            onFocus={(e) => e.target.style.border = "1px solid var(--teal)"}
-            onBlur={(e) => e.target.style.border = "1px solid transparent"}
-          />
-        </div>
-        <button
-          onClick={() => updateFilters({ showAdv: !showAdvancedFilters ? "true" : "false" })}
-          style={{ 
-            padding: "0 18px", 
-            borderRadius: 24, 
-            background: showAdvancedFilters ? "var(--teal)" : "var(--bg2)", 
-            color: showAdvancedFilters ? "#fff" : "var(--text)", 
-            border: "none",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            transition: "all 0.2s"
-          }}
-          title="ตัวกรองเพิ่มเติม"
-        >
-          <i className="ti ti-filter" style={{ fontSize: 18 }}></i>
-        </button>
-      </div>
+      {(() => {
+        const defaultSort = isJournalType(filter) ? "issue-desc" : "newest";
+        const activeFilterCount = (filter !== "all" ? 1 : 0) + (categoryFilter !== "all" ? 1 : 0) + (sourceFilter !== "all" ? 1 : 0) + (sortBy !== defaultSort ? 1 : 0);
+        return (
+          <>
+            <div style={{ display: "flex", gap: 8, marginBottom: showAdvancedFilters ? 12 : 24 }}>
+              <div style={{ flex: 1, position: "relative" }}>
+                <i className="ti ti-search" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--t3)", fontSize: 16 }}></i>
+                <input
+                  value={search}
+                  onChange={e => { setSearch(e.target.value); updateFilters({ search: e.target.value }) }}
+                  placeholder="ค้นหาชื่อหนังสือ, ผู้เขียน, หรือเนื้อหา..."
+                  style={{ width: "100%", borderRadius: 24, padding: "12px 38px 12px 42px", background: "var(--bg2)", border: "1px solid transparent", fontSize: 14, outline: "none", transition: "border 0.2s" }}
+                  onFocus={(e) => e.target.style.border = "1px solid var(--teal)"}
+                  onBlur={(e) => e.target.style.border = "1px solid transparent"}
+                />
+                {search && (
+                  <button
+                    type="button"
+                    aria-label="ล้างคำค้นหา"
+                    onClick={() => { setSearch(""); updateFilters({ search: "" }) }}
+                    style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "var(--bg3)", border: "none", borderRadius: "50%", width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--t2)" }}
+                  >
+                    <i className="ti ti-x" style={{ fontSize: 13 }}></i>
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => updateFilters({ showAdv: !showAdvancedFilters ? "true" : "false" })}
+                style={{ 
+                  padding: "0 18px", 
+                  borderRadius: 24, 
+                  background: showAdvancedFilters || activeFilterCount > 0 ? "var(--teal)" : "var(--bg2)", 
+                  color: showAdvancedFilters || activeFilterCount > 0 ? "#fff" : "var(--text)", 
+                  border: "none",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  transition: "all 0.2s"
+                }}
+                title="ตัวกรองเพิ่มเติม"
+              >
+                <i className="ti ti-filter" style={{ fontSize: 18 }}></i>
+                {activeFilterCount > 0 && <span style={{ fontSize: 11, fontWeight: 700 }}>{activeFilterCount}</span>}
+              </button>
+            </div>
 
-      {/* ━━━ EXPANDABLE FILTERS ━━━ */}
-      {showAdvancedFilters && (
-        <div style={{ background: "var(--bg2)", padding: "16px", borderRadius: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
-          <label style={{ display: "grid", gap: 6 }}>
-            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>ประเภทสื่อ</span>
-            <select value={filter} onChange={e => updateFilters({ filter: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
-              {types.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-            </select>
-          </label>
+            {/* ━━━ EXPANDABLE FILTERS ━━━ */}
+            {showAdvancedFilters && (
+              <div style={{ background: "var(--bg2)", padding: "16px", borderRadius: 16, marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, alignItems: "end" }}>
+                <label style={{ display: "grid", gap: 6 }}>
+                  <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>ประเภทสื่อ</span>
+                  <select value={filter} onChange={e => updateFilters({ filter: e.target.value })} style={{ background: "var(--card)", border: "1px solid var(--br)", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+                    {types.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                  </select>
+                </label>
 
-          <label style={{ display: "grid", gap: 6 }}>
-            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>หมวดหมู่เนื้อหา</span>
-            <select value={categoryFilter} onChange={e => updateFilters({ cat: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
-              <option value="all">-- ทุกหมวดหมู่ --</option>
-              {availableCategories.filter(c => c !== "all").map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </label>
+                <label style={{ display: "grid", gap: 6 }}>
+                  <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>หมวดหมู่เนื้อหา</span>
+                  <select value={categoryFilter} onChange={e => updateFilters({ cat: e.target.value })} style={{ background: "var(--card)", border: "1px solid var(--br)", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+                    <option value="all">-- ทุกหมวดหมู่ --</option>
+                    {availableCategories.filter(c => c !== "all").map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </label>
 
-          <label style={{ display: "grid", gap: 6 }}>
-            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>แหล่งที่มา / สำนักพิมพ์</span>
-            <select value={sourceFilter} onChange={e => updateFilters({ source: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
-              <option value="all">-- ทุกสำนักพิมพ์ --</option>
-              {availableSources.filter(s => s !== "all").map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </label>
+                <label style={{ display: "grid", gap: 6 }}>
+                  <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>แหล่งที่มา / สำนักพิมพ์</span>
+                  <select value={sourceFilter} onChange={e => updateFilters({ source: e.target.value })} style={{ background: "var(--card)", border: "1px solid var(--br)", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+                    <option value="all">-- ทุกสำนักพิมพ์ --</option>
+                    {availableSources.filter(s => s !== "all").map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </label>
 
-          <label style={{ display: "grid", gap: 6 }}>
-            <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>เรียงลำดับ</span>
-            {filter === "journal" ? (
-              <select value={sortBy} onChange={e => updateFilters({ sortBy: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
-                <option value="issue-desc">เล่มใหม่ล่าสุด ➜ เล่มเก่า</option>
-                <option value="issue-asc">เล่มเก่าสุด ➜ เล่มใหม่</option>
-              </select>
-            ) : (
-              <select value={sortBy} onChange={e => updateFilters({ sortBy: e.target.value })} style={{ background: "var(--card)", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
-                <option value="newest">ปีที่พิมพ์ ใหม่ ➜ เก่า</option>
-                <option value="oldest">ปีที่พิมพ์ เก่า ➜ ใหม่</option>
-              </select>
+                <label style={{ display: "grid", gap: 6 }}>
+                  <span style={{ fontSize: 12, color: "var(--t2)", fontWeight: 500 }}>เรียงลำดับ</span>
+                  {isJournalType(filter) ? (
+                    <select value={sortBy} onChange={e => updateFilters({ sortBy: e.target.value })} style={{ background: "var(--card)", border: "1px solid var(--br)", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+                      <option value="issue-desc">เล่มใหม่ล่าสุด ➜ เล่มเก่า</option>
+                      <option value="issue-asc">เล่มเก่าสุด ➜ เล่มใหม่</option>
+                    </select>
+                  ) : (
+                    <select value={sortBy} onChange={e => updateFilters({ sortBy: e.target.value })} style={{ background: "var(--card)", border: "1px solid var(--br)", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}>
+                      <option value="newest">ปีที่พิมพ์ ใหม่ ➜ เก่า</option>
+                      <option value="oldest">ปีที่พิมพ์ เก่า ➜ ใหม่</option>
+                    </select>
+                  )}
+                </label>
+
+                {activeFilterCount > 0 && (
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => updateFilters({ filter: "all", cat: "all", source: "all", sortBy: "newest" })}
+                    style={{ padding: "8px 14px", fontSize: 12, borderRadius: 8 }}
+                  >
+                    <i className="ti ti-refresh" style={{ fontSize: 14 }}></i> ล้างตัวกรอง
+                  </button>
+                )}
+              </div>
             )}
-          </label>
-        </div>
-      )}
+          </>
+        );
+      })()}
 
       {/* BOOKS GRID */}
       {loading ? (
@@ -319,7 +351,7 @@ export default function Library({ go, authState, ctx }) {
                 onClick={() => {
                   if (!authState?.user) {
                     toast.error("กรุณาเข้าสู่ระบบก่อนดาวน์โหลดหรือดูหนังสือ")
-                    go("auth")
+                    go("auth", null, { from: `/library-detail?id=${b.id}` })
                     return
                   }
                   go("library-detail", b)
@@ -368,7 +400,7 @@ export default function Library({ go, authState, ctx }) {
                         onClick={(e) => {
                           e.stopPropagation()
                           toast.error("กรุณาเข้าสู่ระบบก่อนดาวน์โหลดหรือดูหนังสือ")
-                          go("auth")
+                          go("auth", null, { from: `/library-detail?id=${b.id}` })
                         }}
                         style={{
                           width: "100%",

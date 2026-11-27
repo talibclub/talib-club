@@ -1,32 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import Papa from "papaparse";
 import toast from "react-hot-toast";
-import { collection, getDocs, writeBatch, doc, updateDoc, Timestamp } from "firebase/firestore";
+import { collection, getDocs, writeBatch, doc, updateDoc, Timestamp, query, where, or, limit } from "firebase/firestore";
 import { trackingDb as db } from "../lib/trackingFirebase.js";
-import { auth } from "../lib/firebase.js";
 import { formatFirebaseDate } from "../utils/format.js";
 import { exportCSV } from "../utils/csvTracking.js";
-import { SITE } from "../data/site.js";
-
-const MANUAL_LABELS_STORAGE_KEY = "talib_tracking_manual_labels_v1";
-
-function calculateA4LabelLayout(widthMm, heightMm) {
-  if (![widthMm, heightMm].every(value => Number.isFinite(value) && value > 0)) return null;
-  const gapMm = 2;
-  const candidates = [
-    { orientation: "portrait", pageWidth: 202, pageHeight: 289, rotated: false, labelWidth: widthMm, labelHeight: heightMm },
-    { orientation: "portrait", pageWidth: 202, pageHeight: 289, rotated: true, labelWidth: heightMm, labelHeight: widthMm },
-    { orientation: "landscape", pageWidth: 289, pageHeight: 202, rotated: false, labelWidth: widthMm, labelHeight: heightMm },
-    { orientation: "landscape", pageWidth: 289, pageHeight: 202, rotated: true, labelWidth: heightMm, labelHeight: widthMm },
-  ].map(candidate => {
-    const cols = Math.floor((candidate.pageWidth + gapMm) / (candidate.labelWidth + gapMm));
-    const rows = Math.floor((candidate.pageHeight + gapMm) / (candidate.labelHeight + gapMm));
-    return { ...candidate, cols, rows, capacity: cols * rows };
-  }).filter(candidate => candidate.capacity > 0);
-
-  return candidates.sort((a, b) => b.capacity - a.capacity || Number(a.rotated) - Number(b.rotated) || (a.orientation === b.orientation ? 0 : a.orientation === "portrait" ? -1 : 1))[0];
-}
+import SEOHead, { BASE_URL } from "../components/SEOHead.jsx";
 
 export default function Tracking({ authState }) {
   // --- View & Routing State ---
@@ -54,34 +33,27 @@ export default function Tracking({ authState }) {
   // --- Modals State ---
   const [activeModal, setActiveModal] = useState(null); // 'edit-recipient', 'edit-record', 'label'
   const [editData, setEditData] = useState({});
-  const [labelSettings, setLabelSettings] = useState({ name: "สมาคม Talib Club", phone: "", addr: "", senderTheme: "dark", size: "therm-150x100", customWidth: 100, customHeight: 75, a4LabelWidth: 100, a4LabelHeight: 75, a4Rows: 3, a4Cols: 2, a4Orientation: "portrait" });
-  const [manualLabels, setManualLabels] = useState(() => {
-    try {
-      const saved = sessionStorage.getItem(MANUAL_LABELS_STORAGE_KEY);
-      const parsed = saved ? JSON.parse(saved) : [];
-      return Array.isArray(parsed) ? parsed.filter(item => item && item.id && item.fullName && item.address) : [];
-    } catch { return []; }
-  });
-  const [manualLabelDraft, setManualLabelDraft] = useState({ fullName: "", phone: "", address: "", postalCode: "", bonusNote: "" });
-  const [manualLabelModalOpen, setManualLabelModalOpen] = useState(false);
-  const [editingManualLabelId, setEditingManualLabelId] = useState(null);
-  const [labelPreview, setLabelPreview] = useState(null);
+  const [labelSettings, setLabelSettings] = useState({ name: "สมาคม Talib Club", phone: "", addr: "", size: "therm-150x100" });
 
+  // Load PapaParse script
   useEffect(() => {
-    try { sessionStorage.setItem(MANUAL_LABELS_STORAGE_KEY, JSON.stringify(manualLabels)); }
-    catch (error) { console.warn("Could not save temporary manual labels:", error); }
-  }, [manualLabels]);
-
-  // PapaParse used to be injected from cdnjs at runtime with no integrity hash,
-  // so whatever that CDN served got full access to this page — and to the CSV of
-  // names, phone numbers and addresses being parsed on it. It is a bundled
-  // dependency now, imported at the top of the file.
-  useEffect(() => {
+    let script;
+    if (!window.Papa && !document.getElementById("papa-parse-script")) {
+      script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js";
+      script.id = "papa-parse-script";
+      document.head.appendChild(script);
+    }
     if (isTrackingStaff) {
       setIsAdminAuthenticated(true);
       setView("admin-dashboard");
     }
-    return () => {};
+    return () => {
+      if (script && document.head.contains(script)) {
+        document.head.removeChild(script);
+        delete window.Papa;
+      }
+    };
   }, [isTrackingStaff]);
 
   useEffect(() => {
@@ -167,59 +139,51 @@ export default function Tracking({ authState }) {
   // ==========================================
   // ★ PUBLIC SEARCH (หน้าบ้านผู้ใช้)
   // ==========================================
-  const handleCopyTracking = async (trackingNumber) => {
-    try {
-      await navigator.clipboard.writeText(String(trackingNumber).trim());
-      toast.success("คัดลอกเลขพัสดุแล้ว");
-    } catch {
-      toast.error("คัดลอกไม่สำเร็จ กรุณาคัดลอกเลขพัสดุด้วยตนเอง");
-    }
-  };
-
-  // Every click scheduled another 1.5s reset without clearing the previous one,
-  // so an earlier timer could fire mid-sequence and reset the counter just as
-  // the third tap landed.
-  const secretResetRef = useRef(null);
-  useEffect(() => () => clearTimeout(secretResetRef.current), []);
   const handleSecretClick = () => {
-    clearTimeout(secretResetRef.current);
     const newCount = secretClicks + 1;
     setSecretClicks(newCount);
     if (newCount >= 3) {
       setView(isAdminAuthenticated ? "admin-dashboard" : "admin-login");
       setSecretClicks(0);
-      return;
     }
-    secretResetRef.current = setTimeout(() => setSecretClicks(0), 1500);
+    setTimeout(() => setSecretClicks(0), 1500);
   };
 
-  // Search goes through /api/track-lookup (exact match, trimmed fields) instead
-  // of querying Firestore directly — rules can't enforce a `where` clause, so a
-  // client-side query would let any member list other people's data.
   const handlePublicSearch = async (e, mode) => {
     e.preventDefault();
     const rawQuery = userQuery.trim();
     if (!rawQuery) return;
-    if (!auth.currentUser) {
-      await myAlert("กรุณาเข้าสู่ระบบก่อนค้นหาสถานะพัสดุ");
-      return;
-    }
     setIsLoading(true);
     setUserSearchResult(null);
     try {
-      const idToken = await auth.currentUser.getIdToken();
-      const res = await fetch("/api/track-lookup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ mode, query: rawQuery }),
-      });
-      if (res.status === 429) {
-        await myAlert("ค้นหาถี่เกินไป กรุณารอสักครู่แล้วลองใหม่");
-        setIsLoading(false);
-        return;
+      const qClean = rawQuery;
+      const qPhone = rawQuery.replace(/[-\s]/g, ""); // digits only
+      const qTrack = rawQuery.replace(/\s/g, "").toUpperCase();
+
+      let q;
+      if (mode === "recipient") {
+        q = query(
+          collection(db, "recipients"),
+          or(
+            where("fullName", "==", qClean),
+            where("phone", "==", qPhone)
+          ),
+          limit(5)
+        );
+      } else {
+        q = query(
+          collection(db, "records"),
+          or(
+            where("fullName", "==", qClean),
+            where("phone", "==", qPhone),
+            where("trackingNumber", "==", qTrack)
+          ),
+          limit(5)
+        );
       }
-      const data = res.ok ? await res.json() : { results: [] };
-      const found = Array.isArray(data.results) ? data.results : [];
+
+      const snap = await getDocs(q);
+      const found = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setUserSearchResult(found.length > 0 ? found : "NOT_FOUND");
     } catch (err) {
       console.error("Public search error:", err);
@@ -228,16 +192,15 @@ export default function Tracking({ authState }) {
     setIsLoading(false);
   };
 
-
   // ==========================================
   // ★ TAB 1 & 3: CSV UPLOADING
   // ==========================================
   const handleCSVUpload = (e, targetCollection) => {
     const f = e.target.files[0];
-    if (!f) return;
+    if (!f || !window.Papa) return;
     
     setIsLoading(true);
-    Papa.parse(f, {
+    window.Papa.parse(f, {
       header: true, skipEmptyLines: true,
       complete: async (res) => {
         try {
@@ -245,24 +208,9 @@ export default function Tracking({ authState }) {
           const rows = [];
 
           res.data.forEach((row, idx) => {
-            // Header matching used to be a bare `includes`, so a column headed
-            // "เลขที่บ้าน" satisfied the tracking-number key "เลข" and a house
-            // number was imported as a tracking code. Prefer an exact header
-            // match, fall back to "starts with", and only then to `includes`.
-            const norm = (v) => String(v).replace(/\s/g, '').toLowerCase();
             const getVal = (keys) => {
-              const cols = Object.keys(row);
-              for (const key of keys) {
-                const exact = cols.find(k => norm(k) === key);
-                if (exact) return row[exact];
-              }
-              for (const key of keys) {
-                const starts = cols.find(k => norm(k).startsWith(key));
-                if (starts) return row[starts];
-              }
-              for (const key of keys) {
-                const loose = cols.find(k => norm(k).includes(key));
-                if (loose) return row[loose];
+              for (const k of Object.keys(row)) {
+                if (keys.some(key => k.replace(/\s/g,'').toLowerCase().includes(key))) return row[k];
               }
               return "";
             };
@@ -288,76 +236,22 @@ export default function Tracking({ authState }) {
             rows.push(dataObj);
           });
 
-          if (rows.length === 0) {
-            await myAlert("ไม่พบข้อมูลที่ถูกต้องในไฟล์ CSV\n\nโปรดตรวจสอบให้แน่ใจว่าในไฟล์มีคอลัมน์ 'ชื่อ' หรือ 'name'");
-            setIsLoading(false);
-            e.target.value = "";
-            return;
-          }
-
-          const normalize = value => String(value || "").toLowerCase().replace(/[\s\-.,/]/g, "");
-          const getImportKey = item => {
-            if (targetCollection === "records") {
-              const trackingNumber = normalize(item.trackingNumber);
-              return trackingNumber ? `tracking:${trackingNumber}` : `record:${normalize(item.phone)}:${normalize(item.fullName)}`;
-            }
-            const phone = normalize(item.phone).replace(/\D/g, "");
-            return phone ? `phone:${phone}` : `recipient:${normalize(item.fullName)}:${normalize(item.address)}`;
-          };
-          const existingSnap = await getDocs(collection(db, targetCollection));
-          const seenKeys = new Set(existingSnap.docs.map(item => getImportKey(item.data())));
-          const uniqueRows = [];
-          const duplicateRows = [];
-          rows.forEach(item => {
-            const key = getImportKey(item);
-            if (seenKeys.has(key)) duplicateRows.push(item);
-            else { seenKeys.add(key); uniqueRows.push(item); }
-          });
-
-          if (uniqueRows.length === 0) {
-            await myAlert(`ข้อมูลในไฟล์ซ้ำกับในระบบทั้งหมด ${duplicateRows.length} รายการ จึงไม่ได้เพิ่มข้อมูล`, "ไม่พบรายการใหม่");
-            setIsLoading(false);
-            e.target.value = "";
-            return;
-          }
-          const duplicateNote = duplicateRows.length
-            ? `\nข้ามรายการซ้ำ ${duplicateRows.length} รายการ\nตัวอย่าง: ${duplicateRows.slice(0, 4).map(item => item.fullName).join(", ")}${duplicateRows.length > 4 ? " …" : ""}`
-            : "\nไม่พบรายการซ้ำ";
-          const proceed = await myConfirm(`ตรวจพบข้อมูลใหม่ ${uniqueRows.length} รายการ${duplicateNote}\n\nต้องการนำเข้ารายการใหม่หรือไม่?`);
-          if (!proceed) {
-            setIsLoading(false);
-            e.target.value = "";
-            return;
-          }
-
           const BATCH_LIMIT = 450;
           const commitPromises = [];
           
-          for (let i = 0; i < uniqueRows.length; i += BATCH_LIMIT) {
+          for (let i = 0; i < rows.length; i += BATCH_LIMIT) {
             const batch = writeBatch(db);
-            for (const dataObj of uniqueRows.slice(i, i + BATCH_LIMIT)) {
+            for (const dataObj of rows.slice(i, i + BATCH_LIMIT)) {
               batch.set(doc(collection(db, targetCollection)), dataObj);
             }
             commitPromises.push(batch.commit());
           }
           
-          // Promise.all's result was thrown away and the success message always
-          // quoted rows.length, so an import where one 450-row batch failed
-          // still reported every row as saved. allSettled lets the operator see
-          // how many actually landed.
-          const results = await Promise.allSettled(commitPromises);
-          const failedBatches = results.filter(r => r.status === "rejected");
+          await Promise.all(commitPromises);
 
-          const count = uniqueRows.length;
-          if (failedBatches.length > 0) {
-            console.error("CSV import: some batches failed", failedBatches.map(f => f.reason));
-            const savedCount = Math.max(0, count - failedBatches.length * BATCH_LIMIT);
-            await myAlert(
-              `บันทึกได้เพียงบางส่วน — สำเร็จประมาณ ${savedCount} จาก ${count} รายการ (ล้มเหลว ${failedBatches.length} ชุด) กรุณาตรวจสอบข้อมูลในระบบก่อนนำเข้าไฟล์เดิมซ้ำ เพราะรายการที่บันทึกไปแล้วจะถูกเพิ่มเข้าไปอีก`,
-              "บันทึกไม่ครบ"
-            );
-          } else if (count > 0) {
-            await myAlert(`บันทึกข้อมูลสำเร็จ ${count} รายการ${duplicateRows.length ? ` (ข้ามรายการซ้ำ ${duplicateRows.length} รายการ)` : ""}`, "สำเร็จ");
+          const count = rows.length;
+          if (count > 0) {
+            await myAlert(`บันทึกข้อมูลสำเร็จ ${count} รายการเข้าสู่ระบบ`, "สำเร็จ");
             if (targetCollection === "recipients") setAdminTab(2);
             else setAdminTab(4);
           } else {
@@ -377,19 +271,13 @@ export default function Tracking({ authState }) {
   // ★ BULK ACTIONS (โบนัส, ลบ, Export)
   // ==========================================
   const handleBulkDelete = async (collectionName, selectedIds, clearAll = false) => {
-    const sourceRows = collectionName === "recipients" ? recipients : records;
-    const rowsToDelete = clearAll ? sourceRows : sourceRows.filter(row => selectedIds.includes(row.id));
-    const idsToDelete = rowsToDelete.map(row => row.id);
+    let idsToDelete = clearAll ? (collectionName === "recipients" ? recipients : records).map(r => r.id) : selectedIds;
     if (idsToDelete.length === 0) {
       await myAlert("กรุณาเลือกรายการที่ต้องการลบ");
       return;
     }
-
-    const sampleNames = rowsToDelete.slice(0, 6).map(row => row.fullName || row.trackingNumber || "ไม่ระบุชื่อ");
-    const remainingCount = rowsToDelete.length - sampleNames.length;
-    const preview = `${sampleNames.join("\n")}${remainingCount > 0 ? `\nและอีก ${remainingCount} รายการ` : ""}`;
-    const actionLabel = clearAll ? "ล้างรายชื่อทั้งหมด" : "ลบรายการที่เลือก";
-    const isConfirmed = await myConfirm(`${actionLabel} จำนวน ${idsToDelete.length} รายการใช่หรือไม่?\n\n${preview}\n\nการลบนี้ไม่สามารถย้อนกลับได้`, clearAll ? "ยืนยันล้างข้อมูลทั้งหมด" : "ตรวจสอบรายการก่อนลบ");
+    
+    const isConfirmed = await myConfirm(`ยืนยันการลบข้อมูลจำนวน ${idsToDelete.length} รายการใช่หรือไม่?`);
     if (!isConfirmed) return;
 
     setIsLoading(true);
@@ -403,8 +291,8 @@ export default function Tracking({ authState }) {
         await batch.commit();
       }
       await myAlert("ลบข้อมูลออกจากระบบสำเร็จ", "สำเร็จ");
-      if (collectionName === "recipients") { setSelectedRecipients([]); await fetchRecipients(); }
-      else { setSelectedRecords([]); await fetchRecords(); }
+      if (collectionName === "recipients") fetchRecipients();
+      else fetchRecords();
     } catch (e) { 
       console.error(e); 
       await myAlert("เกิดข้อผิดพลาดในการลบข้อมูล", "ข้อผิดพลาด"); 
@@ -465,103 +353,18 @@ export default function Tracking({ authState }) {
   // ==========================================
   // ★ LABEL PRINTER
   // ==========================================
-  const openManualLabelModal = (label = null) => {
-    setEditingManualLabelId(label?.id || null);
-    setManualLabelDraft(label ? {
-      fullName: label.fullName || "",
-      phone: label.phone || "",
-      address: [label.address, label.postalCode].filter(Boolean).join(" "),
-      postalCode: label.postalCode || "",
-      bonusNote: label.bonusNote || "",
-    } : { fullName: "", phone: "", address: "", postalCode: "", bonusNote: "" });
-    setManualLabelModalOpen(true);
-  };
-
-  const saveManualLabel = async () => {
-    const fullName = manualLabelDraft.fullName.trim();
-    const fullAddress = manualLabelDraft.address.trim();
-    if (!fullName || !fullAddress) {
-      await myAlert("กรุณากรอกชื่อผู้รับและที่อยู่ให้ครบ");
-      return;
-    }
-    const postalCode = fullAddress.match(/\b\d{5}\b/)?.[0] || manualLabelDraft.postalCode.trim();
-    const address = postalCode ? fullAddress.replace(postalCode, "").replace(/[,\s]+$/, "").trim() : fullAddress;
-    const labelData = {
-      ...manualLabelDraft,
-      fullName,
-      phone: manualLabelDraft.phone.trim(),
-      address,
-      postalCode,
-      bonusNote: manualLabelDraft.bonusNote.trim(),
-    };
-    if (editingManualLabelId) {
-      setManualLabels(prev => prev.map(item => item.id === editingManualLabelId ? { ...item, ...labelData } : item));
-    } else {
-      setManualLabels(prev => [...prev, { ...labelData, id: `manual-${Date.now()}-${Math.random().toString(36).slice(2)}` }]);
-    }
-    setManualLabelDraft({ fullName: "", phone: "", address: "", postalCode: "", bonusNote: "" });
-    setEditingManualLabelId(null);
-    setManualLabelModalOpen(false);
-  };
-
-  const printLabels = async (mode = "selected") => {
-    const selectedList = mode === "all"
-      ? recipients
-      : recipients.filter(r => selectedRecipients.includes(r.id));
-    const listToPrint = [...selectedList, ...manualLabels];
+  const printLabels = async () => {
+    const listToPrint = recipients.filter(r => selectedRecipients.length === 0 || selectedRecipients.includes(r.id));
     if (listToPrint.length === 0) {
-      await myAlert("ไม่มีรายชื่อให้พิมพ์ กรุณาเลือกรายชื่อหรือเพิ่มลาเบลเองก่อน");
-      return;
-    }
-    if (labelSettings.size === "therm-custom" && (![labelSettings.customWidth, labelSettings.customHeight].every(value => Number.isFinite(Number(value)) && Number(value) >= 50 && Number(value) <= 300))) {
-      await myAlert("ขนาดฉลากต้องอยู่ระหว่าง 50–300 มม. ทั้งด้านกว้างและด้านสูง");
-      return;
-    }
-    if (labelSettings.size === "a4-grid-custom" && ![labelSettings.a4Rows, labelSettings.a4Cols].every(value => Number.isInteger(Number(value)) && Number(value) >= 1 && Number(value) <= 4)) {
-      await myAlert("จำนวนแถวและคอลัมน์ต้องเป็นจำนวนเต็มระหว่าง 1–4");
-      return;
-    }
-    if (labelSettings.size === "a4-fit" && ![labelSettings.a4LabelWidth, labelSettings.a4LabelHeight].every(value => Number.isFinite(Number(value)) && Number(value) >= 50 && Number(value) <= 200)) {
-      await myAlert("ขนาดฉลาก A4 ต้องอยู่ระหว่าง 50–200 มม. ทั้งด้านกว้างและด้านสูง");
+      await myAlert("ไม่มีรายชื่อให้พิมพ์ กรุณาลงรายชื่อเตรียมจัดส่งก่อน");
       return;
     }
     
     const { name: sName, phone: sPhone, addr: sAddr, size } = labelSettings;
-    const a4PresetMatch = size.match(/^a4-grid-(\d)x(\d)-(portrait|landscape)$/);
-    const a4Cols = size === "a4-grid-custom" ? Number(labelSettings.a4Cols) : Number(a4PresetMatch?.[1] || 0);
-    const a4Rows = size === "a4-grid-custom" ? Number(labelSettings.a4Rows) : Number(a4PresetMatch?.[2] || 0);
-    const a4Orientation = size === "a4-grid-custom" ? labelSettings.a4Orientation : a4PresetMatch?.[3];
-    const a4FitLayout = size === "a4-fit" ? calculateA4LabelLayout(Number(labelSettings.a4LabelWidth), Number(labelSettings.a4LabelHeight)) : null;
-    const labelsPerSheet = Number(size.match(/^a4-(1|2|4)$/)?.[1] || 0) || (a4FitLayout?.capacity || (a4Rows * a4Cols));
     const cssMap = {
-      'therm-150x100': `@page{size:150mm 100mm;margin:0}body{margin:0;width:150mm;font-family:'Prompt',sans-serif;}.plabel{width:150mm;height:99mm;box-sizing:border-box;padding:4mm;page-break-after:always;display:flex;flex-direction:column}.l-inner{border:2px solid #000;flex:1;display:flex;flex-direction:column;padding:3mm;border-radius:4px}.l-sender{padding-bottom:3mm;border-bottom:1px dashed #000;font-size:11pt;line-height:1.4}.l-recv{flex:1;padding:4mm 2mm}.l-recv-name{font-size:24pt;font-weight:700;line-height:1.2;margin-bottom:2mm}.l-recv-phone{font-size:16pt;font-weight:600;margin-bottom:2mm}.l-recv-addr{font-size:16pt;line-height:1.45}.l-foot{display:flex;border-top:1px solid #000;height:22mm;align-items:center}.l-note{flex:1;font-size:14pt;font-weight:600;padding-left:2mm;color:#b45309}.l-zip{font-size:36pt;font-weight:700;letter-spacing:2px;padding-right:2mm}`,
-      'therm-100x150': `@page{size:100mm 150mm;margin:0}body{margin:0;width:100mm;font-family:'Prompt',sans-serif;}.plabel{width:100mm;height:149mm;box-sizing:border-box;padding:2mm;page-break-after:always;display:flex;flex-direction:column}.l-inner{border:2px solid #000;flex:1;display:flex;flex-direction:column;padding:3mm;border-radius:4px}.l-sender{padding-bottom:3mm;border-bottom:1px dashed #000;font-size:10pt;line-height:1.4}.l-recv{flex:1;padding:4mm 2mm}.l-recv-name{font-size:20pt;font-weight:700;line-height:1.2;margin-bottom:2mm}.l-recv-phone{font-size:14pt;font-weight:600;margin-bottom:2mm}.l-recv-addr{font-size:15pt;line-height:1.45}.l-foot{display:flex;border-top:1px solid #000;height:24mm;align-items:center}.l-note{flex:1;font-size:12pt;font-weight:600;padding-left:2mm;color:#b45309}.l-zip{font-size:32pt;font-weight:700;letter-spacing:1px;padding-right:2mm}`,
-      'a4-1': `@page{size:A4 portrait;margin:4mm}html,body{margin:0;font-family:'Prompt',sans-serif}.sheet{width:202mm;height:289mm;box-sizing:border-box;page-break-after:always;display:grid;grid-template-columns:1fr;grid-template-rows:1fr;gap:3mm}.plabel{min-width:0;min-height:0;box-sizing:border-box;padding:3mm;display:flex}.l-inner{border:2px solid #000;border-radius:3mm;flex:1;min-width:0;display:flex;flex-direction:column;padding:5mm}.l-sender{padding-bottom:4mm;border-bottom:1px dashed #000;font-size:11pt;line-height:1.45}.l-recv{flex:1;padding:7mm 3mm}.l-recv-name{font-size:24pt;font-weight:700;line-height:1.2;margin-bottom:3mm}.l-recv-phone{font-size:16pt;font-weight:600;margin-bottom:3mm}.l-recv-addr{font-size:16pt;line-height:1.45;overflow-wrap:anywhere}.l-foot{display:flex;border-top:1px solid #000;min-height:25mm;align-items:center}.l-note{flex:1;font-size:13pt;font-weight:600;padding-left:2mm;color:#b45309}.l-zip{font-size:34pt;font-weight:700;letter-spacing:1px;padding-right:2mm}`,
-      'a4-2': `@page{size:A4 portrait;margin:4mm}html,body{margin:0;font-family:'Prompt',sans-serif}.sheet{width:202mm;height:289mm;box-sizing:border-box;page-break-after:always;display:grid;grid-template-columns:1fr;grid-template-rows:repeat(2,minmax(0,1fr));gap:3mm}.plabel{min-width:0;min-height:0;box-sizing:border-box;padding:2mm;display:flex}.l-inner{border:2px solid #000;border-radius:2mm;flex:1;min-width:0;display:flex;flex-direction:column;padding:3mm}.l-sender{padding-bottom:2mm;border-bottom:1px dashed #000;font-size:8pt;line-height:1.3}.l-recv{flex:1;padding:3mm 2mm}.l-recv-name{font-size:18pt;font-weight:700;line-height:1.2;margin-bottom:2mm}.l-recv-phone{font-size:12pt;font-weight:600;margin-bottom:2mm}.l-recv-addr{font-size:13pt;line-height:1.4;overflow-wrap:anywhere}.l-foot{display:flex;border-top:1px solid #000;min-height:18mm;align-items:center}.l-note{flex:1;font-size:10pt;font-weight:600;padding-left:2mm;color:#b45309}.l-zip{font-size:25pt;font-weight:700;letter-spacing:1px;padding-right:2mm}`,
-      'a4-4': `@page{size:A4 landscape;margin:4mm}html,body{margin:0;font-family:'Prompt',sans-serif;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.sheet{width:289mm;height:202mm;box-sizing:border-box;page-break-after:always;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:3mm}.plabel{min-width:0;min-height:0;box-sizing:border-box;padding:1mm;display:flex}.l-inner{border:1.5px solid #000;border-radius:1mm;flex:1;min-width:0;display:flex;flex-direction:column;padding:2mm}.l-sender{padding-bottom:1mm;border-bottom:1px dashed #000;font-size:13pt;line-height:1.3;overflow-wrap:anywhere}.l-recv{flex:1;padding:2mm 1mm}.l-recv-name{font-size:22pt;font-weight:700;line-height:1.15;margin-bottom:1mm;overflow-wrap:anywhere}.l-recv-phone{font-size:15pt;font-weight:600;margin-bottom:1mm}.l-recv-addr{font-size:14pt;line-height:1.35;overflow-wrap:anywhere}.l-foot{display:flex;border-top:1px solid #000;min-height:15mm;align-items:center}.l-note{flex:1;font-size:10pt;font-weight:600;padding-left:1mm;color:#000;overflow-wrap:anywhere}.l-zip{font-size:30pt;font-weight:700;padding-right:1mm}`
+      'therm-150x100': `@page{size:150mm 100mm;margin:0}body{margin:0;width:150mm;font-family:'Prompt',sans-serif;}.plabel{width:150mm;height:99mm;box-sizing:border-box;padding:4mm;page-break-after:always;display:flex;flex-direction:column}.l-inner{border:2px solid #000;flex:1;display:flex;flex-direction:column;padding:3mm;border-radius:4px}.l-sender{padding-bottom:3mm;border-bottom:1px dashed #000;font-size:11pt;line-height:1.4}.l-recv{flex:1;padding:4mm 2mm}.l-recv-name{font-size:24pt;font-weight:700;line-height:1.2;margin-bottom:2mm}.l-recv-phone{font-size:16pt;font-weight:600;margin-bottom:2mm}.l-recv-addr{font-size:14pt;line-height:1.5}.l-foot{display:flex;border-top:1px solid #000;height:22mm;align-items:center}.l-note{flex:1;font-size:14pt;font-weight:600;padding-left:2mm;color:#b45309}.l-zip{font-size:36pt;font-weight:700;letter-spacing:2px;padding-right:2mm}`,
+      'therm-100x150': `@page{size:100mm 150mm;margin:0}body{margin:0;width:100mm;font-family:'Prompt',sans-serif;}.plabel{width:100mm;height:149mm;box-sizing:border-box;padding:2mm;page-break-after:always;display:flex;flex-direction:column}.l-inner{border:2px solid #000;flex:1;display:flex;flex-direction:column;padding:3mm;border-radius:4px}.l-sender{padding-bottom:3mm;border-bottom:1px dashed #000;font-size:10pt;line-height:1.4}.l-recv{flex:1;padding:4mm 2mm}.l-recv-name{font-size:20pt;font-weight:700;line-height:1.2;margin-bottom:2mm}.l-recv-phone{font-size:14pt;font-weight:600;margin-bottom:2mm}.l-recv-addr{font-size:13pt;line-height:1.5}.l-foot{display:flex;border-top:1px solid #000;height:24mm;align-items:center}.l-note{flex:1;font-size:12pt;font-weight:600;padding-left:2mm;color:#b45309}.l-zip{font-size:32pt;font-weight:700;letter-spacing:1px;padding-right:2mm}`
     };
-
-    let layoutCss = cssMap[size] || cssMap['therm-150x100'];
-    if (size === "therm-100x75" || size === "therm-custom") {
-      const widthMm = size === "therm-100x75" ? 100 : Math.max(50, Math.min(300, Number(labelSettings.customWidth) || 100));
-      const heightMm = size === "therm-100x75" ? 75 : Math.max(50, Math.min(300, Number(labelSettings.customHeight) || 75));
-      const scale = Math.min(widthMm / 150, heightMm / 100);
-      layoutCss = `@page{size:${widthMm}mm ${heightMm}mm;margin:0}html,body{margin:0;width:${widthMm}mm;font-family:'Prompt',sans-serif}.plabel{width:${widthMm}mm;height:${heightMm}mm;box-sizing:border-box;padding:2mm;page-break-after:always;display:flex}.l-inner{border:1.5px solid #000;border-radius:1mm;flex:1;min-width:0;display:flex;flex-direction:column;padding:2mm}.l-sender{font-size:${Math.max(8, 13 * scale)}pt;line-height:1.25;overflow-wrap:anywhere}.l-recv{flex:1;padding:2mm 1mm}.l-recv-name{font-size:${Math.max(11, 22 * scale)}pt;font-weight:700;line-height:1.15;margin-bottom:1mm;overflow-wrap:anywhere}.l-recv-phone{font-size:${Math.max(9, 15 * scale)}pt;font-weight:600;margin-bottom:1mm}.l-recv-addr{font-size:${Math.max(10, Math.min(18, 16 * scale))}pt;line-height:1.35;overflow-wrap:anywhere}.l-foot{display:flex;border-top:1px solid #000;min-height:${Math.max(10, 15 * scale)}mm;align-items:center}.l-note{flex:1;font-size:${Math.max(8, 10 * scale)}pt;font-weight:600;padding-left:1mm;color:#000;overflow-wrap:anywhere}.l-zip{font-size:${Math.max(14, 30 * scale)}pt;font-weight:700;padding-right:1mm}`;
-    }
-    if (labelsPerSheet && a4Rows && a4Cols) {
-      const pageWidthMm = a4Orientation === "landscape" ? 289 : 202;
-      const pageHeightMm = a4Orientation === "landscape" ? 202 : 289;
-      const labelWidthMm = (pageWidthMm - ((a4Cols - 1) * 3)) / a4Cols;
-      const labelHeightMm = (pageHeightMm - ((a4Rows - 1) * 3)) / a4Rows;
-      const scale = Math.min(labelWidthMm / 150, labelHeightMm / 100);
-      const gridLayoutCss = `@page{size:A4 ${a4Orientation};margin:4mm}html,body{margin:0;font-family:'Prompt',sans-serif;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.sheet{width:${pageWidthMm}mm;height:${pageHeightMm}mm;box-sizing:border-box;page-break-after:always;display:grid;grid-template-columns:repeat(${a4Cols},minmax(0,1fr));grid-template-rows:repeat(${a4Rows},minmax(0,1fr));gap:3mm}.plabel{min-width:0;min-height:0;box-sizing:border-box;padding:1mm;display:flex}.l-inner{border:1.5px solid #000;border-radius:1mm;flex:1;min-width:0;display:flex;flex-direction:column;padding:2mm}.l-sender{font-size:${Math.max(8, Math.min(15, 13 * scale))}pt;line-height:1.25;overflow-wrap:anywhere}.l-recv{flex:1;padding:2mm 1mm}.l-recv-name{font-size:${Math.max(10, Math.min(25, 22 * scale))}pt;font-weight:700;line-height:1.15;margin-bottom:1mm;overflow-wrap:anywhere}.l-recv-phone{font-size:${Math.max(8, Math.min(17, 15 * scale))}pt;font-weight:600;margin-bottom:1mm}.l-recv-addr{font-size:${Math.max(9, Math.min(18, 16 * scale))}pt;line-height:1.3;overflow-wrap:anywhere}.l-foot{display:flex;border-top:1px solid #000;min-height:${Math.max(9, Math.min(18, 15 * scale))}mm;align-items:center}.l-note{flex:1;font-size:${Math.max(7, Math.min(12, 10 * scale))}pt;font-weight:600;padding-left:1mm;color:#000;overflow-wrap:anywhere}.l-zip{font-size:${Math.max(12, Math.min(34, 30 * scale))}pt;font-weight:700;padding-right:1mm}`;
-      layoutCss = size === "a4-grid-custom" || a4PresetMatch ? gridLayoutCss : layoutCss;
-    }
-    if (size === "a4-fit" && a4FitLayout) {
-      const { orientation, pageWidth, pageHeight, labelWidth, labelHeight, cols, rows } = a4FitLayout;
-      const scale = Math.min(labelWidth / 150, labelHeight / 100);
-      layoutCss = `@page{size:A4 ${orientation};margin:4mm}html,body{margin:0;font-family:'Prompt',sans-serif;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.sheet{width:${pageWidth}mm;height:${pageHeight}mm;box-sizing:border-box;page-break-after:always;display:grid;grid-template-columns:repeat(${cols},${labelWidth}mm);grid-template-rows:repeat(${rows},${labelHeight}mm);gap:2mm;justify-content:center;align-content:center}.plabel{width:${labelWidth}mm;height:${labelHeight}mm;box-sizing:border-box;padding:1mm;display:flex}.l-inner{border:1.5px solid #000;border-radius:1mm;flex:1;min-width:0;display:flex;flex-direction:column;padding:2mm}.l-sender{font-size:${Math.max(8, Math.min(15, 13 * scale))}pt;line-height:1.25;overflow-wrap:anywhere}.l-recv{flex:1;padding:2mm 1mm}.l-recv-name{font-size:${Math.max(10, Math.min(25, 22 * scale))}pt;font-weight:700;line-height:1.15;margin-bottom:1mm;overflow-wrap:anywhere}.l-recv-phone{font-size:${Math.max(8, Math.min(17, 15 * scale))}pt;font-weight:600;margin-bottom:1mm}.l-recv-addr{font-size:${Math.max(9, Math.min(18, 16 * scale))}pt;line-height:1.3;overflow-wrap:anywhere}.l-foot{display:flex;border-top:1px solid #000;min-height:${Math.max(9, Math.min(18, 15 * scale))}mm;align-items:center}.l-note{flex:1;font-size:${Math.max(7, Math.min(12, 10 * scale))}pt;font-weight:600;padding-left:1mm;color:#000;overflow-wrap:anywhere}.l-zip{font-size:${Math.max(12, Math.min(34, 30 * scale))}pt;font-weight:700;padding-right:1mm}`;
-    }
 
     const escapeHTML = (str) => {
       if (!str) return '';
@@ -571,56 +374,30 @@ export default function Tracking({ authState }) {
       });
     };
 
-    const renderLabel = r => {
-      const addressLength = String(r.address || "").length;
-      const addressSizeClass = addressLength > 150 ? "addr-long" : addressLength > 90 ? "addr-medium" : "";
-      return `
+    const labelsHtml = listToPrint.map(r => `
       <div class="plabel"><div class="l-inner">
-        <div class="l-sender"><div class="l-sender-title">ผู้ส่ง / SENDER</div><div><strong>${escapeHTML(sName)}</strong> ${sPhone ? `📞 ${escapeHTML(sPhone)}` : ''}</div><div>${escapeHTML(sAddr)}</div></div>
+        <div class="l-sender"><strong>ผู้ส่ง: ${escapeHTML(sName)}</strong> ${sPhone ? `📞 ${escapeHTML(sPhone)}` : ''}<br/>${escapeHTML(sAddr)}</div>
         <div class="l-recv">
-          <div class="l-recv-title">ผู้รับ / RECEIVER</div>
+          <div style="font-size:10pt;font-weight:700;margin-bottom:4px">ผู้รับ:</div>
           <div class="l-recv-name">${escapeHTML(r.fullName)}</div>
           ${r.phone ? `<div class="l-recv-phone">📞 ${escapeHTML(r.phone)}</div>` : ''}
-          <div class="l-recv-addr ${addressSizeClass}">${escapeHTML(r.address)}</div>
+          <div class="l-recv-addr">${escapeHTML(r.address)}</div>
         </div>
         <div class="l-foot">
           <div class="l-note">${r.bonusNote ? `⚠️ ${escapeHTML(r.bonusNote)}` : ''}</div>
           <div class="l-zip">${escapeHTML(r.postalCode || '')}</div>
         </div>
       </div></div>
-      `;
-    };
-    const labelsHtml = labelsPerSheet
-      ? Array.from({ length: Math.ceil(listToPrint.length / labelsPerSheet) }, (_, page) => {
-        const pageLabels = listToPrint.slice(page * labelsPerSheet, (page + 1) * labelsPerSheet).map(renderLabel).join('');
-        return `<section class="sheet">${pageLabels}</section>`;
-      }).join('')
-      : listToPrint.map(renderLabel).join('');
+    `).join('');
 
-    const senderTheme = labelSettings.senderTheme === "light" ? { background: "#fff", foreground: "#111318", border: "1px solid #111318" } : { background: "#111318", foreground: "#fff", border: "0" };
-    const labelTheme = `.l-sender{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:${senderTheme.background}!important;background-color:${senderTheme.background}!important;color:${senderTheme.foreground}!important;border:${senderTheme.border}!important;border-radius:1mm;padding:2mm!important;margin-bottom:2mm}.l-sender *{color:${senderTheme.foreground}!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.l-sender strong,.l-sender-title{color:${senderTheme.foreground}!important}.l-sender-title{font-weight:700;font-size:.95em;letter-spacing:.02em;margin-bottom:1mm}.l-sender>div:not(.l-sender-title){font-weight:600}.l-recv-title{font-size:10pt;font-weight:700;margin-bottom:4px;color:#111318}.l-recv-addr.addr-medium{font-size:90%}.l-recv-addr.addr-long{font-size:80%}.l-foot{border-top:1px solid #111318}.l-note{color:#8a5200!important}`;
-    const documentHtml = `<html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet"><style>${layoutCss}${labelTheme}</style></head><body>${labelsHtml}</body></html>`;
-    setLabelPreview({ documentHtml, count: listToPrint.length, size, labelsPerSheet, a4Rows, a4Cols, a4Orientation, a4FitLayout, customWidth: labelSettings.customWidth, customHeight: labelSettings.customHeight });
-  };
-
-  const printPreviewLabels = () => {
-    if (!labelPreview) return;
     const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    iframe.style.visibility = "hidden";
+    iframe.style.display = "none";
     document.body.appendChild(iframe);
-    const printDoc = iframe.contentWindow.document;
-    printDoc.open();
-    printDoc.write(labelPreview.documentHtml);
-    printDoc.close();
-    setTimeout(() => {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-      setTimeout(() => iframe.remove(), 1000);
-    }, 500);
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(`<html><head><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet"><style>${cssMap[size] || cssMap['therm-150x100']}</style></head><body>${labelsHtml}</body></html>`);
+    doc.close();
+    setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => document.body.removeChild(iframe), 1000); }, 500);
   };
 
   // ==========================================
@@ -629,12 +406,26 @@ export default function Tracking({ authState }) {
 
   const filteredRecipients = recipients.filter(r => searchQ === "" || r.fullName.includes(searchQ) || (r.phone||"").includes(searchQ));
   const filteredRecords = records.filter(r => searchQ === "" || r.fullName.includes(searchQ) || (r.trackingNumber||"").includes(searchQ) || (r.phone||"").includes(searchQ));
-  const allFilteredRecipientsSelected = filteredRecipients.length > 0 && filteredRecipients.every(r => selectedRecipients.includes(r.id));
-  const allFilteredRecordsSelected = filteredRecords.length > 0 && filteredRecords.every(r => selectedRecords.includes(r.id));
-  const a4FitPreview = calculateA4LabelLayout(Number(labelSettings.a4LabelWidth), Number(labelSettings.a4LabelHeight));
+
+  useEffect(() => {
+    if (!activeModal && !dialogConfig) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        if (dialogConfig) dialogConfig.onCancel?.();
+        else if (activeModal) setActiveModal(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeModal, dialogConfig]);
 
   return (
     <div className="tracking-wrapper animate-fade-in" style={{ color: "var(--text)" }}>
+      <SEOHead
+        title="ตรวจสอบรายชื่อและติดตามพัสดุ | Talib Club Logistics"
+        description="ระบบตรวจสอบรายชื่อผู้รับหนังสือ/วารสาร และค้นหาเลขพัสดุจัดส่ง (Tracking) ของ Talib Club"
+        canonical={`${BASE_URL}/tracking-system`}
+      />
       
       {/* --------------------------------------------------------- */}
       {/* 🏠 VIEW: HOME (PUBLIC) */}
@@ -677,12 +468,35 @@ export default function Tracking({ authState }) {
             {view === "user-recipient" ? "ตรวจสอบรายชื่อรับวารสาร" : "ติดตามเลขพัสดุจัดส่ง"}
           </h1>
 
-          <div className="card" style={{ padding: "clamp(12px, 3vw, 24px)", marginBottom: "32px" }}>
-            <form onSubmit={(e) => handlePublicSearch(e, view === "user-recipient" ? "recipient" : "track")} style={{ display: "flex", gap: "12px", flexDirection: "column", sm: { flexDirection: "row"} }}>
-              <label style={{ fontSize: "13px", color: "var(--t2)", fontWeight: "500" }}>ค้นด้วยชื่อเพื่อดูชื่อและเบอร์โทร หรือค้นด้วยเบอร์โทรเพื่อดูที่อยู่จัดส่ง</label>
-              <div style={{ display: "flex", gap: "12px" }}>
-                <input type="text" className="inp" placeholder={view === "user-recipient" ? "ชื่อ-นามสกุล หรือเบอร์โทร 10 หลัก" : "ชื่อ เบอร์โทร หรือเลข Tracking"} value={userQuery} onChange={(e) => setUserQuery(e.target.value)} style={{ flex: 1, padding: "12px 16px" }} />
-                <button type="submit" className="btn btn-teal" disabled={isLoading} style={{ padding: "0 24px" }}>{isLoading ? "⏳" : "ค้นหา"}</button>
+          <div className="card" style={{ padding: "clamp(16px, 3vw, 24px)", marginBottom: "32px" }}>
+            <form onSubmit={(e) => handlePublicSearch(e, view === "user-recipient" ? "recipient" : "track")} style={{ display: "flex", gap: "12px", flexDirection: "column" }}>
+              <label style={{ fontSize: "13px", color: "var(--t2)", fontWeight: "500" }}>
+                {view === "user-recipient"
+                  ? "ค้นหาด้วย ชื่อ-นามสกุล หรือ เบอร์โทรศัพท์"
+                  : "ค้นหาด้วย ชื่อ-นามสกุล, เบอร์โทรศัพท์ หรือ เลขพัสดุ (Tracking)"}
+              </label>
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                <div style={{ flex: "1 1 220px", position: "relative" }}>
+                  <input
+                    type="text"
+                    className="inp"
+                    placeholder={view === "user-recipient" ? "เช่น สมชาย ใจดี หรือ 0812345678" : "พิมพ์ชื่อ เบอร์โทร หรือเลขพัสดุ..."}
+                    value={userQuery}
+                    onChange={(e) => setUserQuery(e.target.value)}
+                    style={{ width: "100%", padding: "12px 36px 12px 16px" }}
+                  />
+                  {userQuery && (
+                    <button
+                      type="button"
+                      aria-label="ล้างคำค้นหา"
+                      onClick={() => { setUserQuery(""); setUserSearchResult(null); }}
+                      style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "var(--bg2)", border: "none", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", color: "var(--t2)", display: "flex", alignItems: "center", justifyContent: "center" }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <button type="submit" className="btn btn-teal" disabled={isLoading} style={{ padding: "0 24px", minHeight: 44 }}>{isLoading ? "กำลังค้นหา..." : "ค้นหา"}</button>
               </div>
             </form>
           </div>
@@ -691,6 +505,7 @@ export default function Tracking({ authState }) {
             <div className="empty card" style={{ border: "1px dashed var(--br)", padding: "48px 24px" }}>
               <div style={{ fontSize: "40px", marginBottom: "12px" }}>📭</div>
               <p style={{ color: "var(--text)", fontWeight: "500", fontSize: "16px" }}>ไม่พบข้อมูลสำหรับ &quot;{userQuery}&quot;</p>
+              <p style={{ color: "var(--t3)", fontSize: "13px", marginTop: 6 }}>ลองตรวจสอบตัวสะกดชื่อ-นามสกุล หรือค้นหาด้วยเบอร์โทรศัพท์ 10 หลักแทนครับ</p>
             </div>
           )}
 
@@ -707,43 +522,36 @@ export default function Tracking({ authState }) {
                  {item.phone && (
                    <div><div style={{ color: "var(--t2)", fontSize: "12px", marginBottom: "4px" }}>เบอร์โทรศัพท์</div><div style={{ fontSize: "15px" }}>{item.phone}</div></div>
                  )}
-                 {item.address && (
-                   <div style={{ background: "var(--bg2)", border: "1px solid var(--br2)", borderRadius: 10, padding: 16 }}>
-                     <div style={{ color: "var(--t2)", fontSize: "12px", marginBottom: 6 }}>ที่อยู่จัดส่งที่ลงทะเบียนไว้</div>
-                     <div style={{ fontSize: 15, lineHeight: 1.7, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                       {item.address}{item.postalCode ? ` ${item.postalCode}` : ""}
-                     </div>
-                     <a href={SITE.social.facebook} target="_blank" rel="noreferrer" className="btn btn-outline btn-sm" style={{ marginTop: 12, textDecoration: "none" }}>
-                       <i className="ti ti-message-circle"></i> ที่อยู่ไม่ถูกต้อง? แจ้งทีมงาน
-                     </a>
-                   </div>
-                 )}
                  {item.trackingNumber ? (
                    <div style={{ marginTop: "8px", paddingTop: "16px", borderTop: "1px dashed var(--br2)" }}>
                      <div style={{ color: "var(--t2)", fontSize: "12px", marginBottom: "8px" }}>เลข Tracking</div>
-                     <div style={{ background: "var(--bg)", padding: "16px", borderRadius: "8px", border: "1px solid var(--br2)", display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "space-between", alignItems: "center" }}>
-                       <span style={{ fontFamily: "monospace", fontSize: "22px", fontWeight: "700", color: "var(--teal)" }}>{item.trackingNumber}</span>
-                       <a
-                         className="btn btn-outline btn-sm"
-                         href={`https://track.thailandpost.co.th/?trackNumber=${encodeURIComponent(String(item.trackingNumber).trim())}`}
-                         target="_blank"
-                         rel="noopener noreferrer"
-                         onClick={() => handleCopyTracking(item.trackingNumber)}
-                         style={{ textDecoration: "none" }}
-                         aria-label={`คัดลอกและเช็กพัสดุ ${item.trackingNumber} ที่ไปรษณีย์ไทย (เปิดแท็บใหม่)`}
-                       >
-                         คัดลอกและเช็กพัสดุ <i className="ti ti-external-link" aria-hidden="true"></i>
-                       </a>
+                     <div style={{ background: "var(--bg2)", padding: "16px", borderRadius: "10px", border: "1px solid var(--br)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                       <span style={{ fontFamily: "monospace", fontSize: "20px", fontWeight: "700", color: "var(--teal)", letterSpacing: "0.5px" }}>{item.trackingNumber}</span>
+                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                         <button
+                           type="button"
+                           className="btn btn-outline btn-sm"
+                           onClick={async () => {
+                             try {
+                               await navigator.clipboard.writeText(item.trackingNumber);
+                               toast.success("คัดลอกเลขพัสดุแล้ว");
+                             } catch {
+                               toast.error("คัดลอกไม่สำเร็จ");
+                             }
+                           }}
+                         >
+                           <i className="ti ti-copy" style={{ fontSize: 14 }}></i> คัดลอก
+                         </button>
+                       </div>
                      </div>
-                     <p style={{ color: "var(--t2)", fontSize: "12px", margin: "8px 0 0" }}>เปิดเว็บไปรษณีย์ไทยในแท็บใหม่พร้อมเลขพัสดุ</p>
                    </div>
                  ) : (
-                   <div style={{ marginTop: "8px", padding: "16px", background: "var(--acc2)", borderRadius: "8px", color: "var(--teal)", fontSize: "14px", fontWeight: "500", display: "flex", gap: "8px", alignItems: "center" }}>
+                   <div style={{ marginTop: "8px", padding: "16px", background: "var(--teal-bg)", borderRadius: "8px", color: "var(--teal)", fontSize: "14px", fontWeight: "500", display: "flex", gap: "8px", alignItems: "center" }}>
                      <span>✅</span> ท่านมีรายชื่ออยู่ในคลังระบบเตรียมการจัดส่งแล้ว
                    </div>
                  )}
                  {item.bonusNote && (
-                   <div style={{ background: "#fef3c7", color: "#92400e", padding: "12px", borderRadius: "8px", fontSize: "13px", fontWeight: "600", display: "flex", gap: "8px", alignItems: "center" }}>
+                   <div style={{ background: "var(--amber-bg)", color: "var(--amber)", border: "1px solid rgba(245, 158, 11, 0.25)", padding: "12px", borderRadius: "8px", fontSize: "13px", fontWeight: "600", display: "flex", gap: "8px", alignItems: "center" }}>
                      <span>🎁</span> {item.bonusNote}
                    </div>
                  )}
@@ -792,9 +600,7 @@ export default function Tracking({ authState }) {
                  <p style={{ fontSize: "12px", opacity: 0.8, margin: 0 }}>จัดการข้อมูลแบบครบวงจร</p>
                </div>
             </div>
-            {/* talib_admin_auth is a leftover from the old password gate — nothing
-                writes that key any more, so removing it did nothing. */}
-            <button onClick={() => { setIsAdminAuthenticated(false); setView("home"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.3)", color: "white", padding: "6px 16px", borderRadius: "20px", cursor: "pointer", fontSize: "13px" }}>ออกจากระบบแอดมิน</button>
+            <button onClick={() => { setIsAdminAuthenticated(false); localStorage.removeItem("talib_admin_auth"); setView("home"); }} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.3)", color: "white", padding: "6px 16px", borderRadius: "20px", cursor: "pointer", fontSize: "13px" }}>ออกจากระบบแอดมิน</button>
           </div>
 
           {/* Admin Tabs */}
@@ -859,24 +665,20 @@ export default function Tracking({ authState }) {
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                     <button className="btn" style={{ background: "var(--teal)", color: "white" }} onClick={() => setActiveModal('label')}>🏷️ สร้าง/พิมพ์ลาเบล</button>
                     <button className="btn btn-outline" onClick={() => exportCSV(recipients, false, myAlert)}>📥 Export CSV</button>
-                    <span style={{ alignSelf: "center", fontSize: 12, color: "var(--t2)" }}>เลือกอยู่ {selectedRecipients.length} รายการ</span>
-                    <button className="btn btn-outline" disabled={selectedRecipients.length === 0} style={{ color: "#d97706", borderColor: "#fcd34d", background: "#fffbeb", opacity: selectedRecipients.length ? 1 : 0.5 }} onClick={() => handleBulkBonus("recipients", selectedRecipients)}>🎁 โบนัสที่เลือก ({selectedRecipients.length})</button>
-                    <button className="btn btn-outline" disabled={selectedRecipients.length === 0} style={{ color: "#dc2626", borderColor: "#fecaca", background: "#fef2f2", opacity: selectedRecipients.length ? 1 : 0.5 }} onClick={() => handleBulkDelete("recipients", selectedRecipients)}>🗑️ ลบที่เลือก ({selectedRecipients.length})</button>
-                    <button className="btn" style={{ background: "#dc2626", color: "white" }} onClick={() => handleBulkDelete("recipients", [], true)}>🗑️ ล้างทั้งหมด ({recipients.length})</button>
+                    <button className="btn btn-outline" style={{ color: "var(--amber)", borderColor: "rgba(245, 158, 11, 0.3)", background: "var(--amber-bg)" }} onClick={() => handleBulkBonus("recipients", selectedRecipients)}>🎁 โบนัสที่เลือก</button>
+                    <button className="btn btn-outline" style={{ color: "var(--red)", borderColor: "var(--red2)", background: "var(--red-bg)" }} onClick={() => handleBulkDelete("recipients", selectedRecipients)}>🗑️ ลบที่เลือก</button>
+                    <button className="btn" style={{ background: "#dc2626", color: "white" }} onClick={() => handleBulkDelete("recipients", [], true)}>🗑️ ล้างทั้งหมด</button>
                   </div>
                </div>
 
-               <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", fontSize: "14px", marginBottom: "12px" }}>
-                 <strong style={{ color: "var(--teal)" }}>พบ {filteredRecipients.length} จาก {recipients.length} รายชื่อ</strong>
-                 <span style={{ color: "var(--t2)", fontSize: 12 }}>เลือกทั้งหมด = เลือกเฉพาะผลค้นหาที่แสดงอยู่</span>
-               </div>
+               <div style={{ fontSize: "14px", fontWeight: "700", color: "var(--teal)", marginBottom: "12px" }}>{filteredRecipients.length} รายชื่อเตรียมจัดส่ง</div>
 
                <div style={{ overflowX: "auto", border: "1px solid var(--br)", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
                  <table style={{ width: "100%", fontSize: "13px", textAlign: "left", borderCollapse: "collapse" }}>
                    <thead style={{ background: "var(--teal)", color: "white", borderBottom: "2px solid rgba(0,0,0,0.15)" }}>
                      <tr>
                        <th style={{ padding: "12px", width: "40px", textAlign: "center" }}>
-                         <input type="checkbox" aria-label="เลือกหรือยกเลิกการเลือกผลค้นหาที่แสดง" title="เลือก/ยกเลิกผลค้นหาที่แสดง" checked={allFilteredRecipientsSelected} onChange={(e) => setSelectedRecipients(prev => e.target.checked ? [...new Set([...prev, ...filteredRecipients.map(r => r.id)])] : prev.filter(id => !filteredRecipients.some(r => r.id === id)))} style={{ accentColor: "var(--teal)", cursor: "pointer", width: "16px", height: "16px" }} />
+                         <input type="checkbox" checked={selectedRecipients.length === filteredRecipients.length && filteredRecipients.length > 0} onChange={(e) => setSelectedRecipients(e.target.checked ? filteredRecipients.map(r => r.id) : [])} style={{ accentColor: "var(--teal)", cursor: "pointer", width: "16px", height: "16px" }} />
                        </th>
                        <th style={{ padding: "12px", width: "40px" }}>#</th>
                        <th style={{ padding: "12px" }}>ชื่อ-นามสกุล</th>
@@ -901,7 +703,7 @@ export default function Tracking({ authState }) {
                          <td style={{ padding: "12px", color: "#d97706", fontWeight: "600", fontSize: "12px" }}>{r.bonusNote || ""}</td>
                          <td style={{ padding: "12px", textAlign: "center", display: "flex", gap: "8px", justifyContent: "center" }}>
                            <button className="btn btn-outline btn-sm" style={{ padding: "4px 8px", borderColor: "var(--br)", color: "var(--t2)" }} onClick={() => { setEditData(r); setActiveModal('edit-recipient'); }}>✏️</button>
-                           <button className="btn btn-outline btn-sm" style={{ padding: "4px 8px", borderColor: "#fecaca", color: "#dc2626", background: "#fef2f2" }} onClick={() => handleBulkDelete("recipients", [r.id])}>🗑️</button>
+                           <button className="btn btn-outline btn-sm" style={{ padding: "4px 8px", borderColor: "var(--red2)", color: "var(--red)", background: "var(--red-bg)" }} onClick={() => handleBulkDelete("recipients", [r.id])}>🗑️</button>
                          </td>
                        </tr>
                      ))}
@@ -949,24 +751,20 @@ export default function Tracking({ authState }) {
                   </div>
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                     <button className="btn btn-outline" onClick={() => exportCSV(records, true, myAlert)}>📥 Export CSV</button>
-                    <span style={{ alignSelf: "center", fontSize: 12, color: "var(--t2)" }}>เลือกอยู่ {selectedRecords.length} รายการ</span>
-                    <button className="btn btn-outline" disabled={selectedRecords.length === 0} style={{ color: "#d97706", borderColor: "#fcd34d", background: "#fffbeb", opacity: selectedRecords.length ? 1 : 0.5 }} onClick={() => handleBulkBonus("records", selectedRecords)}>🎁 โบนัสที่เลือก ({selectedRecords.length})</button>
-                    <button className="btn btn-outline" disabled={selectedRecords.length === 0} style={{ color: "#dc2626", borderColor: "#fecaca", background: "#fef2f2", opacity: selectedRecords.length ? 1 : 0.5 }} onClick={() => handleBulkDelete("records", selectedRecords)}>🗑️ ลบที่เลือก ({selectedRecords.length})</button>
-                    <button className="btn" style={{ background: "#dc2626", color: "white" }} onClick={() => handleBulkDelete("records", [], true)}>🗑️ ล้างทั้งหมด ({records.length})</button>
+                    <button className="btn btn-outline" style={{ color: "var(--amber)", borderColor: "rgba(245, 158, 11, 0.3)", background: "var(--amber-bg)" }} onClick={() => handleBulkBonus("records", selectedRecords)}>🎁 โบนัสที่เลือก</button>
+                    <button className="btn btn-outline" style={{ color: "var(--red)", borderColor: "var(--red2)", background: "var(--red-bg)" }} onClick={() => handleBulkDelete("records", selectedRecords)}>🗑️ ลบที่เลือก</button>
+                    <button className="btn" style={{ background: "#dc2626", color: "white" }} onClick={() => handleBulkDelete("records", [], true)}>🗑️ ล้างทั้งหมด</button>
                   </div>
                </div>
 
-               <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", fontSize: "14px", marginBottom: "12px" }}>
-                 <strong style={{ color: "var(--teal)" }}>พบ {filteredRecords.length} จาก {records.length} รายการ</strong>
-                 <span style={{ color: "var(--t2)", fontSize: 12 }}>เลือกทั้งหมด = เลือกเฉพาะผลค้นหาที่แสดงอยู่</span>
-               </div>
+               <div style={{ fontSize: "14px", fontWeight: "700", color: "var(--teal)", marginBottom: "12px" }}>{filteredRecords.length} รายการในระบบ</div>
 
                <div style={{ overflowX: "auto", border: "1px solid var(--br)", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
                   <table style={{ width: "100%", fontSize: "13px", textAlign: "left", borderCollapse: "collapse" }}>
                     <thead style={{ background: "var(--teal)", color: "white", borderBottom: "2px solid rgba(0,0,0,0.15)", whiteSpace: "nowrap" }}>
                       <tr>
                         <th style={{ padding: "12px", width: "40px", textAlign: "center" }}>
-                          <input type="checkbox" aria-label="เลือกหรือยกเลิกการเลือกผลค้นหาที่แสดง" title="เลือก/ยกเลิกผลค้นหาที่แสดง" checked={allFilteredRecordsSelected} onChange={(e) => setSelectedRecords(prev => e.target.checked ? [...new Set([...prev, ...filteredRecords.map(r => r.id)])] : prev.filter(id => !filteredRecords.some(r => r.id === id)))} style={{ accentColor: "var(--teal)", cursor: "pointer", width: "16px", height: "16px" }} />
+                          <input type="checkbox" checked={selectedRecords.length === filteredRecords.length && filteredRecords.length > 0} onChange={(e) => setSelectedRecords(e.target.checked ? filteredRecords.map(r => r.id) : [])} style={{ accentColor: "var(--teal)", cursor: "pointer", width: "16px", height: "16px" }} />
                         </th>
                         <th style={{ padding: "12px", width: "40px" }}>#</th>
                         <th style={{ padding: "12px" }}>ชื่อ-นามสกุล</th>
@@ -998,7 +796,7 @@ export default function Tracking({ authState }) {
                           <td style={{ padding: "12px", color: "var(--t2)", fontSize: "12px" }}>{formatFirebaseDate(r.createdAt)}</td>
                           <td style={{ padding: "12px", textAlign: "center", display: "flex", gap: "8px", justifyContent: "center" }}>
                             <button className="btn btn-outline btn-sm" style={{ padding: "4px 8px", borderColor: "var(--br)", color: "var(--t2)" }} onClick={() => { setEditData(r); setActiveModal('edit-record'); }}>✏️</button>
-                            <button className="btn btn-outline btn-sm" style={{ padding: "4px 8px", borderColor: "#fecaca", color: "#dc2626", background: "#fef2f2" }} onClick={() => handleBulkDelete("records", [r.id])}>🗑️</button>
+                            <button className="btn btn-outline btn-sm" style={{ padding: "4px 8px", borderColor: "var(--red2)", color: "var(--red)", background: "var(--red-bg)" }} onClick={() => handleBulkDelete("records", [r.id])}>🗑️</button>
                           </td>
                         </tr>
                       ))}
@@ -1022,22 +820,22 @@ export default function Tracking({ authState }) {
                <button onClick={() => setActiveModal(null)} style={{ background: "none", border: "none", fontSize: "18px", color: "white", cursor: "pointer", opacity: 0.7 }}>✕</button>
              </div>
              <div style={{ padding: "clamp(12px, 3vw, 24px)", display: "grid", gap: "16px", background: "var(--card)" }}>
-               <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>ชื่อ-นามสกุล</label><input type="text" className="inp" value={editData.fullName || ""} onChange={e => setEditData({...editData, fullName: e.target.value})} /></div>
-               <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>เบอร์โทร</label><input type="text" className="inp" value={editData.phone || ""} onChange={e => setEditData({...editData, phone: e.target.value})} /></div>
+               <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>ชื่อ-นามสกุล</label><input type="text" className="inp" value={editData.fullName} onChange={e => setEditData({...editData, fullName: e.target.value})} /></div>
+               <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>เบอร์โทร</label><input type="text" className="inp" value={editData.phone} onChange={e => setEditData({...editData, phone: e.target.value})} /></div>
                
                {activeModal === 'edit-recipient' && (
-                 <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>ที่อยู่จัดส่ง</label><textarea className="inp" rows="2" value={editData.address || ""} onChange={e => setEditData({...editData, address: e.target.value})}></textarea></div>
+                 <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>ที่อยู่จัดส่ง</label><textarea className="inp" rows="2" value={editData.address} onChange={e => setEditData({...editData, address: e.target.value})}></textarea></div>
                )}
 
                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                 <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>รหัสไปรษณีย์</label><input type="text" className="inp" value={editData.postalCode || ""} onChange={e => setEditData({...editData, postalCode: e.target.value})} /></div>
+                 <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>รหัสไปรษณีย์</label><input type="text" className="inp" value={editData.postalCode} onChange={e => setEditData({...editData, postalCode: e.target.value})} /></div>
                  {activeModal === 'edit-record' && (
-                   <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>เมือง/จังหวัด</label><input type="text" className="inp" value={editData.city || ""} onChange={e => setEditData({...editData, city: e.target.value})} /></div>
+                   <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>เมือง/จังหวัด</label><input type="text" className="inp" value={editData.city} onChange={e => setEditData({...editData, city: e.target.value})} /></div>
                  )}
                </div>
 
                {activeModal === 'edit-record' && (
-                 <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>เลข Tracking</label><input type="text" className="inp" style={{ fontFamily: "monospace", fontWeight: "700", color: "var(--teal)" }} value={editData.trackingNumber || ""} onChange={e => setEditData({...editData, trackingNumber: e.target.value})} /></div>
+                 <div><label style={{ fontSize: "12px", fontWeight: "600", color: "var(--t2)" }}>เลข Tracking</label><input type="text" className="inp" style={{ fontFamily: "monospace", fontWeight: "700", color: "var(--teal)" }} value={editData.trackingNumber} onChange={e => setEditData({...editData, trackingNumber: e.target.value})} /></div>
                )}
 
                <div><label style={{ fontSize: "12px", fontWeight: "600", color: "#d97706" }}>🎁 โบนัสพิเศษ</label><input type="text" className="inp" style={{ borderColor: "#fcd34d", background: "var(--teal-bg)" }} value={editData.bonusNote || ""} onChange={e => setEditData({...editData, bonusNote: e.target.value})} /></div>
@@ -1069,15 +867,8 @@ export default function Tracking({ authState }) {
                    <input type="text" className="inp" placeholder="เบอร์โทรผู้ส่ง..." value={labelSettings.phone} onChange={e => setLabelSettings({...labelSettings, phone: e.target.value})} />
                  </div>
                  <textarea className="inp" placeholder="ที่อยู่ผู้ส่ง..." rows="2" value={labelSettings.addr} onChange={e => setLabelSettings({...labelSettings, addr: e.target.value})}></textarea>
-                 <label style={{ display: "grid", gap: 6, marginTop: 10, fontSize: 12, color: "var(--t2)", fontWeight: 600 }}>
-                   รูปแบบพื้นหลังส่วนผู้ส่ง
-                   <select className="inp" value={labelSettings.senderTheme} onChange={e => setLabelSettings({ ...labelSettings, senderTheme: e.target.value })}>
-                     <option value="dark">พื้นดำ ตัวอักษรสีขาว</option>
-                     <option value="light">พื้นขาว ตัวอักษรสีดำ</option>
-                   </select>
-                 </label>
                </div>
-
+               
                <div style={{ background: "var(--bg)", padding: "16px", borderRadius: "8px", border: "1px solid var(--br2)" }}>
                  <div style={{ fontSize: "13px", fontWeight: "700", marginBottom: "12px", color: "var(--teal)" }}>📐 ขนาดลาเบล (Printer Size)</div>
                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -1089,164 +880,13 @@ export default function Tracking({ authState }) {
                      <input type="radio" name="size" value="therm-100x150" checked={labelSettings.size === 'therm-100x150'} onChange={e => setLabelSettings({...labelSettings, size: e.target.value})} style={{ width: "auto", accentColor: "var(--teal)" }} />
                      <div><div style={{ fontWeight: "700", color: "var(--teal)" }}>100×150 มม. (แนวตั้ง)</div><div style={{ fontSize: "12px", color: "var(--t2)" }}>มาตรฐานเครื่องพิมพ์ความร้อน</div></div>
                    </label>
-                   {[
-                     ["therm-100x75", "100×75 มม. (แนวนอน)", "ขนาดฉลากความร้อนยอดนิยม"],
-                     ["therm-custom", "กำหนดขนาดฉลากเอง", "ระบุความกว้างและความสูงเป็นมิลลิเมตร"]
-                   ].map(([value, title, description]) => (
-                     <label key={value} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", border: `1px solid ${labelSettings.size === value ? "var(--teal)" : "var(--br)"}`, borderRadius: "8px", cursor: "pointer", background: labelSettings.size === value ? "var(--teal-bg)" : "var(--bg2)" }}>
-                       <input type="radio" name="size" value={value} checked={labelSettings.size === value} onChange={e => setLabelSettings({ ...labelSettings, size: e.target.value })} style={{ width: "auto", accentColor: "var(--teal)" }} />
-                       <div><div style={{ fontWeight: "700", color: "var(--teal)" }}>{title}</div><div style={{ fontSize: "12px", color: "var(--t2)" }}>{description}</div></div>
-                     </label>
-                   ))}
-                   {labelSettings.size === "therm-custom" && (
-                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: 12, borderRadius: 8, background: "var(--bg2)" }}>
-                       <label style={{ display: "grid", gap: 5, fontSize: 12 }}>กว้าง (มม.)<input className="inp" type="number" min="50" max="300" value={labelSettings.customWidth} onChange={e => setLabelSettings({ ...labelSettings, customWidth: e.target.value })} /></label>
-                       <label style={{ display: "grid", gap: 5, fontSize: 12 }}>สูง (มม.)<input className="inp" type="number" min="50" max="300" value={labelSettings.customHeight} onChange={e => setLabelSettings({ ...labelSettings, customHeight: e.target.value })} /></label>
-                     </div>
-                   )}
-                   {[
-                     ["a4-fit", "A4 · จัดวางอัตโนมัติตามขนาดฉลาก", "เลือกแนวกระดาษและจำนวนต่อแผ่นให้พอดี ใช้กระดาษคุ้มที่สุด"],
-                     ["a4-1", "A4 · 1 ใบต่อแผ่น", "ฉลากขนาดใหญ่ อ่านง่าย เหมาะกับที่อยู่ยาว"],
-                     ["a4-2", "A4 · 2 ใบต่อแผ่น", "ฉลากขนาดกลาง พิมพ์แนวตั้ง 2 แถว"],
-                     ["a4-4", "A4 · 4 ใบต่อแผ่น", "ฉลากแนวนอนใกล้เคียง 150 × 100 มม. จัดวาง 2 × 2"],
-                     ["a4-grid-2x3-portrait", "A4 · 2 คอลัมน์ × 3 แถว (6 ใบ)", "ขนาดฉลากประมาณ 100 × 94 มม."],
-                     ["a4-grid-2x4-portrait", "A4 · 2 คอลัมน์ × 4 แถว (8 ใบ)", "ใกล้เคียงฉลาก 100 × 75 มม."],
-                     ["a4-grid-3x3-portrait", "A4 · 3 คอลัมน์ × 3 แถว (9 ใบ)", "ฉลากขนาดเล็กประมาณ 66 × 94 มม."],
-                     ["a4-grid-custom", "A4 · กำหนดจำนวนช่องเอง", "เลือกจำนวนคอลัมน์ แถว และแนวกระดาษ"]
-                   ].map(([value, title, description]) => (
-                     <label key={value} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", border: `1px solid ${labelSettings.size === value ? "var(--teal)" : "var(--br)"}`, borderRadius: "8px", cursor: "pointer", background: labelSettings.size === value ? "var(--teal-bg)" : "var(--bg2)" }}>
-                       <input type="radio" name="size" value={value} checked={labelSettings.size === value} onChange={e => setLabelSettings({ ...labelSettings, size: e.target.value })} style={{ width: "auto", accentColor: "var(--teal)" }} />
-                       <div><div style={{ fontWeight: "700", color: "var(--teal)" }}>{title}</div><div style={{ fontSize: "12px", color: "var(--t2)" }}>{description}</div></div>
-                     </label>
-                   ))}
-                   {labelSettings.size === "a4-fit" && (
-                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: 12, borderRadius: 8, background: "var(--bg2)" }}>
-                       <label style={{ display: "grid", gap: 5, fontSize: 12 }}>กว้างฉลาก (มม.)<input className="inp" type="number" min="50" max="200" value={labelSettings.a4LabelWidth} onChange={e => setLabelSettings({ ...labelSettings, a4LabelWidth: e.target.value })} /></label>
-                       <label style={{ display: "grid", gap: 5, fontSize: 12 }}>สูงฉลาก (มม.)<input className="inp" type="number" min="50" max="200" value={labelSettings.a4LabelHeight} onChange={e => setLabelSettings({ ...labelSettings, a4LabelHeight: e.target.value })} /></label>
-                       {a4FitPreview && <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--teal)" }}>แนะนำ: A4 แนว{a4FitPreview.orientation === "landscape" ? "นอน" : "ตั้ง"} · {a4FitPreview.cols} คอลัมน์ × {a4FitPreview.rows} แถว · {a4FitPreview.capacity} ใบต่อแผ่น{a4FitPreview.rotated ? " (หมุนแนวฉลาก 90°)" : ""}</div>}
-                     </div>
-                   )}
-                   {labelSettings.size === "a4-grid-custom" && (
-                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, padding: 12, borderRadius: 8, background: "var(--bg2)" }}>
-                       <label style={{ display: "grid", gap: 5, fontSize: 12 }}>คอลัมน์ (1–4)<input className="inp" type="number" min="1" max="4" value={labelSettings.a4Cols} onChange={e => setLabelSettings({ ...labelSettings, a4Cols: e.target.value })} /></label>
-                       <label style={{ display: "grid", gap: 5, fontSize: 12 }}>แถว (1–4)<input className="inp" type="number" min="1" max="4" value={labelSettings.a4Rows} onChange={e => setLabelSettings({ ...labelSettings, a4Rows: e.target.value })} /></label>
-                       <label style={{ display: "grid", gap: 5, fontSize: 12 }}>แนวกระดาษ<select className="inp" value={labelSettings.a4Orientation} onChange={e => setLabelSettings({ ...labelSettings, a4Orientation: e.target.value })}><option value="portrait">แนวตั้ง</option><option value="landscape">แนวนอน</option></select></label>
-                       <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--t2)" }}>ประมาณ {Math.floor(((labelSettings.a4Orientation === "landscape" ? 289 : 202) - (Number(labelSettings.a4Cols) - 1) * 3) / Number(labelSettings.a4Cols || 1))} × {Math.floor(((labelSettings.a4Orientation === "landscape" ? 202 : 289) - (Number(labelSettings.a4Rows) - 1) * 3) / Number(labelSettings.a4Rows || 1))} มม. ต่อฉลาก · {Number(labelSettings.a4Cols || 1) * Number(labelSettings.a4Rows || 1)} ใบต่อแผ่น</div>
-                     </div>
-                   )}
                  </div>
-               </div>
-
-               <div style={{ marginTop: 24, background: "var(--bg)", color: "var(--text)", padding: 16, borderRadius: 10, border: "1px solid var(--br2)" }}>
-                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: manualLabels.length ? 12 : 0 }}>
-                   <div>
-                     <strong style={{ display: "block", color: "var(--teal)", fontSize: 13 }}>📋 รายการลาเบล</strong>
-                     <span style={{ fontSize: 12, color: "var(--t2)" }}>ลาเบลเพิ่มเอง {manualLabels.length} รายการ · ร่างเก็บไว้ในแท็บนี้</span>
-                   </div>
-                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                     {manualLabels.length > 0 && <button type="button" className="btn btn-outline" onClick={async () => { if (await myConfirm(`ล้างลาเบลที่เพิ่มเอง ${manualLabels.length} รายการใช่หรือไม่?`)) setManualLabels([]); }} style={{ padding: "7px 10px", color: "var(--red)", borderColor: "var(--red2)", background: "var(--bg2)", fontSize: 12 }}>ล้างรายการ</button>}
-                     <button type="button" className="btn btn-outline" onClick={() => openManualLabelModal()} style={{ padding: "7px 12px", color: "var(--teal)", borderColor: "var(--teal)", background: "var(--teal-bg)" }}>
-                       <i className="ti ti-plus"></i> เพิ่มลาเบลเอง
-                     </button>
-                   </div>
-                 </div>
-                 {manualLabels.length > 0 && <div style={{ display: "grid", gap: 8 }}>
-                   {manualLabels.map((label, index) => (
-                     <div key={label.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 8, background: "var(--bg2)", color: "var(--text)", border: "1px solid var(--br)" }}>
-                       <div style={{ minWidth: 0, fontSize: 12 }}>
-                         <strong style={{ color: "var(--text)" }}>{index + 1}. {label.fullName}</strong>
-                         <div style={{ color: "var(--t2)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label.phone ? `${label.phone} · ` : ""}{label.address} {label.postalCode}</div>
-                       </div>
-                       <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                         <button type="button" className="btn btn-outline" aria-label={`แก้ไขลาเบล ${label.fullName}`} onClick={() => openManualLabelModal(label)} style={{ padding: "5px 8px", color: "var(--t2)", borderColor: "var(--br)" }}><i className="ti ti-edit"></i></button>
-                         <button type="button" className="btn btn-outline" aria-label={`ลบลาเบล ${label.fullName}`} onClick={() => setManualLabels(prev => prev.filter(item => item.id !== label.id))} style={{ padding: "5px 8px", color: "var(--red)", borderColor: "var(--red2)" }}><i className="ti ti-trash"></i></button>
-                       </div>
-                     </div>
-                   ))}
-                 </div>}
                </div>
              </div>
              <div style={{ padding: "16px 24px", borderTop: "1px solid var(--br)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg)" }}>
-               <div style={{ fontSize: "13px", color: "var(--t2)" }}>
-                 เลือกไว้ <strong style={{ color: "var(--teal)" }}>{selectedRecipients.length}</strong> รายการ
-                 {manualLabels.length > 0 && <> · เพิ่มเอง <strong style={{ color: "var(--teal)" }}>{manualLabels.length}</strong> รายการ</>}
-               </div>
-               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
-                 <button className="btn btn-outline" disabled={selectedRecipients.length + manualLabels.length === 0} style={{ color: "var(--teal)", borderColor: "var(--teal)", opacity: selectedRecipients.length + manualLabels.length === 0 ? 0.5 : 1 }} onClick={() => printLabels("selected")}>
-                   🖨️ พิมพ์ที่เลือก ({selectedRecipients.length + manualLabels.length})
-                 </button>
-                 <button className="btn" disabled={recipients.length + manualLabels.length === 0} style={{ background: "var(--teal)", color: "white", opacity: recipients.length + manualLabels.length === 0 ? 0.5 : 1 }} onClick={() => printLabels("all")}>
-                   🖨️ พิมพ์ทั้งหมด ({recipients.length + manualLabels.length})
-                 </button>
-               </div>
+               <span style={{ fontSize: "13px", color: "var(--t2)" }}>จำนวนที่จะพิมพ์: <strong style={{ color: "var(--teal)", fontSize: "16px" }}>{selectedRecipients.length > 0 ? selectedRecipients.length : recipients.length}</strong> ใบ</span>
+               <button className="btn" style={{ background: "var(--teal)", color: "white" }} onClick={printLabels}>🖨️ พิมพ์ลาเบลที่เลือก</button>
              </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {manualLabelModalOpen && createPortal(
-        <div role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setManualLabelModalOpen(false); }} style={{ position: "fixed", inset: 0, zIndex: 1150, background: "rgba(0,0,0,.72)", display: "grid", placeItems: "center", padding: 16 }}>
-          <form role="dialog" aria-modal="true" aria-labelledby="manual-label-title" onSubmit={e => { e.preventDefault(); saveManualLabel(); }} className="card" style={{ width: "min(520px, 100%)", maxHeight: "90vh", overflowY: "auto", padding: 0, background: "var(--card)", color: "var(--text)", border: "1px solid var(--br)", borderRadius: 12, boxShadow: "0 24px 70px rgba(0,0,0,.3)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", borderBottom: "1px solid var(--br)" }}>
-              <h3 id="manual-label-title" style={{ margin: 0, color: "var(--text)", fontSize: 15 }}><i className="ti ti-plus" style={{ color: "var(--teal)", marginRight: 8 }}></i>{editingManualLabelId ? "แก้ไขลาเบล" : "เพิ่มลาเบลพิเศษ"}</h3>
-              <button type="button" className="btn btn-outline" aria-label="ปิดหน้าต่างเพิ่มลาเบล" onClick={() => setManualLabelModalOpen(false)} style={{ padding: "4px 8px", color: "var(--t2)", borderColor: "var(--br)" }}>✕</button>
-            </div>
-            <div style={{ display: "grid", gap: 12, padding: 16 }}>
-              <label style={{ display: "grid", gap: 6, fontSize: 12, color: "var(--t2)", fontWeight: 600 }}>
-                ชื่อ-นามสกุล *
-                <input autoFocus required className="inp" placeholder="เช่น นาย สมชาย ใจดี" value={manualLabelDraft.fullName} onChange={e => setManualLabelDraft(prev => ({ ...prev, fullName: e.target.value }))} />
-              </label>
-              <label style={{ display: "grid", gap: 6, fontSize: 12, color: "var(--t2)", fontWeight: 600 }}>
-                เบอร์โทร
-                <input className="inp" placeholder="0xx-xxx-xxxx" value={manualLabelDraft.phone} onChange={e => setManualLabelDraft(prev => ({ ...prev, phone: e.target.value }))} />
-              </label>
-              <label style={{ display: "grid", gap: 6, fontSize: 12, color: "var(--t2)", fontWeight: 600 }}>
-                ที่อยู่แบบเต็ม *
-                <textarea required rows={3} className="inp" placeholder="บ้านเลขที่ ซอย ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด รหัสไปรษณีย์" value={manualLabelDraft.address} onChange={e => setManualLabelDraft(prev => ({ ...prev, address: e.target.value }))} style={{ resize: "vertical" }} />
-              </label>
-              <label style={{ display: "grid", gap: 6, fontSize: 12, color: "var(--t2)", fontWeight: 600 }}>
-                หมายเหตุบนลาเบล
-                <input className="inp" placeholder="เช่น ประธาน / ด่วน" value={manualLabelDraft.bonusNote} onChange={e => setManualLabelDraft(prev => ({ ...prev, bonusNote: e.target.value }))} />
-              </label>
-            </div>
-            <div style={{ padding: "0 16px 16px" }}>
-              <button type="submit" className="btn btn-teal" style={{ width: "100%", justifyContent: "center" }}>
-                <i className={editingManualLabelId ? "ti ti-device-floppy" : "ti ti-plus"}></i> {editingManualLabelId ? "บันทึกการแก้ไข" : "เพิ่มลาเบลนี้"}
-              </button>
-            </div>
-          </form>
-        </div>,
-        document.body
-      )}
-
-      {labelPreview && createPortal(
-        <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,.65)", display: "grid", placeItems: "center", padding: 16 }}>
-          <div className="card" style={{ width: "min(1000px, 100%)", height: "min(88vh, 900px)", display: "flex", flexDirection: "column", padding: 0, overflow: "hidden" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 18px", borderBottom: "1px solid var(--br)" }}>
-              <div>
-                <strong style={{ display: "block", color: "var(--teal)" }}>ตัวอย่างลาเบลก่อนพิมพ์</strong>
-                <span style={{ fontSize: 12, color: "var(--t2)" }}>
-                  {labelPreview.count} ใบ · {labelPreview.size === "a4-fit" && labelPreview.a4FitLayout
-                    ? `A4 แนว${labelPreview.a4FitLayout.orientation === "landscape" ? "นอน" : "ตั้ง"} · ${labelPreview.a4FitLayout.cols} × ${labelPreview.a4FitLayout.rows} ช่อง · ${labelPreview.a4FitLayout.capacity} ใบ/แผ่น · ฉลาก ${labelPreview.a4FitLayout.labelWidth} × ${labelPreview.a4FitLayout.labelHeight} มม.${labelPreview.a4FitLayout.rotated ? " (หมุน 90°)" : ""}`
-                    : labelPreview.size.startsWith("a4-grid")
-                    ? `A4 ${labelPreview.a4Orientation === "landscape" ? "แนวนอน" : "แนวตั้ง"} · ${labelPreview.a4Cols} × ${labelPreview.a4Rows} ช่อง · ประมาณ ${Math.floor(((labelPreview.a4Orientation === "landscape" ? 289 : 202) - (labelPreview.a4Cols - 1) * 3) / labelPreview.a4Cols)} × ${Math.floor(((labelPreview.a4Orientation === "landscape" ? 202 : 289) - (labelPreview.a4Rows - 1) * 3) / labelPreview.a4Rows)} มม./ใบ`
-                    : labelPreview.size === "therm-custom"
-                      ? `กำหนดเอง ${labelPreview.customWidth} × ${labelPreview.customHeight} มม.`
-                      : labelPreview.size === "therm-100x75" ? "100 × 75 มม."
-                        : labelPreview.size === "therm-100x150" ? "100 × 150 มม."
-                          : labelPreview.size === "a4-4" ? "A4 แนวนอน · 4 ใบต่อแผ่น"
-                            : labelPreview.size === "a4-2" ? "A4 · 2 ใบต่อแผ่น"
-                              : labelPreview.size === "a4-1" ? "A4 · 1 ใบต่อแผ่น" : "150 × 100 มม."}
-                </span>
-              </div>
-              <button type="button" className="btn btn-outline" onClick={() => setLabelPreview(null)} aria-label="ปิดตัวอย่าง">✕</button>
-            </div>
-            <iframe title="ตัวอย่างหน้ากระดาษลาเบล" srcDoc={labelPreview.documentHtml} style={{ width: "100%", flex: 1, minHeight: 0, border: 0, background: "#d4d4d8" }} />
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "12px 18px", borderTop: "1px solid var(--br)" }}>
-              <button type="button" className="btn btn-outline" onClick={() => setLabelPreview(null)}>กลับไปแก้ไข</button>
-              <button type="button" className="btn" onClick={printPreviewLabels} style={{ background: "var(--teal)", color: "white" }}>🖨️ พิมพ์ {labelPreview.count} ใบ</button>
-            </div>
           </div>
         </div>,
         document.body

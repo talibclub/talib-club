@@ -1,16 +1,13 @@
 import { useEffect, useMemo, useRef } from "react"
+import toast from "react-hot-toast"
 import { useContentDoc, saveContentItem } from "../lib/contentStore.js"
 import { MEDIA } from "../data/index.js"
-import SEOHead, { toIsoDate, BASE_URL } from '../components/SEOHead.jsx'
-import { detailUrl } from "../utils/slug.js"
-import { isoDuration, mediaDescription, mediaSummary, mediaThumbnail } from "../utils/mediaSeo.js"
-import { useCanonicalDetailUrl, useDetailId } from "../hooks/useDetailRoute.js"
-import { useDriveMediaVersion } from '../hooks/useDriveMediaVersion.js'
+import SEOHead, { BASE_URL } from '../components/SEOHead.jsx'
 
 export default function MediaDetail({ item: initialItem, go, authState }) {
-  const driveMediaVersion = useDriveMediaVersion();
   const uid = authState?.user?.uid;
-  const mediaId = useDetailId(initialItem)
+  const urlId = new URLSearchParams(window.location.search).get("id")
+  const mediaId = urlId || initialItem?.id
   const fallbackMedia = useMemo(
     () => (mediaId ? MEDIA.find(m => String(m.id) === String(mediaId)) : null) ?? null,
     [mediaId]
@@ -67,8 +64,6 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
     }
   }, [item, authState?.user?.uid])
 
-  useCanonicalDetailUrl("media-detail", mediaId, item?.title)
-
   if (loading) return <div style={{ textAlign: "center", padding: 40 }}><i className="ti ti-loader-2 spin" style={{ fontSize: 24, color: "var(--teal)" }}></i></div>
   if (!item) return null
 
@@ -77,42 +72,24 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
       {item && (
         <SEOHead
           title={`${item.title} | Talib Club`}
-          description={mediaSummary(item)}
-          canonical={detailUrl(BASE_URL, "media-detail", item.id, item.title)}
-          ogType="video.other"
-          ogImage={mediaThumbnail(item)}
-          jsonLd={{
-            "@context": "https://schema.org",
-            "@type": "VideoObject",
-            "name": item.title,
-            "inLanguage": "th",
-            "description": mediaSummary(item),
-            "thumbnailUrl": mediaThumbnail(item) || undefined,
-            "uploadDate": toIsoDate(item.date || item.createdAt) || undefined,
-            "duration": isoDuration(item.duration),
-            "isPartOf": item.series ? { "@type": "CreativeWorkSeries", "name": item.series } : undefined,
-            "embedUrl": item.embedId ? `https://www.youtube.com/embed/${item.embedId}` : undefined,
-            "publisher": {
-              "@type": "Organization",
-              "name": "Talib Club",
-              "url": BASE_URL,
-              "logo": { "@type": "ImageObject", "url": `${BASE_URL}/logo.png` }
-            },
-            "mainEntityOfPage": { "@type": "WebPage", "@id": detailUrl(BASE_URL, "media-detail", item.id, item.title) }
-          }}
+          description={item.description || item.series || `สื่อการเรียนรู้อิสลาม: ${item.title}`}
+          canonical={`${BASE_URL}/media-detail?id=${item.id}`}
+          ogType="article"
+          ogImage={item.thumbnailUrl || item.coverUrl}
         />
       )}
       {/* ปุ่มย้อนกลับ */}
       <button
-        onClick={() => go("media", initialItem?.returnToMedia || (initialItem?.playlist ? {
+        onClick={() => go("media", initialItem?.playlist ? {
           playlist: initialItem.playlist,
+          teacher: initialItem.teacher || "",
           filter: initialItem.filter,
           page: initialItem.page,
-        } : null))}
-        className="sec-link"
-        style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 20, fontSize: 13, background: "none", border: "none", fontFamily: "'Prompt', sans-serif", cursor: "pointer" }}
+        } : null)}
+        className="btn btn-outline"
+        style={{ marginBottom: 20, padding: "6px 14px", fontSize: 12 }}
       >
-        <i className="ti ti-arrow-left"></i> กลับหน้ารวมมีเดีย
+        <i className="ti ti-arrow-left" style={{ fontSize: 12 }}></i> {initialItem?.playlist ? "กลับไปยังเพลย์ลิสต์" : "กลับหน้ารวมมีเดีย"}
       </button>
 
       {/* ส่วนเล่นมีเดีย (ปรับขอบมน 16px และคุมระบบ Responsive ไม่ให้ดันจอแตก) */}
@@ -133,7 +110,7 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
       )}
       {item.type === "youtube" && !item.embedId && (
         <div className="empty card" style={{ marginBottom: 24, padding: 20 }}>
-          ไม่สามารถแสดงวิดีโอบนหน้านี้ได้
+          ยังไม่ได้ตั้งค่า YouTube Video ID
           {item.url && (
             <a href={item.url} target="_blank" rel="noreferrer" className="btn btn-teal" style={{ marginTop: 12, display: "inline-block" }}>
               เปิดใน YouTube
@@ -155,12 +132,11 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
               allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
               loading="lazy" title={item.title} />
           ) : (
-            <div className="empty">ยังไม่มีไฟล์เสียงสำหรับรายการนี้</div>
+            <div className="empty">ยังไม่ได้ใส่ Spotify URL</div>
           )}
         </div>
       )}
 
-      {item.type === 'audio' && <audio key={driveMediaVersion} src={item.videoUrl} controls preload="metadata" style={{ width: '100%', marginBottom: 24 }} />}
       {item.type === "video" && (
         <div style={{
           marginBottom: 24, borderRadius: 16, overflow: "hidden",
@@ -169,7 +145,6 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
           width: "100%", position: "relative", paddingBottom: "56.25%", height: 0
         }}>
           <video
-            key={driveMediaVersion}
             src={item.videoUrl}
             controls
             autoPlay
@@ -192,18 +167,15 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
           <span style={{ fontSize: 13, color: "var(--t3)", fontWeight: 300 }}>{item.series}</span>
         </div>
 
-        <h1 style={{ fontSize: 22, marginBottom: 20, lineHeight: 1.4, wordBreak: "break-word" }}>{item.title}</h1>
+        <h1 style={{ fontSize: "clamp(20px, 3.5vw, 24px)", marginBottom: 14, lineHeight: 1.4, wordBreak: "break-word" }}>{item.title}</h1>
 
-        {/* The crawler's copy of this page prints the same description
-            (api/seo-prerender.js). When the two disagree about what a URL says,
-            Search Console reads them as competing versions of one page. */}
-        {mediaDescription(item) && (
-          <p style={{ fontSize: 15, lineHeight: 1.8, color: "var(--t2)", marginBottom: 20, whiteSpace: "pre-wrap" }}>
-            {mediaDescription(item)}
+        {item.description && (
+          <p style={{ fontSize: 14, lineHeight: 1.8, color: "var(--t2)", marginBottom: 18, whiteSpace: "pre-wrap" }}>
+            {item.description}
           </p>
         )}
 
-        <div style={{ display: "flex", alignItems: "center", gap: 20, borderTop: ".5px solid var(--br2)", paddingTop: 16, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 18, borderTop: ".5px solid var(--br2)", paddingTop: 16, flexWrap: "wrap" }}>
 
           {/* จากช่อง : */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
@@ -211,10 +183,22 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
               <i className="ti ti-device-tv"></i>
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>จากช่อง :</div>
+              <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>จากช่อง</div>
               <div style={{ fontSize: 14, color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.channel}</div>
             </div>
           </div>
+
+          {item.date && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--bg2)", color: "var(--t2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <i className="ti ti-calendar"></i>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: "var(--t3)", fontWeight: 300 }}>วันที่เผยแพร่</div>
+                <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>{item.date}</div>
+              </div>
+            </div>
+          )}
 
           {/* ความยาวคลิป */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto" }}>
@@ -227,6 +211,43 @@ export default function MediaDetail({ item: initialItem, go, authState }) {
             </div>
           </div>
 
+        </div>
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 18, paddingTop: 16, borderTop: ".5px solid var(--br2)" }}>
+          {(item.url || item.spotifyUrl || (item.type === "youtube" && item.embedId)) && (
+            <a
+              href={item.url || item.spotifyUrl || `https://www.youtube.com/watch?v=${item.embedId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-teal"
+              style={{ fontSize: 12, textDecoration: "none", flex: "1 1 160px" }}
+            >
+              <i className="ti ti-external-link" style={{ fontSize: 14 }}></i>
+              เปิดใน {item.type === "spotify" ? "Spotify" : item.type === "youtube" ? "YouTube" : "แท็บใหม่"}
+            </a>
+          )}
+          <button
+            type="button"
+            className="btn btn-outline"
+            style={{ fontSize: 12, flex: "1 1 140px" }}
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(window.location.href)
+                toast.success("คัดลอกลิงก์มีเดียแล้ว")
+                try {
+                  const prev = Number(localStorage.getItem("talib_shared_articles_count") || 0)
+                  localStorage.setItem("talib_shared_articles_count", String(prev + 1))
+                  window.dispatchEvent(new window.Event("storage"))
+                } catch {
+                  /* ignore */
+                }
+              } catch {
+                toast.error("คัดลอกลิงก์ไม่สำเร็จ")
+              }
+            }}
+          >
+            <i className="ti ti-share" style={{ fontSize: 14 }}></i> คัดลอกลิงก์แชร์
+          </button>
         </div>
       </div>
     </div>

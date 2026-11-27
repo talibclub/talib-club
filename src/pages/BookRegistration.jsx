@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect } from "react"
 import { doc, getDoc } from "firebase/firestore"
-import { ref, uploadBytes, getDownloadURL } from "../lib/driveStorage.js"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { db, storage } from "../lib/firebase.js"
+import { useAuth } from "../hooks/useAuth.js"
 import toast from "react-hot-toast"
-import { SITE } from "../data/site.js"
+import SEOHead, { BASE_URL } from "../components/SEOHead.jsx"
 
-export default function BookRegistration({ authState, go, ctx }) {
-  // See StaffTranslation: this used its own useAuth() instance, duplicating
-  // App's auth listener and profile read for every visit to the form.
+export default function BookRegistration({ go, ctx }) {
+  const authState = useAuth()
   const user = authState?.user
   const campaignId = ctx?.campaignId
 
@@ -32,13 +32,11 @@ export default function BookRegistration({ authState, go, ctx }) {
   // Slip upload
   const [slipFile, setSlipFile] = useState(null)
   const [uploading, setUploading] = useState(false)
-  const uploadInProgressRef = useRef(false)
 
   useEffect(() => {
     window.scrollTo(0, 0)
     if (!campaignId) {
       setErrorMsg("ไม่พบข้อมูลแคมเปญ")
-      setStep(0)
       setLoading(false)
       return
     }
@@ -48,7 +46,6 @@ export default function BookRegistration({ authState, go, ctx }) {
         const docSnap = await getDoc(doc(db, "book_campaigns", campaignId))
         if (!docSnap.exists()) {
           setErrorMsg("ไม่พบแคมเปญแจกหนังสือนี้")
-          setStep(0)
           return
         }
         const campData = docSnap.data()
@@ -86,7 +83,6 @@ export default function BookRegistration({ authState, go, ctx }) {
       } catch (err) {
         console.error(err)
         setErrorMsg("เกิดข้อผิดพลาดในการโหลดข้อมูล")
-        setStep(0)
       } finally {
         setLoading(false)
       }
@@ -157,33 +153,22 @@ export default function BookRegistration({ authState, go, ctx }) {
 
   const handleUploadAndSubmit = async (e) => {
     e.preventDefault()
-    if (uploadInProgressRef.current) return
-    if (!slipFile) {
+    const requiresPayment = Number(campaign?.shippingFee || 0) > 0
+    if (requiresPayment && !slipFile) {
       toast.error("กรุณาแนบสลิปโอนเงิน")
       return
     }
-    // storage.rules only accepts image/* under 5 MB. Without these checks the
-    // upload was attempted anyway and came back as a raw Firebase permission
-    // error, which reads as "something is broken" rather than "that file will
-    // not do".
-    if (!slipFile.type.startsWith("image/")) {
-      toast.error("สลิปต้องเป็นไฟล์รูปภาพเท่านั้น (JPG / PNG) — ไฟล์ PDF ใช้ไม่ได้")
-      return
-    }
-    if (slipFile.size > 5 * 1024 * 1024) {
-      toast.error(`ไฟล์ใหญ่เกินไป (${(slipFile.size / 1024 / 1024).toFixed(1)} MB) — รองรับไม่เกิน 5 MB`)
-      return
-    }
 
-    uploadInProgressRef.current = true
     setUploading(true)
     try {
-      // Upload slip
-      const ext = slipFile.name.split('.').pop()
-      const fileName = `${user.uid}_${campaignId}_${Date.now()}.${ext}`
-      const storageRef = ref(storage, `slips/${fileName}`)
-      await uploadBytes(storageRef, slipFile)
-      const slipUrl = await getDownloadURL(storageRef)
+      let slipUrl = ""
+      if (slipFile) {
+        const ext = slipFile.name.split('.').pop()
+        const fileName = `${user.uid}_${campaignId}_${Date.now()}.${ext}`
+        const storageRef = ref(storage, `slips/${fileName}`)
+        await uploadBytes(storageRef, slipFile)
+        slipUrl = await getDownloadURL(storageRef)
+      }
 
       const idToken = await user.getIdToken()
       const res = await fetch("/api/submit-book-registration", {
@@ -212,24 +197,7 @@ export default function BookRegistration({ authState, go, ctx }) {
       console.error(err)
       toast.error(err instanceof Error && err.message ? err.message : "เกิดข้อผิดพลาดในการบันทึกข้อมูล")
     } finally {
-      uploadInProgressRef.current = false
       setUploading(false)
-    }
-  }
-
-  const handleCopyAccountNumber = async () => {
-    const accountLine = String(campaign?.bankAccount || "").split("\n").find(line => /เลขที่บัญชี|เลขบัญชี/i.test(line))
-    const accountNumber = accountLine?.match(/(?:เลขที่บัญชี|เลขบัญชี)\s*[:：]?\s*([\d -]+)/i)?.[1]?.trim()
-    if (!accountNumber) {
-      toast.error("ไม่พบเลขบัญชี กรุณาตรวจสอบข้อมูลบัญชีที่แสดง")
-      return
-    }
-    try {
-      await navigator.clipboard.writeText(accountNumber)
-      toast.success("คัดลอกเลขบัญชีแล้ว")
-    } catch (err) {
-      console.error("Failed to copy bank account number:", err)
-      toast.error("คัดลอกไม่สำเร็จ กรุณาคัดลอกเลขบัญชีด้วยตนเอง")
     }
   }
 
@@ -263,6 +231,11 @@ export default function BookRegistration({ authState, go, ctx }) {
 
   return (
     <div className="registration-container">
+      <SEOHead
+        title={campaign?.title ? `ลงทะเบียน: ${campaign.title} | Talib Club` : "ลงทะเบียนรับหนังสือ | Talib Club"}
+        description="ลงทะเบียนจองสิทธิ์รับหนังสือและสื่อวิชาการจาก Talib Club"
+        canonical={`${BASE_URL}/book-register${campaignId ? `?campaignId=${campaignId}` : ""}`}
+      />
       <style dangerouslySetInnerHTML={{__html: `
         .registration-container {
           max-width: 800px;
@@ -272,7 +245,7 @@ export default function BookRegistration({ authState, go, ctx }) {
         .form-card {
           padding: 32px;
         }
-        @media (max-width: 767px) {
+        @media (max-width: 768px) {
           .registration-container {
             padding: 20px 12px;
           }
@@ -371,40 +344,58 @@ export default function BookRegistration({ authState, go, ctx }) {
 
           <div style={{ background: "var(--bg2)", padding: 24, borderRadius: 12, textAlign: "center", marginBottom: 24 }}>
             <div style={{ fontSize: 16, color: "var(--t2)", marginBottom: 8 }}>ยอดที่ต้องชำระ</div>
-            <div style={{ fontSize: 36, fontWeight: "bold", color: "var(--teal)", marginBottom: 24 }}>{campaign.shippingFee} บาท</div>
-            
-            <div style={{ display: "inline-block", textAlign: "left", background: "var(--bg)", padding: 20, borderRadius: 12, border: "1px solid var(--br)" }}>
-              {campaign.qrCodeUrl && (
-                <div style={{ marginBottom: 16, textAlign: "center" }}>
-                  <img src={campaign.qrCodeUrl} alt="QR Code" style={{ maxWidth: 200, width: "100%", borderRadius: 8, border: "1px solid var(--br)" }} />
-                </div>
-              )}
-              <div style={{ fontSize: 14, color: "var(--t2)", marginBottom: 4 }}>โอนเงินเข้าบัญชี:</div>
-              <div style={{ fontSize: 18, fontWeight: 500, whiteSpace: "pre-wrap" }}>{campaign.bankAccount}</div>
-              <button type="button" className="btn btn-outline" onClick={handleCopyAccountNumber} style={{ marginTop: 12, padding: "6px 10px", fontSize: 13 }}>
-                <i className="ti ti-copy"></i> คัดลอกเลขบัญชี
-              </button>
+            <div style={{ fontSize: 36, fontWeight: "bold", color: "var(--teal)", marginBottom: 20 }}>
+              {Number(campaign.shippingFee || 0) > 0 ? `${campaign.shippingFee} บาท` : "จัดส่งฟรี (0 บาท)"}
             </div>
+            
+            {Number(campaign.shippingFee || 0) > 0 && (
+              <div style={{ display: "inline-block", textAlign: "left", background: "var(--card)", padding: 20, borderRadius: 12, border: "1px solid var(--br)", maxWidth: "100%" }}>
+                {campaign.qrCodeUrl && (
+                  <div style={{ marginBottom: 16, textAlign: "center" }}>
+                    <img src={campaign.qrCodeUrl} alt="QR Code" style={{ maxWidth: 200, width: "100%", borderRadius: 8, border: "1px solid var(--br)" }} />
+                  </div>
+                )}
+                {campaign.bankAccount && (
+                  <>
+                    <div style={{ fontSize: 13, color: "var(--t2)", marginBottom: 6 }}>โอนเงินเข้าบัญชี:</div>
+                    <div style={{ fontSize: 16, fontWeight: 500, whiteSpace: "pre-wrap", marginBottom: 12 }}>{campaign.bankAccount}</div>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      style={{ fontSize: 12, padding: "6px 14px" }}
+                      onClick={async () => {
+                        try {
+                          const digits = campaign.bankAccount.match(/[\d-]{9,}/)?.[0] || campaign.bankAccount
+                          await navigator.clipboard.writeText(digits.replace(/-/g, ""))
+                          toast.success("คัดลอกเลขบัญชีแล้ว")
+                        } catch {
+                          toast.error("คัดลอกไม่สำเร็จ")
+                        }
+                      }}
+                    >
+                      <i className="ti ti-copy" style={{ fontSize: 14 }}></i> คัดลอกเลขบัญชี
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
-          <label style={{ display: "block", marginBottom: 24 }}>
-            <span className="label-text">แนบหลักฐานการโอนเงิน (สลิป) *</span>
-            <input type="file" required accept="image/*" disabled={uploading} onChange={e => setSlipFile(e.target.files[0])} style={{ width: "100%", padding: 12, background: "var(--bg2)", border: "1px dashed var(--br)", borderRadius: 8 }} />
-          </label>
-
-          {uploading && (
-            <div role="status" aria-live="polite" style={{ display: "flex", alignItems: "center", gap: 12, padding: 16, marginBottom: 20, borderRadius: 10, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)" }}>
-              <i className="ti ti-loader-2 spin" style={{ fontSize: 24, flexShrink: 0 }}></i>
-              <div>
-                <strong style={{ display: "block" }}>กำลังอัปโหลดสลิปและบันทึกข้อมูล</strong>
-                <span style={{ fontSize: 13 }}>กรุณารอสักครู่ อย่าปิดหน้านี้หรือกดส่งซ้ำ</span>
-              </div>
-            </div>
+          {Number(campaign.shippingFee || 0) > 0 && (
+            <label style={{ display: "block", marginBottom: 24 }}>
+              <span className="label-text" style={{ display: "block", marginBottom: 8, fontWeight: 500 }}>แนบหลักฐานการโอนเงิน (สลิป) *</span>
+              <input type="file" required accept="image/*" onChange={e => setSlipFile(e.target.files?.[0] || null)} style={{ width: "100%", padding: 12, background: "var(--bg2)", border: "1px dashed var(--br)", borderRadius: 8 }} />
+              {slipFile && (
+                <div style={{ marginTop: 8, fontSize: 12, color: "var(--teal)", display: "flex", alignItems: "center", gap: 6 }}>
+                  <i className="ti ti-circle-check"></i> เลือกไฟล์แล้ว: {slipFile.name}
+                </div>
+              )}
+            </label>
           )}
 
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <button type="submit" className="btn btn-teal" disabled={uploading}>
-              {uploading ? <><i className="ti ti-loader-2 spin"></i> กำลังอัปโหลด...</> : <>ยืนยันการชำระเงิน <i className="ti ti-check"></i></>}
+              {uploading ? "กำลังบันทึกข้อมูล..." : Number(campaign.shippingFee || 0) > 0 ? "ยืนยันการชำระเงิน" : "ยืนยันการรับสิทธิ์"} <i className="ti ti-check"></i>
             </button>
           </div>
         </form>
@@ -421,22 +412,8 @@ export default function BookRegistration({ authState, go, ctx }) {
           <div style={{ background: "rgba(18, 184, 134, 0.1)", color: "var(--teal)", padding: "12px 16px", borderRadius: 8, marginTop: 16, fontSize: 14, border: "1px solid rgba(18, 184, 134, 0.2)" }}>
             <i className="ti ti-info-circle"></i> ทางเราจะประกาศรายชื่อเมื่อมีการปิดรับลงทะเบียนเรียบร้อยแล้ว
           </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", textAlign: "left", marginTop: 18, padding: "16px 18px", border: "1px solid var(--br)", borderRadius: 12, background: "var(--bg2)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flex: "1 1 260px" }}>
-              <span style={{ width: 40, height: 40, flexShrink: 0, display: "grid", placeItems: "center", borderRadius: "50%", background: "rgba(24, 119, 242, 0.1)", color: "#1877f2" }}>
-                <i className="ti ti-help-circle" style={{ fontSize: 20 }}></i>
-              </span>
-              <div>
-                <strong style={{ display: "block", color: "var(--text)", fontSize: 14 }}>กรอกข้อมูลผิดใช่ไหม?</strong>
-                <span style={{ color: "var(--t2)", fontSize: 13 }}>ติดต่อทีมงานทางเพจ Facebook เพื่อขอแก้ไขข้อมูล</span>
-              </div>
-            </div>
-            <a href={SITE.social.facebook} target="_blank" rel="noreferrer" className="btn btn-outline" style={{ color: "#1877f2", borderColor: "rgba(24, 119, 242, 0.25)", whiteSpace: "nowrap", textDecoration: "none", padding: "9px 14px", fontSize: 13 }}>
-              <i className="ti ti-brand-facebook"></i> ติดต่อทีมงาน
-            </a>
-          </div>
           <div style={{ marginTop: 32, display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
-            <button className="btn btn-teal" onClick={() => go("tracking-system")} style={{ padding: "12px 24px", fontSize: 16, fontWeight: 600 }}>
+            <button className="btn btn-teal" onClick={() => go("tracking")} style={{ padding: "12px 24px", fontSize: 16, fontWeight: 600 }}>
               <i className="ti ti-list-search" style={{ marginRight: 8 }}></i> เช็ครายชื่อและสถานะ
             </button>
             <button className="btn btn-outline" onClick={() => go("home")} style={{ padding: "12px 24px", fontSize: 16 }}>

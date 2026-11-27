@@ -76,6 +76,7 @@ const urlToPage = {
   "staff": "staff",
   "staff-work": "staff-work",
   "staff-translation": "staff-translation",
+  "staff-members": "staff-members",
   "admin": "admin",
   "donate": "donate",
   "reader": "reader",
@@ -235,11 +236,15 @@ export default function App() {
 
   const go = (p, data = null, options = {}) => {
     const urlPath = getPagePath(p, data);
-    
+    const currentFull = location.pathname + location.search;
+    const autoFrom = p === "auth" && location.pathname !== "/" && location.pathname !== "/auth" ? currentFull : undefined;
+    const fromTarget = options.from || autoFrom;
+    const navState = fromTarget ? { ctx: data, from: fromTarget } : { ctx: data };
+
     if (options.replace) {
-      navigate(urlPath, { replace: true, state: { ctx: data } });
+      navigate(urlPath, { replace: true, state: navState });
     } else {
-      navigate(urlPath, { state: { ctx: data } });
+      navigate(urlPath, { state: navState });
     }
     if (!options.noScroll) {
       window.scrollTo(0, 0)
@@ -487,7 +492,7 @@ class PageErrorBoundary extends Component {
         <p style={{ marginBottom: 16 }}>
           ระบบเจอข้อผิดพลาดระหว่างแสดงผลหน้า ลองโหลดใหม่ หรือกลับหน้าแรกเพื่อใช้งานต่อได้เลย
         </p>
-        {this.state.error && (
+        {import.meta.env.DEV && this.state.error && (
           <div style={{ textAlign: "left", background: "var(--bg3)", padding: 12, borderRadius: 8, marginBottom: 16, fontSize: 12, overflowX: "auto" }}>
             <strong style={{ color: "var(--red)" }}>{this.state.error.toString()}</strong>
             <pre style={{ margin: "8px 0 0", color: "var(--t2)", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>

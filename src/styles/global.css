@@ -33,7 +33,6 @@ svg {
 /* --- 2. COLOR THEMES --- */
 .app.dark,
 body.dark {
-  color-scheme: dark;
   --bg: #08090b;
   --bg2: #14161a;
   --bg3: #1d2026;
@@ -51,30 +50,19 @@ body.dark {
   --surface: #191c22;
   --teal: #45d6b6;
   --teal-bg: rgba(69, 214, 182, 0.13);
+  --red: #f87171;
+  --red2: rgba(248, 113, 113, 0.28);
+  --red-bg: rgba(248, 113, 113, 0.12);
+  --amber: #fbbf24;
+  --amber-bg: rgba(251, 191, 36, 0.12);
   --logo-bg: #f7f2e9;
   --logo-c: #f7f2e9;
   --nav-bg: rgba(8, 9, 11, 0.9);
   --shadow: 0 18px 45px rgba(0, 0, 0, 0.32);
-  /* Aliases and one-off colours that components were already calling for but
-     that nothing ever defined. An undefined var() with no fallback makes the
-     whole declaration invalid, so these were silently rendering as transparent
-     backgrounds, inherited text colours and missing borders. */
-  --t1: #f7f2e9;
-  --text2: #c9c0b4;
-  --sub: #c9c0b4;
-  --gray-light: #1d2026;
-  --card-rgb: 17, 19, 24;
-  --teal-dark: #2fae94;
-  --teal-light: #7ae6cd;
-  --teal-alpha-30: rgba(69, 214, 182, 0.3);
-  --orange: #f59e0b;
-  --amber-bg: rgba(245, 158, 11, 0.14);
-  --red2: #f87171;
 }
 
 .app.light,
 body.light {
-  color-scheme: light;
   --bg: #f7f5f1;
   --bg2: #edeae4;
   --bg3: #e2dfd8;
@@ -92,25 +80,15 @@ body.light {
   --surface: #f0ede7;
   --teal: #0f6e56;
   --teal-bg: rgba(15, 110, 86, 0.09);
+  --red: #dc2626;
+  --red2: rgba(220, 38, 38, 0.22);
+  --red-bg: rgba(220, 38, 38, 0.08);
+  --amber: #d97706;
+  --amber-bg: rgba(217, 119, 6, 0.09);
   --logo-bg: #0a0a0d;
   --logo-c: #0a0a0d;
   --nav-bg: rgba(247, 245, 241, 0.92);
   --shadow: 0 10px 28px rgba(35, 31, 27, 0.08);
-  /* Aliases and one-off colours that components were already calling for but
-     that nothing ever defined. An undefined var() with no fallback makes the
-     whole declaration invalid, so these were silently rendering as transparent
-     backgrounds, inherited text colours and missing borders. */
-  --t1: #111010;
-  --text2: #5d5850;
-  --sub: #5d5850;
-  --gray-light: #e2dfd8;
-  --card-rgb: 255, 255, 255;
-  --teal-dark: #0a5341;
-  --teal-light: #2f9b7f;
-  --teal-alpha-30: rgba(15, 110, 86, 0.3);
-  --orange: #d97706;
-  --amber-bg: rgba(217, 119, 6, 0.10);
-  --red2: #dc2626;
 }
 
 /* --- 3. BASE STYLES --- */
@@ -155,13 +133,6 @@ main {
 
 main.wide {
   max-width: 1450px;
-}
-
-/* Card-gallery pages (articles, library, media, scholars): their grids are
-   already repeat(auto-fill, minmax(...)) — the 1100px article-width container
-   was the only thing capping them at 3 columns on wide screens. */
-main.gallery {
-  max-width: 1440px;
 }
 
 /* Typography */
@@ -236,9 +207,6 @@ button {
   border: none;
   font-family: 'Prompt', sans-serif;
   flex-shrink: 0;
-  /* ≥44px tap target without shifting layout */
-  padding: 13px 12px;
-  margin: -13px -12px;
 }
 
 .badge {
@@ -275,26 +243,14 @@ button {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  white-space: nowrap;
-}
-
-/* Buttons with an icon + a .btn-label span collapse to icon-only on mobile
-   instead of wrapping the label onto a second line. Pair with aria-label
-   on the <button> so the action stays announced once the text is hidden. */
-@media (max-width: 767px) {
-  .btn .btn-label {
-    display: none;
-  }
-  .btn:has(.btn-label) {
-    padding: 9px 14px;
-  }
 }
 
 .btn:hover {
   transform: translateY(-1px)
 }
 
-.btn-main {
+.btn-main,
+.btn-acc {
   background: var(--acc);
   color: var(--bg)
 }
@@ -302,6 +258,11 @@ button {
 .btn-teal {
   background: var(--teal);
   color: #fff
+}
+
+.app.dark .btn-teal,
+body.dark .btn-teal {
+  color: #06281f;
 }
 
 .btn-outline {
@@ -363,14 +324,6 @@ button {
   color: var(--teal)
 }
 
-/* Note the `width: 100%` and `max-width: 100%` below: they suit the form fields
-   this rule was written for, but they also apply to every input on the site,
-   including ones positioned over a canvas. If such a field sits in a wrapper
-   that has no width of its own (a `position:absolute` box whose children are
-   all absolutely positioned is zero by zero), 100% of zero wins over the
-   element's own width and it renders 0px wide — present, focusable, and
-   invisible. The notebook's sticky-note editor hit exactly this. Overlay fields
-   should set `max-width: none` and give their wrapper a real size. */
 input,
 select,
 textarea {
@@ -398,17 +351,6 @@ select:focus,
 textarea:focus {
   border-color: var(--teal);
   box-shadow: 0 0 0 3px var(--teal-bg)
-}
-
-/* Keyboard users need to see where focus is — clickable cards and buttons had
-   no visible focus indicator at all. :focus-visible keeps mouse clicks clean. */
-button:focus-visible,
-a:focus-visible,
-[role="button"]:focus-visible,
-[tabindex]:focus-visible {
-  outline: 2px solid var(--teal);
-  outline-offset: 2px;
-  border-radius: 6px;
 }
 
 input:disabled,
@@ -514,14 +456,6 @@ input[type="range"] {
   line-height: inherit
 }
 
-/* Pasted articles can carry near-black inline text colors from their source. */
-.app.dark .article-body [style*="color: rgb(8, 8, 9)"],
-.app.dark .article-body [style*="color: rgb(0, 0, 0)"],
-.app.dark .article-body [style*="color: black"],
-.app.dark .article-body [style*="color: #000"] {
-  color: inherit !important;
-}
-
 .article-body strong, .article-body b, .ql-editor strong, .ql-editor b {
   font-weight: 700 !important;
   color: var(--text);
@@ -558,6 +492,7 @@ input[type="range"] {
 
 .text-highlight-yellow {
   background-color: #fef08a;
+  color: #1c1917;
   padding: 1px 5px;
   border-radius: 4px;
 }
@@ -629,22 +564,22 @@ img.float-right-image {
   font-size: 1.6em;
   text-align: right;
   direction: rtl;
-  line-height: 1.8;
-  margin: 16px 0;
-  padding: 16px 20px;
-  background-color: rgba(20, 184, 166, 0.04);
-  border-right: 4px solid var(--teal);
-  border-radius: 8px 0 0 8px;
+  line-height: 1.9;
+  margin: 18px 0;
+  padding: 18px 22px;
+  background-color: var(--teal-bg);
+  border: 1px solid rgba(15, 110, 86, 0.18);
+  border-radius: 12px;
   color: var(--text);
 }
 
 .callout-info {
-  background: #ecfdf5;
-  border-left: 4px solid #10b981;
-  padding: 16px;
+  background: var(--teal-bg);
+  border: 1px solid rgba(15, 110, 86, 0.22);
+  padding: 16px 18px;
   margin: 16px 0;
-  border-radius: 0 8px 8px 0;
-  color: #065f46;
+  border-radius: 12px;
+  color: var(--text);
   font-weight: 500;
 }
 
@@ -674,12 +609,12 @@ img.float-right-image {
 }
 
 .callout-warn {
-  background: #fef2f2;
-  border-left: 4px solid #ef4444;
-  padding: 16px;
+  background: var(--red-bg);
+  border: 1px solid var(--red2);
+  padding: 16px 18px;
   margin: 16px 0;
-  border-radius: 0 8px 8px 0;
-  color: #991b1b;
+  border-radius: 12px;
+  color: var(--red);
   font-weight: 500;
 }
 
@@ -2841,9 +2776,9 @@ body.menu-open {
   overflow: hidden !important;
 }
 
-/* ━━━ CUTE ANIMATIONS & UI STYLES ━━━ */
+/* ━━━ ANIMATIONS & ARTICLE READER STYLES ━━━ */
 @keyframes floatUpCute {
-  0% { transform: translateY(15px); opacity: 0; }
+  0% { transform: translateY(10px); opacity: 0; }
   100% { transform: translateY(0); opacity: 1; }
 }
 
@@ -2855,12 +2790,12 @@ body.menu-open {
 
 @keyframes wiggle {
   0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-3deg); }
-  75% { transform: rotate(3deg); }
+  25% { transform: rotate(-2deg); }
+  75% { transform: rotate(2deg); }
 }
 
 .animate-float-cute {
-  animation: floatUpCute 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation: floatUpCute 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-pulse-cute {
@@ -2868,20 +2803,19 @@ body.menu-open {
 }
 
 .hover-wiggle:hover {
-  animation: wiggle 0.4s ease-in-out;
+  transform: translateY(-1px);
 }
 
 /* Hover effects for buttons and cards */
 .btn:hover, .filter-pill:hover, .card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(15, 110, 86, 0.12);
+  box-shadow: 0 8px 24px rgba(15, 110, 86, 0.10);
 }
 
 .btn:active {
-  transform: scale(0.96) translateY(0);
+  transform: scale(0.98) translateY(0);
 }
 
-/* ━━━ CUTE ARTICLE READER STYLES ━━━ */
 .reader-content {
   position: relative;
   border-radius: 16px;
@@ -2893,10 +2827,9 @@ body.menu-open {
   margin-bottom: 24px;
   color: var(--text);
   font-size: 1.05em;
-  transition: all 0.3s ease;
+  transition: color 0.2s ease;
 }
 
-/* Drop cap for first paragraph */
 .reader-content p:first-of-type::first-letter {
   font-size: 3.5em;
   float: left;
@@ -2905,70 +2838,37 @@ body.menu-open {
   margin-top: 4px;
   color: var(--teal);
   font-weight: 700;
-  text-shadow: 2px 2px 0px rgba(15, 110, 86, 0.15);
   font-family: serif;
 }
 
-/* Quote blocks */
 .reader-content blockquote {
-  background: linear-gradient(135deg, rgba(15, 110, 86, 0.08) 0%, rgba(15, 110, 86, 0.02) 100%);
-  border-left: 5px solid var(--teal);
-  padding: 24px 28px;
-  border-radius: 0 16px 16px 0;
-  margin: 32px 0;
+  background: var(--teal-bg);
+  border: 1px solid rgba(15, 110, 86, 0.2);
+  padding: 22px 26px;
+  border-radius: 14px;
+  margin: 28px 0;
   font-style: italic;
   position: relative;
   overflow: hidden;
   color: var(--t2);
-  box-shadow: 0 4px 15px rgba(0,0,0,0.02);
 }
 
-.reader-content blockquote::before {
-  content: '"';
-  position: absolute;
-  top: -15px;
-  right: 15px;
-  font-size: 100px;
-  color: rgba(15, 110, 86, 0.06);
-  font-family: serif;
-  line-height: 1;
-}
-
-/* Headers inside article */
 .reader-content h2, .reader-content h3 {
   color: var(--teal);
   position: relative;
   display: inline-block;
-  margin-bottom: 20px;
-  margin-top: 40px;
+  margin-bottom: 18px;
+  margin-top: 36px;
   font-weight: 700;
 }
 
-.reader-content h2::after, .reader-content h3::after {
-  content: '';
-  position: absolute;
-  bottom: -6px;
-  left: 0;
-  width: 40%;
-  height: 4px;
-  background: var(--teal);
-  border-radius: 4px;
-  opacity: 0.4;
-  transition: width 0.3s ease;
-}
-
-.reader-content h2:hover::after, .reader-content h3:hover::after {
-  width: 100%;
-}
-
-/* Cute Reader Controls */
 .reader-tools {
   background: var(--bg2);
   border-radius: 100px;
-  padding: 6px;
+  padding: 5px;
   display: inline-flex;
-  gap: 12px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+  gap: 8px;
+  border: 0.5px solid var(--br);
   margin-bottom: 24px;
 }
 
@@ -2977,286 +2877,74 @@ body.menu-open {
   background: var(--card);
   border-radius: 100px;
   overflow: hidden;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
 }
 
 .reader-btn {
-  padding: 8px 16px;
+  padding: 7px 14px;
   border: none;
   background: transparent;
   color: var(--t2);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: background 0.2s ease, color 0.2s ease;
   border-radius: 100px;
   margin: 2px;
 }
 
 .reader-btn:hover {
-  background: rgba(15, 110, 86, 0.1);
-  color: var(--teal);
-}
-
-.reader-btn.on {
-}
-
-/* --- MOBILE UX IMPROVEMENTS --- */
-@media (max-width: 767px) {
-  /* Prevent iOS Auto-Zoom on inputs */
-  input, select, textarea {
-    font-size: 16px !important;
-    padding: 12px 14px;
-  }
-  
-  /* Reduce global padding on mobile to save space */
-  .card {
-    padding: 16px !important;
-  }
-  
-  /* Bigger touch targets for buttons */
-  .btn {
-    min-height: 44px;
-  }
-  
-  /* Touch feedback active state */
-  .btn:active, button:active, a.card:active, .article-card:active {
-    transform: scale(0.97);
-    transition: transform 0.1s;
-  }
-  
-  /* Ensure admin sidebar dropdown is tall enough */
-  .admin-mobile-select-wrapper select {
-    min-height: 48px;
-    font-size: 16px !important;
-  }
-}
-
-/* Ensure mobile menu locks body scroll */
-body.menu-open {
-  overflow: hidden !important;
-}
-
-/* ━━━ CUTE ANIMATIONS & UI STYLES ━━━ */
-@keyframes floatUpCute {
-  0% { transform: translateY(15px); opacity: 0; }
-  100% { transform: translateY(0); opacity: 1; }
-}
-
-@keyframes pulseSoftCute {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.02); }
-  100% { transform: scale(1); }
-}
-
-@keyframes wiggle {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-3deg); }
-  75% { transform: rotate(3deg); }
-}
-
-.animate-float-cute {
-  animation: floatUpCute 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-.animate-pulse-cute {
-  animation: pulseSoftCute 2.5s infinite ease-in-out;
-}
-
-.hover-wiggle:hover {
-  animation: wiggle 0.4s ease-in-out;
-}
-
-/* Hover effects for buttons and cards */
-.btn:hover, .filter-pill:hover, .card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(15, 110, 86, 0.12);
-}
-
-.btn:active {
-  transform: scale(0.96) translateY(0);
-}
-
-/* ━━━ CUTE ARTICLE READER STYLES ━━━ */
-.reader-content {
-  position: relative;
-  border-radius: 16px;
-  background: var(--bg);
-}
-
-.reader-content p {
-  line-height: 1.85;
-  margin-bottom: 24px;
-  color: var(--text);
-  font-size: 1.05em;
-  transition: all 0.3s ease;
-}
-
-/* Drop cap for first paragraph */
-.reader-content p:first-of-type::first-letter {
-  font-size: 3.5em;
-  float: left;
-  line-height: 0.85;
-  margin-right: 12px;
-  margin-top: 4px;
-  color: var(--teal);
-  font-weight: 700;
-  text-shadow: 2px 2px 0px rgba(15, 110, 86, 0.15);
-  font-family: serif;
-}
-
-/* Quote blocks */
-.reader-content blockquote {
-  background: linear-gradient(135deg, rgba(15, 110, 86, 0.08) 0%, rgba(15, 110, 86, 0.02) 100%);
-  border-left: 5px solid var(--teal);
-  padding: 24px 28px;
-  border-radius: 0 16px 16px 0;
-  margin: 32px 0;
-  font-style: italic;
-  position: relative;
-  overflow: hidden;
-  color: var(--t2);
-  box-shadow: 0 4px 15px rgba(0,0,0,0.02);
-}
-
-.reader-content blockquote::before {
-  content: '"';
-  position: absolute;
-  top: -15px;
-  right: 15px;
-  font-size: 100px;
-  color: rgba(15, 110, 86, 0.06);
-  font-family: serif;
-  line-height: 1;
-}
-
-/* Headers inside article */
-.reader-content h2, .reader-content h3 {
-  color: var(--teal);
-  position: relative;
-  display: inline-block;
-  margin-bottom: 20px;
-  margin-top: 40px;
-  font-weight: 700;
-}
-
-.reader-content h2::after, .reader-content h3::after {
-  content: '';
-  position: absolute;
-  bottom: -6px;
-  left: 0;
-  width: 40%;
-  height: 4px;
-  background: var(--teal);
-  border-radius: 4px;
-  opacity: 0.4;
-  transition: width 0.3s ease;
-}
-
-.reader-content h2:hover::after, .reader-content h3:hover::after {
-  width: 100%;
-}
-
-/* Cute Reader Controls */
-.reader-tools {
-  background: var(--bg2);
-  border-radius: 100px;
-  padding: 6px;
-  display: inline-flex;
-  gap: 12px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-  margin-bottom: 24px;
-}
-
-.reader-control {
-  display: flex;
-  background: var(--card);
-  border-radius: 100px;
-  overflow: hidden;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
-}
-
-.reader-btn {
-  padding: 8px 16px;
-  border: none;
-  background: transparent;
-  color: var(--t2);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-  border-radius: 100px;
-  margin: 2px;
-}
-
-.reader-btn:hover {
-  background: rgba(15, 110, 86, 0.1);
+  background: var(--teal-bg);
   color: var(--teal);
 }
 
 .reader-btn.on {
   background: var(--teal);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(15, 110, 86, 0.3);
 }
 
-/* Highlight text */
+.app.dark .reader-btn.on,
+body.dark .reader-btn.on {
+  color: #06281f;
+}
+
 .reader-content strong {
   color: var(--text);
-  background: linear-gradient(120deg, rgba(15, 110, 86, 0.1) 0%, rgba(15, 110, 86, 0.1) 100%);
-  background-repeat: no-repeat;
-  background-size: 100% 30%;
-  background-position: 0 85%;
 }
 
-/* ━━━ GLOBAL STAGGERED FADE-IN (Cute & Smooth) ━━━ */
+/* ━━━ GLOBAL STAGGERED FADE-IN (Calm & Responsive) ━━━ */
 @keyframes fadeInSoft {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Make pages transition smoothly */
 #root > div > main, .main-content, .dashboard-content, .page-wrapper {
-  animation: fadeInSoft 0.5s ease-out forwards;
+  animation: fadeInSoft 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* All cards gracefully enter the screen */
-.card, .article-card, .scholar-card, .scholar-skeleton-card, .member-card {
-  animation: fadeInSoft 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  animation-fill-mode: both;
+.article-card, .scholar-card, .scholar-skeleton-card, .member-card {
+  animation: fadeInSoft 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Staggered delay for grid elements (up to 12 items for smooth loading waterfall) */
-.card:nth-child(1), .article-card:nth-child(1) { animation-delay: 0.05s; }
-.card:nth-child(2), .article-card:nth-child(2) { animation-delay: 0.10s; }
-.card:nth-child(3), .article-card:nth-child(3) { animation-delay: 0.15s; }
-.card:nth-child(4), .article-card:nth-child(4) { animation-delay: 0.20s; }
-.card:nth-child(5), .article-card:nth-child(5) { animation-delay: 0.25s; }
-.card:nth-child(6), .article-card:nth-child(6) { animation-delay: 0.30s; }
-.card:nth-child(7), .article-card:nth-child(7) { animation-delay: 0.35s; }
-.card:nth-child(8), .article-card:nth-child(8) { animation-delay: 0.40s; }
-.card:nth-child(9), .article-card:nth-child(9) { animation-delay: 0.45s; }
-.card:nth-child(10), .article-card:nth-child(10) { animation-delay: 0.50s; }
-.card:nth-child(11), .article-card:nth-child(11) { animation-delay: 0.55s; }
-.card:nth-child(12), .article-card:nth-child(12) { animation-delay: 0.60s; }
-.card:nth-child(n+13), .article-card:nth-child(n+13) { animation-delay: 0.65s; }
+.article-card:nth-child(1), .scholar-card:nth-child(1) { animation-delay: 0.02s; }
+.article-card:nth-child(2), .scholar-card:nth-child(2) { animation-delay: 0.05s; }
+.article-card:nth-child(3), .scholar-card:nth-child(3) { animation-delay: 0.08s; }
+.article-card:nth-child(4), .scholar-card:nth-child(4) { animation-delay: 0.11s; }
+.article-card:nth-child(5), .scholar-card:nth-child(5) { animation-delay: 0.14s; }
+.article-card:nth-child(6), .scholar-card:nth-child(6) { animation-delay: 0.17s; }
+.article-card:nth-child(n+7), .scholar-card:nth-child(n+7) { animation-delay: 0.20s; }
 
-/* Subtle pulse for active filter pills */
 .filter-pill.active {
-  animation: pulseSoftCute 2.5s infinite ease-in-out;
-  box-shadow: 0 4px 12px rgba(15, 110, 86, 0.2);
+  box-shadow: 0 4px 12px rgba(15, 110, 86, 0.18);
 }
 
-/* Image zoom effect on hover */
-.article-card img, .card img {
-  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1) !important;
+.article-card img {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
-.article-card:hover img, .card:hover img {
-  transform: scale(1.04);
+.article-card:hover img {
+  transform: scale(1.03);
 }
 
-/* Input / Select focus glow */
 input:focus, select:focus, textarea:focus {
-  box-shadow: 0 0 0 3px rgba(15, 110, 86, 0.15);
-  transform: translateY(-1px);
+  box-shadow: 0 0 0 3px var(--teal-bg);
 }
 
 /* Global button shine effect (subtle) */
@@ -3383,39 +3071,41 @@ input:focus, select:focus, textarea:focus {
 .article-body blockquote {
   position: relative;
   margin: 1.5em 0;
-  padding: 15px 20px 15px 45px;
-  background-color: transparent;
-  border-left: 3px solid #e2e8f0;
+  padding: 16px 20px 16px 44px;
+  background-color: var(--bg2);
+  border: 1px solid var(--br);
+  border-radius: 12px;
   color: var(--t2);
   font-style: normal;
-  line-height: 1.7;
+  line-height: 1.8;
 }
 .article-body blockquote::before {
   content: '\201C';
   position: absolute;
-  left: 5px;
-  top: -10px;
-  font-family: Arial, serif;
-  font-size: 60px;
-  color: #cbd5e1;
+  left: 12px;
+  top: 2px;
+  font-family: Georgia, serif;
+  font-size: 48px;
+  color: var(--teal);
+  opacity: 0.3;
   line-height: 1;
 }
 
-/* Quran & Hadith specific highlight blocks (using classes added via parseLegacyArticle or specific colors) */
+/* Quran & Hadith specific highlight blocks */
 .article-body .quran-block {
-  border-left: 4px solid var(--acc);
-  background: rgba(245,158,11,0.05);
+  border: 1px solid var(--acc-br);
+  background: var(--amber-bg);
   padding: 16px 20px;
-  border-radius: 0 8px 8px 0;
+  border-radius: 12px;
   margin: 1.5em 0;
   color: var(--text);
   font-weight: 500;
 }
 .article-body .hadith-block {
-  border-left: 4px solid var(--teal);
-  background: rgba(20,184,166,0.05);
+  border: 1px solid rgba(15, 110, 86, 0.22);
+  background: var(--teal-bg);
   padding: 16px 20px;
-  border-radius: 0 8px 8px 0;
+  border-radius: 12px;
   margin: 1.5em 0;
   color: var(--text);
 }
@@ -3525,13 +3215,17 @@ input:focus, select:focus, textarea:focus {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--acc);
+  background: var(--teal);
   color: #fff;
   font-size: 11px;
   font-weight: 700;
   margin-right: 12px;
   flex-shrink: 0;
   margin-top: 2px;
+}
+.app.dark .article-note-badge,
+body.dark .article-note-badge {
+  color: #06281f;
 }
 
 /* Image Modal Styles */
@@ -3549,7 +3243,7 @@ input:focus, select:focus, textarea:focus {
 .image-modal-content {
   max-width: 90vw;
   max-height: 90vh;
-  border-radius: 8px;
+  border-radius: 12px;
   box-shadow: 0 10px 40px rgba(0,0,0,0.5);
   cursor: default;
 }
@@ -3561,8 +3255,4 @@ input:focus, select:focus, textarea:focus {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-}
-input:focus-visible, select:focus-visible, textarea:focus-visible {
-  outline: 2px solid var(--teal, #0f766e);
-  outline-offset: 3px;
 }

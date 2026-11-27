@@ -8,13 +8,7 @@ import { collection, getDocs, query, where, limit } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
 import { bumpContentMetric } from "../utils/contentMetrics.js"
 import ImageWithFallback from "../components/ImageWithFallback.jsx"
-import SEOHead, { stripHtml, truncate, toIsoDate, BASE_URL } from '../components/SEOHead.jsx'
-import { detailPath, detailUrl } from "../utils/slug.js"
-
-// How long the page has to be open, and visible, before it counts as a view.
-const VIEW_DWELL_MS = 8000
-import { useCanonicalDetailUrl, useDetailId } from "../hooks/useDetailRoute.js"
-import { isPlainLeftClick } from "../utils/linkNavigation.js"
+import SEOHead, { stripHtml, truncate, BASE_URL } from '../components/SEOHead.jsx'
 
 const READER_DEFAULTS = { size: "md", tone: "3" }
 const READER_STORAGE_KEY = "talibReaderPrefs"
@@ -24,7 +18,8 @@ const READER_TONE_LABELS = { 1: "1", 2: "2", 3: "3", 4: "4", 5: "5" }
 
 export default function ArticleDetail({ item, go, authState }) {
   const uid = authState?.user?.uid;
-  const articleId = useDetailId(item)
+  const urlId = new URLSearchParams(window.location.search).get("id")
+  const articleId = urlId || item?.id
   const fallbackArticle = useMemo(
     () => (articleId ? ARTICLES.find(a => String(a.id) === String(articleId)) : null) ?? null,
     [articleId]
@@ -49,8 +44,6 @@ export default function ArticleDetail({ item, go, authState }) {
   }, [item, remoteArticle])
 
 
-
-  useCanonicalDetailUrl("article", articleId, displayItem?.title)
 
   const isSeries = displayItem?.type === "series" || displayItem?.type === "ซีรีส์";
 
@@ -143,33 +136,14 @@ export default function ArticleDetail({ item, go, authState }) {
   const nextEpisode = currentIdx >= 0 && currentIdx < seriesArticles.length - 1 ? seriesArticles[currentIdx + 1] : null;
 
   // อัปเดตยอดวิวขึ้น Firestore
-  //
-  // Counted on mount before, so a link opened and closed a second later — or a
-  // tab restored on startup, or a prefetch — was worth a full view. Wait until
-  // someone has actually had the page open, and in front of them, for a few
-  // seconds. bumpContentMetric() handles the per-reader deduplication.
   useEffect(() => {
-    if (!displayItem || loadingArticles) return
-    if (hasIncrementedView.current === displayItem.id) return
-
-    const articleId = displayItem.id
-    let timer = null
-
-    const start = () => {
-      if (timer || document.visibilityState !== "visible") return
-      timer = setTimeout(() => {
-        hasIncrementedView.current = articleId
-        bumpContentMetric("articles", articleId, "views")
-      }, VIEW_DWELL_MS)
-    }
-    const stop = () => { clearTimeout(timer); timer = null }
-    const onVisibility = () => (document.visibilityState === "visible" ? start() : stop())
-
-    start()
-    document.addEventListener("visibilitychange", onVisibility)
-    return () => {
-      stop()
-      document.removeEventListener("visibilitychange", onVisibility)
+    if (displayItem && !loadingArticles && hasIncrementedView.current !== displayItem.id) {
+      hasIncrementedView.current = displayItem.id
+      const viewKey = `talib_viewed_article_${displayItem.id}`
+      if (!sessionStorage.getItem(viewKey)) {
+        sessionStorage.setItem(viewKey, "1")
+        bumpContentMetric("articles", displayItem.id, "views")
+      }
     }
   }, [displayItem, loadingArticles])
 
@@ -211,11 +185,8 @@ export default function ArticleDetail({ item, go, authState }) {
   }, [bookmarks, uid])
 
   const isSaved = displayItem ? savedList.includes(String(displayItem.id)) : false;
-  const [savingBookmark, setSavingBookmark] = useState(false);
-  const bookmarkBusy = useRef(false);
 
   const toggleSave = async () => {
-    if (bookmarkBusy.current || !displayItem) return;
     if (!uid) {
       toast.error("กรุณาเข้าสู่ระบบก่อนบันทึกบทความ");
       go("auth");
@@ -224,8 +195,7 @@ export default function ArticleDetail({ item, go, authState }) {
 
     // สร้าง ID เฉพาะ: uid + articleId
     const bookmarkId = `${uid}_${displayItem.id}`;
-    bookmarkBusy.current = true;
-    setSavingBookmark(true);
+
     try {
       if (isSaved) {
         await deleteBookmark(bookmarkId);
@@ -242,9 +212,6 @@ export default function ArticleDetail({ item, go, authState }) {
     } catch (err) {
       console.error("Save bookmark failed:", err);
       toast.error("บันทึกไม่สำเร็จ");
-    } finally {
-      bookmarkBusy.current = false;
-      setSavingBookmark(false);
     }
   }
 
@@ -253,14 +220,13 @@ export default function ArticleDetail({ item, go, authState }) {
       await navigator.clipboard.writeText(window.location.href)
       toast.success("คัดลอกลิงก์สำหรับแชร์แล้ว")
       if (displayItem) bumpContentMetric("articles", displayItem.id, "shares")
-      // The "ผู้ส่งต่อความรู้" achievement on the member dashboard reads this
-      // counter, but nothing had ever written it — so the badge could never
-      // unlock for anybody. Kept in localStorage (not Firestore) because the
-      // dashboard reads it synchronously and it is a per-device tally.
       try {
-        const next = Number(localStorage.getItem("talib_shared_articles_count") || 0) + 1
-        localStorage.setItem("talib_shared_articles_count", String(next))
-      } catch { /* private mode: the badge just stays locked */ }
+        const prev = Number(localStorage.getItem("talib_shared_articles_count") || 0)
+        localStorage.setItem("talib_shared_articles_count", String(prev + 1))
+        window.dispatchEvent(new window.Event("storage"))
+      } catch {
+        /* ignore storage errors */
+      }
     } catch {
       toast.error("คัดลอกลิงก์ไม่สำเร็จ กรุณาคัดลอกจากแถบที่อยู่ด้วยตนเอง")
     }
@@ -273,6 +239,24 @@ export default function ArticleDetail({ item, go, authState }) {
   const [showFloatingTOC, setShowFloatingTOC] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [fabExpanded, setFabExpanded] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : true);
+
+  useEffect(() => {
+    if (!modalImage && !showFloatingTOC) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        if (modalImage) setModalImage(null);
+        if (showFloatingTOC) setShowFloatingTOC(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [modalImage, showFloatingTOC]);
+
+  const readingMinutes = useMemo(() => {
+    const plain = stripHtml(displayItem?.body || "");
+    if (!plain) return 1;
+    return Math.max(1, Math.ceil(plain.length / 650));
+  }, [displayItem?.body]);
 
   const autoExpanded = useRef(false);
 
@@ -436,9 +420,9 @@ export default function ArticleDetail({ item, go, authState }) {
       
       if (!isHtml) { // ใส่สไตล์ให้ Plaintext เดิม
         if (level === 2 && !attrs.includes('id=')) {
-           return `<${tag} id="${id}" style="margin-top: 40px; margin-bottom: 20px; font-size: 24px; color: var(--teal); font-weight: 700; background: linear-gradient(90deg, rgba(20,184,166,0.15) 0%, transparent 100%); padding: 10px 16px; border-radius: 12px; border-left: 5px solid var(--teal)">${content}</${tag}>`;
+           return `<${tag} id="${id}" style="margin-top: 40px; margin-bottom: 18px; font-size: 22px; color: var(--teal); font-weight: 700; padding-bottom: 10px; border-bottom: 1px solid var(--br)">${content}</${tag}>`;
         } else if (level === 3 && !attrs.includes('id=')) {
-           return `<${tag} id="${id}" style="margin-top: 28px; margin-bottom: 12px; font-size: 19px; color: var(--text); font-weight: 600"><span style="color: var(--acc); margin-right: 8px">✿</span>${content}</${tag}>`;
+           return `<${tag} id="${id}" style="margin-top: 28px; margin-bottom: 12px; font-size: 18px; color: var(--text); font-weight: 600">${content}</${tag}>`;
         }
       } else { // HTML จาก Quill
         if (!attrs.includes('id=')) {
@@ -538,7 +522,7 @@ export default function ArticleDetail({ item, go, authState }) {
             const url = new URL(href, window.location.origin);
             sura = url.searchParams.get('sura');
             ayah = url.searchParams.get('ayah');
-          } catch {
+          } catch (err) {
             // ignore
           }
         }
@@ -563,28 +547,23 @@ export default function ArticleDetail({ item, go, authState }) {
         <SEOHead
           title={`${displayItem.title} | Talib Club`}
           description={truncate(stripHtml(displayItem.body || displayItem.excerpt || ''), 160)}
-          canonical={detailUrl(BASE_URL, "article", displayItem.id, displayItem.title)}
+          canonical={`${BASE_URL}/article?id=${displayItem.id}`}
           ogImage={displayItem.coverUrl || null}
           ogType="article"
           jsonLd={{
             "@context": "https://schema.org",
             "@type": "Article",
             "headline": displayItem.title,
-            "inLanguage": "th",
             "author": { "@type": "Person", "name": displayItem.author || "Talib Club" },
-            "datePublished": toIsoDate(displayItem.date),
-            "dateModified": toIsoDate(displayItem.updatedAt) || toIsoDate(displayItem.date),
-            "articleSection": displayItem.category || undefined,
-            "keywords": displayItem.tags && displayItem.tags.length ? displayItem.tags.join(", ") : undefined,
+            "datePublished": displayItem.date || undefined,
             "image": displayItem.coverUrl || undefined,
             "publisher": {
               "@type": "Organization",
               "name": "Talib Club",
-              "url": BASE_URL,
               "logo": { "@type": "ImageObject", "url": `${BASE_URL}/logo.png` }
             },
             "description": truncate(stripHtml(displayItem.body || ''), 200),
-            "mainEntityOfPage": { "@type": "WebPage", "@id": detailUrl(BASE_URL, "article", displayItem.id, displayItem.title) }
+            "mainEntityOfPage": { "@type": "WebPage", "@id": `${BASE_URL}/article?id=${displayItem.id}` }
           }}
         />
       )}
@@ -601,53 +580,50 @@ export default function ArticleDetail({ item, go, authState }) {
       </button>
 
       <div style={{ marginBottom: 24, position: "relative" }}>
-        <div style={{ position: "absolute", top: -40, left: -40, width: 120, height: 120, background: "var(--acc)", opacity: 0.1, filter: "blur(40px)", borderRadius: "50%", zIndex: 0 }}></div>
-        <div style={{ position: "absolute", bottom: -20, right: 0, width: 100, height: 100, background: "var(--teal)", opacity: 0.1, filter: "blur(40px)", borderRadius: "50%", zIndex: 0 }}></div>
-        
-        <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
-          <span style={{ padding: "4px 12px", background: "linear-gradient(135deg, var(--teal), #0d9488)", color: "#fff", borderRadius: 20, fontSize: 13, fontWeight: 500, boxShadow: "0 4px 10px rgba(20,184,166,0.3)" }}>{displayItem.category}</span>
-          {isSeries && <span style={{ padding: "4px 12px", background: "linear-gradient(135deg, var(--acc), #d97706)", color: "#fff", borderRadius: 20, fontSize: 13, fontWeight: 500, boxShadow: "0 4px 10px rgba(245,158,11,0.3)" }}>ซีรีส์ {displayItem.seriesId} ตอนที่ {displayItem.part}</span>}
-          {displayItem.type === "specific" && displayItem.seriesName && <span style={{ padding: "4px 12px", background: "linear-gradient(135deg, var(--acc), #d97706)", color: "#fff", borderRadius: 20, fontSize: 13, fontWeight: 500, boxShadow: "0 4px 10px rgba(245,158,11,0.3)" }}>{displayItem.seriesName}</span>}
+        <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
+          <span className="badge badge-teal" style={{ fontSize: 12, padding: "4px 12px" }}>{displayItem.category}</span>
+          {isSeries && <span className="badge badge-acc" style={{ fontSize: 12, padding: "4px 12px" }}>ซีรีส์ {seriesName || displayItem.seriesId} · ตอนที่ {displayItem.part}</span>}
+          {displayItem.type === "specific" && displayItem.seriesName && <span className="badge badge-acc" style={{ fontSize: 12, padding: "4px 12px" }}>{displayItem.seriesName}</span>}
         </div>
-        <h1 className="article-title" style={{ position: "relative", zIndex: 1, fontSize: 32, lineHeight: 1.4, background: "linear-gradient(to right, var(--text), var(--teal))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+        <h1 className="article-title" style={{ position: "relative", zIndex: 1, fontSize: "clamp(24px, 4.5vw, 34px)", lineHeight: 1.38, color: "var(--text)", fontWeight: 700 }}>
           {displayItem.title}
         </h1>
 
-        <div style={{ display: "flex", gap: 16, color: "var(--t3)", fontSize: 12, fontWeight: 300, flexWrap: "wrap", marginTop: 12 }}>
-          <span><i className="ti ti-user" style={{ marginRight: 4, fontSize: 13 }}></i>{displayItem.author}</span>
-          <span><i className="ti ti-calendar" style={{ marginRight: 4, fontSize: 13 }}></i><time dateTime={displayItem.date}>{displayItem.date}</time></span>
-          <span title="ผู้เข้าชม"><i className="ti ti-eye" style={{ marginRight: 4, fontSize: 13 }}></i>{(displayItem.views || 0).toLocaleString()}</span>
-          <span title="แชร์"><i className="ti ti-share" style={{ marginRight: 4, fontSize: 13 }}></i>{(displayItem.shares || 0).toLocaleString()}</span>
+        <div style={{ display: "flex", gap: 16, color: "var(--t3)", fontSize: 12, fontWeight: 400, flexWrap: "wrap", marginTop: 14 }}>
+          {displayItem.author && <span><i className="ti ti-user" style={{ marginRight: 5, fontSize: 13 }}></i>{displayItem.author}</span>}
+          {displayItem.date && <span><i className="ti ti-calendar" style={{ marginRight: 5, fontSize: 13 }}></i><time dateTime={displayItem.date}>{displayItem.date}</time></span>}
+          <span title="เวลาอ่านโดยประมาณ"><i className="ti ti-clock" style={{ marginRight: 5, fontSize: 13 }}></i>อ่าน ~{readingMinutes} นาที</span>
+          <span title="ผู้เข้าชม"><i className="ti ti-eye" style={{ marginRight: 5, fontSize: 13 }}></i>{(displayItem.views || 0).toLocaleString()}</span>
+          <span title="แชร์"><i className="ti ti-share" style={{ marginRight: 5, fontSize: 13 }}></i>{(displayItem.shares || 0).toLocaleString()}</span>
         </div>
       </div>
 
       <div className="divider" />
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 }}>
-        <button onClick={handleShare} className="btn btn-outline hover-wiggle" style={{ fontSize: 12, flex: "1 1 100px", padding: "8px 0" }}>
-          <i className="ti ti-share" style={{ marginRight: 6, fontSize: 14 }}></i> คัดลอกลิงก์
+        <button onClick={handleShare} className="btn btn-outline" style={{ fontSize: 12, flex: "1 1 110px", padding: "8px 12px" }}>
+          <i className="ti ti-share" style={{ fontSize: 14 }}></i> คัดลอกลิงก์
         </button>
-        <button onClick={handlePrint} className="btn btn-outline hover-wiggle" style={{ fontSize: 12, flex: "1 1 100px", padding: "8px 0" }}>
-          <i className="ti ti-printer" style={{ marginRight: 6, fontSize: 14 }}></i> ปริ้น / PDF
+        <button onClick={handlePrint} className="btn btn-outline" style={{ fontSize: 12, flex: "1 1 110px", padding: "8px 12px" }}>
+          <i className="ti ti-printer" style={{ fontSize: 14 }}></i> พิมพ์ / PDF
         </button>
-        <button onClick={toggleSave} disabled={savingBookmark} aria-busy={savingBookmark} className={`btn ${isSaved ? "btn-teal" : "btn-outline"} hover-wiggle`} style={{ fontSize: 12, flex: "1 1 100px", padding: "8px 0" }}>
-          <i className={`ti ${isSaved ? "ti-bookmark-filled animate-pulse-cute" : "ti-bookmark"}`} style={{ marginRight: 6, fontSize: 14 }}></i>
-          {savingBookmark ? "กำลังดำเนินการ..." : isSaved ? "บันทึกแล้ว" : "บันทึกไว้อ่าน"}
+        <button onClick={toggleSave} className={`btn ${isSaved ? "btn-teal" : "btn-outline"}`} style={{ fontSize: 12, flex: "1 1 110px", padding: "8px 12px" }}>
+          <i className={`ti ${isSaved ? "ti-bookmark-filled" : "ti-bookmark"}`} style={{ fontSize: 14 }}></i>
+          {isSaved ? "บันทึกแล้ว" : "บันทึกไว้อ่าน"}
         </button>
       </div>
 
       {displayItem.coverUrl && (
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: 36, width: "100%", position: "relative" }}>
-          <div style={{ position: "absolute", top: "10%", left: "5%", right: "5%", bottom: "-10%", background: "linear-gradient(45deg, var(--teal), var(--acc))", filter: "blur(30px)", opacity: 0.2, zIndex: 0, borderRadius: 30 }}></div>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 32, width: "100%" }}>
           <ImageWithFallback
             src={displayItem.coverUrl}
             alt={displayItem.title}
-            style={{ maxWidth: "100%", maxHeight: 420, borderRadius: 16, boxShadow: "0 20px 40px rgba(0,0,0,0.15)", objectFit: "contain", border: "2px solid rgba(255,255,255,0.5)", zIndex: 1, position: "relative", background: "var(--bg)" }}
+            style={{ maxWidth: "100%", maxHeight: 420, borderRadius: 14, boxShadow: "var(--shadow)", objectFit: "contain", border: "1px solid var(--br)", background: "var(--card)" }}
           />
         </div>
       )}
 
-      <div className="reader-tools animate-float-cute" aria-label="ตัวเลือกการอ่าน" style={{ animationDelay: "0.2s" }}>
+      <div className="reader-tools" aria-label="ตัวเลือกการอ่าน">
         <div className="reader-control" aria-label="ขนาดตัวอักษร">
           {Object.entries(READER_SIZE_LABELS).map(([value, label]) => (
             <button key={value} type="button" className={`reader-btn ${readerPrefs.size === value ? "on" : ""}`} onClick={() => setReaderPrefs(prev => ({ ...prev, size: value }))}>{label}</button>
@@ -662,8 +638,8 @@ export default function ArticleDetail({ item, go, authState }) {
 
       {/* Table of Contents (static) */}
       {toc.length > 0 && (
-        <div className="article-toc animate-float-cute" style={{ animationDelay: "0.3s", marginBottom: 32, padding: "20px 24px", background: "var(--card)", borderRadius: 16, border: "1px solid var(--br)", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
-          <h3 style={{ margin: "0 0 16px 0", fontSize: 16, color: "var(--teal)", display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="article-toc" style={{ marginBottom: 32, padding: "20px 24px", background: "var(--card)", borderRadius: 14, border: "1px solid var(--br)", boxShadow: "var(--shadow)" }}>
+          <h3 style={{ margin: "0 0 14px 0", fontSize: 15, color: "var(--teal)", display: "flex", alignItems: "center", gap: 8, fontWeight: 600 }}>
             <i className="ti ti-list" style={{ fontSize: 18 }}></i>
             สารบัญเนื้อหา
           </h3>
@@ -679,7 +655,7 @@ export default function ArticleDetail({ item, go, authState }) {
                     document.getElementById(t.id)?.scrollIntoView({ behavior: 'smooth' });
                   }}
                 >
-                  <i className="ti ti-chevron-right" style={{ fontSize: 12, marginTop: 3, opacity: 0.5, flexShrink: 0 }}></i>
+                  <i className="ti ti-chevron-right" style={{ fontSize: 12, marginTop: 4, opacity: 0.5, flexShrink: 0 }}></i>
                   <span>{t.title}</span>
                 </a>
               </li>
@@ -689,8 +665,8 @@ export default function ArticleDetail({ item, go, authState }) {
       )}
 
       <div 
-        className={`${readerClass} animate-float-cute`} 
-        style={{ scrollBehavior: "smooth", animationDelay: "0.4s", padding: "16px 20px" }}
+        className={readerClass} 
+        style={{ scrollBehavior: "smooth", padding: "4px 0" }}
         onClick={handleArticleClick}
         dangerouslySetInnerHTML={{ __html: safeFinalHtml }}
       />
@@ -780,23 +756,13 @@ export default function ArticleDetail({ item, go, authState }) {
           <div className="sec-hd" style={{ marginBottom: 14 }}><span className="sec-title">บทความที่เกี่ยวข้อง</span></div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {related.map(r => (
-              <a
-                key={r.id}
-                className="card"
-                href={detailPath("article", r.id, r.title)}
-                style={{ padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", color: "inherit", textDecoration: "none" }}
-                onClick={(e) => {
-                  if (!isPlainLeftClick(e)) return
-                  e.preventDefault()
-                  go("article", { ...r, fromFilters: displayItem?.fromFilters || item?.fromFilters })
-                }}
-              >
+              <div key={r.id} className="card" style={{ padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }} onClick={() => go("article", { ...r, fromFilters: displayItem?.fromFilters || item?.fromFilters })}>
                 <div>
                   <span className="tag tag-teal" style={{ marginRight: 8 }}>{r.category}</span>
                   <span style={{ fontSize: 13, color: "var(--text)", fontWeight: 400 }}>{r.title}</span>
                 </div>
                 <i className="ti ti-arrow-right" style={{ color: "var(--t3)", flexShrink: 0 }}></i>
-              </a>
+              </div>
             ))}
           </div>
         </div>
@@ -804,24 +770,23 @@ export default function ArticleDetail({ item, go, authState }) {
 
       {/* Image Modal for Arabic Text and Image Links */}
       {modalImage && (
-        <div className="image-modal-overlay" onClick={() => setModalImage(null)}>
-          <div className="image-modal-content" onClick={e => e.stopPropagation()}>
-            <div style={{ background: "#fff", padding: "8px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTopLeftRadius: 8, borderTopRightRadius: 8 }}>
+        <div className="image-modal-overlay" role="dialog" aria-modal="true" onClick={() => setModalImage(null)}>
+          <div className="image-modal-content" style={{ background: "var(--card)", border: "1px solid var(--br)", overflow: "hidden" }} onClick={e => e.stopPropagation()}>
+            <div style={{ background: "var(--card)", color: "var(--text)", padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--br)" }}>
               <span style={{ fontWeight: 600, fontSize: 14 }}>รูปภาพอ้างอิง</span>
-              <button onClick={() => setModalImage(null)} style={{ background: "transparent", border: "none", fontSize: 20, cursor: "pointer", color: "var(--t2)" }}>✕</button>
+              <button onClick={() => setModalImage(null)} aria-label="ปิดรูปภาพ" style={{ background: "var(--bg2)", border: "none", width: 28, height: 28, borderRadius: "50%", fontSize: 14, cursor: "pointer", color: "var(--t2)", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
             </div>
-            {/* ถ้าเป็น placeholder ให้แสดงข้อความแทน */}
             {modalImage === '/placeholder-arabic.jpg' ? (
-              <div style={{ padding: 40, background: "#fff", textAlign: "center", borderBottomLeftRadius: 8, borderBottomRightRadius: 8, minWidth: 300 }}>
+              <div style={{ padding: 40, background: "var(--card)", color: "var(--text)", textAlign: "center", minWidth: 280 }}>
                 <i className="ti ti-photo" style={{ fontSize: 40, color: "var(--t3)", marginBottom: 16 }}></i>
                 <div style={{ fontSize: 16, fontWeight: 500 }}>ระบบแสดงรูปภาพพร้อมใช้งาน</div>
                 <div style={{ fontSize: 13, color: "var(--t2)", marginTop: 8 }}>แอดมินสามารถแนบลิงก์รูปภาพในหน้าจัดการบทความได้เลย</div>
               </div>
             ) : (
-              <img src={modalImage} alt="Reference" style={{ display: "block", maxWidth: "100%", maxHeight: "80vh", objectFit: "contain", borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }} />
+              <img src={modalImage} alt="Reference" style={{ display: "block", maxWidth: "100%", maxHeight: "80vh", objectFit: "contain", background: "var(--bg)" }} />
             )}
-            <div style={{ position: "absolute", bottom: 20, left: "50%", transform: "translateX(-50%)", color: "#fff", background: "rgba(0,0,0,0.5)", padding: "4px 12px", borderRadius: 20, fontSize: 12 }}>
-            กดปุ่ม ESC เพื่อปิด
+            <div style={{ position: "absolute", bottom: 20, left: "50%", transform: "translateX(-50%)", color: "#fff", background: "rgba(0,0,0,0.65)", padding: "4px 12px", borderRadius: 20, fontSize: 12 }}>
+              กดปุ่ม ESC เพื่อปิด
             </div>
           </div>
         </div>
@@ -829,28 +794,30 @@ export default function ArticleDetail({ item, go, authState }) {
 
       {/* Floating Action Buttons */}
       {(showBackToTop || toc.length > 0) && createPortal(
-        <div style={{ position: "fixed", bottom: 24, right: 24, display: "flex", flexDirection: "column", gap: 12, zIndex: 2147483647, alignItems: "center" }}>
+        <div style={{ position: "fixed", bottom: 24, right: 24, display: "flex", flexDirection: "column", gap: 10, zIndex: 2147483647, alignItems: "center" }}>
           {fabExpanded && (
             <>
               {showBackToTop && (
                 <button 
-                  className="btn btn-teal hover-wiggle animate-fade-in-up"
+                  className="btn btn-teal animate-fade-in-up"
                   onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
                   title="กลับขึ้นบนสุด"
-                  style={{ width: 48, height: 48, borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(20,184,166,0.4)" }}
+                  aria-label="กลับขึ้นบนสุด"
+                  style={{ width: 46, height: 46, borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--shadow)" }}
                 >
-                  <i className="ti ti-arrow-up" style={{ fontSize: 24 }}></i>
+                  <i className="ti ti-arrow-up" style={{ fontSize: 22 }}></i>
                 </button>
               )}
 
               {toc.length > 0 && (
                 <button 
-                  className="btn btn-acc hover-wiggle animate-fade-in-up"
+                  className="btn btn-acc animate-fade-in-up"
                   onClick={() => setShowFloatingTOC(true)}
                   title="สารบัญเนื้อหา"
-                  style={{ width: 48, height: 48, borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(245,158,11,0.4)" }}
+                  aria-label="เปิดสารบัญเนื้อหา"
+                  style={{ width: 46, height: 46, borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--shadow)" }}
                 >
-                  <i className="ti ti-list" style={{ fontSize: 24 }}></i>
+                  <i className="ti ti-list" style={{ fontSize: 22 }}></i>
                 </button>
               )}
             </>

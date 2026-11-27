@@ -1,53 +1,15 @@
 import React, { useState, useEffect } from "react"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "../lib/firebase.js"
-
-function BookCoverImage({ src, alt = "", thumbnail = false }) {
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => setFailed(false), [src])
-
-  if (!src || failed) {
-    return (
-      <div
-        role="img"
-        aria-label={failed ? "โหลดรูปปกไม่สำเร็จ" : "ไม่มีรูปปก"}
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: thumbnail ? 0 : 10,
-          background: "var(--bg3)",
-          color: "var(--t3)",
-          textAlign: "center",
-          padding: thumbnail ? 0 : 20,
-          boxSizing: "border-box",
-        }}
-      >
-        <i className="ti ti-book-off" style={{ fontSize: thumbnail ? 22 : 52 }} />
-        {!thumbnail && <span style={{ fontSize: 14 }}>{failed ? "โหลดรูปปกไม่สำเร็จ" : "ไม่มีรูปปก"}</span>}
-      </div>
-    )
-  }
-
-  return <img src={src} alt={alt} onError={() => setFailed(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-}
+import SEOHead, { BASE_URL } from "../components/SEOHead.jsx"
 
 export default function BookCampaigns({ go }) {
   const [campaigns, setCampaigns] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-  const [retry, setRetry] = useState(0)
   const [activeImageIdx, setActiveImageIdx] = useState({})
   const [quotas, setQuotas] = useState({})
 
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(false)
     window.scrollTo(0, 0)
     const fetchCampaigns = async () => {
       try {
@@ -56,52 +18,49 @@ export default function BookCampaigns({ go }) {
           where("status", "==", "active")
         )
         const snap = await getDocs(q)
-        if (cancelled) return
         const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
         data.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
         setCampaigns(data)
       } catch (err) {
         console.error(err)
-        if (!cancelled) setError(true)
       } finally {
-        if (!cancelled) setLoading(false)
+        setLoading(false)
       }
     }
     fetchCampaigns()
 
     // Fetch quotas
-    const fetchQuotas = () => fetch("/api/get-campaign-quotas", { cache: "no-store" })
+    fetch("/api/get-campaign-quotas")
       .then(res => res.json())
-      .then(data => { if (!cancelled) setQuotas(data) })
+      .then(data => setQuotas(data))
       .catch(console.error)
-    fetchQuotas()
-    // A reservation can expire while this page remains open; refresh the
-    // displayed quota without requiring the visitor to reload the page.
-    const quotaTimer = setInterval(fetchQuotas, 15000)
-    return () => { cancelled = true; clearInterval(quotaTimer) }
-  }, [retry])
+  }, [])
 
   return (
     <div className="campaigns-container">
+      <SEOHead
+        title="โครงการแจกหนังสือและสื่อความรู้ | Talib Club"
+        description="ศูนย์รวมการลงทะเบียนรับสิทธิ์หนังสือและวารสารวิชาการอิสลามจาก Talib Club"
+        canonical={`${BASE_URL}/books`}
+      />
       <style dangerouslySetInnerHTML={{__html: `
         .campaigns-container {
           max-width: 1000px;
           margin: 0 auto;
-          padding: 60px 20px;
+          padding: 40px 20px 60px;
         }
         .campaign-card {
-          transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+          transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
           border: 1px solid var(--br);
-          border-radius: 24px;
-          background: var(--bg);
+          border-radius: 20px;
+          background: var(--card);
           position: relative;
-          box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+          box-shadow: var(--shadow);
           overflow: hidden;
         }
         .campaign-card:hover {
-          transform: translateY(-8px);
-          box-shadow: 0 20px 40px rgba(0,0,0,0.08);
-          border-color: var(--teal-alpha-30);
+          transform: translateY(-4px);
+          border-color: var(--acc-br);
         }
         .campaign-badge {
           display: inline-flex;
@@ -115,34 +74,37 @@ export default function BookCampaigns({ go }) {
           border: 1px solid var(--br);
         }
         .book-img-container {
-          transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+          transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .campaign-card:hover .book-img-container {
-          transform: translateY(-5px) scale(1.02);
+          transform: translateY(-3px) scale(1.015);
         }
         .premium-btn {
-          background: linear-gradient(135deg, var(--teal), #2b8a3e);
-          color: white;
+          background: var(--teal);
+          color: #fff;
           border: none;
-          padding: 16px 32px;
-          border-radius: 16px;
-          font-size: 18px;
-          font-weight: 700;
+          padding: 14px 28px;
+          border-radius: 14px;
+          font-size: 16px;
+          font-weight: 600;
           cursor: pointer;
-          transition: all 0.3s ease;
-          box-shadow: 0 8px 20px rgba(18, 184, 134, 0.25);
+          transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+          box-shadow: 0 8px 20px rgba(15, 110, 86, 0.22);
           display: inline-flex;
           align-items: center;
           justify-content: center;
           gap: 10px;
         }
+        .app.dark .premium-btn,
+        body.dark .premium-btn {
+          color: #06281f;
+        }
         .premium-btn:hover {
           transform: translateY(-2px);
-          box-shadow: 0 12px 24px rgba(18, 184, 134, 0.35);
+          box-shadow: 0 12px 24px rgba(15, 110, 86, 0.3);
         }
         .premium-btn:active {
-          transform: translateY(1px);
-          box-shadow: 0 4px 10px rgba(18, 184, 134, 0.2);
+          transform: translateY(0);
         }
         
         .campaign-content-layout {
@@ -163,7 +125,7 @@ export default function BookCampaigns({ go }) {
           flex-direction: column;
         }
         
-        @media (max-width: 767px) {
+        @media (max-width: 768px) {
           .campaigns-container {
             padding: 32px 12px;
           }
@@ -183,16 +145,13 @@ export default function BookCampaigns({ go }) {
         }
       `}} />
 
-      <div style={{ textAlign: "center", marginBottom: 60, position: "relative" }}>
-        <div style={{ 
-          position: "absolute", top: -80, left: "50%", transform: "translateX(-50%)", 
-          width: 300, height: 300, background: "var(--teal)", filter: "blur(120px)", opacity: 0.12, zIndex: -1 
-        }} />
-        <h1 style={{ fontSize: 48, fontWeight: 800, marginBottom: 16, background: "linear-gradient(135deg, var(--teal), #2b8a3e)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-          แจกหนังสือ
+      <div style={{ textAlign: "center", marginBottom: 48, position: "relative" }}>
+        <span className="badge badge-teal" style={{ marginBottom: 12, fontSize: 12, padding: "5px 14px" }}>โครงการส่งเสริมการอ่าน</span>
+        <h1 style={{ fontSize: "clamp(28px, 5vw, 40px)", fontWeight: 700, marginBottom: 12, color: "var(--text)" }}>
+          แจกหนังสือและสื่อวิชาการ
         </h1>
-        <p style={{ color: "var(--t2)", fontSize: 18, maxWidth: 600, margin: "0 auto", lineHeight: 1.6 }}>
-          ศูนย์รวมการลงทะเบียนรับสิทธิ์หนังสือและสื่อความรู้จาก Talib Club
+        <p style={{ color: "var(--t2)", fontSize: 16, maxWidth: 600, margin: "0 auto", lineHeight: 1.7 }}>
+          ศูนย์รวมการลงทะเบียนรับสิทธิ์หนังสือและวารสารความรู้จาก Talib Club
         </p>
       </div>
 
@@ -200,11 +159,6 @@ export default function BookCampaigns({ go }) {
         <div style={{ textAlign: "center", padding: 60 }}>
           <i className="ti ti-loader-2 spin" style={{ fontSize: 32, color: "var(--teal)" }}></i>
           <p style={{ marginTop: 16, color: "var(--t2)", fontWeight: 500 }}>กำลังโหลดแคมเปญล่าสุด...</p>
-        </div>
-      ) : error ? (
-        <div className="empty" role="alert">
-          <p>โหลดรายการแจกหนังสือไม่สำเร็จ กรุณาตรวจการเชื่อมต่อแล้วลองอีกครั้ง</p>
-          <button className="btn btn-teal" onClick={() => setRetry(value => value + 1)}>ลองใหม่</button>
         </div>
       ) : campaigns.length === 0 ? (
         <div className="card" style={{ textAlign: "center", padding: 80, color: "var(--t3)", borderRadius: 24, border: "1px dashed var(--br)" }}>
@@ -230,9 +184,11 @@ export default function BookCampaigns({ go }) {
                           {/* Featured Image */}
                           <div className="book-img-container book-featured" style={{ width: "100%", aspectRatio: "3/4", borderRadius: 16, overflow: "hidden", boxShadow: "0 16px 32px rgba(0,0,0,0.15)" }}>
                             {activeItem.imageUrl ? (
-                              <BookCoverImage src={activeItem.imageUrl} alt={activeItem.name} />
+                              <img src={activeItem.imageUrl} alt={activeItem.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                             ) : (
-                              <BookCoverImage />
+                              <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", background: "var(--bg3)", color: "var(--t3)" }}>
+                                <i className="ti ti-book" style={{ fontSize: 60 }}></i>
+                              </div>
                             )}
                           </div>
                           
@@ -253,7 +209,7 @@ export default function BookCampaigns({ go }) {
                                   onMouseEnter={e => { if (activeIdx !== idx) e.currentTarget.style.opacity = 0.9 }} 
                                   onMouseLeave={e => { if (activeIdx !== idx) e.currentTarget.style.opacity = 0.6 }}
                                 >
-                                  <BookCoverImage src={item.imageUrl} alt={item.name} thumbnail />
+                                  {item.imageUrl ? <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ background: "var(--bg3)", height: "100%" }} />}
                                 </div>
                               ))}
                             </div>
