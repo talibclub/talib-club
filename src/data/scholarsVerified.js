@@ -1,6 +1,12 @@
-import { VERIFIED_SCHOLARS_MORE, ADDED_SCHOLARS } from "./scholarsVerifiedMore.js"
+import { VERIFIED_SCHOLARS_MORE, ADDED_SCHOLARS as ADDED_SCHOLARS_BASE } from "./scholarsVerifiedMore.js"
+import { ADDED_SALAFI_SCHOLARS } from "./scholarsAddedSalafi.js"
 import { VERIFIED_WORKS_CLASSICAL } from "./scholarsWorksClassical.js"
 import { VERIFIED_WORKS_REVIVAL_MODERN } from "./scholarsWorksRevivalModern.js"
+
+export const ADDED_SCHOLARS = [
+  ...ADDED_SCHOLARS_BASE,
+  ...ADDED_SALAFI_SCHOLARS,
+]
 
 // ============================================================
 //  TALIB CLUB — ข้อมูลทำเนียบบุคคลที่ตรวจสอบและปรับปรุงแล้ว
@@ -1008,8 +1014,6 @@ export const ALL_VERIFIED_SCHOLARS = mergeVerifiedMaps(
   VERIFIED_WORKS_CLASSICAL,
   VERIFIED_WORKS_REVIVAL_MODERN
 )
-
-export { ADDED_SCHOLARS }
 
 /**
  * รวมข้อมูลอุละมาอ์จาก Firestore เข้ากับข้อมูลที่ตรวจสอบแล้ว
