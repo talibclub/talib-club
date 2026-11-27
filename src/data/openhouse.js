@@ -43,7 +43,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "https://al-maktabah-web.vercel.app/mark.png",
     themeColor: "#f59e0b",
     order: 1,
-    networks: ["salafi-book", "rasypubs", "alhaneefeeyah", "shamela"],
+    networks: [],
     campuses: [
       {
         id: "almaktabah-library",
@@ -101,10 +101,10 @@ export const OPENHOUSE_BOOTHS = [
     },
     description:
       "ดะวะฮฺอัส-สะละฟียะฮฺ | พิสูจน์พระเจ้าเชิงประจักษ์ | เผยแผ่ความจริงและตอบข้อสงสัยต่างศาสนิก",
-    logoUrl: "https://assabiqoon.com/favicon.svg",
+    logoUrl: "https://yt3.googleusercontent.com/gDlQvKGGtkhKHuS9ZTzdmNYoUuFM8jOVPk6O_ef41hKDeA86_10uuJj13AF36P7kduLH-wFcFA=s900-c-k-c0x00ffffff-no-rj",
     themeColor: "#111827",
     order: 2,
-    networks: ["rightpath", "salafythai", "sunnahthai"],
+    networks: [],
     campuses: [
       {
         id: "assabiqoon-dawah",
@@ -192,7 +192,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#0f766e",
     order: 3,
-    networks: ["almaktabah", "salafi-book", "alhaneefeeyah"],
+    networks: [],
     campuses: [
       {
         id: "rasypubs-aqidah",
@@ -263,7 +263,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#1e3a8a",
     order: 4,
-    networks: ["almaktabah", "rasypubs", "salafythai"],
+    networks: [],
     campuses: [
       {
         id: "alh-texts",
@@ -338,7 +338,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#b45309",
     order: 5,
-    networks: ["almaktabah", "rasypubs", "salafythai"],
+    networks: [],
     campuses: [
       {
         id: "salafi-book-main",
@@ -372,7 +372,7 @@ export const OPENHOUSE_BOOTHS = [
       "https://salafythai.com/wp-content/uploads/2020/02/cropped-logo-New-4-32x32.png",
     themeColor: "#0f766e",
     order: 6,
-    networks: ["fatwathai", "assabiqoon", "alhaneefeeyah"],
+    networks: [],
     campuses: [
       {
         id: "salafythai-core",
@@ -432,7 +432,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#059669",
     order: 7,
-    networks: ["darisslamm", "islaminthailand", "almaktabah"],
+    networks: [],
     campuses: [
       {
         id: "genfa-quran",
@@ -499,7 +499,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#0284c7",
     order: 8,
-    networks: ["assabiqoon", "evolution-about"],
+    networks: [],
     campuses: [
       {
         id: "rp-articles",
@@ -564,7 +564,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#047857",
     order: 9,
-    networks: ["genfa", "islammore", "islaminthailand"],
+    networks: [],
     campuses: [
       {
         id: "dar-foundations",
@@ -639,7 +639,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#0d9488",
     order: 10,
-    networks: ["islammore", "darisslamm", "sunnahthai"],
+    networks: [],
     campuses: [
       {
         id: "iit-hubs",
@@ -699,7 +699,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "https://islamhouse.com/logo_IslamHouse.jpg",
     themeColor: "#1d4ed8",
     order: 11,
-    networks: ["islamland-th", "hadeethenc", "quranenc"],
+    networks: [],
     campuses: [
       {
         id: "islamhouse-reading",
@@ -759,7 +759,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#0e7490",
     order: 12,
-    networks: ["islamhouse-th", "almaktabah"],
+    networks: [],
     campuses: [
       {
         id: "islamland-main",
@@ -801,7 +801,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#15803d",
     order: 13,
-    networks: ["almaktabah", "salafi-book"],
+    networks: [],
     campuses: [
       {
         id: "ib19-main",
@@ -837,7 +837,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "https://sunnahthai.com/upload/logo/launchericon-192x192.png",
     themeColor: "#047857",
     order: 14,
-    networks: ["quranth", "quranenc", "hadeethenc", "almaktabah"],
+    networks: [],
     campuses: [
       {
         id: "sunnahthai-sections",
@@ -874,7 +874,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#065f46",
     order: 15,
-    networks: ["sunnahthai", "quranenc", "qurancomplex"],
+    networks: [],
     campuses: [
       {
         id: "quranth-main",
@@ -906,7 +906,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "https://hadeethenc.com/assets_v2/images/og_new_logo.jpg",
     themeColor: "#0369a1",
     order: 16,
-    networks: ["quranenc", "islamhouse-th", "sunnahthai"],
+    networks: ["quranenc"],
     campuses: [
       {
         id: "hadeethenc-langs",
@@ -948,7 +948,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "https://quranenc.com/assets/images/og_new_logo.jpg",
     themeColor: "#15803d",
     order: 17,
-    networks: ["hadeethenc", "sunnahthai", "quranth"],
+    networks: ["hadeethenc"],
     campuses: [
       {
         id: "quranenc-main",
@@ -985,7 +985,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#0d9488",
     order: 18,
-    networks: ["thaiislamqa", "salafythai", "binbaz"],
+    networks: [],
     campuses: [
       {
         id: "fatwathai-main",
@@ -1017,7 +1017,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#0369a1",
     order: 19,
-    networks: ["fatwathai", "salafythai"],
+    networks: [],
     campuses: [
       {
         id: "tiqa-fatwas",
@@ -1075,7 +1075,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#0e7490",
     order: 20,
-    networks: ["islaminthailand", "islamhouse-th", "salafythai"],
+    networks: [],
     campuses: [
       {
         id: "islammore-archive",
@@ -1130,7 +1130,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#0f766e",
     order: 21,
-    networks: ["whitechannel", "yateemtv", "thaisalafi"],
+    networks: [],
     campuses: [
       {
         id: "alhamd-years",
@@ -1190,7 +1190,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#047857",
     order: 22,
-    networks: ["alhaneefeeyah", "thaisalafi", "sufumothman"],
+    networks: [],
     campuses: [
       {
         id: "ilmulnafi-yt",
@@ -1232,7 +1232,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#1a5f7a",
     order: 23,
-    networks: ["ilmulnafi", "alhaneefeeyah", "arifsalafi"],
+    networks: [],
     campuses: [
       {
         id: "thaisalafi-yt",
@@ -1269,7 +1269,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#0f766e",
     order: 24,
-    networks: ["ilmulnafi", "alhamdtv", "whitechannel"],
+    networks: [],
     campuses: [
       {
         id: "sufum-yt",
@@ -1312,7 +1312,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#be185d",
     order: 25,
-    networks: ["almaktabah", "ilmulnafi", "munadiya"],
+    networks: [],
     campuses: [
       {
         id: "alflower-yt",
@@ -1362,7 +1362,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#0369a1",
     order: 26,
-    networks: ["manarah", "alhamdtv", "whitechannel"],
+    networks: [],
     campuses: [
       {
         id: "alyaqeen-yt",
@@ -1399,7 +1399,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#b45309",
     order: 27,
-    networks: ["alyaqeen", "arifsalafi", "thaisalafi"],
+    networks: [],
     campuses: [
       {
         id: "manarah-yt",
@@ -1436,7 +1436,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#334155",
     order: 28,
-    networks: ["thaisalafi", "manarah", "binbaz"],
+    networks: [],
     campuses: [
       {
         id: "arif-yt",
@@ -1473,7 +1473,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#1d4ed8",
     order: 29,
-    networks: ["yateemtv", "alhamdtv", "sufumothman"],
+    networks: [],
     campuses: [
       {
         id: "white-yt",
@@ -1515,7 +1515,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#047857",
     order: 30,
-    networks: ["whitechannel", "alhamdtv"],
+    networks: [],
     campuses: [
       {
         id: "yateem-yt",
@@ -1552,7 +1552,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#4338ca",
     order: 31,
-    networks: ["assabiqoon", "rightpath"],
+    networks: [],
     campuses: [
       {
         id: "evo-yt",
@@ -1593,7 +1593,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#065f46",
     order: 32,
-    networks: ["almaktabah", "salafi-book"],
+    networks: [],
     campuses: [
       {
         id: "alislah-info",
@@ -1654,7 +1654,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#0d9488",
     order: 33,
-    networks: ["alflower", "almaktabah"],
+    networks: [],
     campuses: [
       {
         id: "munadiya-links",
@@ -1692,7 +1692,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#0284c7",
     order: 34,
-    networks: ["islamic-advising-center", "punkwamro"],
+    networks: [],
     campuses: [
       {
         id: "mf-web",
@@ -1734,7 +1734,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#065f46",
     order: 35,
-    networks: ["ibnbaz-th", "almaktabah"],
+    networks: [],
     campuses: [
       {
         id: "ftu-academic",
@@ -1776,7 +1776,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#047857",
     order: 36,
-    networks: ["binbaz", "ftu", "madrasahalwabil"],
+    networks: [],
     campuses: [
       {
         id: "ibnbaz-th-fb",
@@ -1808,7 +1808,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#0f766e",
     order: 37,
-    networks: ["muslimfriend", "punkwamro"],
+    networks: [],
     campuses: [
       {
         id: "iac-main",
@@ -1840,7 +1840,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#0369a1",
     order: 38,
-    networks: ["muslimfriend", "islamic-advising-center"],
+    networks: [],
     campuses: [
       {
         id: "pkr-main",
@@ -1872,7 +1872,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#1e40af",
     order: 39,
-    networks: ["ibnbaz-th", "alhaneefeeyah"],
+    networks: [],
     campuses: [
       {
         id: "wabil-main",
@@ -1905,7 +1905,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#7c2d12",
     order: 40,
-    networks: ["almaktabah", "rasypubs", "salafi-book"],
+    networks: [],
     campuses: [
       {
         id: "tsp-publishers",
@@ -2022,7 +2022,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#0f766e",
     order: 42,
-    networks: ["spubs", "salafisounds", "abuiyaad"],
+    networks: ["spubs", "salafisounds", "abuiyaad", "aqidah", "manhaj"],
     campuses: [
       {
         id: "ak-articles",
@@ -2113,7 +2113,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#334155",
     order: 44,
-    networks: ["spubs", "abukhadeejah", "aqidah", "manhaj", "salafisounds"],
+    networks: ["spubs", "abukhadeejah", "salafisounds", "aqidah", "manhaj"],
     campuses: [
       {
         id: "abuiyaad-sections",
@@ -2155,7 +2155,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#0f766e",
     order: 45,
-    networks: ["abuiyaad", "manhaj", "spubs"],
+    networks: ["abuiyaad", "manhaj", "spubs", "abukhadeejah", "salafisounds"],
     campuses: [
       {
         id: "aqidah-cats",
@@ -2202,7 +2202,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#475569",
     order: 46,
-    networks: ["abuiyaad", "aqidah", "spubs"],
+    networks: ["abuiyaad", "aqidah", "spubs", "abukhadeejah", "salafisounds"],
     campuses: [
       {
         id: "manhaj-cats",
@@ -2253,7 +2253,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "https://shamela.ws/favicon.png",
     themeColor: "#b45309",
     order: 47,
-    networks: ["almaktabah", "binbaz", "al-badr", "sarhaan"],
+    networks: [],
     campuses: [
       {
         id: "shamela-cats",
@@ -2313,7 +2313,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#0f766e",
     order: 48,
-    networks: ["shamela", "qurancomplex", "binbaz"],
+    networks: [],
     campuses: [
       {
         id: "sarhaan-quran",
@@ -2360,7 +2360,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#065f46",
     order: 49,
-    networks: ["quranenc", "quranth", "sarhaan"],
+    networks: [],
     campuses: [
       {
         id: "qc-resources",
@@ -2399,7 +2399,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "https://binbaz.org.sa/img/square-logo.png",
     themeColor: "#065f46",
     order: 50,
-    networks: ["al-badr", "shamela", "fatwathai", "ibnbaz-th"],
+    networks: [],
     campuses: [
       {
         id: "binbaz-fatwas",
@@ -2461,7 +2461,7 @@ export const OPENHOUSE_BOOTHS = [
     logoUrl: "",
     themeColor: "#1e40af",
     order: 51,
-    networks: ["binbaz", "shamela"],
+    networks: [],
     campuses: [
       {
         id: "albadr-sciences",
@@ -2553,7 +2553,7 @@ export function mergeOpenHouseBooths(firestoreBooths = []) {
         category: fb.category || curated.category || "articles",
         name: fb.name || curated.name,
         description: fb.description || curated.description,
-        logoUrl: fb.logoUrl || curated.logoUrl,
+        logoUrl: (typeof fb.logoUrl === "string" ? fb.logoUrl.trim() : "") || curated.logoUrl,
         platforms:
           fb.platforms && fb.platforms.length > 0
             ? fb.platforms

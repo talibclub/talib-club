@@ -63,7 +63,7 @@ export default function OpenHouseCampus({ go, ctx }) {
             slug: firestoreBooth.slug || curatedBooth.slug,
             name: firestoreBooth.name || curatedBooth.name,
             description: firestoreBooth.description || curatedBooth.description,
-            logoUrl: firestoreBooth.logoUrl || curatedBooth.logoUrl,
+            logoUrl: (typeof firestoreBooth.logoUrl === "string" ? firestoreBooth.logoUrl.trim() : "") || curatedBooth.logoUrl,
             platforms:
               firestoreBooth.platforms && firestoreBooth.platforms.length > 0
                 ? firestoreBooth.platforms
