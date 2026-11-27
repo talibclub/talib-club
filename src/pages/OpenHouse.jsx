@@ -352,7 +352,12 @@ export default function OpenHouse({ go }) {
                               display: booth.logoUrl ? "none" : "flex",
                             }}
                           >
-                            <i className="ti ti-book-2"></i>
+                            <i className={`ti ${
+                            booth.platforms?.includes("Facebook") && !booth.platforms?.includes("Website") ? "ti-brand-facebook" :
+                            booth.platforms?.includes("Instagram") && !booth.platforms?.includes("Website") ? "ti-brand-instagram" :
+                            booth.platforms?.includes("YouTube") && !booth.platforms?.includes("Website") ? "ti-brand-youtube" :
+                            "ti-book-2"
+                          }`}></i>
                           </div>
                         </div>
                         <div className="booth-info">

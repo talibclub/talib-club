@@ -63,7 +63,11 @@ export default function OpenHouseCampus({ go, ctx }) {
             slug: firestoreBooth.slug || curatedBooth.slug,
             name: firestoreBooth.name || curatedBooth.name,
             description: firestoreBooth.description || curatedBooth.description,
-            logoUrl: (typeof firestoreBooth.logoUrl === "string" ? firestoreBooth.logoUrl.trim() : "") || curatedBooth.logoUrl,
+            logoUrl:
+              ((typeof firestoreBooth.logoUrl === "string" ? firestoreBooth.logoUrl.trim() : "") &&
+              firestoreBooth.logoUrl.trim() !== "https://assabiqoon.com/favicon.svg"
+                ? firestoreBooth.logoUrl.trim()
+                : "") || curatedBooth.logoUrl,
             platforms:
               firestoreBooth.platforms && firestoreBooth.platforms.length > 0
                 ? firestoreBooth.platforms
@@ -185,7 +189,12 @@ export default function OpenHouseCampus({ go, ctx }) {
                 />
               ) : null}
               <i
-                className="ti ti-building"
+                className={`ti ${
+                  booth.platforms?.includes("Facebook") && !booth.platforms?.includes("Website") ? "ti-brand-facebook" :
+                  booth.platforms?.includes("Instagram") && !booth.platforms?.includes("Website") ? "ti-brand-instagram" :
+                  booth.platforms?.includes("YouTube") && !booth.platforms?.includes("Website") ? "ti-brand-youtube" :
+                  "ti-building"
+                }`}
                 style={{
                   color: booth.themeColor || "var(--teal)",
                   display: booth.logoUrl ? "none" : "inline-block",

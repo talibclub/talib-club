@@ -236,7 +236,7 @@ export const OPENHOUSE_BOOTHS = [
       "Website": "https://rasypubs.pages.dev"
     },
     "description": "สำนักพิมพ์และคลังบทความ/ตำราแปลแนวทางสะลัฟ แบ่งหมวดหมู่วิชาการครบถ้วนทั้งอะกีดะฮ์ มันฮัจญ์ ซุนนะฮ์ ฟิกฮ์ และตัซกียะฮ์",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=rasypubs.pages.dev&sz=128",
     "themeColor": "#0f766e",
     "order": 3,
     "networks": [],
@@ -446,7 +446,7 @@ export const OPENHOUSE_BOOTHS = [
       "Website": "https://salafi-book.vercel.app"
     },
     "description": "คลังรวมหนังสือและตำราอิสลามแนวทางสะลัฟในประเทศไทย รวบรวมรายชื่อและไฟล์ตำราสำคัญสำหรับผู้แสวงหาความรู้",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=salafi-book.vercel.app&sz=128",
     "themeColor": "#b45309",
     "order": 5,
     "networks": [],
@@ -546,7 +546,7 @@ export const OPENHOUSE_BOOTHS = [
       "Instagram": "https://www.instagram.com/right_path.219/"
     },
     "description": "แหล่งบทความวิชาการด้านพิสูจน์อิสลามเชิงประจักษ์ หักล้างข้อกล่าวหา และหลักการเรียนรู้อิสลามที่ถูกต้องตามแนวทางสะลัฟ",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=rightpath.info&sz=128",
     "themeColor": "#0284c7",
     "order": 7,
     "networks": [],
@@ -612,7 +612,7 @@ export const OPENHOUSE_BOOTHS = [
       "Website": "https://www.islaminthailand.org"
     },
     "description": "ศูนย์รวมอัลกุรอาน อัซซุนนะฮ์ ประวัตินบี และคลังบทความ/เสียงบรรยายวิชาการโดยคณาจารย์และเชคริฎอ อะหมัด สมะดี",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=islaminthailand.org&sz=128",
     "themeColor": "#0d9488",
     "order": 8,
     "networks": [],
@@ -734,7 +734,7 @@ export const OPENHOUSE_BOOTHS = [
       "Website": "https://islamland.com/tha"
     },
     "description": "คลังหนังสือ บทความ และสื่อดะอ์วะฮ์แปลไทย ครอบคลุมหลักศรัทธาอะกีดะตุสสะลัฟ ฟิกฮ์ และคู่มือมุสลิมหลายภาษา",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=islamland.com&sz=128",
     "themeColor": "#0e7490",
     "order": 10,
     "networks": [],
@@ -815,7 +815,7 @@ export const OPENHOUSE_BOOTHS = [
       "Website": "https://www.quranth.com"
     },
     "description": "เว็บอ่านอัลกุรอานพร้อมคำแปลภาษาไทยและตัฟซีร ค้นหาอายะฮ์และซูเราะฮ์ได้สะดวกรวดเร็ว",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=quranth.com&sz=128",
     "themeColor": "#065f46",
     "order": 12,
     "networks": [],
@@ -933,7 +933,7 @@ export const OPENHOUSE_BOOTHS = [
       "Website": "https://fatwathai.com/"
     },
     "description": "คลังค้นหาคำวินิจฉัยปัญหาศาสนา (ฟัตวา) ภาษาไทยจากบรรดานักวิชาการอะฮ์ลิสซุนนะฮ์ วัลญะมาอะฮ์",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=fatwathai.com&sz=128",
     "themeColor": "#0d9488",
     "order": 15,
     "networks": [],
@@ -966,7 +966,7 @@ export const OPENHOUSE_BOOTHS = [
       "Website": "https://thaiislamqa.com"
     },
     "description": "คลังแปลคำวินิจฉัยปัญหาศาสนา (ฟัตวา) จาก IslamQA เป็นภาษาไทย พร้อมบล็อกบทความสะลัฟในเครือ",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=thaiislamqa.com&sz=128",
     "themeColor": "#0369a1",
     "order": 16,
     "networks": [],
@@ -1026,7 +1026,7 @@ export const OPENHOUSE_BOOTHS = [
       "Facebook": "https://www.facebook.com/pages/ISLAMMORE-xis-lam-mxr/107983492577066"
     },
     "description": "เว็บไซต์ความรู้อิสลามภาษาไทยรุ่นบุกเบิก รวบรวมบทความศาสนา ฟัตวา และวิทยุ Risalah Radio ตามแนวทางอัลกุรอานและซุนนะฮ์",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=islammore.com&sz=128",
     "themeColor": "#0e7490",
     "order": 17,
     "networks": [],
@@ -1551,7 +1551,7 @@ export const OPENHOUSE_BOOTHS = [
       "Website": "https://www.alislahsamakom.org"
     },
     "description": "สมาคมอิสลามเก่าแก่ย่านบางกอกน้อย มีคลังหิ้งหนังสือ E-Book อิสลามภาษาไทยให้อ่านออนไลน์ฟรีจำนวนมาก",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=alislahsamakom.org&sz=128",
     "themeColor": "#065f46",
     "order": 23,
     "networks": [],
@@ -1614,7 +1614,7 @@ export const OPENHOUSE_BOOTHS = [
       "Instagram": "https://www.instagram.com/munadiya_official/"
     },
     "description": "ห้องเรียนศาสนาอิสลามออนไลน์และชุมชนเรียนรู้สำหรับผู้แสวงหาความรู้ยุคใหม่",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=linktr.ee&sz=128",
     "themeColor": "#0d9488",
     "order": 24,
     "networks": [],
@@ -1654,7 +1654,7 @@ export const OPENHOUSE_BOOTHS = [
       "Facebook": "https://www.facebook.com/muslimsfriendfoundation"
     },
     "description": "มูลนิธิเพื่อการเผยแผ่อิสลาม โครงการแจกหนังสือและสื่อความรู้สำหรับผู้สนใจอิสลามและมุสลิมใหม่",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=muslimfriend.org&sz=128",
     "themeColor": "#0284c7",
     "order": 25,
     "networks": [],
@@ -1953,7 +1953,7 @@ export const OPENHOUSE_BOOTHS = [
       "Website": "https://abukhadeejah.com"
     },
     "description": "คลังบทความ เอกสารแจกฟรี และหนังสือ PDF แนวทางสะละฟีภาษาอังกฤษ เหมาะสำหรับศึกษาค้นคว้าและนำมาแปลเผยแผ่เป็นภาษาไทย",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=abukhadeejah.com&sz=128",
     "themeColor": "#0f766e",
     "order": 32,
     "networks": [
@@ -2004,7 +2004,7 @@ export const OPENHOUSE_BOOTHS = [
       "Podcast": "https://www.salafisounds.com/"
     },
     "description": "คลังเสียงบรรยาย คุฏบะฮ์วันศุกร์ และบทเรียนอธิบายตำราคลาสสิกภาษาอังกฤษฟรีจากเครือข่าย Salafi Publications",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=salafisounds.com&sz=128",
     "themeColor": "#2563eb",
     "order": 33,
     "networks": [
@@ -2060,7 +2060,7 @@ export const OPENHOUSE_BOOTHS = [
       "Telegram": "https://t.me/abuiyaadsp"
     },
     "description": "คลังบทความวิจัยและงานแปลเชิงวิชาการโดยอบู อิยาด (Amjad Rafiq) ด้านอะกีดะฮ์ มันฮัจย์ และการวิเคราะห์กระแสความคิดร่วมสมัย",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=abuiyaad.com&sz=128",
     "themeColor": "#334155",
     "order": 34,
     "networks": [
@@ -2109,7 +2109,7 @@ export const OPENHOUSE_BOOTHS = [
       "Website": "https://www.aqidah.com/creed/"
     },
     "description": "เว็บไซต์เฉพาะทางด้านหลักศรัทธา (อะกีดะฮ์) ของอะฮ์ลิสซุนนะฮ์ วัลญะมาอะฮ์ พร้อมงานแปลตำราคลาสสิกและคำอธิบายของปราชญ์",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=aqidah.com&sz=128",
     "themeColor": "#0f766e",
     "order": 35,
     "networks": [
@@ -2163,7 +2163,7 @@ export const OPENHOUSE_BOOTHS = [
       "Website": "https://www.manhaj.com/manhaj/"
     },
     "description": "เว็บไซต์เฉพาะทางด้านมันฮัจย์ (แนวทางและระเบียบวิธีปฏิบัติ) ของชาวสะลัฟศอลิหฺ การดะวะฮ์ และหลักวิชาการอัลญัรหฺ วัตตะอ์ดีล",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=manhaj.com&sz=128",
     "themeColor": "#475569",
     "order": 36,
     "networks": [
@@ -2278,7 +2278,7 @@ export const OPENHOUSE_BOOTHS = [
       "Website": "https://sarhaan.com/"
     },
     "description": "คลังดาวน์โหลดตำรา คู่มืออธิบายหลักศรัทธา อะกีดะฮ์ ฟิกฮ์ สารานุกรมอัลกุรอาน และตารางสรุปวิชาการอิสลามหลายภาษา",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=sarhaan.com&sz=128",
     "themeColor": "#0f766e",
     "order": 38,
     "networks": [],
@@ -2326,7 +2326,7 @@ export const OPENHOUSE_BOOTHS = [
       "Website": "https://qurancomplex.gov.sa"
     },
     "description": "เว็บไซต์ทางการของศูนย์กษัตริย์ฟะฮัด ณ นครมะดีนะฮ์ รวบรวมมุศฮัฟมาตรฐาน คำแปลอัลกุรอานหลายภาษา และฟอนต์อุษมานีย์ทางการ",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=qurancomplex.gov.sa&sz=128",
     "themeColor": "#065f46",
     "order": 39,
     "networks": [],
@@ -2433,7 +2433,7 @@ export const OPENHOUSE_BOOTHS = [
       "Facebook": "https://www.facebook.com/abdulrazaqelbadr"
     },
     "description": "เว็บไซต์ทางการของเชค ดร.อับดุรร็อซซาก อัล-บัดร์ รวบรวมบทเรียนอธิบายมุตูนวนวิชาการ อะกีดะฮ์ หะดีษ อัซการ์ และจริยธรรมอิสลาม",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=al-badr.net&sz=128",
     "themeColor": "#1e40af",
     "order": 41,
     "networks": [],
@@ -2730,7 +2730,7 @@ export const OPENHOUSE_BOOTHS = [
       "Website": "https://www.troid.org"
     },
     "description": "ศูนย์ดะอ์วะฮ์สะลัฟในแคนาดา แหล่งต้นฉบับแผ่นพับดะอ์วะฮ์ บทความวิชาการ และสื่อเสียงแนวทางสะละฟีภาษาอังกฤษคุณภาพสูง",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=troid.org&sz=128",
     "themeColor": "#0f766e",
     "order": 49,
     "networks": [],
@@ -2763,7 +2763,7 @@ export const OPENHOUSE_BOOTHS = [
       "Website": "https://archive.org/search?query=%E0%B8%AB%E0%B8%99%E0%B8%B1%E0%B8%87%E0%B8%AA%E0%B8%B7%E0%B8%AD%E0%B8%AD%E0%B8%B4%E0%B8%AA%E0%B8%A5%E0%B8%B2%E0%B8%A1&and%5B%5D=mediatype%3A%22texts%22"
     },
     "description": "แหล่งรวมไฟล์ PDF และ E-Book อิสลามภาษาไทย เช่น อัลกุรอานแปลไทย หนังสือดุอาอ์ และตำราวิชาการเก่าหายาก",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=archive.org&sz=128",
     "themeColor": "#475569",
     "order": 50,
     "networks": [],
@@ -2796,7 +2796,7 @@ export const OPENHOUSE_BOOTHS = [
       "Website": "https://anyflip.com/explore?q=%E0%B8%AD%E0%B8%B4%E0%B8%AA%E0%B8%A5%E0%B8%B2%E0%B8%A1"
     },
     "description": "แหล่งรวม E-Book หนังสืออิสลามภาษาไทยแบบเปิดอ่านออนไลน์ได้ทันทีบนเบราว์เซอร์",
-    "logoUrl": "",
+    "logoUrl": "https://www.google.com/s2/favicons?domain=anyflip.com&sz=128",
     "themeColor": "#0284c7",
     "order": 51,
     "networks": [],
@@ -2860,7 +2860,7 @@ export function mergeOpenHouseBooths(firestoreBooths = [], deletedSlugs = []) {
         name: fb.name || curated.name,
         description: fb.description || curated.description,
         logoUrl:
-          (typeof fb.logoUrl === "string" ? fb.logoUrl.trim() : "") ||
+          ((typeof fb.logoUrl === "string" ? fb.logoUrl.trim() : "") && fb.logoUrl.trim() !== "https://assabiqoon.com/favicon.svg" ? fb.logoUrl.trim() : "") ||
           curated.logoUrl,
         platforms:
           fb.platforms && fb.platforms.length > 0
